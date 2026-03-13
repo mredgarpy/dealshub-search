@@ -15,14 +15,15 @@ const SHOPIFY_ADMIN_TOKEN  = process.env.SHOPIFY_ADMIN_TOKEN;
 const SHOPIFY_CLIENT_ID     = '5bcd017d59287f7c9d7ab012b67d4e5b';
 const SHOPIFY_CLIENT_SECRET = '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';
 
-// ─── OAUTH CALLBACK (one-time token capture) ─────────────────────────────────────────────────
+// âââ OAUTH CALLBACK (one-time token capture) âââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/oauth/callback', async (req, res) => {
   const { code, shop } = req.query;
   if (!code || !shop) return res.status(400).json({ error: 'Missing code or shop' });
   try {
     const tokenBody = 'client_id=' + encodeURIComponent(SHOPIFY_CLIENT_ID)
       + '&client_secret=' + encodeURIComponent(SHOPIFY_CLIENT_SECRET)
-      + '&code=' + encodeURIComponent(code);
+      + '&code=' + encodeURIComponent(code)
+         + '&redirect_uri=' + encodeURIComponent('https://dealshub-search.onrender.com/oauth/callback');
 
     const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method:  'POST',
@@ -33,19 +34,19 @@ app.get('/oauth/callback', async (req, res) => {
     const rawText = await response.text();
     console.log('=== SHOPIFY TOKEN EXCHANGE ===');
     console.log('Status:', response.status);
-    console.log('Body:', rawText.slice(0, 2000));
+    console.log('Body:', rawText.slice(0, 50000));
 
     let data;
     try { data = JSON.parse(rawText); }
     catch (e) {
-      const escaped = rawText.slice(0,2000)
+      const escaped = rawText.slice(0,20000)
         .replace(/&/g,'&amp;')
         .replace(/</g,'&lt;')
         .replace(/>/g,'&gt;');
       return res.send(`<html><body style="font-family:monospace;padding:20px">
         <h2>Token Exchange Raw Response</h2>
         <p><strong>HTTP Status:</strong> ${response.status}</p>
-        <p><strong>Body (first 2000 chars):</strong></p>
+        <p><strong>Body (first 20000 chars):</strong></p>
         <pre style="background:#f0f0f0;padding:10px;word-break:break-all;white-space:pre-wrap">${escaped}</pre>
       </body></html>`);
     }
@@ -61,14 +62,14 @@ app.get('/oauth/callback', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── HEALTH ───────────────────────────────────────────────────────────────────────────────
+// âââ HEALTH âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/health', (req, res) => res.json({
   status: 'ok',
   rapidapi: !!RAPIDAPI_KEY,
   shopify: !!SHOPIFY_ADMIN_TOKEN
 }));
 
-// ─── SEARCH ──────────────────────────────────────────────────────────────────────────────
+// âââ SEARCH ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/search', async (req, res) => {
   const query = req.query.q;
   if (!query) return res.status(400).json({ error: 'Missing query parameter q' });
@@ -125,7 +126,7 @@ app.get('/search', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── CREATE PRODUCT + RETURN VARIANT ID ──────────────────────────────────────────────
+// âââ CREATE PRODUCT + RETURN VARIANT ID ââââââââââââââââââââââââââââââââââââââââââââââ
 app.post('/create-and-add', async (req, res) => {
   const { title, price, originalPrice, image, sourceUrl, sourcePlatform } = req.body;
   if (!title || !price) return res.status(400).json({ error: 'Missing title or price' });

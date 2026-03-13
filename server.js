@@ -85,7 +85,7 @@ async function searchAliexpress(q, limit = 8) {
       const sale = p.prices?.salePrice?.minPrice || orig;
       return {
         id: p.productId,
-        title: p.title || 'AliExpress Product',
+        title: (typeof p.title === 'object' ? (p.title?.displayTitle || p.title?.seoTitle) : p.title) || 'AliExpress Product',
         price: sale > 0 ? +(sale * markup()).toFixed(2) : null,
         originalPrice: orig || null,
         image: p.image?.imgUrl ? 'https:' + p.image.imgUrl : '',

@@ -47,11 +47,11 @@ async function searchAmazon(q, limit = 8) {
 async function searchShein(q, limit = 8) {
   try {
     const r = await fetch(
-      `https://unofficial-shein.p.rapidapi.com/search?q=${encodeURIComponent(q)}&page=1&limit=${limit}&sort=7`,
+      `https://unofficial-shein.p.rapidapi.com/products/search?keywords=${encodeURIComponent(q)}&page=1&limit=${limit}`,
       { headers: rapidHeaders('unofficial-shein.p.rapidapi.com') }
     );
     const d = await r.json();
-    const items = d.info?.products || d.data?.products || d.products || [];
+    const items = d.info?.products || [];
     return items.slice(0, limit).map(p => {
       const rawPrice = p.salePrice?.amount || p.retailPrice?.amount || p.price || 0;
       const orig = parseFloat(rawPrice);
@@ -66,7 +66,7 @@ async function searchShein(q, limit = 8) {
         reviews: p.comment_info?.comment_num || 0,
         badge: p.is_new ? 'New' : null,
         source: 'shein',
-        sourceName: 'SHEIN'
+        storeName: 'SHEIN'
       };
     }).filter(p => p.price && p.image);
   } catch(e) { console.error('SHEIN search error:', e.message); return []; }
@@ -75,26 +75,26 @@ async function searchShein(q, limit = 8) {
 async function searchAliexpress(q, limit = 8) {
   try {
     const r = await fetch(
-      `https://aliexpress-datahub.p.rapidapi.com/item_search?q=${encodeURIComponent(q)}&page=1`,
-      { headers: rapidHeaders('aliexpress-datahub.p.rapidapi.com') }
+      `https://aliexpress-data.p.rapidapi.com/product/search?query=${encodeURIComponent(q)}&page=1`,
+      { headers: rapidHeaders('aliexpress-data.p.rapidapi.com') }
     );
     const d = await r.json();
-    const items = d.result?.resultList || d.items || d.data?.items || [];
-    return items.slice(0, limit).map(p => {
-      const item = p.item || p;
-      const orig = parseFloat(item.sku?.def?.promotionPrice || item.sku?.def?.price || item.prices?.salePrice?.minPrice || 0);
+    const items = (d.data?.content || []).filter(p => p.productId).slice(0, limit);
+    return items.map(p => {
+      const orig = p.prices?.originalPrice?.minPrice || p.prices?.salePrice?.minPrice || 0;
+      const sale = p.prices?.salePrice?.minPrice || orig;
       return {
-        id: item.itemId || Math.random().toString(36).slice(2),
-        title: item.title || 'AliExpress Product',
-        price: orig > 0 ? +(orig * markup()).toFixed(2) : null,
+        id: p.productId,
+        title: p.title || 'AliExpress Product',
+        price: sale > 0 ? +(sale * markup()).toFixed(2) : null,
         originalPrice: orig || null,
-        image: item.image?.imgUrl ? `https:${item.image.imgUrl}` : (item.imageUrl || ''),
-        url: `https://www.aliexpress.com/item/${item.itemId || ''}.html`,
-        rating: item.evaluation?.starRating || null,
-        reviews: item.evaluation?.totalValidNum || 0,
+        image: p.image?.imgUrl ? 'https:' + p.image.imgUrl : '',
+        url: `https://www.aliexpress.com/item/${p.productId}.html`,
+        rating: p.evaluation?.starRating || null,
+        reviews: p.trade?.realTradeCount || 0,
         badge: null,
         source: 'aliexpress',
-        sourceName: 'AliExpress'
+        storeName: 'AliExpress'
       };
     }).filter(p => p.price && p.image);
   } catch(e) { console.error('AliExpress search error:', e.message); return []; }
@@ -103,53 +103,63 @@ async function searchAliexpress(q, limit = 8) {
 async function searchSephora(q, limit = 6) {
   try {
     const r = await fetch(
-      `https://sephora.p.rapidapi.com/products/search?q=${encodeURIComponent(q)}&pageIndex=1&pageSize=${limit}`,
+      `https://sephora.p.rapidapi.com/us/products/v2/search?q=${encodeURIComponent(q)}&pageIndex=0&pageSize=${limit}`,
       { headers: rapidHeaders('sephora.p.rapidapi.com') }
     );
     const d = await r.json();
-    const items = d.products || d.data?.products || [];
-    return items.slice(0, limit).map(p => ({
-      id: p.productId || Math.random().toString(36).slice(2),
-      title: p.displayName || p.productName || 'Sephora Product',
-      price: p.currentSku?.listPrice ? +(parseFloat(p.currentSku.listPrice.replace(/[^0-9.]/g,'')) * markup()).toFixed(2) : null,
-      originalPrice: p.currentSku?.listPrice ? parseFloat(p.currentSku.listPrice.replace(/[^0-9.]/g,'')) : null,
-      image: p.heroImage || p.image || '',
-      url: `https://www.sephora.com${p.targetUrl || ''}`,
-      rating: p.rating || null,
-      reviews: p.reviews || 0,
-      badge: p.isNew ? 'New' : null,
-      source: 'sephora',
-      sourceName: 'Sephora'
-    })).filter(p => p.price && p.image);
+    const items = d.products || [];
+    return items.slice(0, limit).map(p => {
+      const priceStr = p.currentSku?.listPrice || '';
+      const orig = parseFloat(priceStr.replace(/[^0-9.]/g, '')) || 0;
+      return {
+        id: p.productId,
+        title: p.displayName || p.productName || 'Sephora Product',
+        price: orig > 0 ? +(orig * markup()).toFixed(2) : null,
+        originalPrice: orig || null,
+        image: p.heroImage || p.image450 || p.image250 || '',
+        url: p.targetUrl ? 'https://www.sephora.com' + p.targetUrl.split('?')[0] : '',
+        rating: parseFloat(p.rating) || null,
+        reviews: p.reviews || 0,
+        badge: null,
+        source: 'sephora',
+        storeName: 'Sephora'
+      };
+    }).filter(p => p.price && p.image);
   } catch(e) { console.error('Sephora search error:', e.message); return []; }
 }
 
 async function searchMacys(q, limit = 6) {
   try {
     const r = await fetch(
-      `https://macys.p.rapidapi.com/catalog/search?query=${encodeURIComponent(q)}&page=1&perPage=${limit}`,
-      { headers: rapidHeaders('macys.p.rapidapi.com') }
+      `https://macys4.p.rapidapi.com/api/product/all?page=1&limit=${Math.max(limit * 4, 40)}`,
+      { headers: rapidHeaders('macys4.p.rapidapi.com') }
     );
     const d = await r.json();
-    const items = d.productsList || d.products || [];
-    return items.slice(0, limit).map(p => {
-      const orig = parseFloat(p.priceRange?.min || p.price || 0);
+    let items = Object.values(d.products || {});
+    const qLow = q.toLowerCase();
+    const filtered = items.filter(p => p.name && p.name.toLowerCase().includes(qLow));
+    items = (filtered.length > 0 ? filtered : items).slice(0, limit);
+    return items.map(p => {
+      const orig = p.oldPrice > 0 ? p.oldPrice : (p.regularPrice || p.price || 0);
+      const sale = p.salePrice || p.price || 0;
       return {
-        id: p.id || Math.random().toString(36).slice(2),
-        title: p.name || p.title || "Macy's Product",
-        price: orig > 0 ? +(orig * markup()).toFixed(2) : null,
+        id: p.product_id || Math.random().toString(36).slice(2),
+        title: p.name || "Macy's Product",
+        price: sale > 0 ? +(sale * markup()).toFixed(2) : null,
         originalPrice: orig || null,
-        image: p.image?.href || p.imageUrl || '',
-        url: `https://www.macys.com${p.productLink || ''}`,
-        rating: p.rating || null,
-        reviews: p.reviewCount || 0,
-        badge: p.isNew ? 'New' : null,
+        image: p.img250 || p.img || '',
+        url: p.productUrl || 'https://www.macys.com',
+        rating: null,
+        reviews: 0,
+        badge: p.salePrice && p.oldPrice > 0 && p.salePrice < p.oldPrice ? 'Sale' : null,
         source: 'macys',
-        sourceName: "Macy's"
+        storeName: "Macy's"
       };
     }).filter(p => p.price && p.image);
-  } catch(e) { console.error("Macys search error:", e.message); return []; }
+  } catch(e) { console.error('Macys search error:', e.message); return []; }
 }
+
+
 
 function interleave(arrays, total) {
   const result = [];

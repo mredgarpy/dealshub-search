@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
+const axios = require('axios');
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -21,8 +22,7 @@ app.get('/debug-creds', (req, res) => {
     client_id_length: SHOPIFY_CLIENT_ID.length,
     client_secret_prefix: SHOPIFY_CLIENT_SECRET.slice(0, 10),
     client_secret_length: SHOPIFY_CLIENT_SECRET.length,
-    client_secret_type: typeof SHOPIFY_CLIENT_SECRET,
-    sample_body: `client_id=${SHOPIFY_CLIENT_ID}&client_secret=${SHOPIFY_CLIENT_SECRET.slice(0,6)}...&code=SAMPLE&redirect_uri=https://dealshub-search.onrender.com/oauth/callback`
+    body_preview: `client_id=${SHOPIFY_CLIENT_ID}&client_secret=${SHOPIFY_CLIENT_SECRET.slice(0,6)}...&code=SAMPLE`
   });
 });
 
@@ -32,60 +32,61 @@ app.get('/oauth/callback', async (req, res) => {
   if (!code || !shop) return res.status(400).json({ error: 'Missing code or shop' });
 
   try {
-    // Build body using URLSearchParams for reliability
-    const params = new URLSearchParams();
-    params.append('client_id', SHOPIFY_CLIENT_ID);
-    params.append('client_secret', SHOPIFY_CLIENT_SECRET);
-    params.append('code', code);
-    params.append('redirect_uri', 'https://dealshub-search.onrender.com/oauth/callback');
-    const tokenBody = params.toString();
+    // Per Shopify docs: only client_id, client_secret, code — NO redirect_uri
+    const tokenUrl = `https://${shop}/admin/oauth/access_token`;
+    const tokenBody = `client_id=${SHOPIFY_CLIENT_ID}&client_secret=${SHOPIFY_CLIENT_SECRET}&code=${code}`;
 
-    // Debug logging (partial secret only)
-    console.log('=== TOKEN EXCHANGE DEBUG ===');
+    console.log('=== TOKEN EXCHANGE (v3 - no redirect_uri) ===');
+    console.log('URL:', tokenUrl);
     console.log('Shop:', shop);
     console.log('Code:', code.slice(0, 8) + '...');
-    console.log('Client ID:', SHOPIFY_CLIENT_ID);
-    console.log('Secret prefix:', SHOPIFY_CLIENT_SECRET.slice(0, 10));
-    console.log('Secret length:', SHOPIFY_CLIENT_SECRET.length);
     console.log('Body (redacted):', tokenBody.replace(SHOPIFY_CLIENT_SECRET, '[SECRET]'));
-    console.log('URL:', `https://${shop}/admin/oauth/access_token`);
+    console.log('Client ID:', SHOPIFY_CLIENT_ID);
+    console.log('Secret len:', SHOPIFY_CLIENT_SECRET.length);
 
-    const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+    // Try with axios first
+    let axiosResult = null;
+    try {
+      const axiosResp = await axios.post(tokenUrl, tokenBody, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+      axiosResult = { status: axiosResp.status, data: axiosResp.data };
+      console.log('AXIOS SUCCESS:', JSON.stringify(axiosResult));
+    } catch (axiosErr) {
+      axiosResult = {
+        error: axiosErr.message,
+        status: axiosErr.response?.status,
+        data: axiosErr.response?.data
+      };
+      console.log('AXIOS ERROR:', JSON.stringify(axiosResult));
+    }
+
+    // Also try with node-fetch
+    const fetchResp = await fetch(tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: tokenBody
     });
+    const rawText = await fetchResp.text();
+    console.log('FETCH STATUS:', fetchResp.status);
+    console.log('FETCH BODY:', rawText.slice(0, 2000));
 
-    const rawText = await response.text();
-    console.log('=== SHOPIFY RESPONSE ===');
-    console.log('Status:', response.status);
-    console.log('Body:', rawText.slice(0, 50000));
+    let fetchData;
+    try { fetchData = JSON.parse(rawText); } catch (e) { fetchData = { raw: rawText }; }
 
-    let data;
-    try {
-      data = JSON.parse(rawText);
-    } catch (e) {
-      const escaped = rawText.slice(0, 20000)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-      return res.send(`<html><body style="font-family:monospace;padding:20px">
-        <h2>Token Exchange Raw Response</h2>
-        <p><strong>HTTP Status:</strong> ${response.status}</p>
-        <p><strong>Body (first 20000 chars):</strong></p>
-        <pre style="background:#f0f0f0;padding:10px;word-break:break-all;white-space:pre-wrap">${escaped}</pre>
-      </body></html>`);
-    }
+    const token = axiosResult?.data?.access_token || fetchData?.access_token;
 
     res.send(`<html><body style="font-family:monospace;padding:20px">
-      <h2>${data.access_token ? '&#x2705; Access Token Captured!' : '&#x274C; No Token in Response'}</h2>
+      <h2>${token ? '&#x2705; Token Captured!' : '&#x274C; No Token'}</h2>
       <p><strong>Shop:</strong> ${shop}</p>
-      <p><strong>Token:</strong> <code style="background:#e8f5e9;padding:8px;display:block;word-break:break-all">${data.access_token || 'NOT FOUND'}</code></p>
-      <p><strong>Scopes:</strong> ${data.scope || 'N/A'}</p>
-      <p><strong>Full response:</strong></p>
-      <pre style="background:#f0f0f0;padding:10px">${JSON.stringify(data, null, 2)}</pre>
+      <p><strong>Token:</strong> <code style="background:#e8f5e9;padding:8px;display:block;word-break:break-all">${token || 'NOT FOUND'}</code></p>
+      <h3>Axios Result:</h3>
+      <pre style="background:#f0f0f0;padding:10px">${JSON.stringify(axiosResult, null, 2)}</pre>
+      <h3>Fetch Result (status ${fetchResp.status}):</h3>
+      <pre style="background:#f0f0f0;padding:10px">${JSON.stringify(fetchData, null, 2)}</pre>
     </body></html>`);
   } catch (err) {
+    console.error('CALLBACK ERROR:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

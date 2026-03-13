@@ -1009,4 +1009,53 @@ function skeletonCards(n){
 }
 
 const PORT = process.env.PORT || 3000;
+// ─── CART REDIRECT → SHOPIFY CHECKOUT ────────────────────────────────────────────
+app.get('/cart/:items', async (req, res) => {
+  const itemsStr = req.params.items;
+  if (!SHOPIFY_ADMIN_TOKEN || !SHOPIFY_STORE_DOMAIN) {
+    return res.status(503).send('Shopify not configured');
+  }
+  try {
+    const lineItems = itemsStr.split(',').map(part => {
+      const [id, qty] = part.split(':');
+      return { variant_id: parseInt(id), quantity: parseInt(qty) || 1 };
+    }).filter(i => i.variant_id);
+
+    // Publish each product so it is available in the storefront
+    for (const item of lineItems) {
+      const varResp = await fetch(`https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/variants/${item.variant_id}.json`, {
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN }
+      });
+      if (varResp.ok) {
+        const varData = await varResp.json();
+        const productId = varData.variant && varData.variant.product_id;
+        if (productId) {
+          await fetch(`https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/products/${productId}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN },
+            body: JSON.stringify({ product: { id: productId, status: 'active', published: true } })
+          });
+        }
+      }
+    }
+
+    // Create checkout via Admin API
+    const chkResp = await fetch(`https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/checkouts.json`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN },
+      body: JSON.stringify({ checkout: { line_items: lineItems } })
+    });
+    const chkData = await chkResp.json();
+    const webUrl = chkData.checkout && chkData.checkout.web_url;
+    if (webUrl) return res.redirect(webUrl);
+
+    // Fallback: direct Shopify cart URL
+    return res.redirect(`https://${SHOPIFY_STORE_DOMAIN}/cart/${itemsStr}`);
+  } catch (err) {
+    console.error('Cart redirect error:', err.message);
+    res.status(500).send('Checkout error: ' + err.message);
+  }
+});
+
+
 app.listen(PORT, () => console.log(`DealsHub store on port ${PORT} â https://dealshub-search.onrender.com/store`));

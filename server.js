@@ -1000,6 +1000,66 @@ function showToast(msg, type=''){
     loadFeatured('fashion')
   ]);
 })();
+
+// ── PRODUCT DETAIL MODAL ──────────────────────────────────────────────
+(function initPdModal(){
+  var el = document.createElement('div');
+  el.id = 'pdModal';
+  el.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);overflow-y:auto;padding:20px 10px';
+  el.innerHTML = '<div style="background:#fff;max-width:880px;margin:0 auto;border-radius:18px;overflow:hidden;position:relative;display:flex;flex-wrap:wrap;box-shadow:0 20px 60px rgba(0,0,0,.25)">'
+    + '<button onclick="closePdModal()" style="position:absolute;top:14px;right:18px;width:36px;height:36px;background:rgba(0,0,0,.08);border:none;border-radius:50%;font-size:22px;cursor:pointer;z-index:2;color:#333">&times;</button>'
+    + '<div style="flex:0 0 45%;min-width:260px;background:#f8f8f8;display:flex;align-items:center;justify-content:center;padding:28px">'
+    + '<img id="pdImg" src="" alt="" style="max-width:100%;max-height:380px;object-fit:contain;border-radius:10px"></div>'
+    + '<div style="flex:1;min-width:260px;padding:36px 28px;display:flex;flex-direction:column;gap:10px">'
+    + '<span id="pdStore" style="font-size:11px;font-weight:800;text-transform:uppercase;color:#888;letter-spacing:1.5px"></span>'
+    + '<h2 id="pdTitle" style="margin:0;font-size:19px;font-weight:700;line-height:1.35;color:#111"></h2>'
+    + '<div id="pdRating" style="font-size:14px;color:#f59e0b;min-height:20px"></div>'
+    + '<div id="pdPrice" style="font-size:34px;font-weight:800;color:#111"></div>'
+    + '<p id="pdDesc" style="font-size:13px;color:#666;line-height:1.65;margin:0;max-height:110px;overflow-y:auto"></p>'
+    + '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">'
+    + '<button id="pdCartBtn" style="flex:1;min-width:150px;padding:15px;background:#111;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer" onclick="pdAddToCart()">&#128722; Agregar al carrito</button>'
+    + '<a id="pdLink" href="#" target="_blank" rel="noopener" style="padding:15px 18px;border:2px solid #111;border-radius:10px;font-size:13px;font-weight:700;color:#111;text-decoration:none;display:flex;align-items:center">Ver en tienda &#8599;</a>'
+    + '</div></div></div>';
+  document.body.appendChild(el);
+  el.addEventListener('click', function(e){ if(e.target===el) closePdModal(); });
+})();
+
+var _pdCur = null;
+function showProductDetail(p){
+  _pdCur = p;
+  var img=document.getElementById('pdImg'), title=document.getElementById('pdTitle'),
+      store=document.getElementById('pdStore'), price=document.getElementById('pdPrice'),
+      desc=document.getElementById('pdDesc'), link=document.getElementById('pdLink'),
+      rat=document.getElementById('pdRating');
+  if(img) img.src = p.image||'';
+  if(title) title.textContent = p.title||'';
+  if(store) store.textContent = p.store||'';
+  if(price) price.textContent = p.price ? ('$'+parseFloat(p.price).toFixed(2)) : '';
+  if(desc) desc.textContent = p.description||'';
+  if(link) link.href = p.url||'#';
+  if(rat){
+    var r=parseFloat(p.rating)||0, rv=parseInt(p.review_count)||0, s='';
+    if(r>0){ for(var i=0;i<5;i++) s+=i<Math.round(r)?'\u2605':'\u2606'; s+=' '+r.toFixed(1); if(rv) s+='  ('+rv.toLocaleString()+' rese\u00f1as)'; }
+    rat.textContent=s;
+  }
+  var modal=document.getElementById('pdModal');
+  if(modal){ modal.style.display='block'; document.body.style.overflow='hidden'; }
+}
+function closePdModal(){
+  var modal=document.getElementById('pdModal');
+  if(modal) modal.style.display='none';
+  document.body.style.overflow=''; _pdCur=null;
+}
+function pdAddToCart(){ if(_pdCur) addToCart(_pdCur); closePdModal(); }
+(function patchMPC(){
+  var orig=makeProductCard;
+  makeProductCard=function(p){
+    var card=orig(p);
+    card.style.cursor='pointer';
+    card.addEventListener('click',function(e){ if(!e.target.closest('button,a')) showProductDetail(p); });
+    return card;
+  };
+})();
 </script>
 </body>
 </html>`;

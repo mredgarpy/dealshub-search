@@ -10,10 +10,10 @@ const MARKUP_PERCENT = parseFloat(process.env.MARKUP_PERCENT || '12');
 const SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
 const SHOPIFY_ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
 const SHOPIFY_CLIENT_ID = '5bcd017d59287f7c9d7ab012b67d4e5b';
-const SHOPIFY_CLIENT_SECRET_RAW = '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';
+const SHOPIFY_CLIENT_SECRET_RAW = process.env.SHOPIFY_CLIENT_SECRET_RAW || '';
 const SHOPIFY_CLIENT_SECRET = SHOPIFY_CLIENT_SECRET_RAW.replace(/^shpss_/, '');
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// âââ HELPERS ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const markup = () => 1 + (MARKUP_PERCENT / 100);
 
 const rapidHeaders = (host) => ({
@@ -162,10 +162,10 @@ function interleave(arrays, total) {
   return result;
 }
 
-// ─── HEALTH ──────────────────────────────────────────────────────────────────
+// âââ HEALTH ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/health', (req, res) => res.json({ status: 'ok', rapidapi: !!RAPIDAPI_KEY, shopify: !!SHOPIFY_ADMIN_TOKEN }));
 
-// ─── DEBUG ────────────────────────────────────────────────────────────────────
+// âââ DEBUG ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/debug-creds', (req, res) => res.json({
   client_id: SHOPIFY_CLIENT_ID,
   client_secret_sent: SHOPIFY_CLIENT_SECRET,
@@ -173,7 +173,7 @@ app.get('/debug-creds', (req, res) => res.json({
   note: 'shpss_ stripped'
 }));
 
-// ─── OAUTH CALLBACK ───────────────────────────────────────────────────────────
+// âââ OAUTH CALLBACK âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/oauth/callback', async (req, res) => {
   const { code, shop } = req.query;
   if (!code || !shop) return res.status(400).json({ error: 'Missing code or shop' });
@@ -194,7 +194,7 @@ app.get('/oauth/callback', async (req, res) => {
       return res.send(`<html><body style="font-family:monospace;padding:20px"><h2>OAuth Raw (v4)</h2><p>Status: ${response.status}</p><pre>${esc}</pre></body></html>`);
     }
     res.send(`<html><body style="font-family:monospace;padding:20px">
-      <h2>${data.access_token ? '✅ TOKEN CAPTURED!' : '❌ No Token'}</h2>
+      <h2>${data.access_token ? 'â TOKEN CAPTURED!' : 'â No Token'}</h2>
       <p><b>Shop:</b> ${shop}</p>
       <p><b>Token:</b> <code style="background:#e8f5e9;padding:8px;display:block;word-break:break-all">${data.access_token || 'NOT FOUND'}</code></p>
       <p><b>Scopes:</b> ${data.scope || 'N/A'}</p>
@@ -203,7 +203,7 @@ app.get('/oauth/callback', async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── API: SEARCH ─────────────────────────────────────────────────────────────
+// âââ API: SEARCH âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/api/search', async (req, res) => {
   const { q, store = 'all', limit = '24' } = req.query;
   if (!q || q.trim().length < 2) return res.status(400).json({ error: 'Query too short' });
@@ -224,7 +224,7 @@ app.get('/api/search', async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── API: TRENDING ────────────────────────────────────────────────────────────
+// âââ API: TRENDING ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/api/trending', async (req, res) => {
   try {
     const queries = ['trending fashion', 'viral products', 'hot deals'];
@@ -239,7 +239,7 @@ app.get('/api/trending', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── API: BESTSELLERS ─────────────────────────────────────────────────────────
+// âââ API: BESTSELLERS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/api/bestsellers', async (req, res) => {
   try {
     const [amazon, shein, ali] = await Promise.allSettled([
@@ -252,7 +252,7 @@ app.get('/api/bestsellers', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── API: NEW ARRIVALS ────────────────────────────────────────────────────────
+// âââ API: NEW ARRIVALS ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/api/new-arrivals', async (req, res) => {
   try {
     const [amazon, shein, sephora, macys] = await Promise.allSettled([
@@ -266,7 +266,7 @@ app.get('/api/new-arrivals', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── API: FEATURED (categories) ───────────────────────────────────────────────
+// âââ API: FEATURED (categories) âââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/api/featured', async (req, res) => {
   const { category = 'fashion' } = req.query;
   try {
@@ -280,7 +280,7 @@ app.get('/api/featured', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── API: CREATE PRODUCT ─────────────────────────────────────────────────────
+// âââ API: CREATE PRODUCT âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.post('/api/create-and-add', async (req, res) => {
   const { title, price, originalPrice, image, sourceUrl, sourcePlatform } = req.body;
   if (!title || !price) return res.status(400).json({ error: 'Missing title or price' });
@@ -310,20 +310,20 @@ app.post('/api/create-and-add', async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
-// ─── STORE FRONTEND ───────────────────────────────────────────────────────────
+// âââ STORE FRONTEND âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 app.get('/', (req, res) => res.redirect('/store'));
 app.get('/store', (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(STORE_HTML);
 });
 
-// ─── HTML STOREFRONT ──────────────────────────────────────────────────────────
+// âââ HTML STOREFRONT ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const STORE_HTML = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DealsHub Miami — Moda & Lifestyle</title>
+<title>DealsHub Miami â Moda & Lifestyle</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -336,7 +336,7 @@ const STORE_HTML = `<!DOCTYPE html>
   body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
   a{color:inherit;text-decoration:none}
 
-  /* ── NAVBAR ── */
+  /* ââ NAVBAR ââ */
   .navbar{background:var(--primary);padding:0;position:sticky;top:0;z-index:1000;box-shadow:0 2px 20px rgba(0,0,0,.3)}
   .nav-top{display:flex;align-items:center;gap:12px;padding:10px 16px;max-width:1600px;margin:0 auto}
   .logo{color:#fff;font-size:22px;font-weight:700;white-space:nowrap;flex-shrink:0}
@@ -353,14 +353,14 @@ const STORE_HTML = `<!DOCTYPE html>
   .cart-badge{position:relative;display:inline-block}
   .cart-count{position:absolute;top:-6px;right:-8px;background:var(--accent);color:#fff;border-radius:50%;width:18px;height:18px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
 
-  /* ── CATEGORY BAR ── */
+  /* ââ CATEGORY BAR ââ */
   .cat-bar{background:var(--secondary);overflow-x:auto;white-space:nowrap;scrollbar-width:none}
   .cat-bar::-webkit-scrollbar{display:none}
   .cat-bar-inner{display:flex;gap:0;max-width:1600px;margin:0 auto;padding:0 8px}
   .cat-btn{background:none;border:none;color:rgba(255,255,255,.85);padding:9px 14px;cursor:pointer;font-size:13.5px;font-weight:500;transition:all .2s;white-space:nowrap;flex-shrink:0}
   .cat-btn:hover,.cat-btn.active{color:#fff;background:rgba(255,255,255,.12);border-radius:4px}
 
-  /* ── HERO ── */
+  /* ââ HERO ââ */
   .hero{position:relative;overflow:hidden;background:var(--primary);height:420px;cursor:pointer}
   .hero-slides{display:flex;transition:transform .5s ease;height:100%}
   .hero-slide{min-width:100%;height:100%;background-size:cover;background-position:center;display:flex;align-items:flex-end;flex-shrink:0;position:relative}
@@ -378,7 +378,7 @@ const STORE_HTML = `<!DOCTYPE html>
   .hero-nav:hover{background:rgba(255,255,255,.3)}
   .hero-prev{left:16px}.hero-next{right:16px}
 
-  /* ── BANNERS ROW ── */
+  /* ââ BANNERS ROW ââ */
   .banners{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:16px;max-width:1600px;margin:0 auto}
   .banner-card{border-radius:12px;overflow:hidden;position:relative;height:140px;cursor:pointer;background:#ddd}
   .banner-card img{width:100%;height:100%;object-fit:cover;transition:transform .3s}
@@ -387,7 +387,7 @@ const STORE_HTML = `<!DOCTYPE html>
   .banner-label h3{color:#fff;font-size:16px;font-weight:700}
   .banner-label span{color:rgba(255,255,255,.8);font-size:12px;margin-top:4px}
 
-  /* ── SECTION ── */
+  /* ââ SECTION ââ */
   .section{max-width:1600px;margin:0 auto;padding:16px 16px 8px}
   .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
   .section-title{font-size:20px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
@@ -395,16 +395,16 @@ const STORE_HTML = `<!DOCTYPE html>
   .section-link{color:var(--accent);font-size:13px;font-weight:600;cursor:pointer}
   .section-link:hover{text-decoration:underline}
 
-  /* ── CAROUSEL ── */
+  /* ââ CAROUSEL ââ */
   .carousel{overflow:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:8px}
   .carousel::-webkit-scrollbar{display:none}
   .carousel-inner{display:flex;gap:12px;padding:4px 2px}
   .carousel-inner .product-card{min-width:200px;max-width:200px;flex-shrink:0}
 
-  /* ── PRODUCT GRID ── */
+  /* ââ PRODUCT GRID ââ */
   .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;padding:4px 2px}
 
-  /* ── PRODUCT CARD ── */
+  /* ââ PRODUCT CARD ââ */
   .product-card{background:var(--card);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s;cursor:pointer;display:flex;flex-direction:column;position:relative}
   .product-card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,.12)}
   .product-card .badge{position:absolute;top:8px;left:8px;z-index:2;background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;text-transform:uppercase}
@@ -432,13 +432,13 @@ const STORE_HTML = `<!DOCTYPE html>
   .btn-add:hover{background:var(--accent)}
   .btn-add.added{background:var(--success)}
 
-  /* ── FILTER BAR ── */
+  /* ââ FILTER BAR ââ */
   .filter-bar{background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;position:sticky;top:60px;z-index:100}
   .filter-bar::-webkit-scrollbar{display:none}
   .filter-btn{background:none;border:1.5px solid var(--border);padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
   .filter-btn:hover,.filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 
-  /* ── SEARCH RESULTS PAGE ── */
+  /* ââ SEARCH RESULTS PAGE ââ */
   #search-view{display:none}
   #home-view{display:block}
   .search-header{background:var(--primary);color:#fff;padding:14px 20px;max-width:1600px;margin:0 auto;border-radius:0 0 8px 8px}
@@ -447,7 +447,7 @@ const STORE_HTML = `<!DOCTYPE html>
   .no-results{text-align:center;padding:60px 20px;color:var(--muted)}
   .no-results .emoji{font-size:60px;display:block;margin-bottom:16px}
 
-  /* ── CART SIDEBAR ── */
+  /* ââ CART SIDEBAR ââ */
   .cart-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;opacity:0;pointer-events:none;transition:opacity .3s}
   .cart-overlay.open{opacity:1;pointer-events:all}
   .cart-sidebar{position:fixed;right:-420px;top:0;bottom:0;width:420px;max-width:100vw;background:#fff;z-index:2001;box-shadow:-4px 0 30px rgba(0,0,0,.15);transition:right .3s;display:flex;flex-direction:column}
@@ -475,7 +475,7 @@ const STORE_HTML = `<!DOCTYPE html>
   .empty-cart{text-align:center;padding:40px 20px;color:var(--muted)}
   .empty-cart .ec-icon{font-size:50px;display:block;margin-bottom:12px}
 
-  /* ── LOADING ── */
+  /* ââ LOADING ââ */
   .skeleton{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px}
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   .skeleton-card{height:300px;border-radius:10px}
@@ -484,7 +484,7 @@ const STORE_HTML = `<!DOCTYPE html>
   .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  /* ── FOOTER ── */
+  /* ââ FOOTER ââ */
   footer{background:var(--primary);color:rgba(255,255,255,.7);padding:32px 16px;margin-top:40px}
   .footer-inner{max-width:1600px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:24px}
   .footer-col h4{color:#fff;font-size:14px;font-weight:700;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
@@ -496,13 +496,13 @@ const STORE_HTML = `<!DOCTYPE html>
   .source-pills{display:flex;gap:6px;flex-wrap:wrap}
   .source-pill{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600}
 
-  /* ── TOAST ── */
+  /* ââ TOAST ââ */
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a2e;color:#fff;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;transition:transform .3s;box-shadow:0 4px 20px rgba(0,0,0,.3)}
   .toast.show{transform:translateX(-50%) translateY(0)}
   .toast.success{background:#27ae60}
   .toast.error{background:#e74c3c}
 
-  /* ── RESPONSIVE ── */
+  /* ââ RESPONSIVE ââ */
   @media(max-width:768px){
     .hero{height:280px}.hero-text h1{font-size:24px}.hero-text{padding:20px}
     .banners{grid-template-columns:1fr;padding:10px}
@@ -528,7 +528,7 @@ const STORE_HTML = `<!DOCTYPE html>
         <option value="sephora">Sephora</option>
         <option value="macys">Macy's</option>
       </select>
-      <input type="text" id="searchInput" placeholder="Buscar productos, marcas y más..." autocomplete="off">
+      <input type="text" id="searchInput" placeholder="Buscar productos, marcas y mÃ¡s..." autocomplete="off">
       <button id="searchBtn" title="Buscar (Enter)">&#128269;</button>
     </div>
     <div class="nav-icons">
@@ -549,14 +549,14 @@ const STORE_HTML = `<!DOCTYPE html>
     <button class="cat-btn" onclick="filterCat(this,'shoes')">&#128095; Zapatos</button>
     <button class="cat-btn" onclick="filterCat(this,'beauty makeup')">&#128132; Belleza</button>
     <button class="cat-btn" onclick="filterCat(this,'accessories jewelry')">&#128144; Accesorios</button>
-    <button class="cat-btn" onclick="filterCat(this,'electronics')">&#128241; Electrónica</button>
+    <button class="cat-btn" onclick="filterCat(this,'electronics')">&#128241; ElectrÃ³nica</button>
     <button class="cat-btn" onclick="filterCat(this,'home decor')">&#127968; Hogar</button>
     <button class="cat-btn" onclick="filterCat(this,'sports')">&#9917; Deportes</button>
-    <button class="cat-btn" onclick="filterCat(this,'kids')">&#127874; Niños</button>
+    <button class="cat-btn" onclick="filterCat(this,'kids')">&#127874; NiÃ±os</button>
   </div>
 </div>
 
-<!-- ═══ HOME VIEW ═══ -->
+<!-- âââ HOME VIEW âââ -->
 <div id="home-view">
 
   <!-- HERO -->
@@ -565,15 +565,15 @@ const STORE_HTML = `<!DOCTYPE html>
       <div class="hero-slide" style="background-image:url('https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1400&q=80')">
         <div class="hero-text">
           <span class="tag">&#128293; Tendencia</span>
-          <h1>Nueva Colección Primavera</h1>
+          <h1>Nueva ColecciÃ³n Primavera</h1>
           <p>Descubre los mejores precios de Amazon, SHEIN y AliExpress</p>
-          <button class="cta" onclick="searchProducts('new arrivals women')">Ver Colección</button>
+          <button class="cta" onclick="searchProducts('new arrivals women')">Ver ColecciÃ³n</button>
         </div>
       </div>
       <div class="hero-slide" style="background-image:url('https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1400&q=80')">
         <div class="hero-text">
           <span class="tag">&#128293; Viral</span>
-          <h1>Los Más Vendidos</h1>
+          <h1>Los MÃ¡s Vendidos</h1>
           <p>Productos virales al mejor precio con entrega internacional</p>
           <button class="cta" onclick="searchProducts('best sellers fashion')">Ver Bestsellers</button>
         </div>
@@ -582,16 +582,16 @@ const STORE_HTML = `<!DOCTYPE html>
         <div class="hero-text">
           <span class="tag">&#127381; Nuevo</span>
           <h1>Belleza & Skincare</h1>
-          <p>Lo último de Sephora y las mejores marcas beauty</p>
+          <p>Lo Ãºltimo de Sephora y las mejores marcas beauty</p>
           <button class="cta" onclick="filterCat(null,'beauty makeup')">Ver Belleza</button>
         </div>
       </div>
       <div class="hero-slide" style="background-image:url('https://images.unsplash.com/photo-1558171813-2a83b23bc7a0?w=1400&q=80')">
         <div class="hero-text">
           <span class="tag">&#9889; Oferta</span>
-          <h1>Electrónica y Gadgets</h1>
-          <p>Los mejores gadgets y electrónicos del momento</p>
-          <button class="cta" onclick="filterCat(null,'electronics')">Ver Electrónica</button>
+          <h1>ElectrÃ³nica y Gadgets</h1>
+          <p>Los mejores gadgets y electrÃ³nicos del momento</p>
+          <button class="cta" onclick="filterCat(null,'electronics')">Ver ElectrÃ³nica</button>
         </div>
       </div>
     </div>
@@ -604,15 +604,15 @@ const STORE_HTML = `<!DOCTYPE html>
   <div class="banners">
     <div class="banner-card" onclick="filterCat(null,'women fashion')">
       <img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=600&q=80" alt="Moda Mujer">
-      <div class="banner-label"><h3>Moda Mujer</h3><span>Ver colección →</span></div>
+      <div class="banner-label"><h3>Moda Mujer</h3><span>Ver colecciÃ³n â</span></div>
     </div>
     <div class="banner-card" onclick="filterCat(null,'beauty skincare')">
       <img src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=600&q=80" alt="Belleza">
-      <div class="banner-label"><h3>Belleza & Skincare</h3><span>Descubrir →</span></div>
+      <div class="banner-label"><h3>Belleza & Skincare</h3><span>Descubrir â</span></div>
     </div>
     <div class="banner-card" onclick="filterCat(null,'shoes sneakers')">
       <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80" alt="Zapatos">
-      <div class="banner-label"><h3>Zapatos Trending</h3><span>Explorar →</span></div>
+      <div class="banner-label"><h3>Zapatos Trending</h3><span>Explorar â</span></div>
     </div>
   </div>
 
@@ -620,7 +620,7 @@ const STORE_HTML = `<!DOCTYPE html>
   <div class="section">
     <div class="section-header">
       <h2 class="section-title"><span class="emoji">&#128293;</span>Trending Ahora</h2>
-      <span class="section-link" onclick="searchProducts('trending fashion')">Ver todo →</span>
+      <span class="section-link" onclick="searchProducts('trending fashion')">Ver todo â</span>
     </div>
     <div class="carousel" id="trendingCarousel">
       <div class="loader-wrap">${skeletonCards(8)}</div>
@@ -630,8 +630,8 @@ const STORE_HTML = `<!DOCTYPE html>
   <!-- BEST SELLERS -->
   <div class="section">
     <div class="section-header">
-      <h2 class="section-title"><span class="emoji">&#127942;</span>Más Vendidos</h2>
-      <span class="section-link" onclick="searchProducts('best sellers')">Ver todo →</span>
+      <h2 class="section-title"><span class="emoji">&#127942;</span>MÃ¡s Vendidos</h2>
+      <span class="section-link" onclick="searchProducts('best sellers')">Ver todo â</span>
     </div>
     <div class="carousel" id="bestsellersCarousel">
       <div class="loader-wrap">${skeletonCards(8)}</div>
@@ -642,7 +642,7 @@ const STORE_HTML = `<!DOCTYPE html>
   <div class="section">
     <div class="section-header">
       <h2 class="section-title"><span class="emoji">&#127381;</span>Novedades</h2>
-      <span class="section-link" onclick="searchProducts('new arrivals')">Ver todo →</span>
+      <span class="section-link" onclick="searchProducts('new arrivals')">Ver todo â</span>
     </div>
     <div class="carousel" id="newArrivalsCarousel">
       <div class="loader-wrap">${skeletonCards(8)}</div>
@@ -661,10 +661,10 @@ const STORE_HTML = `<!DOCTYPE html>
 
 </div><!-- /home-view -->
 
-<!-- ═══ SEARCH VIEW ═══ -->
+<!-- âââ SEARCH VIEW âââ -->
 <div id="search-view">
   <div class="search-header">
-    <h2 id="searchTitle">Resultados de búsqueda</h2>
+    <h2 id="searchTitle">Resultados de bÃºsqueda</h2>
     <span id="searchSubtitle"></span>
   </div>
 
@@ -704,13 +704,13 @@ const STORE_HTML = `<!DOCTYPE html>
       <h4>DealsHub Miami</h4>
       <ul>
         <li>Sobre Nosotros</li>
-        <li>Cómo Funciona</li>
+        <li>CÃ³mo Funciona</li>
         <li>Blog de Tendencias</li>
         <li>Trabaja con Nosotros</li>
       </ul>
     </div>
     <div class="footer-col">
-      <h4>Atención al Cliente</h4>
+      <h4>AtenciÃ³n al Cliente</h4>
       <ul>
         <li>Centro de Ayuda</li>
         <li>Seguimiento de Pedido</li>
@@ -729,7 +729,7 @@ const STORE_HTML = `<!DOCTYPE html>
       </div>
     </div>
     <div class="footer-col">
-      <h4>Síguenos</h4>
+      <h4>SÃ­guenos</h4>
       <ul>
         <li>&#128247; Instagram</li>
         <li>&#127916; TikTok</li>
@@ -739,15 +739,15 @@ const STORE_HTML = `<!DOCTYPE html>
     </div>
   </div>
   <div class="footer-bottom">
-    <span>© 2025 DealsHub Miami. Todos los derechos reservados.</span>
-    <span>Los precios incluyen markup de distribución.</span>
+    <span>Â© 2025 DealsHub Miami. Todos los derechos reservados.</span>
+    <span>Los precios incluyen markup de distribuciÃ³n.</span>
   </div>
 </footer>
 
 <script>
 const API = '';  // same-origin
 
-// ─── CART STATE ───────────────────────────────────────────────────────────────
+// âââ CART STATE âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 let cart = JSON.parse(localStorage.getItem('dh_cart') || '[]');
 let currentQuery = '';
 let currentStore = 'all';
@@ -758,7 +758,7 @@ function saveCart(){ localStorage.setItem('dh_cart', JSON.stringify(cart)); upda
 function updateCartBadge(){ document.getElementById('cartCount').textContent = cart.reduce((s,i)=>s+i.qty,0); }
 updateCartBadge();
 
-// ─── HERO ─────────────────────────────────────────────────────────────────────
+// âââ HERO âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 (function initHero(){
   const dotsEl = document.getElementById('heroDots');
   for(let i=0;i<totalSlides;i++){
@@ -779,7 +779,7 @@ function moveHero(dir){
   goHero((heroIndex+dir+totalSlides)%totalSlides);
 }
 
-// ─── SEARCH ───────────────────────────────────────────────────────────────────
+// âââ SEARCH âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 document.getElementById('searchInput').addEventListener('keydown', e => {
   if(e.key === 'Enter') {
     const q = e.target.value.trim();
@@ -797,7 +797,7 @@ async function searchProducts(q, store) {
   document.getElementById('searchInput').value = q;
   showSearchView(q);
   const resultsEl = document.getElementById('searchResults');
-  resultsEl.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><span>Buscando en Amazon, SHEIN, AliExpress y más...</span></div>';
+  resultsEl.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><span>Buscando en Amazon, SHEIN, AliExpress y mÃ¡s...</span></div>';
   try {
     const resp = await fetch(\`\${API}/api/search?q=\${encodeURIComponent(q)}&store=\${currentStore}&limit=48\`);
     const data = await resp.json();
@@ -809,7 +809,7 @@ async function searchProducts(q, store) {
       renderGrid(resultsEl, data.results, false);
     }
   } catch(e){
-    resultsEl.innerHTML = '<div class="no-results"><span class="emoji">&#9888;&#65039;</span><h3>Error de conexión</h3><p>Intenta nuevamente</p></div>';
+    resultsEl.innerHTML = '<div class="no-results"><span class="emoji">&#9888;&#65039;</span><h3>Error de conexiÃ³n</h3><p>Intenta nuevamente</p></div>';
   }
 }
 
@@ -846,13 +846,13 @@ function filterCat(btn, cat){
     'fashion':'&#128084; Moda Destacada','women clothing':'&#128149; Moda Mujer',
     'men clothing':'&#128084; Moda Hombre','shoes':'&#128095; Zapatos Trending',
     'beauty makeup':'&#128132; Belleza & Makeup','accessories jewelry':'&#128144; Accesorios',
-    'electronics':'&#128241; Electrónica','home decor':'&#127968; Hogar',
-    'sports':'&#9917; Deportes','kids':'&#127874; Para Niños'
+    'electronics':'&#128241; ElectrÃ³nica','home decor':'&#127968; Hogar',
+    'sports':'&#9917; Deportes','kids':'&#127874; Para NiÃ±os'
   };
   document.getElementById('featuredTitle').innerHTML = \`<span class="emoji"></span>\${titles[cat]||cat}\`;
 }
 
-// ─── LOAD SECTIONS ────────────────────────────────────────────────────────────
+// âââ LOAD SECTIONS ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function loadCarousel(endpoint, containerId){
   try {
     const resp = await fetch(\`\${API}\${endpoint}\`);
@@ -875,7 +875,7 @@ async function loadFeatured(category = 'fashion'){
   } catch(e){ console.error('featured', e); }
 }
 
-// ─── RENDER PRODUCTS ─────────────────────────────────────────────────────────
+// âââ RENDER PRODUCTS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderGrid(container, products, carousel){
   container.innerHTML = '';
   products.forEach(p => {
@@ -887,7 +887,7 @@ function makeProductCard(p){
   const card = document.createElement('div');
   card.className = 'product-card';
   const disc = p.originalPrice > 0 ? Math.round((1 - p.price / p.originalPrice) * 100) : 0;
-  const stars = p.rating ? '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5-Math.round(p.rating)) : '';
+  const stars = p.rating ? 'â'.repeat(Math.round(p.rating)) + 'â'.repeat(5-Math.round(p.rating)) : '';
   const badge = p.badge ? \`<div class="badge \${p.badge.toLowerCase().replace(/[^a-z]/g,'')}">\${p.badge}</div>\` : '';
   const srcClass = p.source || 'amazon';
   card.innerHTML = \`
@@ -911,7 +911,7 @@ function makeProductCard(p){
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-// ─── CART ─────────────────────────────────────────────────────────────────────
+// âââ CART âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function addToCart(pJson){
   const p = JSON.parse(pJson);
   const existing = cart.find(i => i.id === p.id);
@@ -919,7 +919,7 @@ function addToCart(pJson){
   else { cart.push({...p, qty:1}); }
   saveCart();
   renderCart();
-  showToast(\`✔ \${p.title.slice(0,30)}... agregado\`, 'success');
+  showToast(\`â \${p.title.slice(0,30)}... agregado\`, 'success');
 }
 
 function removeFromCart(id){ cart = cart.filter(i=>i.id!==id); saveCart(); renderCart(); }
@@ -932,7 +932,7 @@ function renderCart(){
   const el = document.getElementById('cartItems');
   const footer = document.getElementById('cartFooter');
   if(!cart.length){
-    el.innerHTML = '<div class="empty-cart"><span class="ec-icon">&#128722;</span><p>Tu carrito está vacío</p></div>';
+    el.innerHTML = '<div class="empty-cart"><span class="ec-icon">&#128722;</span><p>Tu carrito estÃ¡ vacÃ­o</p></div>';
     footer.innerHTML = '';
     return;
   }
@@ -980,10 +980,10 @@ async function checkout(){
     } else {
       showToast('Checkout no disponible temporalmente', 'error');
     }
-  } catch(e){ showToast('Error procesando el pedido. Inténtalo nuevamente.', 'error'); }
+  } catch(e){ showToast('Error procesando el pedido. IntÃ©ntalo nuevamente.', 'error'); }
 }
 
-// ─── TOAST ────────────────────────────────────────────────────────────────────
+// âââ TOAST ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 let toastTimer;
 function showToast(msg, type=''){
   const t = document.getElementById('toast');
@@ -991,7 +991,7 @@ function showToast(msg, type=''){
   clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove('show'), 2800);
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
+// âââ INIT âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 (async function init(){
   await Promise.all([
     loadCarousel('/api/trending', 'trendingCarousel'),
@@ -1009,4 +1009,4 @@ function skeletonCards(n){
 }
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`DealsHub store on port ${PORT} — https://dealshub-search.onrender.com/store`));
+app.listen(PORT, () => console.log(`DealsHub store on port ${PORT} â https://dealshub-search.onrender.com/store`));

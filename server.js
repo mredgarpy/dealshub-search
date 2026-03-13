@@ -19,16 +19,16 @@ app.get('/oauth/callback', async (req, res) => {
   const { code, shop } = req.query;
   if (!code || !shop) return res.status(400).json({ error: 'Missing code or shop' });
   try {
-    // Use form-encoded body (more reliable than JSON for Shopify token exchange)
-    const params = new URLSearchParams();
-    params.append('client_id',     SHOPIFY_CLIENT_ID);
-    params.append('client_secret', SHOPIFY_CLIENT_SECRET);
-    params.append('code',          code);
+    const tokenBody = JSON.stringify({
+      client_id:     SHOPIFY_CLIENT_ID,
+      client_secret: SHOPIFY_CLIENT_SECRET,
+      code
+    });
 
     const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:    params.toString()
+      headers: { 'Content-Type': 'application/json' },
+      body:    tokenBody
     });
 
     const rawText = await response.text();

@@ -1119,3 +1119,5 @@ app.get('/cart/:items', async (req, res) => {
 
 
 app.listen(PORT, () => console.log(`DealsHub store on port ${PORT} Ã¢ÂÂ https://dealshub-search.onrender.com/store`));
+
+// fix: correct RapidAPI hosts

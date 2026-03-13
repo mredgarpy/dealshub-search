@@ -142,7 +142,8 @@ async function searchMacys(query, limit = 20) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
         'Referer': 'https://www.macys.com/shop/search?keyword=' + encodeURIComponent(query),
-        'x-macys-webservice-client-id': 'tablet_web'
+        'x-macys-webservice-client-id': 'tablet_web',
+        'via': '1.1 macys.com'
       },
       timeout: 15000
     });

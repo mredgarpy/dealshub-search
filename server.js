@@ -238,36 +238,36 @@ app.get('/api/search', async (req, res) => {
 // Store-specific search routes
 app.get('/api/search/shein', async (req, res) => {
   try {
-    const { q = '' } = req.query;
+    const { q = '', limit = '20' } = req.query;
     if (!q.trim()) return res.json({ results: [], total: 0, query: q });
-    const results = await searchShein(q);
+    const results = await searchShein(q, parseInt(limit) || 20);
     res.json({ results, total: results.length, query: q });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/search/aliexpress', async (req, res) => {
   try {
-    const { q = '' } = req.query;
+    const { q = '', limit = '20' } = req.query;
     if (!q.trim()) return res.json({ results: [], total: 0, query: q });
-    const results = await searchAliexpress(q);
+    const results = await searchAliexpress(q, parseInt(limit) || 20);
     res.json({ results, total: results.length, query: q });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/search/sephora', async (req, res) => {
   try {
-    const { q = '' } = req.query;
+    const { q = '', limit = '20' } = req.query;
     if (!q.trim()) return res.json({ results: [], total: 0, query: q });
-    const results = await searchSephora(q);
+    const results = await searchSephora(q, parseInt(limit) || 20);
     res.json({ results, total: results.length, query: q });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/search/macys', async (req, res) => {
   try {
-    const { q = '' } = req.query;
+    const { q = '', limit = '20' } = req.query;
     if (!q.trim()) return res.json({ results: [], total: 0, query: q });
-    const results = await searchMacys(q);
+    const results = await searchMacys(q, parseInt(limit) || 20);
     res.json({ results, total: results.length, query: q });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });

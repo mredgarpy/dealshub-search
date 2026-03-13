@@ -180,7 +180,7 @@ app.get('/oauth/callback', async (req, res) => {
   try {
     const params = new URLSearchParams();
     params.append('client_id', SHOPIFY_CLIENT_ID);
-    params.append('client_secret', SHOPIFY_CLIENT_SECRET);
+    params.append('client_secret', SHOPIFY_CLIENT_SECRET_RAW); // send full shpss_ prefix
     params.append('code', code);
     console.log('=== TOKEN EXCHANGE v4 (shpss_ stripped) === secret_len:', SHOPIFY_CLIENT_SECRET.length);
     const response = await fetch(`https://${shop}/admin/oauth/access_token`, {

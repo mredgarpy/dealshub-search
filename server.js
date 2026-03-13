@@ -46,25 +46,33 @@ async function searchAmazon(q, limit = 8) {
 
 async function searchShein(query, limit = 20) {
   try {
-    const url = 'https://us.shein.com/api/productList/search/v2?keywords=' + encodeURIComponent(query) + '&limit=' + limit + '&page=1&sort=0';
+    const encoded = encodeURIComponent(query);
+    const url = 'https://us.shein.com/api/productList/search/v2?keywords=' + encoded + '&limit=' + limit + '&page=1&sort=0&currency=USD&lang=en&country=US';
     const resp = await axios.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
-        'Accept': 'application/json',
-        'Referer': 'https://us.shein.com/search?q=' + encodeURIComponent(query)
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://us.shein.com/search?q=' + encoded,
+        'Origin': 'https://us.shein.com'
       },
       timeout: 15000
     });
-    const products = (resp.data && resp.data.info && resp.data.info.products) ? resp.data.info.products : [];
+    const d = resp.data || {};
+    const info = d.info || d.data || {};
+    const products = info.products || info.goods || d.products || d.goods || [];
+    console.log('SHEIN raw code:', d.code, 'products count:', products.length);
     return products.slice(0, limit).map(p => ({
-      title: p.goods_name || '',
-      price: p.retailPrice && p.retailPrice.amount ? '$' + p.retailPrice.amount : (p.salePrice && p.salePrice.amount ? '$' + p.salePrice.amount : ''),
+      title: p.goods_name || p.name || '',
+      price: (p.retailPrice && p.retailPrice.amount) ? '$' + p.retailPrice.amount
+           : (p.salePrice && p.salePrice.amount) ? '$' + p.salePrice.amount
+           : (p.price ? '$' + p.price : ''),
       image: p.goods_img ? (p.goods_img.startsWith('//') ? 'https:' + p.goods_img : p.goods_img) : '',
-      url: 'https://us.shein.com/' + (p.goods_url_name || 'product') + '-p-' + p.goods_id + '.html',
+      url: 'https://us.shein.com/' + (p.goods_url_name || 'product') + '-p-' + (p.goods_id || '') + '.html',
       store: 'SHEIN'
     }));
   } catch (e) {
-    console.error('SHEIN error:', e.message);
+    console.error('SHEIN error:', e.message, e.response && e.response.status);
     return [];
   }
 }
@@ -127,23 +135,26 @@ async function searchSephora(q, limit = 6) {
 
 async function searchMacys(query, limit = 20) {
   try {
-    const url = 'https://www.macys.com/xapi/digital/v1/products/search?keyword=' + encodeURIComponent(query) + '&pageSize=' + limit + '&requestType=search';
+    const encoded = encodeURIComponent(query);
+    const url = 'https://www.macys.com/xapi/digital/v1/products/search?keyword=' + encoded + '&pageSize=40&requestType=search&_shoppingMode=site';
     const resp = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/plain, */*',
-        'Referer': 'https://www.macys.com/shop/search?keyword=' + encodeURIComponent(query),
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.macys.com/shop/search?keyword=' + encoded,
         'x-macys-webservice-client-id': 'tablet_web'
       },
       timeout: 15000
     });
-    const products = (resp.data && resp.data.response && resp.data.response.products)
-      ? resp.data.response.products
-      : (resp.data && resp.data.products ? resp.data.products : []);
+    const d = resp.data || {};
+    const resp2 = d.response || d.data || d;
+    const products = resp2.products || d.products || [];
+    console.log('Macys raw product count:', products.length, 'totalCount:', resp2.totalCount || d.totalCount);
     return products.slice(0, limit).map(p => ({
       title: (p.detail && p.detail.name) ? p.detail.name : (p.name || ''),
       price: (p.pricing && p.pricing.price && p.pricing.price.tieredPrice && p.pricing.price.tieredPrice[0] && p.pricing.price.tieredPrice[0].values && p.pricing.price.tieredPrice[0].values[0])
-        ? p.pricing.price.tieredPrice[0].values[0].formattedValue || ('$' + p.pricing.price.tieredPrice[0].values[0].value)
+        ? (p.pricing.price.tieredPrice[0].values[0].formattedValue || ('$' + p.pricing.price.tieredPrice[0].values[0].value))
         : '',
       image: (p.imagery && p.imagery.images && p.imagery.images[0])
         ? 'https://slimages.macysassets.com/is/image/MCY/products/' + p.imagery.images[0].filePath
@@ -152,7 +163,7 @@ async function searchMacys(query, limit = 20) {
       store: "Macy's"
     }));
   } catch (e) {
-    console.error("Macy's error:", e.message);
+    console.error("Macy's error:", e.message, e.response && e.response.status);
     return [];
   }
 }

@@ -44,37 +44,32 @@ async function searchAmazon(q, limit = 8) {
   } catch(e) { console.error('Amazon search error:', e.message); return []; }
 }
 
-async function searchShein(query, limit = 20) {
+async function searchShein(q, limit = 8) {
   try {
-    const encoded = encodeURIComponent(query);
-    const url = 'https://us.shein.com/api/productList/search/v2?keywords=' + encoded + '&limit=' + limit + '&page=1&sort=0&currency=USD&lang=en&country=US';
-    const resp = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://us.shein.com/search?q=' + encoded,
-        'Origin': 'https://us.shein.com'
-      },
-      timeout: 15000
-    });
-    const d = resp.data || {};
-    const info = d.info || d.data || {};
-    const products = info.products || info.goods || d.products || d.goods || [];
-    console.log('SHEIN raw code:', d.code, 'products count:', products.length);
-    return products.slice(0, limit).map(p => ({
-      title: p.goods_name || p.name || '',
-      price: (p.retailPrice && p.retailPrice.amount) ? '$' + p.retailPrice.amount
-           : (p.salePrice && p.salePrice.amount) ? '$' + p.salePrice.amount
-           : (p.price ? '$' + p.price : ''),
-      image: p.goods_img ? (p.goods_img.startsWith('//') ? 'https:' + p.goods_img : p.goods_img) : '',
-      url: 'https://us.shein.com/' + (p.goods_url_name || 'product') + '-p-' + (p.goods_id || '') + '.html',
-      store: 'SHEIN'
-    }));
-  } catch (e) {
-    console.error('SHEIN error:', e.message, e.response && e.response.status);
-    return [];
-  }
+    const r = await fetch(
+      `https://unofficial-shein.p.rapidapi.com/products/search?keywords=${encodeURIComponent(q)}&page=1&limit=${limit}`,
+      { headers: rapidHeaders('unofficial-shein.p.rapidapi.com') }
+    );
+    const d = await r.json();
+    const items = d.info?.products || [];
+    return items.slice(0, limit).map(p => {
+      const rawPrice = p.salePrice?.amount || p.retailPrice?.amount || p.price || 0;
+      const orig = parseFloat(rawPrice);
+      return {
+        id: p.goods_id || Math.random().toString(36).slice(2),
+        title: p.goods_name || p.name || 'SHEIN Product',
+        price: orig > 0 ? +(orig * markup()).toFixed(2) : null,
+        originalPrice: orig || null,
+        image: p.goods_img || p.image || '',
+        url: `https://www.shein.com/${p.goods_url_name || 'product'}-p-${p.goods_id || ''}.html`,
+        rating: p.comment_info?.comment_rank_average || null,
+        reviews: p.comment_info?.comment_num || 0,
+        badge: p.is_new ? 'New' : null,
+        source: 'shein',
+        storeName: 'SHEIN'
+      };
+    }).filter(p => p.price && p.image);
+  } catch(e) { console.error('SHEIN search error:', e.message); return []; }
 }
 
 async function searchAliexpress(q, limit = 8) {
@@ -133,39 +128,35 @@ async function searchSephora(q, limit = 6) {
   } catch(e) { console.error('Sephora search error:', e.message); return []; }
 }
 
-async function searchMacys(query, limit = 20) {
+async function searchMacys(q, limit = 6) {
   try {
-    const encoded = encodeURIComponent(query);
-    const url = 'https://www.macys.com/xapi/digital/v1/products/search?keyword=' + encoded + '&pageSize=40&requestType=search&_shoppingMode=site';
-    const resp = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://www.macys.com/shop/search?keyword=' + encoded,
-        'x-macys-webservice-client-id': 'tablet_web'
-      },
-      timeout: 15000
-    });
-    const d = resp.data || {};
-    const resp2 = d.response || d.data || d;
-    const products = resp2.products || d.products || [];
-    console.log('Macys raw product count:', products.length, 'totalCount:', resp2.totalCount || d.totalCount);
-    return products.slice(0, limit).map(p => ({
-      title: (p.detail && p.detail.name) ? p.detail.name : (p.name || ''),
-      price: (p.pricing && p.pricing.price && p.pricing.price.tieredPrice && p.pricing.price.tieredPrice[0] && p.pricing.price.tieredPrice[0].values && p.pricing.price.tieredPrice[0].values[0])
-        ? (p.pricing.price.tieredPrice[0].values[0].formattedValue || ('$' + p.pricing.price.tieredPrice[0].values[0].value))
-        : '',
-      image: (p.imagery && p.imagery.images && p.imagery.images[0])
-        ? 'https://slimages.macysassets.com/is/image/MCY/products/' + p.imagery.images[0].filePath
-        : '',
-      url: 'https://www.macys.com' + ((p.detail && p.detail.defaultCategoryPath) ? p.detail.defaultCategoryPath : '/shop/product/detail'),
-      store: "Macy's"
-    }));
-  } catch (e) {
-    console.error("Macy's error:", e.message, e.response && e.response.status);
-    return [];
-  }
+    const r = await fetch(
+      `https://macys4.p.rapidapi.com/api/product/all?page=1&limit=${Math.max(limit * 4, 40)}`,
+      { headers: rapidHeaders('macys4.p.rapidapi.com') }
+    );
+    const d = await r.json();
+    let items = Object.values(d.products || {});
+    const qLow = q.toLowerCase();
+    const filtered = items.filter(p => p.name && p.name.toLowerCase().includes(qLow));
+    items = (filtered.length > 0 ? filtered : items).slice(0, limit);
+    return items.map(p => {
+      const orig = p.oldPrice > 0 ? p.oldPrice : (p.regularPrice || p.price || 0);
+      const sale = p.salePrice || p.price || 0;
+      return {
+        id: p.product_id || Math.random().toString(36).slice(2),
+        title: p.name || "Macy's Product",
+        price: sale > 0 ? +(sale * markup()).toFixed(2) : null,
+        originalPrice: orig || null,
+        image: p.img250 || p.img || '',
+        url: p.productUrl || 'https://www.macys.com',
+        rating: null,
+        reviews: 0,
+        badge: p.salePrice && p.oldPrice > 0 && p.salePrice < p.oldPrice ? 'Sale' : null,
+        source: 'macys',
+        storeName: "Macy's"
+      };
+    }).filter(p => p.price && p.image);
+  } catch(e) { console.error('Macys search error:', e.message); return []; }
 }
 
 
@@ -1188,28 +1179,6 @@ app.get('/cart/:items', async (req, res) => {
 
 
 
-app.get('/api/debug', async (req, res) => {
-  const { store = 'shein', q = 'dress' } = req.query;
-  try {
-    let url, headers;
-    if (store === 'shein') {
-      url = 'https://us.shein.com/api/productList/search/v2?keywords=' + encodeURIComponent(q) + '&limit=5&page=1&sort=0&currency=USD&lang=en';
-      headers = { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1', 'Accept': 'application/json', 'Referer': 'https://us.shein.com/' };
-    } else {
-      url = 'https://www.macys.com/xapi/digital/v1/products/search?keyword=' + encodeURIComponent(q) + '&pageSize=5&requestType=search';
-      headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json', 'Referer': 'https://www.macys.com/', 'x-macys-webservice-client-id': 'tablet_web' };
-    }
-    const resp = await axios.get(url, { headers, timeout: 15000 });
-    const d = resp.data || {};
-    const topKeys = Object.keys(d);
-    const infoKeys = Object.keys(d.info || {});
-    const respKeys = Object.keys(d.response || {});
-    const pCount = (d.info && (d.info.products || d.info.goods) ? (d.info.products || d.info.goods) : (d.response && d.response.products ? d.response.products : (d.products || []))).length;
-    const firstPKeys = (() => { const arr = d.info && (d.info.products || d.info.goods) ? (d.info.products || d.info.goods) : (d.response && d.response.products ? d.response.products : (d.products || [])); return arr[0] ? Object.keys(arr[0]) : []; })();
-    res.json({ httpStatus: resp.status, topKeys, infoKeys, respKeys, productsCount: pCount, firstProductKeys: firstPKeys, codeField: d.code || d.status });
-  } catch (e) {
-    res.json({ error: e.message, httpStatus: e.response && e.response.status, responseType: typeof (e.response && e.response.data), snippet: typeof (e.response && e.response.data) === 'string' ? e.response.data.slice(0, 300) : JSON.stringify(e.response && e.response.data).slice(0, 300) });
-  }
-});
+);
 
 app.listen(PORT, () => console.log(`DealsHub store on port ${PORT} â https://dealshub-search.onrender.com/store`));

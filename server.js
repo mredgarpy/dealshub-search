@@ -188,13 +188,28 @@ app.get('/oauth/callback', async (req, res) => {
   const { code, shop } = req.query;
   if (!code || !shop) return res.status(400).json({ error: 'Missing code or shop' });
   try {
+<<<<<<< HEAD
+    // Use form-encoded body (more reliable than JSON for Shopify token exchange)
+    const params = new URLSearchParams();
+    params.append('client_id',     SHOPIFY_CLIENT_ID);
+    params.append('client_secret', SHOPIFY_CLIENT_SECRET);
+    params.append('code',          code);
+
+=======
     const params = new URLSearchParams();
     params.append('client_id', SHOPIFY_CLIENT_ID);
     params.append('client_secret', SHOPIFY_CLIENT_SECRET_RAW); // send full shpss_ prefix
     params.append('code', code);
     console.log('=== TOKEN EXCHANGE v4 (shpss_ stripped) === secret_len:', SHOPIFY_CLIENT_SECRET.length);
+>>>>>>> b7b6cc5f87bb3a50c54f34e7475bc525d8239792
     const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+<<<<<<< HEAD
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    params.toString()
+=======
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString()
+>>>>>>> b7b6cc5f87bb3a50c54f34e7475bc525d8239792
     });
     const rawText = await response.text();
     console.log('Status:', response.status, '| Body:', rawText.slice(0, 300));
@@ -272,6 +287,15 @@ app.get('/api/search/macys', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+app.get('/api/search/amazon', async (req, res) => {
+  try {
+    const { q = '', limit = '20' } = req.query;
+    if (!q.trim()) return res.json({ results: [], total: 0, query: q });
+    const results = await searchAmazon(q, parseInt(limit) || 20);
+    res.json({ results, total: results.length, query: q });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 
 app.get('/api/trending', async (req, res) => {
   try {

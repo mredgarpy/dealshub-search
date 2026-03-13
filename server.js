@@ -1187,4 +1187,29 @@ app.get('/cart/:items', async (req, res) => {
 });
 
 
+
+app.get('/api/debug', async (req, res) => {
+  const { store = 'shein', q = 'dress' } = req.query;
+  try {
+    let url, headers;
+    if (store === 'shein') {
+      url = 'https://us.shein.com/api/productList/search/v2?keywords=' + encodeURIComponent(q) + '&limit=5&page=1&sort=0&currency=USD&lang=en';
+      headers = { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1', 'Accept': 'application/json', 'Referer': 'https://us.shein.com/' };
+    } else {
+      url = 'https://www.macys.com/xapi/digital/v1/products/search?keyword=' + encodeURIComponent(q) + '&pageSize=5&requestType=search';
+      headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json', 'Referer': 'https://www.macys.com/', 'x-macys-webservice-client-id': 'tablet_web' };
+    }
+    const resp = await axios.get(url, { headers, timeout: 15000 });
+    const d = resp.data || {};
+    const topKeys = Object.keys(d);
+    const infoKeys = Object.keys(d.info || {});
+    const respKeys = Object.keys(d.response || {});
+    const pCount = (d.info && (d.info.products || d.info.goods) ? (d.info.products || d.info.goods) : (d.response && d.response.products ? d.response.products : (d.products || []))).length;
+    const firstPKeys = (() => { const arr = d.info && (d.info.products || d.info.goods) ? (d.info.products || d.info.goods) : (d.response && d.response.products ? d.response.products : (d.products || [])); return arr[0] ? Object.keys(arr[0]) : []; })();
+    res.json({ httpStatus: resp.status, topKeys, infoKeys, respKeys, productsCount: pCount, firstProductKeys: firstPKeys, codeField: d.code || d.status });
+  } catch (e) {
+    res.json({ error: e.message, httpStatus: e.response && e.response.status, responseType: typeof (e.response && e.response.data), snippet: typeof (e.response && e.response.data) === 'string' ? e.response.data.slice(0, 300) : JSON.stringify(e.response && e.response.data).slice(0, 300) });
+  }
+});
+
 app.listen(PORT, () => console.log(`DealsHub store on port ${PORT} â https://dealshub-search.onrender.com/store`));

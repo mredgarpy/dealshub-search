@@ -1,0 +1,12 @@
+{
+  "sections": {
+    "main": {
+      "type": "dealshub-search-results",
+      "settings": {
+        "title": "Buscar Productos",
+        "placeholder": "Buscar en todas las tiendas..."
+      }
+    }
+  },
+  "order": ["main"]
+}

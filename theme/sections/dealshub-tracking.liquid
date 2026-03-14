@@ -1,0 +1,17 @@
+{% comment %}
+  DealsHub — Order Tracking Page Section
+{% endcomment %}
+
+<div class="dh-tracking page-width">
+  <div class="dh-tracking__hero">
+    <h1 class="dh-tracking__title">{{ section.settings.title | default: 'Rastrear Mi Pedido' }}</h1>
+    <p class="dh-tracking__sub">{{ section.settings.subtitle | default: 'Ingresa tu nԺmero de orden para ver el estado de tu pedido' }}</p>
+  </div>
+
+  <div class="dh-tracking__form-wrap">
+    <form id="dh-tracking-form" class="dh-tracking__form">
+      <input type="text" id="dh-tracking-input" class="dh-tracking__input" placeholder="Número de orden (ej: #1234)" required>
+      <button type="submit" class="dh-tracking__btn">Rastrear</button>
+    </form>
+  </div>
+</div>

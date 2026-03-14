@@ -1,0 +1,12 @@
+{
+  "sections": {
+    "main": {
+      "type": "dealshub-tracking",
+      "settings": {
+        "title": "Rastrear Mi Pedido",
+        "subtitle": "Ingresa tu número de orden para ver el estado de tu pedido"
+      }
+    }
+  },
+  "order": ["main"]
+}

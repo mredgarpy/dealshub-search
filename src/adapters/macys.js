@@ -1,0 +1,1 @@
+// Macys Adapter

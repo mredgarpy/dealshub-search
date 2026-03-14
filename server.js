@@ -374,7 +374,8 @@ app.post('/api/create-and-add', async (req, res) => {
     if (!r.ok) { const errText = await r.text(); return res.status(r.status).json({ error: errText }); }
     const data = await r.json();
     const product = data.product;
-    res.json({ success: true, variantId: product.variants[0].id, productId: product.id, productHandle: product.handle });
+    const vid = product.variants[0].id;
+    res.json({ success: true, variantId: vid, productId: product.id, productHandle: product.handle, checkout_url: 'https://' + SHOPIFY_STORE_DOMAIN + '/cart/' + vid + ':1' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 

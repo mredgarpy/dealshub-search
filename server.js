@@ -357,7 +357,7 @@ app.post('/api/create-and-add', async (req, res) => {
     const productPayload = {
       product: {
         title, status: 'active', published: true,
-        variants: [{ price: parseFloat(price).toFixed(2), inventory_management: 'shopify', inventory_policy: 'continue' }],
+        variants: [{ price: parseFloat(price).toFixed(2), inventory_management: null, inventory_policy: 'continue' }],
         images: image ? [{ src: image }] : [],
         metafields: [
           { namespace: 'dealshub', key: 'source_url', value: sourceUrl || '', type: 'single_line_text_field' },
@@ -376,22 +376,7 @@ app.post('/api/create-and-add', async (req, res) => {
     const product = data.product;
     const vid = product.variants[0].id;
 
-      // Set inventory level at store location
-      try {
-        const invItemId = product.variants[0].inventory_item_id;
-        const locRes = await fetch('https://' + SHOPIFY_STORE_DOMAIN + '/admin/api/2024-01/locations.json', {
-          headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN }
-        });
-        const locData = await locRes.json();
-        if (locData.locations && locData.locations.length > 0) {
-          const locationId = locData.locations[0].id;
-          await fetch('https://' + SHOPIFY_STORE_DOMAIN + '/admin/api/2024-01/inventory_levels/set.json', {
-            method: 'POST',
-            headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ location_id: locationId, inventory_item_id: invItemId, available: 99999 })
-          });
-        }
-      } catch (invErr) { console.log('Inventory set error:', invErr.message); }
+      // Inventory tracking disabled - using inventory_management: null
     res.json({ success: true, variantId: vid, productId: product.id, productHandle: product.handle, checkout_url: 'https://' + SHOPIFY_STORE_DOMAIN + '/cart/' + vid + ':1' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });

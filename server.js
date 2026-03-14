@@ -376,8 +376,23 @@ app.post('/api/create-and-add', async (req, res) => {
     const product = data.product;
     const vid = product.variants[0].id;
 
-      // Inventory tracking disabled - using inventory_management: null
-    res.json({ success: true, variantId: vid, productId: product.id, productHandle: product.handle, checkout_url: 'https://stylehubmiami.com/cart/' + vid + ':1' });
+      // Set inventory to 9999 to enable checkout
+      const inventoryItemId = product.variants[0].inventory_item_id;
+      try {
+        const locResp = await fetch(`https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/locations.json`, {
+          headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN }
+        });
+        const locData = await locResp.json();
+        const locationId = locData.locations[0].id;
+        await fetch(`https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/inventory_levels/set.json`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN },
+          body: JSON.stringify({ location_id: locationId, inventory_item_id: inventoryItemId, available: 9999 })
+        });
+      } catch (invErr) {
+        console.error('Inventory set error (non-blocking):', invErr.message);
+      }
+          res.json({ success: true, variantId: vid, productId: product.id, productHandle: product.handle, checkout_url: 'https://stylehubmiami.com/cart/' + vid + ':1' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 

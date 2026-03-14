@@ -7,7 +7,7 @@ app.use(express.json());
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const MARKUP_PERCENT = parseFloat(process.env.MARKUP_PERCENT || '12');
-const SHOPIFY_STORE_DOMAIN = process.env.SHOhPIFY_STORE_DOMAIN;
+const SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
 const SHOPIFY_ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
 const SHOPIFY_CLIENT_ID = '5bcd017d59287f7c9d7ab012b67d4e5b';
 const SHOPIFY_CLIENT_SECRET_RAW = process.env.SHOPIFY_CLIENT_SECRET_RAW || '';
@@ -379,11 +379,7 @@ app.post('/api/create-and-add', async (req, res) => {
       // Set inventory to 9999 to enable checkout
       const inventoryItemId = product.variants[0].inventory_item_id;
       try {
-        const locResp = await fetch(`https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/locations.json`, {
-          headers: { 'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN }
-        });
-        const locData = await locResp.json();
-        const locationId = locData.locations[0].id;
+        const locationId = 84042121347;
         await fetch(`https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-01/inventory_levels/set.json`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': SHOPIFY_ADMIN_TOKEN },

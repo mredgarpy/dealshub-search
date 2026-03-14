@@ -1,4 +1,4 @@
-const express = require('express');
+hconst express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const app = express();
@@ -1184,6 +1184,116 @@ app.get('/cart/:items', async (req, res) => {
     res.status(500).send('Checkout error: ' + err.message);
   }
 });
+
+
+
+
+// ============ PRODUCT DETAIL ENDPOINT ============
+app.get('/api/product/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const store = (req.query.store || 'amazon').toLowerCase();
+    let productData;
+    if (store === 'amazon') productData = await getAmazonDetail(id);
+    else if (store === 'aliexpress') productData = await getAliexpressDetail(id);
+    else if (store === 'sephora') productData = await getSephoraDetail(id, req.query.sku || '');
+    else return res.status(400).json({ error: 'Invalid store' });
+    if (!productData) return res.status(404).json({ error: 'Product not found' });
+    res.json(productData);
+  } catch (err) {
+    console.error('Product detail error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch product details' });
+  }
+});
+
+async function getAmazonDetail(asin) {
+  try {
+    const r = await fetch(`https://real-time-amazon-data.p.rapidapi.com/product-details?asin=${encodeURIComponent(asin)}&country=US`, { headers: rapidHeaders('real-time-amazon-data.p.rapidapi.com') });
+    const d = await r.json();
+    const p = d.data;
+    if (!p) return null;
+    const price = p.product_price ? parseFloat(p.product_price.replace(/[^0-9.]/g, '')) : null;
+    const origPrice = p.product_original_price ? parseFloat(p.product_original_price.replace(/[^0-9.]/g, '')) : price;
+    return {
+      id: asin, title: p.product_title || '', description: p.product_description || (p.about_product || []).join('\n'), about: p.about_product || [],
+      price: price ? '$' + (price * markup()).toFixed(2) : null, originalPrice: origPrice ? '$' + (origPrice * markup()).toFixed(2) : null,
+      images: p.product_photos || [p.product_photo], rating: p.product_star_rating || null, reviews: p.product_num_ratings || 0,
+      variants: (p.product_variations || []).map(v => ({ name: v.name || '', values: (v.values || []).map(val => ({ value: val.value || val, asin: val.asin || null, image: val.photo || null, selected: val.is_selected || false })) })),
+      specifications: p.product_details || {}, features: p.about_product || [], url: `https://www.amazon.com/dp/${asin}`, source: 'amazon', storeName: 'Amazon',
+      badge: p.is_best_seller ? 'Best Seller' : (p.is_amazon_choice ? 'Amazon Choice' : null), brand: p.product_byline || null, availability: p.product_availability || null, category: p.product_category || null
+    };
+  } catch (e) { console.error('Amazon detail error:', e.message); return null; }
+}
+
+async function getAliexpressDetail(productId) {
+  try {
+    const r = await fetch(`https://aliexpress-data.p.rapidapi.com/product/detail?productId=${encodeURIComponent(productId)}`, { headers: rapidHeaders('aliexpress-data.p.rapidapi.com') });
+    const d = await r.json();
+    const p = d.data || d;
+    if (!p) return null;
+    const title = p.title || p.product?.title || '';
+    const imgs = p.images || p.product?.images || [];
+    const desc = p.description || p.product?.description || '';
+    const skuProps = p.skuProperties || p.product?.skuProperties || [];
+    const variants = skuProps.map(prop => ({ name: prop.skuPropertyName || '', values: (prop.skuPropertyValues || []).map(v => ({ value: v.propertyValueDisplayName || v.propertyValueName || '', image: v.skuPropertyImagePath || null, id: v.propertyValueId || null, selected: false })) }));
+    const saleMin = p.salePrice?.min || p.product?.salePrice?.min;
+    const origMin = p.originalPrice?.min || p.product?.originalPrice?.min;
+    const salePrice = saleMin ? parseFloat(saleMin) : null;
+    const originalPrice = origMin ? parseFloat(origMin) : null;
+    const specifications = {};
+    (p.specs || p.product?.specs || []).forEach(s => { if (s.name && s.value) specifications[s.name] = s.value; });
+    return {
+      id: productId, title, description: desc, about: [],
+      price: salePrice ? '$' + (salePrice * markup()).toFixed(2) : null, originalPrice: originalPrice ? '$' + (originalPrice * markup()).toFixed(2) : null,
+      images: imgs.map(img => img.startsWith('//') ? 'https:' + img : img), rating: p.evaluation?.starRating || null, reviews: p.trade?.realTradeCount || 0,
+      variants, specifications, features: [], url: `https://www.aliexpress.com/item/${productId}.html`, source: 'aliexpress', storeName: 'AliExpress',
+      badge: null, brand: null, availability: null, category: null
+    };
+  } catch (e) { console.error('AliExpress detail error:', e.message); return null; }
+}
+
+async function getSephoraDetail(productId, preferedSku) {
+  try {
+    let url = `https://sephora.p.rapidapi.com/us/products/v2/detail?productId=${encodeURIComponent(productId)}`;
+    if (preferedSku) url += `&preferedSku=${encodeURIComponent(preferedSku)}`;
+    const r = await fetch(url, { headers: rapidHeaders('sephora.p.rapidapi.com') });
+    const d = await r.json();
+    const p = d.data || d;
+    if (!p) return null;
+    const product = p.productDetails || p;
+    const name = product.displayName || product.productName || '';
+    const brand = product.brand?.displayName || product.brandName || '';
+    const desc = product.longDescription || product.shortDescription || '';
+    const imgs = [];
+    if (product.heroImage) imgs.push(product.heroImage);
+    if (product.altImages) imgs.push(...product.altImages);
+    if (product.skuImages) Object.values(product.skuImages).forEach(a => { if (Array.isArray(a)) imgs.push(...a); });
+    const sku = product.currentSku || {};
+    const listPrice = sku.listPrice ? parseFloat(sku.listPrice.replace(/[^0-9.]/g, '')) : null;
+    const salePrice = sku.salePrice ? parseFloat(sku.salePrice.replace(/[^0-9.]/g, '')) : listPrice;
+    const variants = [];
+    if (product.regularChildSkus && product.regularChildSkus.length > 1) {
+      const shades = [], sizes = [];
+      product.regularChildSkus.forEach(c => {
+        const entry = { value: c.variationValue || c.skuId, image: c.smallImage || null, id: c.skuId, selected: c.skuId === sku.skuId };
+        if (c.variationType === 'Shade') shades.push(entry); else if (c.variationType === 'Size') sizes.push(entry);
+      });
+      if (shades.length) variants.push({ name: 'Shade', values: shades });
+      if (sizes.length) variants.push({ name: 'Size', values: sizes });
+    }
+    const specifications = {};
+    if (product.ingredients) specifications['Ingredients'] = product.ingredients;
+    if (product.howToUse) specifications['How to Use'] = product.howToUse;
+    if (brand) specifications['Brand'] = brand;
+    return {
+      id: productId, title: name, description: desc, about: [],
+      price: salePrice ? '$' + (salePrice * markup()).toFixed(2) : null, originalPrice: listPrice ? '$' + (listPrice * markup()).toFixed(2) : null,
+      images: imgs.length > 0 ? imgs : [''], rating: product.rating || null, reviews: product.reviews || 0,
+      variants, specifications, features: [], url: `https://www.sephora.com/product/${productId}`, source: 'sephora', storeName: 'Sephora',
+      badge: product.isNew ? 'New' : null, brand, availability: null, category: product.parentCategory?.displayName || null
+    };
+  } catch (e) { console.error('Sephora detail error:', e.message); return null; }
+}
 
 
 

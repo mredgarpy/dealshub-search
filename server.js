@@ -1,4 +1,4 @@
-const express = require('express');
+hconst express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const app = express();
@@ -1218,7 +1218,7 @@ async function getAmazonDetail(asin) {
       id: asin, title: p.product_title || '', description: p.product_description || (p.about_product || []).join('\n'), about: p.about_product || [],
       price: price ? '$' + (price * markup()).toFixed(2) : null, originalPrice: origPrice ? '$' + (origPrice * markup()).toFixed(2) : null,
       images: p.product_photos || [p.product_photo], rating: p.product_star_rating || null, reviews: p.product_num_ratings || 0,
-      variants: (p.product_variations || []).map(v => ({ name: v.name || '', values: (v.values || []).map(val => ({ value: val.value || val, asin: val.asin || null, image: val.photo || null, selected: val.is_selected || false })) })),
+      variants: (Array.isArray(p.product_variations) ? p.product_variations : []).map(v => ({ name: v.name || '', values: (v.values || []).map(val => ({ value: val.value || val, asin: val.asin || null, image: val.photo || null, selected: val.is_selected || false })) })),
       specifications: p.product_details || {}, features: p.about_product || [], url: `https://www.amazon.com/dp/${asin}`, source: 'amazon', storeName: 'Amazon',
       badge: p.is_best_seller ? 'Best Seller' : (p.is_amazon_choice ? 'Amazon Choice' : null), brand: p.product_byline || null, availability: p.product_availability || null, category: p.product_category || null
     };

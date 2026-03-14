@@ -357,7 +357,7 @@ app.post('/api/create-and-add', async (req, res) => {
     const productPayload = {
       product: {
         title, status: 'active', published: true,
-        variants: [{ price: parseFloat(price).toFixed(2), inventory_management: null, inventory_policy: 'continue' }],
+        variants: [{ price: parseFloat(price).toFixed(2), inventory_management: null, inventory_policy: 'continue', inventory_quantity: 9999 }],
         images: image ? [{ src: image }] : [],
         metafields: [
           { namespace: 'dealshub', key: 'source_url', value: sourceUrl || '', type: 'single_line_text_field' },

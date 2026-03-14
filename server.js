@@ -7,7 +7,7 @@ app.use(express.json());
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const MARKUP_PERCENT = parseFloat(process.env.MARKUP_PERCENT || '12');
-const SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN;
+const SHOPIFY_STORE_DOMAIN = process.env.SHOhPIFY_STORE_DOMAIN;
 const SHOPIFY_ADMIN_TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
 const SHOPIFY_CLIENT_ID = '5bcd017d59287f7c9d7ab012b67d4e5b';
 const SHOPIFY_CLIENT_SECRET_RAW = process.env.SHOPIFY_CLIENT_SECRET_RAW || '';
@@ -377,7 +377,7 @@ app.post('/api/create-and-add', async (req, res) => {
     const vid = product.variants[0].id;
 
       // Inventory tracking disabled - using inventory_management: null
-    res.json({ success: true, variantId: vid, productId: product.id, productHandle: product.handle, checkout_url: 'https://' + SHOPIFY_STORE_DOMAIN + '/cart/' + vid + ':1' });
+    res.json({ success: true, variantId: vid, productId: product.id, productHandle: product.handle, checkout_url: 'https://stylehubmiami.com/cart/' + vid + ':1' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 

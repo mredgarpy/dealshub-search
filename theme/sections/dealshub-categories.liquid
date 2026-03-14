@@ -1,0 +1,98 @@
+{% comment %}
+  DealsHub — Category Tiles Section
+{% endcomment %}
+
+<div class="dh-cats page-width">
+  <h2 class="dh-cats__title">{{ section.settings.title | default: 'Categorías Populares' }}</h2>
+  <div class="dh-cats__grid">
+    {% for block in section.blocks %}
+      <a href="/pages/search?q={{ block.settings.search_query | url_encode }}" class="dh-cat-tile" style="background: {{ block.settings.bg_color | default: '#f8f9fa' }};">
+        <span class="dh-cat-tile__emoji">{{ block.settings.emoji | default: '🛍️' }}</span>
+        <span class="dh-cat-tile__name">{{ block.settings.name }}</span>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+  .dh-cats { padding: 40px 0; }
+  .dh-cats__title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 24px;
+    text-align: center;
+  }
+  .dh-cats__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+  }
+  .dh-cat-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 12px;
+    border-radius: 16px;
+    text-decoration: none;
+    transition: transform .2s, box-shadow .2s;
+    min-height: 120px;
+  }
+  .dh-cat-tile:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.1);
+  }
+  .dh-cat-tile__emoji { font-size: 36px; margin-bottom: 8px; }
+  .dh-cat-tile__name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a2e;
+    text-align: center;
+  }
+  @media (max-width: 600px) {
+    .dh-cats__grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .dh-cat-tile { padding: 16px 8px; min-height: 100px; }
+  }
+</style>
+
+{% schema %}
+{
+  "name": "DealsHub Categories",
+  "tag": "section",
+  "class": "dealshub-categories-section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Title",
+      "default": "Categorías Populares"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "category",
+      "name": "Category",
+      "settings": [
+        { "type": "text", "id": "name", "label": "Name", "default": "Category" },
+        { "type": "text", "id": "emoji", "label": "Emoji", "default": "🛍️" },
+        { "type": "text", "id": "search_query", "label": "Search Query", "default": "" },
+        { "type": "color", "id": "bg_color", "label": "Background Color", "default": "#f0f7ff" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "DealsHub Categories",
+      "blocks": [
+        { "type": "category", "settings": { "name": "Moda", "emoji": "👗", "search_query": "fashion dresses", "bg_color": "#fff0f5" } },
+        { "type": "category", "settings": { "name": "Belleza", "emoji": "💄", "search_query": "beauty skincare", "bg_color": "#f5f0ff" } },
+        { "type": "category", "settings": { "name": "Electrónica", "emoji": "📱", "search_query": "electronics phone", "bg_color": "#f0f7ff" } },
+        { "type": "category", "settings": { "name": "Hogar", "emoji": "🏠", "search_query": "home decor", "bg_color": "#f0fff5" } },
+        { "type": "category", "settings": { "name": "Zapatillas", "emoji": "👟", "search_query": "sneakers shoes", "bg_color": "#fff5f0" } },
+        { "type": "category", "settings": { "name": "Accesorios", "emoji": "💍", "search_query": "jewelry accessories", "bg_color": "#f5f5f0" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

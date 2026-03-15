@@ -1,1 +1,205 @@
-<!DOCTYPE>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StyleHub Admin — Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f4f6f8; color: #1a1a2e; }
+    .admin-nav { background: #1a1a2e; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .admin-nav h1 { color: #fff; font-size: 18px; font-weight: 700; }
+    .admin-nav__actions { display: flex; gap: 12px; }
+    .admin-nav__btn { padding: 8px 16px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: transparent; color: #fff; font-size: 13px; cursor: pointer; transition: background .2s; }
+    .admin-nav__btn:hover { background: rgba(255,255,255,.1); }
+    .admin-nav__btn--danger { border-color: #ff4757; color: #ff4757; }
+    .admin-nav__btn--danger:hover { background: rgba(255,71,87,.1); }
+    .admin-container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    /* Stats Cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    .stat-card__label { font-size: 13px; color: #888; margin-bottom: 4px; }
+    .stat-card__value { font-size: 28px; font-weight: 700; color: #1a1a2e; }
+    .stat-card__sub { font-size: 12px; color: #2ed573; margin-top: 4px; }
+    .stat-card__sub--warn { color: #ffa502; }
+    .stat-card__sub--err { color: #ff4757; }
+
+    /* Tables */
+    .admin-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 24px; }
+    .admin-card__title { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .admin-table { width: 100%; border-collapse: collapse; }
+    .admin-table th { text-align: left; padding: 10px 12px; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid #f0f0f0; }
+    .admin-table td { padding: 12px; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .status-dot--ok { background: #2ed573; }
+    .status-dot--err { background: #ff4757; }
+    .status-dot--warn { background: #ffa502; }
+
+    /* Pricing Editor */
+    .pricing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .pricing-item { padding: 16px; border: 1px solid #e8e8e8; border-radius: 10px; }
+    .pricing-item__name { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+    .pricing-item__field { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+    .pricing-item__field label { font-size: 13px; color: #666; }
+    .pricing-item__field input { width: 80px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; text-align: right; }
+
+    /* Log view */
+    .log-view { background: #1a1a2e; border-radius: 10px; padding: 16px; max-height: 400px; overflow-y: auto; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.8; }
+    .log-entry { color: #a0aec0; }
+    .log-entry--error { color: #ff4757; }
+    .log-entry--warn { color: #ffa502; }
+    .log-entry--info { color: #2ed573; }
+
+    .refresh-btn { padding: 6px 14px; background: #f0f0f0; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .refresh-btn:hover { background: #e0e0e0; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .admin-container { padding: 16px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <nav class="admin-nav">
+    <h1>🏬 StyleHub Admin</h1>
+    <div class="admin-nav__actions">
+      <button class="admin-nav__btn" onclick="refreshAll()">↻ Refresh</button>
+      <button class="admin-nav__btn admin-nav__btn--danger" onclick="clearCache()">🗑️ Clear Cache</button>
+    </div>
+  </nav>
+
+  <div class="admin-container">
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="stat-card__label">Status</div><div class="stat-card__value" id="stat-status">...</div></div>
+      <div class="stat-card"><div class="stat-card__label">Version</div><div class="stat-card__value" id="stat-version">...</div></div>
+      <div class="stat-card"><div class="stat-card__label">Search Cache</div><div class="stat-card__value" id="stat-search-cache">...</div></div>
+      <div class="stat-card"><div class="stat-card__label">Product Cache</div><div class="stat-card__value" id="stat-product-cache">...</div></div>
+      <div class="stat-card"><div class="stat-card__label">Uptime</div><div class="stat-card__value" id="stat-uptime">...</div></div>
+    </div>
+
+    <!-- Source Health -->
+    <div class="admin-card">
+      <div class="admin-card__title">
+        Source Health
+        <button class="refresh-btn" onclick="loadHealth()">Check</button>
+      </div>
+      <table class="admin-table">
+        <thead>
+          <tr><th>Source</th><th>Status</th><th>Latency</th><th>Results</th></tr>
+        </thead>
+        <tbody id="health-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Pricing Rules -->
+    <div class="admin-card">
+      <div class="admin-card__title">Pricing Rules</div>
+      <div class="pricing-grid" id="pricing-grid"></div>
+    </div>
+
+    <!-- Recent Syncs (placeholder) -->
+    <div class="admin-card">
+      <div class="admin-card__title">Recent Syncs</div>
+      <table class="admin-table">
+        <thead>
+          <tr><th>Product</th><th>Source</th><th>Price</th><th>Status</th><th>Time</th></tr>
+        </thead>
+        <tbody id="syncs-tbody">
+          <tr><td colspan="5" style="text-align:center;color:#888;padding:24px;">Syncs will appear here when customers purchase products</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API_BASE}/health`);
+        const data = await res.json();
+        document.getElementById('stat-status').textContent = data.status === 'ok' ? '✅ Online' : '❌ Error';
+        document.getElementById('stat-version').textContent = 'v' + data.version;
+        document.getElementById('stat-search-cache').textContent = data.cacheSize?.search || 0;
+        document.getElementById('stat-product-cache').textContent = data.cacheSize?.product || 0;
+        const mins = Math.floor(data.uptime / 60);
+        const hrs = Math.floor(mins / 60);
+        document.getElementById('stat-uptime').textContent = hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
+      } catch (e) {
+        document.getElementById('stat-status').textContent = '❌ Offline';
+      }
+    }
+
+    async function loadHealth() {
+      const tbody = document.getElementById('health-tbody');
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:16px;">Checking...</td></tr>';
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/source-health`);
+        const data = await res.json();
+        tbody.innerHTML = Object.entries(data.sources).map(([name, info]) => `
+          <tr>
+            <td><strong>${name.charAt(0).toUpperCase() + name.slice(1)}</strong></td>
+            <td><span class="status-dot status-dot--${info.status === 'ok' ? 'ok' : 'err'}"></span>${info.status}</td>
+            <td>${info.latencyMs}ms</td>
+            <td>${info.resultCount ?? '-'}</td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:#ff4757">Error loading</td></tr>';
+      }
+    }
+
+    function loadPricing() {
+      const rules = {
+        Amazon: { markupPct: 12, minMarginPct: 8, roundTo: 0.99 },
+        AliExpress: { markupPct: 25, minMarginPct: 15, roundTo: 0.99 },
+        Sephora: { markupPct: 10, minMarginPct: 5, roundTo: 0.99 },
+        "Macy's": { markupPct: 10, minMarginPct: 5, roundTo: 0.99 },
+        SHEIN: { markupPct: 30, minMarginPct: 18, roundTo: 0.99 }
+      };
+      const grid = document.getElementById('pricing-grid');
+      grid.innerHTML = Object.entries(rules).map(([name, rule]) => `
+        <div class="pricing-item">
+          <div class="pricing-item__name">${name}</div>
+          <div class="pricing-item__field">
+            <label>Markup %</label>
+            <input type="number" value="${rule.markupPct}" min="0" max="100" readonly>
+          </div>
+          <div class="pricing-item__field">
+            <label>Min Margin %</label>
+            <input type="number" value="${rule.minMarginPct}" min="0" max="100" readonly>
+          </div>
+          <div class="pricing-item__field">
+            <label>Rounding</label>
+            <input type="text" value="${rule.roundTo}" readonly>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function clearCache() {
+      if (!confirm('Clear all cache?')) return;
+      try {
+        await fetch(`${API_BASE}/api/admin/cache/clear`, { method: 'POST' });
+        alert('Cache cleared');
+        loadStats();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    function refreshAll() {
+      loadStats();
+      loadHealth();
+    }
+
+    // Init
+    loadStats();
+    loadHealth();
+    loadPricing();
+  </script>
+</body>
+</html>

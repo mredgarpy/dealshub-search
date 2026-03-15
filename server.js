@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub â Main Server (Hybrid Commerce Backend)
+// DealsHub Ã¢ÂÂ Main Server (Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
 // ============================================================
@@ -62,7 +62,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// CAPA A â LIVE DISCOVERY LAYER
+// CAPA A Ã¢ÂÂ LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -329,7 +329,7 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B â ON-DEMAND SYNC LAYER
+// CAPA B Ã¢ÂÂ ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
@@ -431,7 +431,7 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D â OPERATIONS LAYER (Admin endpoints)
+// CAPA D Ã¢ÂÂ OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
@@ -572,12 +572,16 @@ app.post('/api/admin/cleanup', async (req, res) => {
     const { ids, secret } = req.body;
     if (secret !== 'stylehub2026') return res.status(403).json({ error: 'Unauthorized' });
     if (!ids || !Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
-    const { shopifyAPI } = require('./src/services/shopify-sync');
+    const domain = process.env.SHOPIFY_STORE_DOMAIN;
+    const token = process.env.SHOPIFY_ACCESS_TOKEN;
     const results = [];
     for (const id of ids) {
       try {
-        await shopifyAPI('products/' + id + '.json', 'DELETE');
-        results.push({ id, status: 'deleted' });
+        const r = await fetch('https://' + domain + '/admin/api/2024-01/products/' + id + '.json', {
+          method: 'DELETE',
+          headers: { 'X-Shopify-Access-Token': token }
+        });
+        results.push({ id, status: r.ok ? 'deleted' : 'error', code: r.status });
       } catch (e) {
         results.push({ id, status: 'error', message: e.message });
       }

@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — Amazon Adapter (Real-Time Amazon Data via RapidAPI)
+// DealsHub â Amazon Adapter (Real-Time Amazon Data via RapidAPI)
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
@@ -78,7 +78,7 @@ class AmazonAdapter extends BaseAdapter {
                     d.product_availability?.toLowerCase().includes('out') ? 'out_of_stock' : 'unknown';
 
     // Variants from Amazon
-    if (d.product_variations) {
+    if (d.product_variations && Array.isArray(d.product_variations)) {
       const groups = {};
       d.product_variations.forEach(v => {
         const name = v.name || 'Option';

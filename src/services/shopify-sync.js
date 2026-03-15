@@ -216,7 +216,7 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
       note: productData.shippingData?.note || 'Standard shipping',
       deliveryLabel: productData.deliveryEstimate?.label || null
     },
-    checkoutUrl: `https://${CUSTOM_DOMAIN()}/cart/${variantId}:${quantity}`,
+    checkoutUrl: `https://${CUSTOM_DOMAIN()}/cart/clear?return_to=/cart/${variantId}:${quantity}`,
     cartAddPayload: {
       id: variantId,
       quantity,

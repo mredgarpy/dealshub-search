@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub â Shopify Sync Service (On-Demand Product Creation)
+// DealsHub Ã¢ÂÂ Shopify Sync Service (On-Demand Product Creation)
 // ============================================================
 // Creates/updates products in Shopify ONLY when user wants to buy
 // Handles: deduplication, inventory, variants, metafields
@@ -148,29 +148,12 @@ async function createShopifyProduct(productData, pricingResult) {
     throw new Error('Product creation returned no product');
   }
 
-  // ---- SET INVENTORY FOR ALL VARIANTS ----
-  const locationId = LOCATION_ID();
-  for (const variant of product.variants) {
-    try {
-      await shopifyAPI('/inventory_levels/set.json', 'POST', {
-        location_id: locationId,
-        inventory_item_id: variant.inventory_item_id,
-        available: 9999
-      });
-      logger.info('sync', `Inventory set for variant ${variant.id}`, { available: 9999 });
-    } catch (invErr) {
-      logger.error('sync', `Inventory set failed for variant ${variant.id}`, { error: invErr.message });
-      // FALLBACK: Try to update inventory item to not track
-      try {
-        await shopifyAPI(`/inventory_items/${variant.inventory_item_id}.json`, 'PUT', {
-          inventory_item: { tracked: false }
-        });
-        logger.info('sync', `Fallback: Set variant ${variant.id} to untracked`);
-      } catch (e2) {
-        logger.error('sync', `Fallback also failed for variant ${variant.id}`, { error: e2.message });
-      }
-    }
-  }
+  // ---- PROPAGATION DELAY ----
+  // Wait for Shopify to fully index the new product before returning checkout URL
+  // inventory_management is null (no tracking), so no need to set inventory levels
+  logger.info('sync', 'Waiting 3s for Shopify product propagation...');
+  await new Promise(resolve => setTimeout(resolve, 3000));
+  logger.info('sync', 'Propagation delay complete, returning checkout URL');
 
   // Cache the mapping
   const mapping = {

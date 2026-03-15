@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub â Main Server (Hybrid Commerce Backend)
+// DealsHub Ã¢ÂÂ Main Server (Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
 // ============================================================
@@ -62,7 +62,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// CAPA A â LIVE DISCOVERY LAYER
+// CAPA A Ã¢ÂÂ LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -329,7 +329,7 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B â ON-DEMAND SYNC LAYER
+// CAPA B Ã¢ÂÂ ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
@@ -431,7 +431,7 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D â OPERATIONS LAYER (Admin endpoints)
+// CAPA D Ã¢ÂÂ OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
@@ -521,9 +521,25 @@ app.get('/api/order-status', async (req, res) => {
 
 // ---- STATIC: Public assets (served with CORS for Shopify storefront) ----
 
-// Redirect PDP JS to jsDelivr CDN (bypasses Render static caching issue)
+// Proxy PDP JS from jsDelivr CDN (bypasses Render static caching issue)
+const https = require('https');
 app.get('/static/dealshub-product.js', (req, res) => {
-  res.redirect(302, 'https://cdn.jsdelivr.net/gh/mredgarpy/dealshub-search@main/public/dealshub-product.js');
+  const cdnUrl = 'https://cdn.jsdelivr.net/gh/mredgarpy/dealshub-search@main/public/dealshub-product.js';
+  https.get(cdnUrl, (cdnRes) => {
+    if (cdnRes.statusCode >= 300 && cdnRes.statusCode < 400 && cdnRes.headers.location) {
+      https.get(cdnRes.headers.location, (finalRes) => {
+        res.set('Content-Type', 'application/javascript');
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Cache-Control', 'public, max-age=300');
+        finalRes.pipe(res);
+      }).on('error', () => res.status(500).send('// CDN error'));
+    } else {
+      res.set('Content-Type', 'application/javascript');
+      res.set('Access-Control-Allow-Origin', '*');
+      res.set('Cache-Control', 'public, max-age=300');
+      cdnRes.pipe(res);
+    }
+  }).on('error', () => res.status(500).send('// CDN error'));
 });
 
 app.use('/static', express.static(path.join(__dirname, 'public'), {

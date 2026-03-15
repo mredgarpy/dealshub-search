@@ -196,7 +196,8 @@
 
     /* Return Policy */
     html+='<div style="border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:12px">';
-    var retWin=p.returnPolicy||p.return_window||'30-day';
+    var retRaw=p.returnPolicy||p.return_window||'30-day';
+    var retWin=typeof retRaw==='object'?(retRaw.summary||retRaw.text||retRaw.window||retRaw.label||retRaw.description||JSON.stringify(retRaw)):String(retRaw);
     html+='<p style="font-size:13px;color:#333;margin:0"><strong>Returns:</strong> '+esc(retWin)+' return policy</p>';
     html+='</div>';
 

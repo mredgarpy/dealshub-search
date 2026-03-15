@@ -148,12 +148,33 @@ async function createShopifyProduct(productData, pricingResult) {
     throw new Error('Product creation returned no product');
   }
 
-  // ---- PROPAGATION DELAY ----
-  // Wait for Shopify to fully index the new product before returning checkout URL
-  // inventory_management is null (no tracking), so no need to set inventory levels
-  logger.info('sync', 'Waiting 3s for Shopify product propagation...');
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  logger.info('sync', 'Propagation delay complete, returning checkout URL');
+  // ---- VERIFY PRODUCT AVAILABILITY ----
+    // Poll the Shopify storefront to confirm the product is available for checkout
+    // Newly created products can take 10-30s to be indexed by Shopify checkout
+    const verifyUrl = `https://${CUSTOM_DOMAIN()}/products/${product.handle}.json`;
+    let available = false;
+    for (let attempt = 1; attempt <= 12; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      try {
+        const checkResp = await fetch(verifyUrl);
+        if (checkResp.ok) {
+          const checkData = await checkResp.json();
+          const variant = checkData.product && checkData.product.variants && checkData.product.variants[0];
+          if (variant && variant.id) {
+            available = true;
+            logger.info('sync', `Product available on storefront after ${attempt * 5}s (variant ${variant.id})`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            break;
+          }
+        }
+        logger.info('sync', `Availability check attempt ${attempt}/12 - not yet available`);
+      } catch (e) {
+        logger.info('sync', `Availability check attempt ${attempt}/12 - error: ${e.message}`);
+      }
+    }
+    if (!available) {
+      logger.warn('sync', 'Product not confirmed available after 60s, proceeding anyway');
+    }
 
   // Cache the mapping
   const mapping = {

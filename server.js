@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub ÃÂ¢ÃÂÃÂ Main Server (Hybrid Commerce Backend)
+// DealsHub ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Main Server (Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
 // ============================================================
@@ -62,7 +62,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// CAPA A ÃÂ¢ÃÂÃÂ LIVE DISCOVERY LAYER
+// CAPA A ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -329,7 +329,7 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B ÃÂ¢ÃÂÃÂ ON-DEMAND SYNC LAYER
+// CAPA B ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
@@ -431,7 +431,7 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D ÃÂ¢ÃÂÃÂ OPERATIONS LAYER (Admin endpoints)
+// CAPA D ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
@@ -581,6 +581,97 @@ app.post('/api/admin/cleanup', async (req, res) => {
           method: 'DELETE',
           headers: { 'X-Shopify-Access-Token': token }
         });
+
+// Admin: Update theme asset (replace text)
+app.post('/api/admin/theme-update', async (req, res) => {
+  try {
+    const { secret, assetKey, find, replace } = req.body;
+    if (secret !== 'stylehub2026') return res.status(403).json({ error: 'Unauthorized' });
+    if (!assetKey) return res.status(400).json({ error: 'assetKey required' });
+    
+    const domain = process.env.SHOPIFY_STORE_DOMAIN;
+    const token = process.env.SHOPIFY_ADMIN_TOKEN;
+    const themeId = '157178462339';
+    
+    // GET current asset
+    const getR = await fetch('https://' + domain + '/admin/api/2024-01/themes/' + themeId + '/assets.json?asset[key]=' + encodeURIComponent(assetKey), {
+      headers: { 'X-Shopify-Access-Token': token }
+    });
+    if (!getR.ok) return res.status(getR.status).json({ error: 'GET failed', status: getR.status });
+    const getData = await getR.json();
+    let value = getData.asset.value;
+    
+    // Count and replace
+    const regex = new RegExp(find, 'g');
+    const matchCount = (value.match(regex) || []).length;
+    if (matchCount === 0) return res.json({ assetKey, matches: 0, updated: false });
+    
+    value = value.replace(regex, replace);
+    
+    // PUT updated asset
+    const putR = await fetch('https://' + domain + '/admin/api/2024-01/themes/' + themeId + '/assets.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
+      body: JSON.stringify({ asset: { key: assetKey, value: value } })
+    });
+    
+    if (!putR.ok) {
+      const errText = await putR.text();
+      return res.status(putR.status).json({ error: 'PUT failed', status: putR.status, detail: errText.substring(0, 200) });
+    }
+    
+    res.json({ assetKey, matches: matchCount, updated: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Batch theme rebrand
+app.post('/api/admin/theme-rebrand', async (req, res) => {
+  try {
+    const { secret, assets } = req.body;
+    if (secret !== 'stylehub2026') return res.status(403).json({ error: 'Unauthorized' });
+    if (!assets || !Array.isArray(assets)) return res.status(400).json({ error: 'assets array required' });
+    
+    const domain = process.env.SHOPIFY_STORE_DOMAIN;
+    const token = process.env.SHOPIFY_ADMIN_TOKEN;
+    const themeId = '157178462339';
+    const results = [];
+    
+    for (const assetKey of assets) {
+      try {
+        const getR = await fetch('https://' + domain + '/admin/api/2024-01/themes/' + themeId + '/assets.json?asset[key]=' + encodeURIComponent(assetKey), {
+          headers: { 'X-Shopify-Access-Token': token }
+        });
+        if (!getR.ok) { results.push({ assetKey, error: 'GET ' + getR.status }); continue; }
+        const getData = await getR.json();
+        let value = getData.asset.value;
+        
+        const before = (value.match(/DealsHub|dealshub|DEALSHUB/g) || []).length;
+        if (before === 0) { results.push({ assetKey, matches: 0, skip: true }); continue; }
+        
+        value = value.replace(/DealsHub/g, 'StyleHub');
+        value = value.replace(/dealshub/g, 'stylehub');
+        value = value.replace(/DEALSHUB/g, 'STYLEHUB');
+        
+        const putR = await fetch('https://' + domain + '/admin/api/2024-01/themes/' + themeId + '/assets.json', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
+          body: JSON.stringify({ asset: { key: assetKey, value: value } })
+        });
+        
+        results.push({ assetKey, matches: before, updated: putR.ok, status: putR.status });
+        await new Promise(r => setTimeout(r, 500));
+      } catch(e) {
+        results.push({ assetKey, error: e.message });
+      }
+    }
+    
+    res.json({ total: assets.length, results });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
         results.push({ id, status: r.ok ? 'deleted' : 'error', code: r.status });
       } catch (e) {
         results.push({ id, status: 'error', message: e.message });

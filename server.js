@@ -72,7 +72,7 @@ app.get('/api/search', async (req, res) => {
 
   const sources = store ? [store.toLowerCase()] : VALID_SOURCES;
   const limitNum = Math.min(parseInt(limit) || 20, 50);
-  const cacheKey = `search:${q}:${sources.join(',')}${page}:${limitNum}`;
+  const cacheKey = `search:${q}:${sources.join(',')}:${page}:${limitNum}`;
 
   // Check cache
   const cached = searchCache.get(cacheKey);
@@ -518,6 +518,15 @@ app.get('/api/order-status', async (req, res) => {
     res.status(500).json({ error: 'Failed to look up order' });
   }
 });
+
+// ---- STATIC: Public assets (served with CORS for Shopify storefront) ----
+app.use('/static', express.static(path.join(__dirname, 'public'), {
+  maxAge: '1h',
+  setHeaders: (res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'public, max-age=3600');
+  }
+}));
 
 // ---- ADMIN: Dashboard ----
 app.use('/admin', express.static(path.join(__dirname, 'admin')));

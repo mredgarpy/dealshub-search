@@ -24,7 +24,6 @@ class AmazonAdapter extends BaseAdapter {
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
     if (!data || !data.data) {
       logger.warn('amazon', `Product not found: ${asin}`);
-      // Fallback: try search by ASIN
       const searchUrl = `https://${API_HOST}/search?query=${encodeURIComponent(asin)}&page=1&country=US`;
       const searchData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
       if (searchData?.data?.products?.length > 0) {
@@ -56,6 +55,11 @@ class AmazonAdapter extends BaseAdapter {
   }
 
   normalizeProduct(d) {
+    try { return this._normalizeProductInner(d); }
+    catch (e) { logger.error('amazon', 'normalizeProduct error', { error: e.message }); return this.normalizeProductFromSearch(d); }
+  }
+
+  _normalizeProductInner(d) {
     const p = emptyProduct();
     p.source = 'amazon';
     p.sourceId = d.asin || '';
@@ -77,10 +81,14 @@ class AmazonAdapter extends BaseAdapter {
     p.stockSignal = d.product_availability?.toLowerCase().includes('in stock') ? 'in_stock' :
                     d.product_availability?.toLowerCase().includes('out') ? 'out_of_stock' : 'unknown';
 
-    // Variants from Amazon
-    if (d.product_variations) {
+    // Variants from Amazon (can be array, object, or undefined)
+    const variations = Array.isArray(d.product_variations) ? d.product_variations :
+                       (d.product_variations && typeof d.product_variations === 'object') ?
+                         Object.values(d.product_variations).flat().filter(v => v && typeof v === 'object') : [];
+    if (variations.length > 0) {
       const groups = {};
-      d.product_variations.forEach(v => {
+      variations.forEach(v => {
+        if (!v || typeof v !== 'object') return;
         const name = v.name || 'Option';
         if (!groups[name]) groups[name] = { name, values: [] };
         groups[name].values.push({
@@ -91,9 +99,9 @@ class AmazonAdapter extends BaseAdapter {
         });
       });
       p.options = Object.values(groups);
-      p.variants = d.product_variations.map(v => ({
+      p.variants = variations.filter(v => v && typeof v === 'object').map(v => ({
         id: v.asin || '',
-        title: `${v.name}: ${v.value}`,
+        title: `${v.name || 'Option'}: ${v.value || ''}`,
         price: parsePrice(v.price) || p.price,
         image: v.image || null,
         available: true
@@ -126,7 +134,7 @@ class AmazonAdapter extends BaseAdapter {
     product.sourceName = 'Amazon';
     product.title = p.product_title || '';
     product.brand = p.product_brand || null;
-    product.images = p.product_photo ? [p.product_photo] : [];
+    product.images = p.product_photo ? [p.product_photo] : (p.product_photos || []);
     product.primaryImage = product.images[0] || '';
     product.price = parsePrice(p.product_price);
     product.originalPrice = parsePrice(p.product_original_price);

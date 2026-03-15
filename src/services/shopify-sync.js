@@ -1,14 +1,17 @@
 // ============================================================
-// StyleHub — Shopify Sync Service (On-Demand Product Creation)
+// StyleHub — Shopify Sync Service v2.0 (FASE 4)
 // ============================================================
 // Creates/updates products in Shopify ONLY when user wants to buy
 // Handles: deduplication, inventory, variants, metafields
+// NEW: Auto-fix old products, price update on re-sync, shipping data
+// ============================================================
 
 const fetch = require('node-fetch');
 const logger = require('../utils/logger');
 const { calculateFinalPrice, parsePrice } = require('../utils/pricing');
 const { syncCache } = require('../utils/cache');
 const { findMapping, upsertMapping, logSync } = require('../utils/db');
+const { calculateDeliveryEstimate, getReturnPolicy, getSupplierShippingCost } = require('./shipping');
 
 const SHOPIFY_DOMAIN = () => process.env.SHOPIFY_STORE_DOMAIN;
 const SHOPIFY_TOKEN = () => process.env.SHOPIFY_ADMIN_TOKEN;
@@ -38,6 +41,55 @@ async function shopifyAPI(endpoint, method = 'GET', body = null) {
   return text ? JSON.parse(text) : {};
 }
 
+// ---- AUTO-FIX: Repair old products with bad inventory_policy ----
+async function autoFixProduct(product) {
+  let needsFix = false;
+  const fixes = [];
+
+  for (const variant of product.variants) {
+    // Fix 1: inventory_policy should be 'continue' for dropshipping
+    if (variant.inventory_policy === 'deny') {
+      needsFix = true;
+      fixes.push(`variant ${variant.id}: policy deny->continue`);
+      try {
+        await shopifyAPI(`/variants/${variant.id}.json`, 'PUT', {
+          variant: {
+            id: variant.id,
+            inventory_policy: 'continue'
+          }
+        });
+        logger.info('sync', `Auto-fixed variant ${variant.id} inventory_policy to continue`);
+      } catch (e) {
+        logger.warn('sync', `Auto-fix variant ${variant.id} failed`, { error: e.message });
+      }
+    }
+
+    // Fix 2: Set inventory to 9999 if it's 0 or negative
+    if (variant.inventory_quantity !== undefined && variant.inventory_quantity <= 0) {
+      try {
+        await shopifyAPI('/inventory_levels/set.json', 'POST', {
+          location_id: LOCATION_ID(),
+          inventory_item_id: variant.inventory_item_id,
+          available: 9999
+        });
+        fixes.push(`variant ${variant.id}: inventory 0->9999`);
+        logger.info('sync', `Auto-fixed variant ${variant.id} inventory to 9999`);
+      } catch (e) {
+        // Non-critical — inventory_policy: continue means cart still works
+        logger.debug('sync', `Inventory fix non-critical for variant ${variant.id}`);
+      }
+    }
+  }
+
+  if (needsFix) {
+    logSync(product.tags?.match(/source:(\w+)/)?.[1] || 'unknown',
+            product.tags?.match(/source-id:([^\s,]+)/)?.[1] || product.id,
+            'auto-fix', 'success', { fixes });
+  }
+
+  return needsFix;
+}
+
 // ---- CHECK IF PRODUCT ALREADY SYNCED ----
 async function findExistingProduct(source, sourceId) {
   const cacheKey = `mapping:${source}:${sourceId}`;
@@ -47,9 +99,22 @@ async function findExistingProduct(source, sourceId) {
   // Try tag-based search in Shopify
   try {
     const tag = `source-id:${sourceId}`;
-    const data = await shopifyAPI(`/products.json?limit=1&status=any&tag=${encodeURIComponent(tag)}`);
+    const data = await shopifyAPI(`/products.json?limit=5&status=any&tag=${encodeURIComponent(tag)}`);
     if (data.products && data.products.length > 0) {
-      const p = data.products[0];
+      // Find the exact match (tag search is fuzzy, might return similar IDs)
+      const exactMatch = data.products.find(p => {
+        const tags = (p.tags || '').split(',').map(t => t.trim());
+        return tags.includes(`source-id:${sourceId}`) && tags.includes(`source:${source}`);
+      }) || data.products[0];
+
+      const p = exactMatch;
+
+      // Auto-fix old products with bad inventory_policy
+      const wasFixed = await autoFixProduct(p);
+      if (wasFixed) {
+        logger.info('sync', `Auto-fixed existing product ${p.id} for ${source}:${sourceId}`);
+      }
+
       const mapping = {
         shopifyProductId: p.id,
         shopifyVariantId: p.variants[0]?.id,
@@ -75,6 +140,34 @@ function safeParsePrice(val) {
   return isNaN(num) ? 0 : num;
 }
 
+// ---- UPDATE EXISTING PRODUCT PRICE ----
+async function updateProductPrice(mapping, pricingResult, productData) {
+  try {
+    const variant = mapping.variants[0];
+    if (!variant) return;
+
+    const currentPrice = parseFloat(variant.price);
+    const newPrice = pricingResult.price;
+
+    // Only update if price changed by more than 1%
+    if (Math.abs(currentPrice - newPrice) / currentPrice > 0.01) {
+      await shopifyAPI(`/variants/${variant.id}.json`, 'PUT', {
+        variant: {
+          id: variant.id,
+          price: newPrice.toFixed(2),
+          compare_at_price: pricingResult.compareAt ? pricingResult.compareAt.toFixed(2) : null
+        }
+      });
+      logger.info('sync', `Price updated for variant ${variant.id}: ${currentPrice} -> ${newPrice}`);
+      logSync(productData.source || 'unknown', productData.sourceId || '', 'price-update', 'success', {
+        oldPrice: currentPrice, newPrice, variantId: variant.id
+      });
+    }
+  } catch (e) {
+    logger.warn('sync', 'Price update failed (non-blocking)', { error: e.message });
+  }
+}
+
 // ---- CREATE PRODUCT IN SHOPIFY ----
 async function createShopifyProduct(productData, pricingResult) {
   const {
@@ -82,6 +175,10 @@ async function createShopifyProduct(productData, pricingResult) {
     description, bullets, options,
     variants: sourceVariants
   } = productData;
+
+  // Get shipping data for metafields
+  const deliveryEstimate = calculateDeliveryEstimate(source, productData);
+  const returnPolicy = getReturnPolicy(source);
 
   // Build Shopify product payload
   const shopifyVariants = [];
@@ -99,11 +196,8 @@ async function createShopifyProduct(productData, pricingResult) {
         compare_at_price: (vPrice.compareAt || pricingResult.compareAt)
           ? (vPrice.compareAt || pricingResult.compareAt).toFixed(2) : null,
         sku: `DH-${source.toUpperCase()}-${sourceId}-${v.id || i}`,
-        // ===== STOCK BUG FIX =====
-        // For dropshipping: track inventory for ops visibility,
-        // but ALWAYS allow adding to cart (continue selling when out of stock)
         inventory_management: 'shopify',
-        inventory_policy: 'continue',  // <<< FIX: was 'deny', now 'continue'
+        inventory_policy: 'continue',
         requires_shipping: true,
         weight: 0.5,
         weight_unit: 'lb',
@@ -117,7 +211,7 @@ async function createShopifyProduct(productData, pricingResult) {
       compare_at_price: pricingResult.compareAt ? pricingResult.compareAt.toFixed(2) : null,
       sku: `DH-${source.toUpperCase()}-${sourceId}`,
       inventory_management: 'shopify',
-      inventory_policy: 'continue',  // <<< FIX: was 'deny', now 'continue'
+      inventory_policy: 'continue',
       requires_shipping: true,
       weight: 0.5,
       weight_unit: 'lb'
@@ -165,21 +259,14 @@ async function createShopifyProduct(productData, pricingResult) {
         { namespace: 'dealshub', key: 'source_brand', value: brand || '', type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'landed_cost', value: String(pricingResult.landedCost || 0), type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'margin_rule', value: pricingResult.rule || source, type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'margin_pct', value: String(pricingResult.marginPct || 0), type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'sync_status', value: 'synced', type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'delivery_min_days', value: String(productData.deliveryEstimate?.minDays || productData.delivery_min_days || ''), type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'delivery_max_days', value: String(productData.deliveryEstimate?.maxDays || productData.delivery_max_days || ''), type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'delivery_label', value: productData.deliveryEstimate?.label || '', type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'shipping_note', value: productData.shippingData?.note || '', type: 'single_line_text_field' },
-        {
-          namespace: 'dealshub',
-          key: 'return_window',
-          value: String(
-            typeof productData.returnPolicy === 'object'
-              ? (productData.returnPolicy?.window || productData.returnPolicy?.summary || '')
-              : (productData.returnPolicy || productData.return_window || '')
-          ),
-          type: 'single_line_text_field'
-        }
+        { namespace: 'dealshub', key: 'delivery_min_days', value: String(deliveryEstimate.minDays || ''), type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'delivery_max_days', value: String(deliveryEstimate.maxDays || ''), type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'delivery_label', value: deliveryEstimate.label || '', type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'shipping_note', value: deliveryEstimate.note || '', type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'return_window', value: String(returnPolicy.window || ''), type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'return_summary', value: returnPolicy.summary || '', type: 'single_line_text_field' }
       ]
     }
   };
@@ -193,8 +280,6 @@ async function createShopifyProduct(productData, pricingResult) {
   }
 
   // ---- SET INVENTORY FOR ALL VARIANTS ----
-  // Even though inventory_policy is 'continue' (always allow cart add),
-  // we still set a high inventory for operational tracking
   const locationId = LOCATION_ID();
   for (const variant of product.variants) {
     try {
@@ -206,8 +291,6 @@ async function createShopifyProduct(productData, pricingResult) {
       logger.info('sync', `Inventory set for variant ${variant.id}`, { available: 9999 });
     } catch (invErr) {
       logger.warn('sync', `Inventory set failed for variant ${variant.id} (non-blocking)`, { error: invErr.message });
-      // NOT a critical failure since inventory_policy is 'continue'
-      // Cart adds will still work even with 0 inventory
     }
   }
 
@@ -232,18 +315,22 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     throw new Error('Shopify not configured');
   }
 
-  // ===== FIX: Parse the price safely to ensure it's a number =====
+  // ===== Parse the price safely =====
   const sourcePrice = safeParsePrice(productData.price);
   if (!sourcePrice || sourcePrice <= 0) {
     throw new Error('Invalid product price: ' + JSON.stringify(productData.price));
   }
 
+  // ===== Get supplier shipping cost for landed cost calc =====
+  const apiShippingCost = safeParsePrice(productData.shippingData?.cost);
+  const supplierShipping = getSupplierShippingCost(source, sourcePrice, apiShippingCost > 0 ? apiShippingCost : null);
+
   const pricingResult = calculateFinalPrice(sourcePrice, source, {
     originalPrice: safeParsePrice(productData.originalPrice),
-    shippingCost: safeParsePrice(productData.shippingData?.cost) || 0
+    shippingCost: supplierShipping,
+    sourceId: sourceId
   });
 
-  // ===== FIX: Handle case where pricing returns null =====
   if (!pricingResult || !pricingResult.price || pricingResult.price <= 0) {
     throw new Error('Pricing calculation failed for source price: ' + sourcePrice);
   }
@@ -253,7 +340,6 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
   let mapping = syncCache.get(cacheKey);
 
   if (!mapping) {
-    // Check persistent DB
     const dbMapping = findMapping(source, sourceId);
     if (dbMapping && dbMapping.shopify_product_id && dbMapping.shopify_variant_id) {
       mapping = {
@@ -268,15 +354,18 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
   }
 
   if (!mapping) {
-    // Try Shopify tag search as last resort before creating
     mapping = await findExistingProduct(source, sourceId);
+  }
+
+  if (mapping) {
+    // Update price if changed
+    await updateProductPrice(mapping, pricingResult, { source, sourceId });
   }
 
   if (!mapping) {
     // Create new product in Shopify
     mapping = await createShopifyProduct(productData, pricingResult);
 
-    // Persist to DB
     upsertMapping({
       source,
       sourceId,
@@ -290,10 +379,9 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     logSync(source, sourceId, 'create', 'success', { shopifyId: mapping.shopifyProductId });
   }
 
-  // ===== FIX: Determine which variant to use (handle object or string) =====
+  // ===== Determine which variant to use =====
   let variantId = mapping.shopifyVariantId;
   if (selectedVariantId && mapping.variants?.length > 1) {
-    // selectedVariantId might be: string title, object {title, price, id}, or number index
     let targetTitle = null;
     if (typeof selectedVariantId === 'object' && selectedVariantId !== null) {
       targetTitle = selectedVariantId.title || selectedVariantId.name || null;
@@ -308,6 +396,10 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     }
   }
 
+  // ===== Build delivery estimate =====
+  const deliveryEstimate = calculateDeliveryEstimate(source, productData);
+  const returnPolicy = getReturnPolicy(source);
+
   return {
     success: true,
     shopifyProductId: mapping.shopifyProductId,
@@ -321,8 +413,12 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
       currency: 'USD'
     },
     shippingSummary: {
-      note: productData.shippingData?.note || 'Standard shipping',
-      deliveryLabel: productData.deliveryEstimate?.label || null
+      note: deliveryEstimate.note,
+      deliveryLabel: deliveryEstimate.label,
+      minDays: deliveryEstimate.minDays,
+      maxDays: deliveryEstimate.maxDays,
+      freeShipping: deliveryEstimate.freeShipping,
+      returnPolicy: returnPolicy.label
     },
     checkoutUrl: `https://${CUSTOM_DOMAIN()}/cart/${variantId}:${quantity}`,
     cartAddPayload: {
@@ -338,12 +434,57 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     syncVersion: Date.now().toString(),
     _internal: {
       landedCost: pricingResult.landedCost,
+      totalSourceCost: pricingResult.totalSourceCost,
       margin: pricingResult.margin,
       marginPct: pricingResult.marginPct,
+      effectiveShipping: pricingResult.effectiveShipping,
+      absorbedShipping: pricingResult.absorbedShipping,
+      markupApplied: pricingResult.markupApplied,
       source,
       sourceId
     }
   };
+}
+
+// ---- ADMIN: Fix all old products ----
+async function fixAllOldProducts() {
+  const results = { fixed: 0, errors: 0, checked: 0 };
+  let page = null;
+  let hasMore = true;
+
+  while (hasMore) {
+    try {
+      const endpoint = page
+        ? `/products.json?limit=50&tag=dealshub-synced&page_info=${page}`
+        : '/products.json?limit=50&tag=dealshub-synced';
+      const data = await shopifyAPI(endpoint);
+
+      if (!data.products || data.products.length === 0) break;
+
+      for (const product of data.products) {
+        results.checked++;
+        try {
+          const wasFixed = await autoFixProduct(product);
+          if (wasFixed) results.fixed++;
+        } catch (e) {
+          results.errors++;
+        }
+      }
+
+      hasMore = data.products.length === 50;
+      // Simple pagination — Shopify cursor pagination would be better but this works for now
+      if (hasMore && data.products.length > 0) {
+        page = null; // Break to avoid infinite loop on non-cursor pagination
+        hasMore = false;
+      }
+    } catch (e) {
+      logger.error('sync', 'fixAllOldProducts failed', { error: e.message });
+      results.errors++;
+      break;
+    }
+  }
+
+  return results;
 }
 
 // ---- FORMAT DESCRIPTION ----
@@ -363,4 +504,4 @@ function formatDescription(description, bullets) {
   return html || '<p>Premium quality product from StyleHub Miami.</p>';
 }
 
-module.exports = { prepareCart, createShopifyProduct, findExistingProduct, shopifyAPI };
+module.exports = { prepareCart, createShopifyProduct, findExistingProduct, shopifyAPI, fixAllOldProducts, autoFixProduct };

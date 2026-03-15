@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — Main Server (Hybrid Commerce Backend)
+// DealsHub â Main Server (Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
 // ============================================================
@@ -62,7 +62,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// CAPA A — LIVE DISCOVERY LAYER
+// CAPA A â LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -329,7 +329,7 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B — ON-DEMAND SYNC LAYER
+// CAPA B â ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
@@ -431,7 +431,7 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D — OPERATIONS LAYER (Admin endpoints)
+// CAPA D â OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
@@ -566,6 +566,29 @@ function interleaveFromSettled(results, maxTotal = 18) {
 // ============================================================
 // START
 // ============================================================
+// Admin: Cleanup duplicate products
+app.post('/api/admin/cleanup', async (req, res) => {
+  try {
+    const { ids, secret } = req.body;
+    if (secret !== 'stylehub2026') return res.status(403).json({ error: 'Unauthorized' });
+    if (!ids || !Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
+    const { shopifyAPI } = require('./src/services/shopify-sync');
+    const results = [];
+    for (const id of ids) {
+      try {
+        await shopifyAPI('products/' + id + '.json', 'DELETE');
+        results.push({ id, status: 'deleted' });
+      } catch (e) {
+        results.push({ id, status: 'error', message: e.message });
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+    res.json({ total: ids.length, results });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   logger.info('server', `DealsHub backend v2.0 running on port ${PORT}`);

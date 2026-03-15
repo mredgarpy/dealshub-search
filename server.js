@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Main Server (Hybrid Commerce Backend)
+// DealsHub ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Main Server (Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
 // ============================================================
@@ -62,7 +62,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// CAPA A ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ LIVE DISCOVERY LAYER
+// CAPA A ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -329,7 +329,7 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ ON-DEMAND SYNC LAYER
+// CAPA B ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
@@ -431,7 +431,7 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ OPERATIONS LAYER (Admin endpoints)
+// CAPA D ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
@@ -581,6 +581,18 @@ app.post('/api/admin/cleanup', async (req, res) => {
           method: 'DELETE',
           headers: { 'X-Shopify-Access-Token': token }
         });
+        results.push({ id, status: r.ok ? 'deleted' : 'error', code: r.status });
+      } catch (e) {
+        results.push({ id, status: 'error', message: e.message });
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+    res.json({ total: ids.length, results });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // Admin: Update theme asset (replace text)
 app.post('/api/admin/theme-update', async (req, res) => {
@@ -668,17 +680,6 @@ app.post('/api/admin/theme-rebrand', async (req, res) => {
     }
     
     res.json({ total: assets.length, results });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-        results.push({ id, status: r.ok ? 'deleted' : 'error', code: r.status });
-      } catch (e) {
-        results.push({ id, status: 'error', message: e.message });
-      }
-      await new Promise(r => setTimeout(r, 500));
-    }
-    res.json({ total: ids.length, results });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

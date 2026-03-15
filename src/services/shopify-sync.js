@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — Shopify Sync Service (On-Demand Product Creation)
+// DealsHub â Shopify Sync Service (On-Demand Product Creation)
 // ============================================================
 // Creates/updates products in Shopify ONLY when user wants to buy
 // Handles: deduplication, inventory, variants, metafields
@@ -70,8 +70,8 @@ async function createShopifyProduct(productData, pricingResult) {
         price: vPrice.price.toFixed(2),
         compare_at_price: vPrice.compareAt ? vPrice.compareAt.toFixed(2) : null,
         sku: `DH-${source.toUpperCase()}-${sourceId}-${v.id || i}`,
-        inventory_management: 'shopify',  // CRITICAL FIX: Must be 'shopify' not null
-        inventory_policy: 'deny',
+        inventory_management: null, // FIX: null = no tracking, avoids write_inventory scope
+        inventory_policy: 'continue',
         requires_shipping: true,
         weight: 0.5,
         weight_unit: 'lb',
@@ -84,8 +84,8 @@ async function createShopifyProduct(productData, pricingResult) {
       price: pricingResult.price.toFixed(2),
       compare_at_price: pricingResult.compareAt ? pricingResult.compareAt.toFixed(2) : null,
       sku: `DH-${source.toUpperCase()}-${sourceId}`,
-      inventory_management: 'shopify',  // CRITICAL FIX
-      inventory_policy: 'deny',
+      inventory_management: null, // FIX: null = no tracking
+      inventory_policy: 'continue',
       requires_shipping: true,
       weight: 0.5,
       weight_unit: 'lb'

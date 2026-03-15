@@ -12,7 +12,7 @@ const { findMapping, upsertMapping, logSync } = require('../utils/db');
 
 const SHOPIFY_DOMAIN = () => process.env.SHOPIFY_STORE_DOMAIN;
 const SHOPIFY_TOKEN = () => process.env.SHOPIFY_ADMIN_TOKEN;
-const LOCATION_ID = () => parseInt(process.env.SHOPIFY_LOCATION_ID || '84042121347');
+const LOCATION_ID  = () => parseInt(process.env.SHOPIFY_LOCATION_ID || '84042121347');
 const CUSTOM_DOMAIN = () => process.env.SHOPIFY_CUSTOM_DOMAIN || 'stylehubmiami.com';
 const API_VERSION = '2024-01';
 
@@ -27,8 +27,10 @@ async function shopifyAPI(endpoint, method = 'GET', body = null) {
     }
   };
   if (body) opts.body = JSON.stringify(body);
+
   const resp = await fetch(url, opts);
   const text = await resp.text();
+
   if (!resp.ok) {
     logger.error('shopify-api', `${method} ${endpoint} failed: ${resp.status}`, { body: text.substring(0, 500) });
     throw new Error(`Shopify API ${resp.status}: ${text.substring(0, 200)}`);
@@ -42,22 +44,44 @@ async function findExistingProduct(source, sourceId) {
   const cached = syncCache.get(cacheKey);
   if (cached) return cached;
 
-  // Search by metafield
+  // Try tag-based search in Shopify
   try {
-    const query = encodeURIComponent(`metafield:dealshub.source_product_id:${sourceId}`);
-    const data = await shopifyAPI(`/products.json?limit=1&status=any&fields=id,handle,variants,status`);
-    // Metafield search via GraphQL would be better; for now use tag-based lookup
-    // We'll also try handle-based lookup
+    const tag = `source-id:${sourceId}`;
+    const data = await shopifyAPI(`/products.json?limit=1&status=any&tag=${encodeURIComponent(tag)}`);
+    if (data.products && data.products.length > 0) {
+      const p = data.products[0];
+      const mapping = {
+        shopifyProductId: p.id,
+        shopifyVariantId: p.variants[0]?.id,
+        handle: p.handle,
+        variants: p.variants.map(v => ({ id: v.id, title: v.title, price: v.price }))
+      };
+      syncCache.set(cacheKey, mapping, 3600000);
+      return mapping;
+    }
   } catch (e) {
     logger.debug('sync', 'Existing product search failed', { error: e.message });
   }
+
   return null;
+}
+
+// ---- SAFE PRICE PARSER ----
+function safeParsePrice(val) {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const cleaned = String(val).replace(/[^0-9.]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
 }
 
 // ---- CREATE PRODUCT IN SHOPIFY ----
 async function createShopifyProduct(productData, pricingResult) {
-  const { source, sourceId, title, images, primaryImage, brand,
-          description, bullets, options, variants: sourceVariants } = productData;
+  const {
+    source, sourceId, title, images, primaryImage, brand,
+    description, bullets, options,
+    variants: sourceVariants
+  } = productData;
 
   // Build Shopify product payload
   const shopifyVariants = [];
@@ -65,14 +89,21 @@ async function createShopifyProduct(productData, pricingResult) {
   if (sourceVariants && sourceVariants.length > 0) {
     // Create variants from source data
     sourceVariants.slice(0, 100).forEach((v, i) => {
-      const vPrice = v.price ? calculateFinalPrice(v.price, source) : pricingResult;
+      const vPriceRaw = safeParsePrice(v.price);
+      const vPrice = vPriceRaw > 0
+        ? calculateFinalPrice(vPriceRaw, source)
+        : pricingResult;
       shopifyVariants.push({
         title: v.title || `Option ${i + 1}`,
-        price: vPrice.price.toFixed(2),
-        compare_at_price: vPrice.compareAt ? vPrice.compareAt.toFixed(2) : null,
+        price: (vPrice.price || pricingResult.price).toFixed(2),
+        compare_at_price: (vPrice.compareAt || pricingResult.compareAt)
+          ? (vPrice.compareAt || pricingResult.compareAt).toFixed(2) : null,
         sku: `DH-${source.toUpperCase()}-${sourceId}-${v.id || i}`,
-        inventory_management: 'shopify',  // CRITICAL FIX: Must be 'shopify' not null
-        inventory_policy: 'deny',
+        // ===== STOCK BUG FIX =====
+        // For dropshipping: track inventory for ops visibility,
+        // but ALWAYS allow adding to cart (continue selling when out of stock)
+        inventory_management: 'shopify',
+        inventory_policy: 'continue',  // <<< FIX: was 'deny', now 'continue'
         requires_shipping: true,
         weight: 0.5,
         weight_unit: 'lb',
@@ -85,8 +116,8 @@ async function createShopifyProduct(productData, pricingResult) {
       price: pricingResult.price.toFixed(2),
       compare_at_price: pricingResult.compareAt ? pricingResult.compareAt.toFixed(2) : null,
       sku: `DH-${source.toUpperCase()}-${sourceId}`,
-      inventory_management: 'shopify',  // CRITICAL FIX
-      inventory_policy: 'deny',
+      inventory_management: 'shopify',
+      inventory_policy: 'continue',  // <<< FIX: was 'deny', now 'continue'
       requires_shipping: true,
       weight: 0.5,
       weight_unit: 'lb'
@@ -104,7 +135,10 @@ async function createShopifyProduct(productData, pricingResult) {
   // Product options
   const shopifyOptions = [];
   if (sourceVariants && sourceVariants.length > 0) {
-    shopifyOptions.push({ name: (options?.[0]?.name) || 'Option', values: sourceVariants.map(v => v.title) });
+    shopifyOptions.push({
+      name: (options?.[0]?.name) || 'Option',
+      values: sourceVariants.map(v => v.title || `Option`)
+    });
   }
 
   const payload = {
@@ -122,21 +156,30 @@ async function createShopifyProduct(productData, pricingResult) {
         brand ? `brand:${brand}` : null
       ].filter(Boolean).join(', '),
       variants: shopifyVariants,
-      images: shopifyImages,
+      images: shopifyImages.length > 0 ? shopifyImages : undefined,
       options: shopifyOptions.length > 0 ? shopifyOptions : undefined,
       metafields: [
         { namespace: 'dealshub', key: 'source_store', value: source, type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'source_product_id', value: String(sourceId), type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'source_url', value: productData.sourceUrl || '', type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'source_brand', value: brand || '', type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'landed_cost', value: String(pricingResult.landedCost), type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'landed_cost', value: String(pricingResult.landedCost || 0), type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'margin_rule', value: pricingResult.rule || source, type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'sync_status', value: 'synced', type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'delivery_min_days', value: String(productData.deliveryEstimate?.minDays || ''), type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'delivery_max_days', value: String(productData.deliveryEstimate?.maxDays || ''), type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'delivery_min_days', value: String(productData.deliveryEstimate?.minDays || productData.delivery_min_days || ''), type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'delivery_max_days', value: String(productData.deliveryEstimate?.maxDays || productData.delivery_max_days || ''), type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'delivery_label', value: productData.deliveryEstimate?.label || '', type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'shipping_note', value: productData.shippingData?.note || '', type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'return_window', value: String(productData.returnPolicy?.window || ''), type: 'single_line_text_field' }
+        {
+          namespace: 'dealshub',
+          key: 'return_window',
+          value: String(
+            typeof productData.returnPolicy === 'object'
+              ? (productData.returnPolicy?.window || productData.returnPolicy?.summary || '')
+              : (productData.returnPolicy || productData.return_window || '')
+          ),
+          type: 'single_line_text_field'
+        }
       ]
     }
   };
@@ -150,6 +193,8 @@ async function createShopifyProduct(productData, pricingResult) {
   }
 
   // ---- SET INVENTORY FOR ALL VARIANTS ----
+  // Even though inventory_policy is 'continue' (always allow cart add),
+  // we still set a high inventory for operational tracking
   const locationId = LOCATION_ID();
   for (const variant of product.variants) {
     try {
@@ -160,16 +205,9 @@ async function createShopifyProduct(productData, pricingResult) {
       });
       logger.info('sync', `Inventory set for variant ${variant.id}`, { available: 9999 });
     } catch (invErr) {
-      logger.error('sync', `Inventory set failed for variant ${variant.id}`, { error: invErr.message });
-      // FALLBACK: Try to update inventory item to not track
-      try {
-        await shopifyAPI(`/inventory_items/${variant.inventory_item_id}.json`, 'PUT', {
-          inventory_item: { tracked: false }
-        });
-        logger.info('sync', `Fallback: Set variant ${variant.id} to untracked`);
-      } catch (e2) {
-        logger.error('sync', `Fallback also failed for variant ${variant.id}`, { error: e2.message });
-      }
+      logger.warn('sync', `Inventory set failed for variant ${variant.id} (non-blocking)`, { error: invErr.message });
+      // NOT a critical failure since inventory_policy is 'continue'
+      // Cart adds will still work even with 0 inventory
     }
   }
 
@@ -178,10 +216,13 @@ async function createShopifyProduct(productData, pricingResult) {
     shopifyProductId: product.id,
     shopifyVariantId: product.variants[0]?.id,
     handle: product.handle,
-    variants: product.variants.map(v => ({ id: v.id, title: v.title, price: v.price }))
+    variants: product.variants.map(v => ({
+      id: v.id,
+      title: v.title,
+      price: v.price
+    }))
   };
   syncCache.set(`mapping:${source}:${sourceId}`, mapping, 3600000);
-
   return mapping;
 }
 
@@ -191,18 +232,23 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     throw new Error('Shopify not configured');
   }
 
-  // Calculate final pricing
-  const sourcePrice = productData.price;
+  // ===== FIX: Parse the price safely to ensure it's a number =====
+  const sourcePrice = safeParsePrice(productData.price);
   if (!sourcePrice || sourcePrice <= 0) {
-    throw new Error('Invalid product price');
+    throw new Error('Invalid product price: ' + JSON.stringify(productData.price));
   }
 
   const pricingResult = calculateFinalPrice(sourcePrice, source, {
-    originalPrice: productData.originalPrice,
-    shippingCost: productData.shippingData?.cost || 0
+    originalPrice: safeParsePrice(productData.originalPrice),
+    shippingCost: safeParsePrice(productData.shippingData?.cost) || 0
   });
 
-  // Check for existing synced product — DB first, then cache
+  // ===== FIX: Handle case where pricing returns null =====
+  if (!pricingResult || !pricingResult.price || pricingResult.price <= 0) {
+    throw new Error('Pricing calculation failed for source price: ' + sourcePrice);
+  }
+
+  // Check for existing synced product — DB first, then cache, then Shopify search
   const cacheKey = `mapping:${source}:${sourceId}`;
   let mapping = syncCache.get(cacheKey);
 
@@ -222,25 +268,44 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
   }
 
   if (!mapping) {
+    // Try Shopify tag search as last resort before creating
+    mapping = await findExistingProduct(source, sourceId);
+  }
+
+  if (!mapping) {
     // Create new product in Shopify
     mapping = await createShopifyProduct(productData, pricingResult);
+
     // Persist to DB
     upsertMapping({
-      source, sourceId,
+      source,
+      sourceId,
       shopifyProductId: mapping.shopifyProductId,
       shopifyVariantId: mapping.shopifyVariantId,
       handle: mapping.handle,
       price: pricingResult.price,
-      originalPrice: productData.originalPrice
+      originalPrice: safeParsePrice(productData.originalPrice)
     });
+
     logSync(source, sourceId, 'create', 'success', { shopifyId: mapping.shopifyProductId });
   }
 
-  // Determine which variant to use
+  // ===== FIX: Determine which variant to use (handle object or string) =====
   let variantId = mapping.shopifyVariantId;
   if (selectedVariantId && mapping.variants?.length > 1) {
-    const match = mapping.variants.find(v => v.title === selectedVariantId);
-    if (match) variantId = match.id;
+    // selectedVariantId might be: string title, object {title, price, id}, or number index
+    let targetTitle = null;
+    if (typeof selectedVariantId === 'object' && selectedVariantId !== null) {
+      targetTitle = selectedVariantId.title || selectedVariantId.name || null;
+    } else if (typeof selectedVariantId === 'string') {
+      targetTitle = selectedVariantId;
+    }
+    if (targetTitle) {
+      const match = mapping.variants.find(v =>
+        v.title && v.title.toLowerCase() === targetTitle.toLowerCase()
+      );
+      if (match) variantId = match.id;
+    }
   }
 
   return {
@@ -267,9 +332,10 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
         _source_store: source,
         _source_id: String(sourceId),
         _sync_version: Date.now().toString(),
-        _landed_cost_band: String(pricingResult.landedCost)
+        _landed_cost_band: String(pricingResult.landedCost || 0)
       }
     },
+    syncVersion: Date.now().toString(),
     _internal: {
       landedCost: pricingResult.landedCost,
       margin: pricingResult.margin,
@@ -288,7 +354,10 @@ function formatDescription(description, bullets) {
   }
   if (bullets && bullets.length > 0) {
     html += '<ul class="product-features">';
-    bullets.forEach(b => { html += `<li>${b}</li>`; });
+    bullets.forEach(b => {
+      const text = typeof b === 'string' ? b : (b.text || b.value || '');
+      if (text) html += `<li>${text}</li>`;
+    });
     html += '</ul>';
   }
   return html || '<p>Premium quality product from StyleHub Miami.</p>';

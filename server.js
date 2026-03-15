@@ -556,6 +556,101 @@ app.get('/api/admin/stats', (req, res) => {
   });
 });
 
+// ---- ADMIN: Push Theme Asset (server-side Shopify API call) ----
+app.put('/api/admin/theme-asset', async (req, res) => {
+  const { key, value } = req.body;
+  if (!key || !value) return res.status(400).json({ error: 'Missing key or value' });
+
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+  const themeId = process.env.SHOPIFY_THEME_ID || '157178462339';
+
+  if (!shopifyDomain || !shopifyToken) {
+    return res.status(503).json({ error: 'Shopify not configured' });
+  }
+
+  try {
+    const fetch = require('node-fetch');
+    const url = `https://${shopifyDomain}/admin/api/2024-01/themes/${themeId}/assets.json`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'X-Shopify-Access-Token': shopifyToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ asset: { key, value } })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      logger.error('theme', 'Theme asset push failed', { key, status: response.status });
+      return res.status(response.status).json({ error: 'Shopify API error', detail: errText.substring(0, 500) });
+    }
+
+    const data = await response.json();
+    logger.info('theme', 'Theme asset pushed', { key });
+    res.json({ success: true, key: data.asset.key, size: data.asset.size });
+  } catch (e) {
+    logger.error('theme', 'Theme asset push error', { error: e.message, key });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: Read Theme Asset ----
+app.get('/api/admin/theme-asset', async (req, res) => {
+  const { key } = req.query;
+  if (!key) return res.status(400).json({ error: 'Missing key' });
+
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+  const themeId = process.env.SHOPIFY_THEME_ID || '157178462339';
+
+  if (!shopifyDomain || !shopifyToken) {
+    return res.status(503).json({ error: 'Shopify not configured' });
+  }
+
+  try {
+    const fetch = require('node-fetch');
+    const url = `https://${shopifyDomain}/admin/api/2024-01/themes/${themeId}/assets.json?asset[key]=${encodeURIComponent(key)}`;
+    const response = await fetch(url, {
+      headers: { 'X-Shopify-Access-Token': shopifyToken }
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Asset not found' });
+    }
+
+    const data = await response.json();
+    res.json({ asset: data.asset });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: List Theme Assets ----
+app.get('/api/admin/theme-assets', async (req, res) => {
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+  const themeId = process.env.SHOPIFY_THEME_ID || '157178462339';
+
+  if (!shopifyDomain || !shopifyToken) {
+    return res.status(503).json({ error: 'Shopify not configured' });
+  }
+
+  try {
+    const fetch = require('node-fetch');
+    const url = `https://${shopifyDomain}/admin/api/2024-01/themes/${themeId}/assets.json`;
+    const response = await fetch(url, {
+      headers: { 'X-Shopify-Access-Token': shopifyToken }
+    });
+    const data = await response.json();
+    const keys = data.assets.map(a => a.key).sort();
+    res.json({ total: keys.length, assets: keys });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ============================================================
 // HELPERS
 // ============================================================

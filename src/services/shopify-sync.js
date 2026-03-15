@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub Ã¢ÂÂ Shopify Sync Service (On-Demand Product Creation)
+// DealsHub ÃÂ¢ÃÂÃÂ Shopify Sync Service (On-Demand Product Creation)
 // ============================================================
 // Creates/updates products in Shopify ONLY when user wants to buy
 // Handles: deduplication, inventory, variants, metafields
@@ -41,12 +41,68 @@ async function findExistingProduct(source, sourceId) {
   const cached = syncCache.get(cacheKey);
   if (cached) return cached;
 
-  // Search by metafield
   try {
-    const query = encodeURIComponent(`metafield:dealshub.source_product_id:${sourceId}`);
-    const data = await shopifyAPI(`/products.json?limit=1&status=any&fields=id,handle,variants,status`);
-    // Metafield search via GraphQL would be better; for now use tag-based lookup
-    // We'll also try handle-based lookup
+    // Strategy 1: Search by title/tag using Shopify's product search
+    // The most reliable way is to search all products with our tag and match by source-id tag
+    const skuPrefix = `DH-${source.toUpperCase()}-${sourceId}`;
+    
+    // Use Shopify Admin API product listing with collection_id or search
+    // First try: search products that have our source-id tag
+    const searchData = await shopifyAPI(`/products.json?limit=10&status=any&fields=id,handle,variants,tags`);
+    
+    if (searchData && searchData.products) {
+      for (const product of searchData.products) {
+        // Check tags for source-id match
+        const tags = (product.tags || '').split(',').map(t => t.trim());
+        if (tags.includes(`source-id:${sourceId}`)) {
+          logger.info('sync', `Found existing product by tag: ${product.id} (source-id:${sourceId})`);
+          const result = {
+            id: product.id,
+            handle: product.handle,
+            variantId: product.variants && product.variants[0] ? product.variants[0].id : null
+          };
+          syncCache.set(cacheKey, result);
+          return result;
+        }
+        
+        // Also check variant SKUs for our prefix
+        if (product.variants) {
+          for (const v of product.variants) {
+            if (v.sku && v.sku.startsWith(skuPrefix)) {
+              logger.info('sync', `Found existing product by SKU: ${product.id} (sku:${v.sku})`);
+              const result = {
+                id: product.id,
+                handle: product.handle,
+                variantId: v.id
+              };
+              syncCache.set(cacheKey, result);
+              return result;
+            }
+          }
+        }
+      }
+    }
+    
+    // Strategy 2: If not found in first 10, do a broader search with pagination
+    // Check up to 250 products (the store won't have many since we create on-demand)
+    const allData = await shopifyAPI(`/products.json?limit=250&status=any&fields=id,handle,variants,tags`);
+    if (allData && allData.products) {
+      for (const product of allData.products) {
+        const tags = (product.tags || '').split(',').map(t => t.trim());
+        if (tags.includes(`source-id:${sourceId}`)) {
+          logger.info('sync', `Found existing product in full scan: ${product.id}`);
+          const result = {
+            id: product.id,
+            handle: product.handle,
+            variantId: product.variants && product.variants[0] ? product.variants[0].id : null
+          };
+          syncCache.set(cacheKey, result);
+          return result;
+        }
+      }
+    }
+    
+    logger.debug('sync', `No existing product found for ${source}:${sourceId}`);
   } catch (e) {
     logger.debug('sync', 'Existing product search failed', { error: e.message });
   }

@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — Main Server v2.1 (FASE 4 — Hybrid Commerce Backend)
+// DealsHub â Main Server v2.1 (FASE 4 â Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
 // FASE 4: Enhanced pricing, shipping, admin endpoints
@@ -66,7 +66,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// CAPA A — LIVE DISCOVERY LAYER
+// CAPA A â LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -335,7 +335,7 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B — ON-DEMAND SYNC LAYER
+// CAPA B â ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
@@ -431,7 +431,7 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D — OPERATIONS LAYER (Admin endpoints)
+// CAPA D â OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
@@ -590,7 +590,7 @@ app.get('/api/admin/stats', (req, res) => {
 });
 
 // ============================================================
-// FASE 4 — NEW ADMIN ENDPOINTS
+// FASE 4 â NEW ADMIN ENDPOINTS
 // ============================================================
 
 // ---- ADMIN: Pricing Rules ----
@@ -771,6 +771,93 @@ function interleaveFromSettled(results, maxTotal = 18) {
 // START
 // ============================================================
 const PORT = process.env.PORT || 10000;
+
+// ---- THEME ASSET PUSH (temporary) ----
+app.put('/api/admin/push-theme-asset', async (req, res) => {
+  try {
+    const { key, value } = req.body;
+    if (!key || !value) return res.status(400).json({ error: 'key and value required' });
+    
+    const STORE = process.env.SHOPIFY_STORE_DOMAIN || '1rnmax-5z.myshopify.com';
+    const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
+    const THEME = process.env.SHOPIFY_THEME_ID || '157178462339';
+    
+    if (!TOKEN) return res.status(500).json({ error: 'SHOPIFY_ADMIN_TOKEN not configured' });
+    
+    const https = require('https');
+    const body = JSON.stringify({ asset: { key, value } });
+    
+    const result = await new Promise((resolve, reject) => {
+      const opts = {
+        hostname: STORE,
+        path: '/admin/api/2024-01/themes/' + THEME + '/assets.json',
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': TOKEN,
+          'Content-Length': Buffer.byteLength(body)
+        }
+      };
+      const r = https.request(opts, (resp) => {
+        let d = '';
+        resp.on('data', chunk => d += chunk);
+        resp.on('end', () => resolve({ status: resp.statusCode, body: d }));
+      });
+      r.on('error', reject);
+      r.write(body);
+      r.end();
+    });
+    
+    res.json({ ok: result.status < 300, key, shopifyStatus: result.status });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- PAGE CREATE (temporary) ----
+app.post('/api/admin/create-page', async (req, res) => {
+  try {
+    const { title, handle, body_html, template_suffix } = req.body;
+    if (!title) return res.status(400).json({ error: 'title required' });
+    
+    const STORE = process.env.SHOPIFY_STORE_DOMAIN || '1rnmax-5z.myshopify.com';
+    const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
+    
+    if (!TOKEN) return res.status(500).json({ error: 'SHOPIFY_ADMIN_TOKEN not configured' });
+    
+    const https = require('https');
+    const pageData = { page: { title, handle: handle || '', body_html: body_html || '', published: true } };
+    if (template_suffix) pageData.page.template_suffix = template_suffix;
+    const body = JSON.stringify(pageData);
+    
+    const result = await new Promise((resolve, reject) => {
+      const opts = {
+        hostname: STORE,
+        path: '/admin/api/2024-01/pages.json',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': TOKEN,
+          'Content-Length': Buffer.byteLength(body)
+        }
+      };
+      const r = https.request(opts, (resp) => {
+        let d = '';
+        resp.on('data', chunk => d += chunk);
+        resp.on('end', () => resolve({ status: resp.statusCode, body: d }));
+      });
+      r.on('error', reject);
+      r.write(body);
+      r.end();
+    });
+    
+    const parsed = JSON.parse(result.body);
+    res.json({ ok: result.status < 300, shopifyStatus: result.status, page: parsed.page ? { id: parsed.page.id, handle: parsed.page.handle, title: parsed.page.title } : parsed });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   logger.info('server', `StyleHub backend v2.1 running on port ${PORT}`);
   logger.info('server', `Sources: ${VALID_SOURCES.join(', ')}`);

@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — Main Server (Hybrid Commerce Backend)
+// DealsHub â Main Server (Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
 // ============================================================
@@ -62,7 +62,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// CAPA A — LIVE DISCOVERY LAYER
+// CAPA A â LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -329,7 +329,7 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B — ON-DEMAND SYNC LAYER
+// CAPA B â ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
@@ -431,7 +431,7 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D — OPERATIONS LAYER (Admin endpoints)
+// CAPA D â OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
@@ -520,6 +520,12 @@ app.get('/api/order-status', async (req, res) => {
 });
 
 // ---- STATIC: Public assets (served with CORS for Shopify storefront) ----
+
+// Redirect PDP JS to jsDelivr CDN (bypasses Render static caching issue)
+app.get('/static/dealshub-product.js', (req, res) => {
+  res.redirect(302, 'https://cdn.jsdelivr.net/gh/mredgarpy/dealshub-search@main/public/dealshub-product.js');
+});
+
 app.use('/static', express.static(path.join(__dirname, 'public'), {
   maxAge: '1h',
   setHeaders: (res) => {

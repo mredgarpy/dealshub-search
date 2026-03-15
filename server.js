@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub Ã¢ÂÂ Main Server (Hybrid Commerce Backend)
+// DealsHub ÃÂ¢ÃÂÃÂ Main Server (Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
 // ============================================================
@@ -62,7 +62,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================
-// CAPA A Ã¢ÂÂ LIVE DISCOVERY LAYER
+// CAPA A ÃÂ¢ÃÂÃÂ LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -329,7 +329,7 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B Ã¢ÂÂ ON-DEMAND SYNC LAYER
+// CAPA B ÃÂ¢ÃÂÃÂ ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
@@ -431,7 +431,7 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D Ã¢ÂÂ OPERATIONS LAYER (Admin endpoints)
+// CAPA D ÃÂ¢ÃÂÃÂ OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
@@ -573,7 +573,7 @@ app.post('/api/admin/cleanup', async (req, res) => {
     if (secret !== 'stylehub2026') return res.status(403).json({ error: 'Unauthorized' });
     if (!ids || !Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
     const domain = process.env.SHOPIFY_STORE_DOMAIN;
-    const token = process.env.SHOPIFY_ACCESS_TOKEN;
+    const token = process.env.SHOPIFY_ADMIN_TOKEN;
     const results = [];
     for (const id of ids) {
       try {

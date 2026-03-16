@@ -3,6 +3,7 @@
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
+const logger = require('../utils/logger');
 
 const API_HOST = 'sephora.p.rapidapi.com';
 
@@ -19,30 +20,29 @@ class SephoraAdapter extends BaseAdapter {
   async getProduct(skuId) {
     const url = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(skuId)}&preferedSku=${encodeURIComponent(skuId)}`;
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
-    if (!data || !data.currentSku) {
-      // Try search fallback
-      const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(skuId)}&pageIndex=0&pageSize=1`;
-      const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
-      if (sData?.products?.[0]) return this.normalizeProductFromSearch(sData.products[0]);
-      return null;
-    }
-    return this.normalizeProduct(data);
+    if (data?.currentSku) return this.normalizeProduct(data);
+    // Try search fallback
+    const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(skuId)}&pageIndex=0&pageSize=1`;
+    const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
+    if (sData?.products?.[0]) return this.normalizeProductFromSearch(sData.products[0]);
+    return null;
   }
 
   normalizeSearchResult(p) {
     if (!p) return null;
     const price = parsePrice(p.currentSku?.listPrice || p.listPrice);
+    const origPrice = parsePrice(p.currentSku?.valuePrice);
     const img = p.currentSku?.skuImages?.image450 || p.heroImage || p.image450 || '';
     return {
       id: p.currentSku?.skuId || p.productId || '',
       title: p.displayName || p.productName || '',
       price: price ? `$${price.toFixed(2)}` : null,
-      originalPrice: null,
+      originalPrice: origPrice && origPrice > (price || 0) ? `$${origPrice.toFixed(2)}` : null,
       image: img,
       url: `https://www.sephora.com${p.targetUrl || '/product/' + (p.productId || '')}`,
       rating: p.rating ? parseFloat(p.rating) : null,
       reviews: p.reviews || 0,
-      badge: p.isNew ? 'New' : (p.isExclusive ? 'Exclusive' : null),
+      badge: p.isNew ? 'New' : (p.isExclusive ? 'Exclusive' : (p.isLimitedEdition ? 'Limited Edition' : null)),
       source: 'sephora',
       sourceName: 'Sephora',
       brand: p.brandName || null
@@ -50,6 +50,11 @@ class SephoraAdapter extends BaseAdapter {
   }
 
   normalizeProduct(d) {
+    try { return this._normalizeProductInner(d); }
+    catch (e) { logger.error('sephora', 'normalizeProduct error', { error: e.message }); return this.normalizeProductFromSearch(d); }
+  }
+
+  _normalizeProductInner(d) {
     const p = emptyProduct();
     p.source = 'sephora';
     p.sourceId = d.currentSku?.skuId || d.productId || '';
@@ -57,23 +62,74 @@ class SephoraAdapter extends BaseAdapter {
     p.title = d.displayName || d.productName || '';
     p.brand = d.brandName || d.brand?.displayName || null;
     p.category = d.parentCategory?.displayName || null;
-    p.breadcrumbs = d.breadcrumbs?.map(b => b.displayName) || [];
-    p.description = d.longDescription || d.shortDescription || '';
-    p.bullets = d.quickLookDescription ? [d.quickLookDescription] : [];
 
-    // Images
-    const skuImgs = d.currentSku?.skuImages;
-    if (skuImgs) {
-      p.images = [skuImgs.image450, skuImgs.image250, skuImgs.image135].filter(Boolean);
+    // Breadcrumbs
+    if (d.breadcrumbs?.length) {
+      p.breadcrumbs = d.breadcrumbs.map(b => b.displayName || b.name || b).filter(Boolean);
+    } else if (d.parentCategory) {
+      p.breadcrumbs = [d.parentCategory.displayName].filter(Boolean);
     }
-    if (d.alternateImages) p.images.push(...d.alternateImages.map(i => i.image450).filter(Boolean));
+
+    // Description — combine all text fields for rich content
+    const descParts = [];
+    if (d.longDescription) descParts.push(d.longDescription);
+    if (d.shortDescription && d.shortDescription !== d.longDescription) descParts.push(d.shortDescription);
+    if (d.suggestedUsage) descParts.push(`How to Use: ${d.suggestedUsage}`);
+    if (d.ingredientDesc) descParts.push(`Ingredients: ${d.ingredientDesc}`);
+    p.description = descParts.join('\n\n') || '';
+
+    // Bullets — quick look + key details
+    p.bullets = [];
+    if (d.quickLookDescription) p.bullets.push(d.quickLookDescription);
+    // Size / value info
+    if (d.currentSku?.size) p.bullets.push(`Size: ${d.currentSku.size}`);
+    if (d.currentSku?.variationValue) p.bullets.push(`Shade: ${d.currentSku.variationValue}`);
+    // Key details from product
+    if (d.skinType) p.bullets.push(`Skin Type: ${d.skinType}`);
+    if (d.coverage) p.bullets.push(`Coverage: ${d.coverage}`);
+    if (d.finish) p.bullets.push(`Finish: ${d.finish}`);
+    if (d.formulation) p.bullets.push(`Formulation: ${d.formulation}`);
+    if (d.skinConcern) p.bullets.push(`Concerns: ${d.skinConcern}`);
+    if (d.hairType) p.bullets.push(`Hair Type: ${d.hairType}`);
+    if (d.fragFamily) p.bullets.push(`Fragrance: ${d.fragFamily}`);
+    // Product claims / highlights
+    if (Array.isArray(d.productHighlights)) {
+      d.productHighlights.forEach(h => {
+        if (h && typeof h === 'string') p.bullets.push(h);
+      });
+    }
+
+    // Images — collect from multiple sources
+    p.images = [];
+    const skuImgs = d.currentSku?.skuImages;
+    if (skuImgs?.image450) p.images.push(skuImgs.image450);
+    // Alternate images
+    if (d.alternateImages) {
+      d.alternateImages.forEach(i => {
+        if (i.image450 && !p.images.includes(i.image450)) p.images.push(i.image450);
+      });
+    }
+    // Hero image as fallback
+    if (d.heroImage && !p.images.includes(d.heroImage)) p.images.push(d.heroImage);
     p.primaryImage = p.images[0] || '';
 
+    // Price
     p.price = parsePrice(d.currentSku?.listPrice || d.listPrice);
-    p.originalPrice = parsePrice(d.currentSku?.valuePrice);
+    p.originalPrice = parsePrice(d.currentSku?.valuePrice || d.valuePrice);
+    if (p.originalPrice && p.price && p.originalPrice <= p.price) p.originalPrice = null;
+
+    // Rating
     p.rating = d.rating ? parseFloat(d.rating) : null;
     p.reviews = d.reviews || 0;
-    p.badge = d.isNew ? 'New' : (d.isExclusive ? 'Exclusive' : null);
+
+    // Badge
+    p.badge = d.isNew ? 'New' :
+              d.isExclusive ? 'Exclusive' :
+              d.isLimitedEdition ? 'Limited Edition' :
+              d.isOnlyFewLeft ? 'Almost Gone' :
+              d.lovesCount > 10000 ? 'Loved' : null;
+
+    // Availability
     p.availability = d.currentSku?.isOutOfStock ? 'Out of Stock' : 'In Stock';
     p.stockSignal = d.currentSku?.isOutOfStock ? 'out_of_stock' : 'in_stock';
 
@@ -81,13 +137,13 @@ class SephoraAdapter extends BaseAdapter {
     if (d.regularChildSkus) {
       const colorMap = {};
       d.regularChildSkus.forEach(sku => {
-        const color = sku.variationValue || 'Default';
-        if (!colorMap[color]) colorMap[color] = [];
-        colorMap[color].push(sku);
+        const val = sku.variationValue || 'Default';
+        if (!colorMap[val]) colorMap[val] = [];
+        colorMap[val].push(sku);
       });
       if (Object.keys(colorMap).length > 1) {
         p.options.push({
-          name: d.variationType || 'Color',
+          name: d.variationType || 'Shade',
           values: Object.keys(colorMap).map(c => ({
             value: c,
             image: colorMap[c][0]?.skuImages?.image135 || null,
@@ -97,18 +153,49 @@ class SephoraAdapter extends BaseAdapter {
       }
       p.variants = d.regularChildSkus.map(sku => ({
         id: sku.skuId || '',
-        title: sku.variationValue || 'Default',
-        price: parsePrice(sku.listPrice),
+        title: [sku.variationValue, sku.size].filter(Boolean).join(' / ') || 'Default',
+        price: parsePrice(sku.listPrice) || p.price,
         image: sku.skuImages?.image450 || null,
         available: !sku.isOutOfStock
       }));
     }
 
+    // Shipping
     p.shippingData.note = 'FREE Standard Shipping';
+    p.shippingData.cost = 0;
+    p.shippingData.method = 'Standard';
     p.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days' };
+
+    // Return policy
     p.returnPolicy = { window: 30, summary: 'Free returns within 30 days' };
-    p.sourceUrl = `https://www.sephora.com/product/${p.normalizedHandle || p.sourceId}`;
+    if (d.returnPolicy) p.returnPolicy.summary = d.returnPolicy;
+
+    p.sourceUrl = d.targetUrl ? `https://www.sephora.com${d.targetUrl}` :
+                  `https://www.sephora.com/product/${this._makeHandle(p.title)}-P${d.productId || p.sourceId}`;
     p.normalizedHandle = this._makeHandle(p.title);
+
+    // Raw source meta
+    p.rawSourceMeta = {
+      productId: d.productId || null,
+      skuId: d.currentSku?.skuId || null,
+      brandId: d.brand?.brandId || null,
+      isNew: d.isNew || false,
+      isExclusive: d.isExclusive || false,
+      isLimitedEdition: d.isLimitedEdition || false,
+      isOnlyFewLeft: d.isOnlyFewLeft || false,
+      lovesCount: d.lovesCount || 0,
+      variationType: d.variationType || null,
+      totalChildSkus: d.regularChildSkus?.length || 0,
+      hasIngredients: !!d.ingredientDesc,
+      hasSuggestedUsage: !!d.suggestedUsage,
+      skinType: d.skinType || null,
+      coverage: d.coverage || null,
+      finish: d.finish || null,
+      formulation: d.formulation || null,
+      size: d.currentSku?.size || null,
+      targetUrl: d.targetUrl || null
+    };
+
     return p;
   }
 
@@ -119,13 +206,17 @@ class SephoraAdapter extends BaseAdapter {
     product.sourceName = 'Sephora';
     product.title = p.displayName || '';
     product.brand = p.brandName || null;
+    product.description = p.longDescription || p.shortDescription || '';
+    product.bullets = p.quickLookDescription ? [p.quickLookDescription] : [];
     product.price = parsePrice(p.currentSku?.listPrice || p.listPrice);
+    product.originalPrice = parsePrice(p.currentSku?.valuePrice);
     product.images = [p.heroImage || p.currentSku?.skuImages?.image450].filter(Boolean);
     product.primaryImage = product.images[0] || '';
     product.rating = p.rating ? parseFloat(p.rating) : null;
     product.reviews = p.reviews || 0;
-    product.availability = 'In Stock';
-    product.stockSignal = 'in_stock';
+    product.badge = p.isNew ? 'New' : (p.isExclusive ? 'Exclusive' : null);
+    product.availability = p.currentSku?.isOutOfStock ? 'Out of Stock' : 'In Stock';
+    product.stockSignal = p.currentSku?.isOutOfStock ? 'out_of_stock' : 'in_stock';
     product.shippingData.note = 'FREE Standard Shipping';
     product.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days' };
     product.returnPolicy = { window: 30, summary: 'Free returns within 30 days' };

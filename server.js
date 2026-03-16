@@ -141,7 +141,7 @@ app.get('/api/product/:id', async (req, res) => {
     const adapter = getAdapter(source);
     if (!adapter) return res.status(400).json({ error: `Source ${source} not available` });
 
-    const product = await adapter.getProduct(id);
+    const product = await adapter.getProduct(id, { title: req.query.title });
     if (!product) {
       return res.status(404).json({ error: 'Product not found', source, id });
     }

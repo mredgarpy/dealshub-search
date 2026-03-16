@@ -70,8 +70,8 @@ async function createShopifyProduct(productData, pricingResult) {
         title: v.title || `Option ${i + 1}`,
         price: vPrice.price.toFixed(2),
         compare_at_price: vPrice.compareAt ? vPrice.compareAt.toFixed(2) : null,
-        sku: `DH}-${source.toUpperCase()}-${sourceId}-${v.id || i}`,
-        inventory_management: 'shopify', // CRITICAL FIX: Must be 'shopify' not null
+        sku: `DH-${source.toUpperCase()}-${sourceId}-${v.id || i}`,
+        inventory_management: 'shopify',  // CRITICAL FIX: Must be 'shopify' not null
         inventory_policy: 'deny',
         requires_shipping: true,
         weight: 0.5,
@@ -136,7 +136,7 @@ async function createShopifyProduct(productData, pricingResult) {
         { namespace: 'dealshub', key: 'delivery_max_days', value: String(productData.deliveryEstimate?.maxDays || ''), type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'delivery_label', value: productData.deliveryEstimate?.label || '', type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'shipping_note', value: productData.shippingData?.note || '', type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'return_window', value: String(productData.returnPolicy'?.window || '')1 type: 'single_line_text_field' }
+        { namespace: 'dealshub', key: 'return_window', value: String(productData.returnPolicy?.window || ''), type: 'single_line_text_field' }
       ]
     }
   };
@@ -150,7 +150,7 @@ async function createShopifyProduct(productData, pricingResult) {
   }
 
   // ---- SET INVENTORY FOR ALL VARIANTS ----
-  IConst locationId = LOCATION_ID();
+  const locationId = LOCATION_ID();
   for (const variant of product.variants) {
     try {
       await shopifyAPI('/inventory_levels/set.json', 'POST', {
@@ -163,7 +163,7 @@ async function createShopifyProduct(productData, pricingResult) {
       logger.error('sync', `Inventory set failed for variant ${variant.id}`, { error: invErr.message });
       // FALLBACK: Try to update inventory item to not track
       try {
-        await shopifyAPI(`/cinventory_items/${variant.inventory_item_id}.json`, 'PUT', {
+        await shopifyAPI(`/inventory_items/${variant.inventory_item_id}.json`, 'PUT', {
           inventory_item: { tracked: false }
         });
         logger.info('sync', `Fallback: Set variant ${variant.id} to untracked`);

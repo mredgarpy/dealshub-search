@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — Sephora Adapter (via RapidAPI)
+// DealsHub â Sephora Adapter (via RapidAPI)
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
@@ -8,7 +8,7 @@ const logger = require('../utils/logger');
 const API_HOST = 'sephora.p.rapidapi.com';
 
 class SephoraAdapter extends BaseAdapter {
-  constructor(config) { super('sephora', config); }
+  constructor(config) { super('sephora', { ...config, timeout: 18000 }); }
 
   async search(query, limit = 12) {
     const url = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(query)}&pageIndex=0&pageSize=${limit}`;
@@ -18,28 +18,41 @@ class SephoraAdapter extends BaseAdapter {
   }
 
   async getProduct(id) {
-    // id can be productId (P######) or skuId (numeric). Try detail with productId first.
+    // id can be productId (P######) or skuId (numeric)
     const isProductId = /^P\d+$/i.test(id);
+
+    // ATTEMPT 1: Try detail endpoint directly
     const productIdParam = isProductId ? id : id;
     const skuParam = isProductId ? '' : id;
     const url = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(productIdParam)}${skuParam ? '&preferedSku=' + encodeURIComponent(skuParam) : ''}`;
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
     if (data?.currentSku) return this.normalizeProduct(data);
-    // If numeric skuId failed as productId, try search fallback to find the real productId
-    if (!isProductId) {
-      const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(id)}&pageIndex=0&pageSize=1`;
-      const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
-      if (sData?.products?.[0]) {
-        const realProductId = sData.products[0].productId;
-        if (realProductId && realProductId !== id) {
-          // Retry with the real productId
-          const retryUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(realProductId)}&preferedSku=${encodeURIComponent(id)}`;
-          const retryData = await this.fetchJSON(retryUrl, { headers: this.rapidHeaders(API_HOST) });
-          if (retryData?.currentSku) return this.normalizeProduct(retryData);
-        }
-        return this.normalizeProductFromSearch(sData.products[0]);
+
+    // ATTEMPT 2: Search fallback — works for both productId and skuId formats
+    // Use the product name from detail response if available, otherwise search by ID
+    const searchQuery = data?.displayName || id;
+    const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(searchQuery)}&pageIndex=0&pageSize=5`;
+    const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
+
+    if (sData?.products?.length) {
+      // Try to find exact match by productId or skuId
+      const exactMatch = sData.products.find(p =>
+        p.productId === id || String(p.currentSku?.skuId) === String(id)
+      );
+      const bestMatch = exactMatch || sData.products[0];
+
+      // If we found a different productId, try detail again with it
+      if (!isProductId && bestMatch.productId && bestMatch.productId !== id) {
+        const retryUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(bestMatch.productId)}&preferedSku=${encodeURIComponent(id)}`;
+        const retryData = await this.fetchJSON(retryUrl, { headers: this.rapidHeaders(API_HOST) });
+        if (retryData?.currentSku) return this.normalizeProduct(retryData);
       }
+
+      // Fall back to search-based normalization (still provides usable product data)
+      logger.warn('sephora', `Detail API failed for ${id}, using search fallback`);
+      return this.normalizeProductFromSearch(bestMatch);
     }
+
     return null;
   }
 
@@ -85,7 +98,7 @@ class SephoraAdapter extends BaseAdapter {
       p.breadcrumbs = [d.parentCategory.displayName].filter(Boolean);
     }
 
-    // Description — combine all text fields for rich content
+    // Description â combine all text fields for rich content
     const descParts = [];
     if (d.longDescription) descParts.push(d.longDescription);
     if (d.shortDescription && d.shortDescription !== d.longDescription) descParts.push(d.shortDescription);
@@ -93,7 +106,7 @@ class SephoraAdapter extends BaseAdapter {
     if (d.ingredientDesc) descParts.push(`Ingredients: ${d.ingredientDesc}`);
     p.description = descParts.join('\n\n') || '';
 
-    // Bullets — quick look + key details
+    // Bullets â quick look + key details
     p.bullets = [];
     if (d.quickLookDescription) p.bullets.push(d.quickLookDescription);
     // Size / value info
@@ -114,7 +127,7 @@ class SephoraAdapter extends BaseAdapter {
       });
     }
 
-    // Images — collect from multiple sources
+    // Images â collect from multiple sources
     p.images = [];
     const skuImgs = d.currentSku?.skuImages;
     if (skuImgs?.image450) p.images.push(skuImgs.image450);

@@ -21,16 +21,22 @@ class SephoraAdapter extends BaseAdapter {
     // id can be productId (P######) or skuId (numeric)
     const isProductId = /^P\d+$/i.test(id);
 
-    // ATTEMPT 1: Try detail endpoint directly
+    // ATTEMPT 1: Try detail endpoint with resilient JSON parsing
     const productIdParam = isProductId ? id : id;
     const skuParam = isProductId ? '' : id;
-    const url = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(productIdParam)}${skuParam ? '&preferedSku=' + encodeURIComponent(skuParam) : ''}`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+    const detailUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(productIdParam)}${skuParam ? '&preferedSku=' + encodeURIComponent(skuParam) : ''}`;
+    const { data, rawText } = await this._fetchDetailResilient(detailUrl);
     if (data?.currentSku) return this.normalizeProduct(data);
 
-    // ATTEMPT 2: Search fallback — works for both productId and skuId formats
-    // Use the product name from detail response if available, otherwise search by ID
-    const searchQuery = data?.displayName || id;
+    // Extract displayName from partial/truncated JSON response
+    let searchQuery = data?.displayName || null;
+    if (!searchQuery && rawText) {
+      const m = rawText.match(/"displayName"\s*:\s*"([^"]+)"/);
+      if (m) searchQuery = m[1];
+    }
+    searchQuery = searchQuery || id;
+
+    // ATTEMPT 2: Search fallback using displayName or id
     const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(searchQuery)}&pageIndex=0&pageSize=5`;
     const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
 
@@ -54,6 +60,30 @@ class SephoraAdapter extends BaseAdapter {
     }
 
     return null;
+  }
+
+  async _fetchDetailResilient(url) {
+    try {
+      const response = await fetch(url, {
+        headers: this.rapidHeaders(API_HOST),
+        signal: AbortSignal.timeout(this.config?.timeout || 18000)
+      });
+      if (!response.ok) {
+        logger.error('sephora', `Detail API HTTP ${response.status}`, { url: url.substring(0, 80) });
+        return { data: null, rawText: '' };
+      }
+      const rawText = await response.text();
+      try {
+        const data = JSON.parse(rawText);
+        return { data, rawText };
+      } catch (e) {
+        logger.warn('sephora', 'Truncated JSON from detail API, extracting partial data', { textLen: rawText.length });
+        return { data: null, rawText };
+      }
+    } catch (e) {
+      logger.error('sephora', 'Detail fetch error', { error: e.message });
+      return { data: null, rawText: '' };
+    }
   }
 
   normalizeSearchResult(p) {

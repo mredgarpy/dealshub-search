@@ -126,8 +126,8 @@ app.get('/api/search', async (req, res) => {
 // ---- UNIFIED PRODUCT DETAIL ----
 app.get('/api/product/:id', async (req, res) => {
   const { id } = req.params;
-  const { store = 'amazon' } = req.query;
-  const source = store.toLowerCase();
+  const { store, source: sourceParam } = req.query;
+  const source = (sourceParam || store || 'amazon').toLowerCase();
 
   if (!VALID_SOURCES.includes(source)) {
     return res.status(400).json({ error: `Invalid source: ${source}. Valid: ${VALID_SOURCES.join(', ')}` });

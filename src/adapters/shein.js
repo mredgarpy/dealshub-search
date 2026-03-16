@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — SHEIN Adapter (via RapidAPI)
+// DealsHub â SHEIN Adapter (via RapidAPI)
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
@@ -21,12 +21,13 @@ class SheinAdapter extends BaseAdapter {
     return data.info.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }
 
-  async getProduct(productId) {
+  async getProduct(productId, options = {}) {
     const url = `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD`;
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
     if (data?.info) return this.normalizeProduct(data.info);
     // Fallback to search
-    const searchUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&page=1&limit=1`;
+    const searchQuery = options.title || productId;
+    const searchUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(searchQuery)}&language=en&country=US&currency=USD&page=1&limit=1`;
     const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
     if (sData?.info?.products?.[0]) return this.normalizeProductFromSearch(sData.info.products[0]);
     return null;
@@ -74,7 +75,7 @@ class SheinAdapter extends BaseAdapter {
       p.breadcrumbs = [d.cat_name];
     }
 
-    // Description — combine all available text sources
+    // Description â combine all available text sources
     const descParts = [];
     if (d.detail?.description) descParts.push(d.detail.description);
     if (d.goods_desc && d.goods_desc !== d.detail?.description) descParts.push(d.goods_desc);
@@ -91,7 +92,7 @@ class SheinAdapter extends BaseAdapter {
     if (d.detail?.sizeTemplate) descParts.push(`Size Guide: ${d.detail.sizeTemplate}`);
     p.description = descParts.join('\n\n') || '';
 
-    // Bullets — structured product attributes + description bullets
+    // Bullets â structured product attributes + description bullets
     p.bullets = [];
     if (Array.isArray(d.detail?.goods_desc_bullet) && d.detail.goods_desc_bullet.length) {
       p.bullets = d.detail.goods_desc_bullet.filter(b => b && typeof b === 'string');
@@ -122,7 +123,7 @@ class SheinAdapter extends BaseAdapter {
     if (d.detail?.neckline) p.bullets.push(`Neckline: ${d.detail.neckline}`);
     if (d.detail?.sleeveLength) p.bullets.push(`Sleeve: ${d.detail.sleeveLength}`);
 
-    // Images — multiple sources
+    // Images â multiple sources
     p.images = [];
     if (d.goods_imgs?.detail_image?.length) {
       p.images = d.goods_imgs.detail_image
@@ -161,7 +162,7 @@ class SheinAdapter extends BaseAdapter {
     p.availability = d.is_on_sale === 0 ? 'Out of Stock' : 'In Stock';
     p.stockSignal = d.is_on_sale === 0 ? 'out_of_stock' : 'in_stock';
 
-    // Variants (size, color) — saleAttr shape
+    // Variants (size, color) â saleAttr shape
     if (d.productDetails?.saleAttr) {
       const saleAttr = d.productDetails.saleAttr;
       const attrEntries = typeof saleAttr === 'object' ? Object.values(saleAttr) : [];

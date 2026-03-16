@@ -1,2 +1,50 @@
 {% comment %}
   DealsHub — Trust Badges Strip
+  Usage: {% render 'trust-badges' %}
+{% endcomment %}
+
+<div class="dh-trust-strip">
+  <div class="dh-trust-strip__item">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2ed573" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+    <span>Secure Checkout</span>
+  </div>
+  <div class="dh-trust-strip__item">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5352ed" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+    <span>Protected Payment</span>
+  </div>
+  <div class="dh-trust-strip__item">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff6348" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+    <span>Tracked Shipping</span>
+  </div>
+  <div class="dh-trust-strip__item">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffa502" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+    <span>Easy Returns</span>
+  </div>
+</div>
+
+<style>
+  .dh-trust-strip {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 16px 0;
+    flex-wrap: wrap;
+  }
+  .dh-trust-strip__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #555;
+    white-space: nowrap;
+  }
+  @media (max-width: 600px) {
+    .dh-trust-strip {
+      gap: 12px;
+    }
+    .dh-trust-strip__item span {
+      font-size: 11px;
+    }
+  }
+</style>

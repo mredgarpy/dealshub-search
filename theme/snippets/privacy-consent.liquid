@@ -1,0 +1,399 @@
+{% comment %}
+  DealsHub — Privacy & Cookie Consent Banner (FASE 7)
+  Include before </body> in theme.liquid: {% render 'privacy-consent' %}
+
+  Consent categories:
+  - essential: Always on (cart, checkout, security)
+  - analytics: GA4, internal analytics
+  - marketing: Meta Pixel, TikTok Pixel, email remarketing
+{% endcomment %}
+
+<!-- DealsHub Consent Manager -->
+<div id="dh-consent-banner" role="dialog" aria-label="Cookie consent" aria-modal="false" style="display:none;">
+  <style>
+    #dh-consent-banner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 99999;
+      background: #fff;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transform: translateY(100%);
+      transition: transform 0.35s ease;
+    }
+    #dh-consent-banner.dh-visible {
+      transform: translateY(0);
+    }
+    .dh-consent-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px 24px;
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .dh-consent-text {
+      flex: 1;
+      min-width: 280px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+    }
+    .dh-consent-text h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #111;
+    }
+    .dh-consent-text a {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+    .dh-consent-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .dh-consent-btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      white-space: nowrap;
+      transition: background 0.2s, color 0.2s;
+    }
+    .dh-consent-btn:focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 2px;
+    }
+    .dh-btn-accept {
+      background: #111;
+      color: #fff;
+    }
+    .dh-btn-accept:hover {
+      background: #333;
+    }
+    .dh-btn-reject {
+      background: #f3f4f6;
+      color: #333;
+    }
+    .dh-btn-reject:hover {
+      background: #e5e7eb;
+    }
+    .dh-btn-settings {
+      background: transparent;
+      color: #666;
+      padding: 10px 12px;
+      text-decoration: underline;
+      font-weight: 400;
+    }
+
+    /* Settings panel */
+    .dh-consent-settings {
+      display: none;
+      width: 100%;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+      margin-top: 4px;
+    }
+    .dh-consent-settings.dh-open {
+      display: block;
+    }
+    .dh-consent-category {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .dh-consent-category:last-child {
+      border-bottom: none;
+    }
+    .dh-cat-info {
+      flex: 1;
+    }
+    .dh-cat-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: #111;
+    }
+    .dh-cat-desc {
+      font-size: 12px;
+      color: #666;
+      margin-top: 2px;
+    }
+    .dh-toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .dh-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+    .dh-toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc;
+      border-radius: 24px;
+      transition: background 0.2s;
+    }
+    .dh-toggle-slider:before {
+      content: '';
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .dh-toggle input:checked + .dh-toggle-slider {
+      background: #111;
+    }
+    .dh-toggle input:checked + .dh-toggle-slider:before {
+      transform: translateX(20px);
+    }
+    .dh-toggle input:disabled + .dh-toggle-slider {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 600px) {
+      .dh-consent-inner {
+        flex-direction: column;
+        padding: 16px;
+        gap: 12px;
+      }
+      .dh-consent-actions {
+        width: 100%;
+      }
+      .dh-consent-btn {
+        flex: 1;
+        text-align: center;
+      }
+    }
+  </style>
+
+  <div class="dh-consent-inner">
+    <div class="dh-consent-text">
+      <h3>We value your privacy</h3>
+      <p>We use cookies to improve your shopping experience, analyze site traffic, and personalize content. You can choose which cookies to accept.
+        <a href="/policies/privacy-policy" target="_blank">Privacy Policy</a>
+      </p>
+    </div>
+    <div class="dh-consent-actions">
+      <button class="dh-consent-btn dh-btn-accept" id="dh-consent-accept" aria-label="Accept all cookies">Accept All</button>
+      <button class="dh-consent-btn dh-btn-reject" id="dh-consent-reject" aria-label="Reject optional cookies">Essential Only</button>
+      <button class="dh-consent-btn dh-btn-settings" id="dh-consent-toggle-settings" aria-expanded="false" aria-controls="dh-consent-settings-panel">Manage</button>
+    </div>
+
+    <div class="dh-consent-settings" id="dh-consent-settings-panel" role="region" aria-label="Cookie settings">
+      <div class="dh-consent-category">
+        <div class="dh-cat-info">
+          <div class="dh-cat-name">Essential</div>
+          <div class="dh-cat-desc">Required for cart, checkout, and security. Always active.</div>
+        </div>
+        <label class="dh-toggle">
+          <input type="checkbox" checked disabled aria-label="Essential cookies, always active">
+          <span class="dh-toggle-slider"></span>
+        </label>
+      </div>
+      <div class="dh-consent-category">
+        <div class="dh-cat-info">
+          <div class="dh-cat-name">Analytics</div>
+          <div class="dh-cat-desc">Help us understand how visitors interact with our store (Google Analytics).</div>
+        </div>
+        <label class="dh-toggle">
+          <input type="checkbox" id="dh-consent-analytics" aria-label="Analytics cookies">
+          <span class="dh-toggle-slider"></span>
+        </label>
+      </div>
+      <div class="dh-consent-category">
+        <div class="dh-cat-info">
+          <div class="dh-cat-name">Marketing</div>
+          <div class="dh-cat-desc">Used for personalized ads and remarketing (Meta, TikTok).</div>
+        </div>
+        <label class="dh-toggle">
+          <input type="checkbox" id="dh-consent-marketing" aria-label="Marketing cookies">
+          <span class="dh-toggle-slider"></span>
+        </label>
+      </div>
+      <div style="text-align:right; padding-top:12px;">
+        <button class="dh-consent-btn dh-btn-accept" id="dh-consent-save" aria-label="Save cookie preferences">Save Preferences</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var STORAGE_KEY = 'dh_consent_v1';
+  var _callbacks = [];
+
+  /* Consent state */
+  var consent = {
+    essential: true,
+    analytics: false,
+    marketing: false,
+    timestamp: null
+  };
+
+  /* Load saved consent */
+  function loadConsent() {
+    try {
+      var saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        var parsed = JSON.parse(saved);
+        if (parsed && parsed.timestamp) {
+          consent = parsed;
+          return true;
+        }
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  /* Save consent */
+  function saveConsent() {
+    consent.timestamp = new Date().toISOString();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(consent));
+    } catch (e) {}
+    notifyCallbacks();
+  }
+
+  /* Notify registered callbacks */
+  function notifyCallbacks() {
+    for (var i = 0; i < _callbacks.length; i++) {
+      try { _callbacks[i](consent); } catch (e) {}
+    }
+  }
+
+  /* Public API */
+  window.DHConsent = {
+    hasConsent: function(category) {
+      if (category === 'essential') return true;
+      return consent[category] === true;
+    },
+    getConsent: function() {
+      return Object.assign({}, consent);
+    },
+    onUpdate: function(cb) {
+      if (typeof cb === 'function') _callbacks.push(cb);
+    },
+    show: function() {
+      var banner = document.getElementById('dh-consent-banner');
+      if (banner) {
+        banner.style.display = '';
+        requestAnimationFrame(function() {
+          banner.classList.add('dh-visible');
+        });
+      }
+    },
+    hide: function() {
+      var banner = document.getElementById('dh-consent-banner');
+      if (banner) {
+        banner.classList.remove('dh-visible');
+        setTimeout(function() { banner.style.display = 'none'; }, 400);
+      }
+    },
+    reset: function() {
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+      consent = { essential: true, analytics: false, marketing: false, timestamp: null };
+      window.DHConsent.show();
+    }
+  };
+
+  /* Initialize */
+  var hasSaved = loadConsent();
+
+  if (hasSaved) {
+    // Consent already given, notify immediately
+    notifyCallbacks();
+  } else {
+    // Show banner after short delay
+    setTimeout(function() { window.DHConsent.show(); }, 800);
+  }
+
+  /* Event handlers */
+  document.addEventListener('DOMContentLoaded', function() {
+    var acceptBtn = document.getElementById('dh-consent-accept');
+    var rejectBtn = document.getElementById('dh-consent-reject');
+    var toggleBtn = document.getElementById('dh-consent-toggle-settings');
+    var saveBtn = document.getElementById('dh-consent-save');
+    var settingsPanel = document.getElementById('dh-consent-settings-panel');
+    var analyticsCheck = document.getElementById('dh-consent-analytics');
+    var marketingCheck = document.getElementById('dh-consent-marketing');
+
+    if (acceptBtn) {
+      acceptBtn.addEventListener('click', function() {
+        consent.analytics = true;
+        consent.marketing = true;
+        saveConsent();
+        window.DHConsent.hide();
+      });
+    }
+
+    if (rejectBtn) {
+      rejectBtn.addEventListener('click', function() {
+        consent.analytics = false;
+        consent.marketing = false;
+        saveConsent();
+        window.DHConsent.hide();
+      });
+    }
+
+    if (toggleBtn && settingsPanel) {
+      toggleBtn.addEventListener('click', function() {
+        var open = settingsPanel.classList.toggle('dh-open');
+        toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+          if (analyticsCheck) analyticsCheck.checked = consent.analytics;
+          if (marketingCheck) marketingCheck.checked = consent.marketing;
+        }
+      });
+    }
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function() {
+        consent.analytics = analyticsCheck ? analyticsCheck.checked : false;
+        consent.marketing = marketingCheck ? marketingCheck.checked : false;
+        saveConsent();
+        window.DHConsent.hide();
+      });
+    }
+  });
+
+  /* Integrate with Shopify Customer Privacy API if available */
+  if (window.Shopify && window.Shopify.customerPrivacy) {
+    try {
+      var sp = window.Shopify.customerPrivacy;
+      if (typeof sp.setTrackingConsent === 'function') {
+        window.DHConsent.onUpdate(function(c) {
+          sp.setTrackingConsent({
+            analytics: c.analytics,
+            marketing: c.marketing,
+            preferences: true
+          }, function() {});
+        });
+      }
+    } catch (e) {}
+  }
+
+})();
+</script>

@@ -17,7 +17,7 @@ class SephoraAdapter extends BaseAdapter {
     return data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }
 
-  async getProduct(id) {
+  async getProduct(id, options = {}) {
     // id can be productId (P######) or skuId (numeric)
     const isProductId = /^P\d+$/i.test(id);
 
@@ -34,7 +34,7 @@ class SephoraAdapter extends BaseAdapter {
       const m = rawText.match(/"displayName"\s*:\s*"([^"]+)"/);
       if (m) searchQuery = m[1];
     }
-    searchQuery = searchQuery || id;
+    searchQuery = searchQuery || options.title || id;
 
     // ATTEMPT 2: Search fallback using displayName or id
     const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(searchQuery)}&pageIndex=0&pageSize=5`;

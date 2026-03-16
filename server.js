@@ -138,7 +138,7 @@ app.get('/api/product/:id', async (req, res) => {
   try {
     const adapter = getAdapter(source);
     if (!adapter) return res.status(400).json({ error: `Source ${source} not available` });
-
+    
     const product = await adapter.getProduct(id);
     if (!product) {
       return res.status(404).json({ error: 'Product not found', source, id });
@@ -225,6 +225,16 @@ app.get('/api/bestsellers', async (req, res) => {
       Object.entries(queries).map(([source, q]) => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(q, 6) : Promise.resolve([]);
+      })
+    );
+    const all = interleaveFromSettled(results, 18);
+    const response = { results: all, section: 'bestsellers' };
+    searchCache.set(cacheKey, response, 600000);
+    res.json(response);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});     return adapter ? adapter.search(q, 6) : Promise.resolve([]);
       })
     );
     const all = interleaveFromSettled(results, 18);
@@ -338,7 +348,7 @@ app.get('/api/source-health', async (req, res) => {
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
 app.post('/api/prepare-cart', async (req, res) => {
-  const { source, sourceId, selectedVariant, quantity = 1 } = req.body;
+  const { source, sourceId, selectedVariant, quantity = 1, forceResync = false } = req.body;
 
   if (!source || !sourceId) {
     return res.status(400).json({ error: 'Missing source or sourceId' });
@@ -363,7 +373,8 @@ app.post('/api/prepare-cart', async (req, res) => {
       sourceId: String(sourceId),
       productData,
       selectedVariantId: selectedVariant,
-      quantity: parseInt(quantity) || 1
+      quantity: parseInt(quantity) || 1,
+      forceResync
     });
 
     logger.info('cart', 'Cart prepared', {
@@ -630,7 +641,8 @@ app.get('/api/admin/theme-asset', async (req, res) => {
     });
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: 'Asset not found' });
+      const errText = await response.text();
+      return res.status(response.status).json({ error: 'Asset not found', status: response.status, detail: errText.substring(0, 300) });
     }
 
     const data = await response.json();
@@ -656,7 +668,14 @@ app.get('/api/admin/theme-assets', async (req, res) => {
     const response = await fetch(url, {
       headers: { 'X-Shopify-Access-Token': shopifyToken }
     });
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(response.status).json({ error: `Shopify API ${response.status}`, detail: errText.substring(0, 500), domain: shopifyDomain, themeId });
+    }
     const data = await response.json();
+    if (!data || !data.assets) {
+      return res.status(500).json({ error: 'Unexpected response format', data: JSON.stringify(data).substring(0, 500) });
+    }
     const keys = data.assets.map(a => a.key).sort();
     res.json({ total: keys.length, assets: keys });
   } catch (e) {

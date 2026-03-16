@@ -55,7 +55,7 @@ initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    version: '2.0.0',
+    version: '2.2.0',
     sources: VALID_SOURCES,
     cacheSize: { search: searchCache.size, product: productCache.size },
     uptime: process.uptime()
@@ -565,7 +565,7 @@ app.get('/api/admin/stats', (req, res) => {
     cache: { search: searchCache.size, product: productCache.size },
     sources: VALID_SOURCES,
     uptime: process.uptime(),
-    version: '2.1.0'
+    version: '2.2.0'
   });
 });
 
@@ -703,7 +703,7 @@ function interleaveFromSettled(results, maxTotal = 18) {
 // ============================================================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  logger.info('server', `StyleHub backend v2.0 running on port ${PORT}`);
+  logger.info('server', `StyleHub backend v2.2 running on port ${PORT}`);
   logger.info('server', `Sources: ${VALID_SOURCES.join(', ')}`);
   logger.info('server', `Shopify: ${process.env.SHOPIFY_STORE_DOMAIN ? 'configured' : 'NOT configured'}`);
 });

@@ -1,2 +1,66 @@
 {% comment %}
   DealsHub — SEO Meta Tags
+  Include in theme.liquid head: {% render 'seo-meta' %}
+{% endcomment %}
+
+<!-- Primary Meta Tags -->
+<meta name="description" content="{{ page_description | default: 'StyleHub Miami — Best deals from top brands, all in one place. Secure checkout powered by Shopify.' }}">
+<meta name="keywords" content="best deals, online shopping, fashion deals, beauty deals, electronics deals, home deals, stylehub miami, deals hub">
+<meta name="author" content="StyleHub Miami">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:title" content="{{ page_title | default: 'StyleHub Miami — Top Deals, One Destination' }}">
+<meta property="og:description" content="{{ page_description | default: 'Discover the best deals on fashion, beauty, electronics and more. Secure checkout, fast shipping.' }}">
+<meta property="og:image" content="{{ page_image | default: settings.social_image | default: 'https://stylehubmiami.com/og-image.jpg' }}">
+<meta property="og:site_name" content="StyleHub Miami">
+<meta property="og:locale" content="en_US">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ page_title | default: 'StyleHub Miami' }}">
+<meta name="twitter:description" content="{{ page_description | default: 'Top deals from your favorite brands, all in one place.' }}">
+<meta name="twitter:image" content="{{ page_image | default: settings.social_image }}">
+
+<!-- Structured Data: Organization -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "StyleHub Miami",
+  "url": "https://stylehubmiami.com",
+  "logo": "{{ settings.logo | default: 'https://stylehubmiami.com/logo.png' }}",
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "email": "support@stylehubmiami.com",
+    "contactType": "customer service",
+    "availableLanguage": ["English", "Spanish"]
+  },
+  "sameAs": []
+}
+</script>
+
+<!-- Structured Data: WebSite with Search Action -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "StyleHub Miami",
+  "url": "https://stylehubmiami.com",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://stylehubmiami.com/pages/search-results?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+
+<!-- Canonical -->
+<link rel="canonical" href="{{ canonical_url }}">
+
+<!-- Preconnect to API and image CDNs -->
+<link rel="preconnect" href="https://dealshub-search.onrender.com" crossorigin>
+<link rel="dns-prefetch" href="https://dealshub-search.onrender.com">
+<link rel="preconnect" href="https://m.media-amazon.com" crossorigin>
+<link rel="dns-prefetch" href="https://m.media-amazon.com">

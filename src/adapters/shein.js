@@ -8,7 +8,7 @@ const logger = require('../utils/logger');
 const API_HOST = 'unofficial-shein.p.rapidapi.com';
 
 class SheinAdapter extends BaseAdapter {
-  constructor(config) { super('shein', config); }
+  constructor(config) { super('shein', { ...config, timeout: 18000 }); }
 
   async search(query, limit = 12) {
     const url = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(query)}&language=en&country=US&currency=USD&page=1&limit=${limit}`;

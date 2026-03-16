@@ -3,10 +3,12 @@
     "main": {
       "type": "dealshub-search-results",
       "settings": {
-        "title": "Buscar Productos",
-        "placeholder": "Buscar en todas las tiendas..."
+        "title": "Search Products",
+        "placeholder": "Search all stores..."
       }
     }
   },
-  "order": ["main"]
+  "order": [
+    "main"
+  ]
 }

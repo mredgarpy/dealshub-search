@@ -3,10 +3,12 @@
     "main": {
       "type": "dealshub-tracking",
       "settings": {
-        "title": "Rastrear Mi Pedido",
-        "subtitle": "Ingresa tu número de orden para ver el estado de tu pedido"
+        "title": "Track My Order",
+        "subtitle": "Enter your order number to check your order status"
       }
     }
   },
-  "order": ["main"]
+  "order": [
+    "main"
+  ]
 }

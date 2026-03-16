@@ -1,205 +1,2066 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StyleHub Admin — Dashboard</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f4f6f8; color: #1a1a2e; }
-    .admin-nav { background: #1a1a2e; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
-    .admin-nav h1 { color: #fff; font-size: 18px; font-weight: 700; }
-    .admin-nav__actions { display: flex; gap: 12px; }
-    .admin-nav__btn { padding: 8px 16px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: transparent; color: #fff; font-size: 13px; cursor: pointer; transition: background .2s; }
-    .admin-nav__btn:hover { background: rgba(255,255,255,.1); }
-    .admin-nav__btn--danger { border-color: #ff4757; color: #ff4757; }
-    .admin-nav__btn--danger:hover { background: rgba(255,71,87,.1); }
-    .admin-container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DealsHub Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    /* Stats Cards */
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-    .stat-card__label { font-size: 13px; color: #888; margin-bottom: 4px; }
-    .stat-card__value { font-size: 28px; font-weight: 700; color: #1a1a2e; }
-    .stat-card__sub { font-size: 12px; color: #2ed573; margin-top: 4px; }
-    .stat-card__sub--warn { color: #ffa502; }
-    .stat-card__sub--err { color: #ff4757; }
+        :root {
+            --primary: #5C6AC4;
+            --primary-dark: #4A56A8;
+            --accent: #008060;
+            --danger: #DE3618;
+            --warning: #FFA500;
+            --success: #008060;
+            --dark-bg: #1a1a2e;
+            --light-bg: #f5f5f7;
+            --border: #e5e5e7;
+            --text-primary: #000;
+            --text-secondary: #6c757d;
+            --sidebar-width: 280px;
+        }
 
-    /* Tables */
-    .admin-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 24px; }
-    .admin-card__title { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-    .admin-table { width: 100%; border-collapse: collapse; }
-    .admin-table th { text-align: left; padding: 10px 12px; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid #f0f0f0; }
-    .admin-table td { padding: 12px; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
-    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-    .status-dot--ok { background: #2ed573; }
-    .status-dot--err { background: #ff4757; }
-    .status-dot--warn { background: #ffa502; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: var(--light-bg);
+            color: var(--text-primary);
+        }
 
-    /* Pricing Editor */
-    .pricing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-    .pricing-item { padding: 16px; border: 1px solid #e8e8e8; border-radius: 10px; }
-    .pricing-item__name { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
-    .pricing-item__field { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
-    .pricing-item__field label { font-size: 13px; color: #666; }
-    .pricing-item__field input { width: 80px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; text-align: right; }
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
 
-    /* Log view */
-    .log-view { background: #1a1a2e; border-radius: 10px; padding: 16px; max-height: 400px; overflow-y: auto; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; line-height: 1.8; }
-    .log-entry { color: #a0aec0; }
-    .log-entry--error { color: #ff4757; }
-    .log-entry--warn { color: #ffa502; }
-    .log-entry--info { color: #2ed573; }
+        /* SIDEBAR */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--dark-bg);
+            color: white;
+            padding: 2rem 1.5rem;
+            overflow-y: auto;
+            flex-shrink: 0;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        }
 
-    .refresh-btn { padding: 6px 14px; background: #f0f0f0; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
-    .refresh-btn:hover { background: #e0e0e0; }
+        .sidebar-header {
+            margin-bottom: 3rem;
+        }
 
-    /* Responsive */
-    @media (max-width: 768px) {
-      .admin-container { padding: 16px; }
-      .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-  </style>
+        .sidebar-logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .sidebar-subtitle {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+        }
+
+        .sidebar-nav li {
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar-nav button {
+            width: 100%;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            text-align: left;
+            font-size: 0.95rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .sidebar-nav button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .sidebar-nav button.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .sidebar-icon {
+            font-size: 1.25rem;
+            width: 1.5rem;
+            text-align: center;
+        }
+
+        /* MAIN CONTENT */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: white;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .content-section {
+            display: none;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        /* CARDS & LAYOUTS */
+        .card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-trend {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        /* BUTTONS */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--light-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: #f0f0f0;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            opacity: 0.9;
+        }
+
+        .btn-small {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* TABLES */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        th {
+            background: var(--light-bg);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: rgba(92, 106, 196, 0.02);
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* BADGES */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge-success {
+            background: rgba(0, 128, 96, 0.1);
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: rgba(255, 165, 0, 0.1);
+            color: var(--warning);
+        }
+
+        .badge-danger {
+            background: rgba(222, 54, 24, 0.1);
+            color: var(--danger);
+        }
+
+        .badge-info {
+            background: rgba(92, 106, 196, 0.1);
+            color: var(--primary);
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-dot.online {
+            background: var(--success);
+        }
+
+        .status-dot.warning {
+            background: var(--warning);
+        }
+
+        .status-dot.offline {
+            background: var(--danger);
+        }
+
+        /* FORMS */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 0.625rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(92, 106, 196, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        /* MODALS */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            float: right;
+        }
+
+        /* ALERTS */
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .alert-success {
+            background: rgba(0, 128, 96, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(0, 128, 96, 0.2);
+        }
+
+        .alert-error {
+            background: rgba(222, 54, 24, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(222, 54, 24, 0.2);
+        }
+
+        .alert-warning {
+            background: rgba(255, 165, 0, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(255, 165, 0, 0.2);
+        }
+
+        .alert-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem;
+            color: inherit;
+            padding: 0;
+            line-height: 1;
+        }
+
+        /* LOADING SPINNER */
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid var(--light-bg);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .loading-text {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        /* EMPTY STATE */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* SEARCH & FILTER */
+        .search-filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-box input {
+            width: 100%;
+        }
+
+        /* SOURCE HEALTH */
+        .source-health-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .source-health-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .source-name {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        /* CHART PLACEHOLDER */
+        .chart-placeholder {
+            background: var(--light-bg);
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 3rem 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                padding: 1rem;
+            }
+
+            .sidebar-header {
+                margin-bottom: 1rem;
+            }
+
+            .sidebar-nav {
+                display: flex;
+                gap: 0.5rem;
+                overflow-x: auto;
+            }
+
+            .sidebar-nav li {
+                flex-shrink: 0;
+            }
+
+            .sidebar-nav button {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.75rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .search-filter-bar {
+                flex-direction: column;
+            }
+
+            .table-wrapper {
+                font-size: 0.75rem;
+            }
+
+            th, td {
+                padding: 0.75rem 0.5rem;
+            }
+
+            .btn {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.75rem;
+            }
+
+            .modal-content {
+                padding: 1.5rem;
+            }
+        }
+
+        /* TOAST NOTIFICATION */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 2000;
+            max-width: 400px;
+        }
+
+        .toast {
+            background: white;
+            border-left: 4px solid var(--primary);
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .toast.success {
+            border-left-color: var(--success);
+        }
+
+        .toast.error {
+            border-left-color: var(--danger);
+        }
+
+        .toast.warning {
+            border-left-color: var(--warning);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 <body>
-  <nav class="admin-nav">
-    <h1>🏬 StyleHub Admin</h1>
-    <div class="admin-nav__actions">
-      <button class="admin-nav__btn" onclick="refreshAll()">↻ Refresh</button>
-      <button class="admin-nav__btn admin-nav__btn--danger" onclick="clearCache()">🗑️ Clear Cache</button>
-    </div>
-  </nav>
+    <div class="container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🎯 DealsHub</div>
+                <div class="sidebar-subtitle">Admin Panel</div>
+            </div>
+            <nav>
+                <ul class="sidebar-nav">
+                    <li><button class="nav-btn active" data-module="dashboard"><span class="sidebar-icon">📊</span>Dashboard</button></li>
+                    <li><button class="nav-btn" data-module="sync"><span class="sidebar-icon">🔄</span>Product Sync</button></li>
+                    <li><button class="nav-btn" data-module="pricing"><span class="sidebar-icon">💰</span>Costs & Margins</button></li>
+                    <li><button class="nav-btn" data-module="shipping"><span class="sidebar-icon">📦</span>Shipping Rules</button></li>
+                    <li><button class="nav-btn" data-module="mapping"><span class="sidebar-icon">🗺️</span>Source Mapping</button></li>
+                    <li><button class="nav-btn" data-module="routing"><span class="sidebar-icon">📮</span>Order Routing</button></li>
+                    <li><button class="nav-btn" data-module="logs"><span class="sidebar-icon">📋</span>Error Monitor</button></li>
+                    <li><button class="nav-btn" data-module="settings"><span class="sidebar-icon">⚙️</span>Settings</button></li>
+                </ul>
+            </nav>
+        </aside>
 
-  <div class="admin-container">
-    <!-- Stats -->
-    <div class="stats-grid" id="stats-grid">
-      <div class="stat-card"><div class="stat-card__label">Status</div><div class="stat-card__value" id="stat-status">...</div></div>
-      <div class="stat-card"><div class="stat-card__label">Version</div><div class="stat-card__value" id="stat-version">...</div></div>
-      <div class="stat-card"><div class="stat-card__label">Search Cache</div><div class="stat-card__value" id="stat-search-cache">...</div></div>
-      <div class="stat-card"><div class="stat-card__label">Product Cache</div><div class="stat-card__value" id="stat-product-cache">...</div></div>
-      <div class="stat-card"><div class="stat-card__label">Uptime</div><div class="stat-card__value" id="stat-uptime">...</div></div>
-    </div>
+        <!-- MAIN CONTENT -->
+        <div class="main">
+            <!-- HEADER -->
+            <header class="header">
+                <h1 class="header-title">DealsHub Operations</h1>
+                <div class="header-actions">
+                    <span id="lastUpdate" style="font-size: 0.875rem; color: var(--text-secondary);"></span>
+                </div>
+            </header>
 
-    <!-- Source Health -->
-    <div class="admin-card">
-      <div class="admin-card__title">
-        Source Health
-        <button class="refresh-btn" onclick="loadHealth()">Check</button>
-      </div>
-      <table class="admin-table">
-        <thead>
-          <tr><th>Source</th><th>Status</th><th>Latency</th><th>Results</th></tr>
-        </thead>
-        <tbody id="health-tbody"></tbody>
-      </table>
-    </div>
+            <!-- CONTENT -->
+            <div class="content">
+                <!-- DASHBOARD MODULE -->
+                <section class="content-section active" id="dashboard-section">
+                    <div class="stats-grid" id="dashboardStats">
+                        <div class="loading">
+                            <div class="loading-text"><span class="spinner"></span> Loading dashboard...</div>
+                        </div>
+                    </div>
 
-    <!-- Pricing Rules -->
-    <div class="admin-card">
-      <div class="admin-card__title">Pricing Rules</div>
-      <div class="pricing-grid" id="pricing-grid"></div>
-    </div>
+                    <div class="card">
+                        <h2 style="margin-bottom: 1rem;">Source Health Status</h2>
+                        <div class="source-health-grid" id="sourceHealth"></div>
+                    </div>
 
-    <!-- Recent Syncs (placeholder) -->
-    <div class="admin-card">
-      <div class="admin-card__title">Recent Syncs</div>
-      <table class="admin-table">
-        <thead>
-          <tr><th>Product</th><th>Source</th><th>Price</th><th>Status</th><th>Time</th></tr>
-        </thead>
-        <tbody id="syncs-tbody">
-          <tr><td colspan="5" style="text-align:center;color:#888;padding:24px;">Syncs will appear here when customers purchase products</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+                    <div class="card">
+                        <h2 style="margin-bottom: 1rem;">Recent Sync Activity</h2>
+                        <div class="table-wrapper">
+                            <table id="recentActivityTable">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Source</th>
+                                        <th>Product ID</th>
+                                        <th>Action</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
 
-  <script>
-    const API_BASE = window.location.origin;
+                    <div class="card">
+                        <h2 style="margin-bottom: 1rem;">Failure Alerts</h2>
+                        <div id="failureAlerts"></div>
+                    </div>
+                </section>
 
-    async function loadStats() {
-      try {
-        const res = await fetch(`${API_BASE}/health`);
-        const data = await res.json();
-        document.getElementById('stat-status').textContent = data.status === 'ok' ? '✅ Online' : '❌ Error';
-        document.getElementById('stat-version').textContent = 'v' + data.version;
-        document.getElementById('stat-search-cache').textContent = data.cacheSize?.search || 0;
-        document.getElementById('stat-product-cache').textContent = data.cacheSize?.product || 0;
-        const mins = Math.floor(data.uptime / 60);
-        const hrs = Math.floor(mins / 60);
-        document.getElementById('stat-uptime').textContent = hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
-      } catch (e) {
-        document.getElementById('stat-status').textContent = '❌ Offline';
-      }
-    }
+                <!-- PRODUCT SYNC MODULE -->
+                <section class="content-section" id="sync-section">
+                    <div class="card">
+                        <h2 style="margin-bottom: 1.5rem;">Product Sync Center</h2>
 
-    async function loadHealth() {
-      const tbody = document.getElementById('health-tbody');
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:16px;">Checking...</td></tr>';
-      try {
-        const res = await fetch(`${API_BASE}/api/admin/source-health`);
-        const data = await res.json();
-        tbody.innerHTML = Object.entries(data.sources).map(([name, info]) => `
-          <tr>
-            <td><strong>${name.charAt(0).toUpperCase() + name.slice(1)}</strong></td>
-            <td><span class="status-dot status-dot--${info.status === 'ok' ? 'ok' : 'err'}"></span>${info.status}</td>
-            <td>${info.latencyMs}ms</td>
-            <td>${info.resultCount ?? '-'}</td>
-          </tr>
-        `).join('');
-      } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="4" style="color:#ff4757">Error loading</td></tr>';
-      }
-    }
+                        <div class="search-filter-bar">
+                            <div class="search-box">
+                                <input type="text" id="syncSearch" placeholder="Search by source, product ID, or handle...">
+                            </div>
+                            <select id="syncSourceFilter" style="max-width: 150px;">
+                                <option value="">All Sources</option>
+                                <option value="amazon">Amazon</option>
+                                <option value="aliexpress">AliExpress</option>
+                                <option value="macys">Macy's</option>
+                                <option value="sephora">Sephora</option>
+                                <option value="shein">SHEIN</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="openManualSyncModal()">+ Manual Sync</button>
+                        </div>
 
-    function loadPricing() {
-      const rules = {
-        Amazon: { markupPct: 12, minMarginPct: 8, roundTo: 0.99 },
-        AliExpress: { markupPct: 25, minMarginPct: 15, roundTo: 0.99 },
-        Sephora: { markupPct: 10, minMarginPct: 5, roundTo: 0.99 },
-        "Macy's": { markupPct: 10, minMarginPct: 5, roundTo: 0.99 },
-        SHEIN: { markupPct: 30, minMarginPct: 18, roundTo: 0.99 }
-      };
-      const grid = document.getElementById('pricing-grid');
-      grid.innerHTML = Object.entries(rules).map(([name, rule]) => `
-        <div class="pricing-item">
-          <div class="pricing-item__name">${name}</div>
-          <div class="pricing-item__field">
-            <label>Markup %</label>
-            <input type="number" value="${rule.markupPct}" min="0" max="100" readonly>
-          </div>
-          <div class="pricing-item__field">
-            <label>Min Margin %</label>
-            <input type="number" value="${rule.minMarginPct}" min="0" max="100" readonly>
-          </div>
-          <div class="pricing-item__field">
-            <label>Rounding</label>
-            <input type="text" value="${rule.roundTo}" readonly>
-          </div>
+                        <div class="table-wrapper">
+                            <table id="syncTable">
+                                <thead>
+                                    <tr>
+                                        <th>Source</th>
+                                        <th>Source ID</th>
+                                        <th>Shopify Handle</th>
+                                        <th>Price</th>
+                                        <th>Status</th>
+                                        <th>Last Sync</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PRICING MODULE -->
+                <section class="content-section" id="pricing-section">
+                    <div class="card">
+                        <h2 style="margin-bottom: 1.5rem;">Pricing Rules & Margins</h2>
+                        <button class="btn btn-primary" style="margin-bottom: 1rem;" onclick="openPricingRuleModal()">+ Add Pricing Rule</button>
+
+                        <div class="table-wrapper">
+                            <table id="pricingTable">
+                                <thead>
+                                    <tr>
+                                        <th>Source</th>
+                                        <th>Category</th>
+                                        <th>Brand</th>
+                                        <th>Markup %</th>
+                                        <th>Min Margin %</th>
+                                        <th>Price Floor</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2 style="margin-bottom: 1.5rem;">Price Simulator</h2>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Source Price ($)</label>
+                                <input type="number" id="simSourcePrice" placeholder="e.g., 25.00" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <label>Source</label>
+                                <select id="simSource">
+                                    <option value="amazon">Amazon</option>
+                                    <option value="aliexpress">AliExpress</option>
+                                    <option value="macys">Macy's</option>
+                                    <option value="sephora">Sephora</option>
+                                    <option value="shein">SHEIN</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>&nbsp;</label>
+                                <button class="btn btn-primary" onclick="simulatePrice()">Calculate</button>
+                            </div>
+                        </div>
+                        <div id="simulatorResult"></div>
+                    </div>
+                </section>
+
+                <!-- SHIPPING MODULE -->
+                <section class="content-section" id="shipping-section">
+                    <div class="card">
+                        <h2 style="margin-bottom: 1.5rem;">Shipping Rules</h2>
+                        <button class="btn btn-primary" style="margin-bottom: 1rem;" onclick="openShippingRuleModal()">+ Add Shipping Rule</button>
+
+                        <div class="table-wrapper">
+                            <table id="shippingTable">
+                                <thead>
+                                    <tr>
+                                        <th>Source</th>
+                                        <th>Region</th>
+                                        <th>Method</th>
+                                        <th>Cost</th>
+                                        <th>Min Days</th>
+                                        <th>Max Days</th>
+                                        <th>Label</th>
+                                        <th>Active</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MAPPING MODULE -->
+                <section class="content-section" id="mapping-section">
+                    <div class="card">
+                        <h2 style="margin-bottom: 1.5rem;">Source → Shopify Product Mapping</h2>
+
+                        <div class="search-filter-bar">
+                            <div class="search-box">
+                                <input type="text" id="mappingSearch" placeholder="Search mappings...">
+                            </div>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table id="mappingTable">
+                                <thead>
+                                    <tr>
+                                        <th>Source</th>
+                                        <th>Source ID</th>
+                                        <th>Shopify Product</th>
+                                        <th>Handle</th>
+                                        <th>Source URL</th>
+                                        <th>Shopify URL</th>
+                                        <th>Mapped At</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2 style="margin-bottom: 1rem;">Mapping Statistics</h2>
+                        <div class="chart-placeholder">
+                            <div id="mappingStats">Chart will display mapping distribution by source</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ROUTING MODULE -->
+                <section class="content-section" id="routing-section">
+                    <div class="card">
+                        <h2 style="margin-bottom: 1.5rem;">Order Routing & Fulfillment</h2>
+                        <button class="btn btn-primary" style="margin-bottom: 1rem;" onclick="openRoutingModal()">+ New Routing Entry</button>
+
+                        <div class="search-filter-bar">
+                            <select id="routingStatusFilter" style="max-width: 150px;">
+                                <option value="">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="processing">Processing</option>
+                                <option value="shipped">Shipped</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="issue">Issue</option>
+                            </select>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table id="routingTable">
+                                <thead>
+                                    <tr>
+                                        <th>Order Number</th>
+                                        <th>Source</th>
+                                        <th>Status</th>
+                                        <th>Supplier Order ID</th>
+                                        <th>Tracking</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ERROR MONITOR MODULE -->
+                <section class="content-section" id="logs-section">
+                    <div class="card">
+                        <h2 style="margin-bottom: 1.5rem;">Sync Logs</h2>
+
+                        <div class="search-filter-bar">
+                            <select id="logsSourceFilter" style="max-width: 150px;">
+                                <option value="">All Sources</option>
+                                <option value="amazon">Amazon</option>
+                                <option value="aliexpress">AliExpress</option>
+                                <option value="macys">Macy's</option>
+                                <option value="sephora">Sephora</option>
+                                <option value="shein">SHEIN</option>
+                            </select>
+                            <select id="logsStatusFilter" style="max-width: 150px;">
+                                <option value="">All Status</option>
+                                <option value="success">Success</option>
+                                <option value="error">Error</option>
+                                <option value="pending">Pending</option>
+                            </select>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table id="logsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Source</th>
+                                        <th>Product ID</th>
+                                        <th>Action</th>
+                                        <th>Status</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2 style="margin-bottom: 1.5rem;">Source Failures</h2>
+                        <div class="table-wrapper">
+                            <table id="failuresTable">
+                                <thead>
+                                    <tr>
+                                        <th>Source</th>
+                                        <th>Endpoint</th>
+                                        <th>Error Type</th>
+                                        <th>Message</th>
+                                        <th>Resolved</th>
+                                        <th>Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SETTINGS MODULE -->
+                <section class="content-section" id="settings-section">
+                    <div class="card">
+                        <h2 style="margin-bottom: 1.5rem;">System Settings</h2>
+
+                        <div style="margin-bottom: 2rem;">
+                            <h3 style="margin-bottom: 1rem;">Cache Management</h3>
+                            <button class="btn btn-secondary" onclick="clearCache()">🧹 Clear All Caches</button>
+                        </div>
+
+                        <div style="margin-bottom: 2rem;">
+                            <h3 style="margin-bottom: 1rem;">Source Health Check</h3>
+                            <button class="btn btn-secondary" onclick="runHealthCheck()">🏥 Run Health Check</button>
+                            <div id="healthCheckResult" style="margin-top: 1rem;"></div>
+                        </div>
+
+                        <div>
+                            <h3 style="margin-bottom: 1rem;">System Information</h3>
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td style="border: none; padding: 0.5rem 0;"><strong>Version:</strong></td>
+                                    <td style="border: none; padding: 0.5rem 0;" id="systemVersion">-</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: none; padding: 0.5rem 0;"><strong>Uptime:</strong></td>
+                                    <td style="border: none; padding: 0.5rem 0;" id="systemUptime">-</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: none; padding: 0.5rem 0;"><strong>Environment:</strong></td>
+                                    <td style="border: none; padding: 0.5rem 0;" id="systemEnv">production</td>
+                                </tr>
+                                <tr>
+                                    <td style="border: none; padding: 0.5rem 0;"><strong>API Base:</strong></td>
+                                    <td style="border: none; padding: 0.5rem 0;" id="systemAPI">https://dealshub-search.onrender.com</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
         </div>
-      `).join('');
-    }
+    </div>
 
-    async function clearCache() {
-      if (!confirm('Clear all cache?')) return;
-      try {
-        await fetch(`${API_BASE}/api/admin/cache/clear`, { method: 'POST' });
-        alert('Cache cleared');
-        loadStats();
-      } catch (e) {
-        alert('Error: ' + e.message);
-      }
-    }
+    <!-- MODALS -->
+    <!-- Manual Sync Modal -->
+    <div class="modal" id="manualSyncModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal('manualSyncModal')">×</button>
+            <div class="modal-header">Manual Product Sync</div>
+            <div class="form-group">
+                <label>Source</label>
+                <select id="manualSyncSource">
+                    <option value="amazon">Amazon</option>
+                    <option value="aliexpress">AliExpress</option>
+                    <option value="macys">Macy's</option>
+                    <option value="sephora">Sephora</option>
+                    <option value="shein">SHEIN</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Source Product ID (ASIN, SKU, etc.)</label>
+                <input type="text" id="manualSyncProductId" placeholder="e.g., B0973L1NVT">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('manualSyncModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitManualSync()">Sync Product</button>
+            </div>
+        </div>
+    </div>
 
-    function refreshAll() {
-      loadStats();
-      loadHealth();
-    }
+    <!-- Pricing Rule Modal -->
+    <div class="modal" id="pricingRuleModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal('pricingRuleModal')">×</button>
+            <div class="modal-header">Pricing Rule</div>
+            <div class="form-group">
+                <label>Source</label>
+                <select id="pricingRuleSource">
+                    <option value="">All Sources</option>
+                    <option value="amazon">Amazon</option>
+                    <option value="aliexpress">AliExpress</option>
+                    <option value="macys">Macy's</option>
+                    <option value="sephora">Sephora</option>
+                    <option value="shein">SHEIN</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Category (optional)</label>
+                <input type="text" id="pricingRuleCategory" placeholder="e.g., moda, belleza">
+            </div>
+            <div class="form-group">
+                <label>Brand (optional)</label>
+                <input type="text" id="pricingRuleBrand" placeholder="e.g., Nike">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Markup %</label>
+                    <input type="number" id="pricingRuleMarkup" placeholder="e.g., 40" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label>Min Margin %</label>
+                    <input type="number" id="pricingRuleMinMargin" placeholder="e.g., 15" step="0.1">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Price Floor ($)</label>
+                    <input type="number" id="pricingRuleFloor" placeholder="e.g., 9.99" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Round To</label>
+                    <select id="pricingRuleRound">
+                        <option value="0.01">$0.01</option>
+                        <option value="0.99">$X.99</option>
+                        <option value="1">$1</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="pricingRuleActive" checked>
+                    Active
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('pricingRuleModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitPricingRule()">Save Rule</button>
+            </div>
+        </div>
+    </div>
 
-    // Init
-    loadStats();
-    loadHealth();
-    loadPricing();
-  </script>
+    <!-- Shipping Rule Modal -->
+    <div class="modal" id="shippingRuleModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal('shippingRuleModal')">×</button>
+            <div class="modal-header">Shipping Rule</div>
+            <div class="form-group">
+                <label>Source</label>
+                <select id="shippingRuleSource">
+                    <option value="amazon">Amazon</option>
+                    <option value="aliexpress">AliExpress</option>
+                    <option value="macys">Macy's</option>
+                    <option value="sephora">Sephora</option>
+                    <option value="shein">SHEIN</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Region</label>
+                <select id="shippingRuleRegion">
+                    <option value="US">United States</option>
+                    <option value="CA">Canada</option>
+                    <option value="MX">Mexico</option>
+                    <option value="INTL">International</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Method</label>
+                <input type="text" id="shippingRuleMethod" placeholder="e.g., Standard, Express">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Cost ($)</label>
+                    <input type="number" id="shippingRuleCost" placeholder="e.g., 5.99" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Min Days</label>
+                    <input type="number" id="shippingRuleMinDays" placeholder="e.g., 3">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Max Days</label>
+                    <input type="number" id="shippingRuleMaxDays" placeholder="e.g., 7">
+                </div>
+                <div class="form-group">
+                    <label>Label</label>
+                    <input type="text" id="shippingRuleLabel" placeholder="e.g., Arrives in 3-7 days">
+                </div>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="shippingRuleActive" checked>
+                    Active
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('shippingRuleModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitShippingRule()">Save Rule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Routing Modal -->
+    <div class="modal" id="routingModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal('routingModal')">×</button>
+            <div class="modal-header">Order Routing Entry</div>
+            <div class="form-group">
+                <label>Order Number</label>
+                <input type="text" id="routingOrderNumber" placeholder="e.g., #10001">
+            </div>
+            <div class="form-group">
+                <label>Source</label>
+                <select id="routingSource">
+                    <option value="amazon">Amazon</option>
+                    <option value="aliexpress">AliExpress</option>
+                    <option value="macys">Macy's</option>
+                    <option value="sephora">Sephora</option>
+                    <option value="shein">SHEIN</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select id="routingStatus">
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="issue">Issue</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Supplier Order ID</label>
+                <input type="text" id="routingSupplierOrderId" placeholder="e.g., AMAZON-12345">
+            </div>
+            <div class="form-group">
+                <label>Tracking Number</label>
+                <input type="text" id="routingTracking" placeholder="e.g., 1Z999AA10123456784">
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea id="routingNotes" placeholder="Internal notes..." rows="3"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('routingModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitRouting()">Save Routing</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // CONFIGURATION
+        const API_BASE = 'https://dealshub-search.onrender.com/api/admin';
+        const SOURCES = ['amazon', 'aliexpress', 'macys', 'sephora', 'shein'];
+
+        // STATE
+        let currentModule = 'dashboard';
+        let dashboardRefreshInterval = null;
+
+        // INITIALIZATION
+        document.addEventListener('DOMCont     <option value="shein">SHEIN</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Region</label>
+                <select id="shippingRuleRegion">
+                    <option value="US">United States</option>
+                    <option value="CA">Canada</option>
+                    <option value="MX">Mexico</option>
+                    <option value="INTL">International</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Method</label>
+                <input type="text" id="shippingRuleMethod" placeholder="e.g., Standard, Express">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Cost ($)</label>
+                    <input type="number" id="shippingRuleCost" placeholder="e.g., 5.99" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Min Days</label>
+                    <input type="number" id="shippingRuleMinDays" placeholder="e.g., 3">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Max Days</label>
+                    <input type="number" id="shippingRuleMaxDays" placeholder="e.g., 7">
+                </div>
+                <div class="form-group">
+                    <label>Label</label>
+                    <input type="text" id="shippingRuleLabel" placeholder="e.g., Arrives in 3-7 days">
+                </div>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="shippingRuleActive" checked>
+                    Active
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('shippingRuleModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitShippingRule()">Save Rule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Routing Modal -->
+    <div class="modal" id="routingModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal('routingModal')">×</button>
+            <div class="modal-header">Order Routing Entry</div>
+            <div class="form-group">
+                <label>Order Number</label>
+                <input type="text" id="routingOrderNumber" placeholder="e.g., #10001">
+            </div>
+            <div class="form-group">
+                <label>Source</label>
+                <select id="routingSource">
+                    <option value="amazon">Amazon</option>
+                    <option value="aliexpress">AliExpress</option>
+                    <option value="macys">Macy's</option>
+                    <option value="sephora">Sephora</option>
+                    <option value="shein">SHEIN</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select id="routingStatus">
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="issue">Issue</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Supplier Order ID</label>
+                <input type="text" id="routingSupplierOrderId" placeholder="e.g., AMAZON-12345">
+            </div>
+            <div class="form-group">
+                <label>Tracking Number</label>
+                <input type="text" id="routingTracking" placeholder="e.g., 1Z999AA10123456784">
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea id="routingNotes" placeholder="Internal notes..." rows="3"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('routingModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitRouting()">Save Routing</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // CONFIGURATION
+        const API_BASE = 'https://dealshub-search.onrender.com/api/admin';
+        const SOURCES = ['amazon', 'aliexpress', 'macys', 'sephora', 'shein'];
+
+        // STATE
+        let currentModule = 'dashboard';
+        let dashboardRefreshInterval = null;
+
+        // INITIALIZATION
+        document.addEventListener('DOMContentLoaded', () => {
+            setupNavigation();
+            loadDashboard();
+            setupAutoRefresh();
+            updateLastUpdate();
+        });
+
+        // NAVIGATION
+        function setupNavigation() {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const module = e.currentTarget.dataset.module;
+                    switchModule(module);
+                });
+            });
+        }
+
+        function switchModule(module) {
+            currentModule = module;
+
+            // Update active nav button
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-module="${module}"]`).classList.add('active');
+
+            // Update active section
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(`${module}-section`).classList.add('active');
+
+            // Load module data
+            loadModuleData(module);
+        }
+
+        // MODULE LOADING
+        async function loadModuleData(module) {
+            try {
+                switch(module) {
+                    case 'dashboard':
+                        loadDashboard();
+                        break;
+                    case 'sync':
+                        loadSyncCenter();
+                        break;
+                    case 'pricing':
+                        loadPricingRules();
+                        break;
+                    case 'shipping':
+                        loadShippingRules();
+                        break;
+                    case 'mapping':
+                        loadMapping();
+                        break;
+                    case 'routing':
+                        loadRouting();
+                        break;
+                    case 'logs':
+                        loadLogs();
+                        break;
+                    case 'settings':
+                        loadSettings();
+                        break;
+                }
+            } catch (error) {
+                console.error(`Error loading ${module}:`, error);
+                showToast(`Error loading ${module}`, 'error');
+            }
+        }
+
+        // DASHBOARD
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard`);
+                const data = await response.json();
+
+                const statsHtml = `
+                    <div class="stat-card">
+                        <div class="stat-label">Total Products Synced</div>
+                        <div class="stat-value">${data.productsSynced || 0}</div>
+                        <div class="stat-trend">+${data.productsSyncedToday || 0} today</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Orders Today</div>
+                        <div class="stat-value">${data.ordersToday || 0}</div>
+                        <div class="stat-trend">$${(data.revenueTodayAmount || 0).toFixed(2)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Sources</div>
+                        <div class="stat-value">${data.activeSources || 0}</div>
+                        <div class="stat-trend">out of ${SOURCES.length}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Average Margin</div>
+                        <div class="stat-value">${(data.averageMargin || 0).toFixed(1)}%</div>
+                        <div class="stat-trend">Target: 30%</div>
+                    </div>
+                `;
+                document.getElementById('dashboardStats').innerHTML = statsHtml;
+
+                // Source Health
+                const healthHtml = SOURCES.map(source => {
+                    const status = data.sourceStatus?.[source];
+                    const statusClass = status?.status === 'online' ? 'online' : status?.status === 'warning' ? 'warning' : 'offline';
+                    return `
+                        <div class="source-health-card">
+                            <div class="source-name">
+                                <span class="status-dot ${statusClass}"></span>
+                                ${source.charAt(0).toUpperCase() + source.slice(1)}
+                            </div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                ${status?.productsCount || 0} products
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                                Response: ${status?.responseTime || '-'}ms
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('sourceHealth').innerHTML = healthHtml;
+
+                // Recent Activity
+                if (data.recentActivity && data.recentActivity.length > 0) {
+                    const tbody = document.querySelector('#recentActivityTable tbody');
+                    tbody.innerHTML = data.recentActivity.slice(0, 10).map(activity => `
+                        <tr>
+                            <td>${new Date(activity.timestamp).toLocaleTimeString()}</td>
+                            <td><span class="badge badge-info">${activity.source}</span></td>
+                            <td>${activity.productId}</td>
+                            <td>${activity.action}</td>
+                            <td><span class="badge ${activity.status === 'success' ? 'badge-success' : activity.status === 'error' ? 'badge-danger' : 'badge-warning'}">${activity.status}</span></td>
+                        </tr>
+                    `).join('');
+                } else {
+                    document.querySelector('#recentActivityTable tbody').innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">No recent activity</td></tr>';
+                }
+
+                // Failures
+                if (data.failureCount > 0) {
+                    document.getElementById('failureAlerts').innerHTML = `
+                        <div class="alert alert-error">
+                            <span style="font-size: 1.25rem;">⚠️</span>
+                            <div style="flex: 1;">
+                                <strong>${data.failureCount} unresolved failures</strong><br>
+                                ${data.failureDetails || 'Check Error Monitor for details.'}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('failureAlerts').innerHTML = `
+                        <div class="alert alert-success">
+                            <span style="font-size: 1.25rem;">✓</span>
+                            <div>All systems operational</div>
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Dashboard error:', error);
+                document.getElementById('dashboardStats').innerHTML = '<div class="alert alert-error">Failed to load dashboard data</div>';
+            }
+        }
+
+        // PRODUCT SYNC
+        async function loadSyncCenter() {
+            try {
+                const response = await fetch(`${API_BASE}/mappings?limit=100`);
+                const data = await response.json();
+
+                const tbody = document.querySelector('#syncTable tbody');
+                if (data.mappings && data.mappings.length > 0) {
+                    tbody.innerHTML = data.mappings.map(mapping => `
+                        <tr>
+                            <td><span class="badge badge-info">${mapping.source}</span></td>
+                            <td>${mapping.sourceId}</td>
+                            <td>${mapping.handle || '-'}</td>
+                            <td>$${(mapping.price || 0).toFixed(2)}</td>
+                            <td><span class="badge ${mapping.status === 'synced' ? 'badge-success' : 'badge-warning'}">${mapping.status}</span></td>
+                            <td>${mapping.lastSync ? new Date(mapping.lastSync).toLocaleDateString() : '-'}</td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn btn-small btn-secondary" onclick="resyncProduct('${mapping.source}', '${mapping.sourceId}')">Resync</button>
+                                    <button class="btn btn-small btn-danger" onclick="deleteMapping('${mapping.id}')">Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No mappings yet</td></tr>';
+                }
+            } catch (error) {
+                console.error('Sync center error:', error);
+                document.querySelector('#syncTable tbody').innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;"><div class="alert alert-error">Failed to load mappings</div></td></tr>';
+            }
+        }
+
+        // PRICING
+        async function loadPricingRules() {
+            try {
+                const response = await fetch(`${API_BASE}/pricing-rules`);
+                const data = await response.json();
+
+                const tbody = document.querySelector('#pricingTable tbody');
+                if (data.rules && data.rules.length > 0) {
+                    tbody.innerHTML = data.rules.map((rule, idx) => `
+                        <tr>
+                            <td>${rule.source || 'All'}</td>
+                            <td>${rule.category || 'All'}</td>
+                            <td>${rule.brand || 'All'}</td>
+                            <td>${(rule.markup || 0).toFixed(1)}%</td>
+                            <td>${(rule.minMargin || 0).toFixed(1)}%</td>
+                            <td>$${(rule.priceFloor || 0).toFixed(2)}</td>
+                            <td><span class="badge ${rule.active ? 'badge-success' : 'badge-warning'}">${rule.active ? 'Active' : 'Inactive'}</span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn btn-small btn-secondary" onclick="editPricingRule(${idx})">Edit</button>
+                                    <button class="btn btn-small btn-danger" onclick="deletePricingRule(${idx})">Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">No pricing rules</td></tr>';
+                }
+            } catch (error) {
+                console.error('Pricing rules error:', error);
+                document.querySelector('#pricingTable tbody').innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;"><div class="alert alert-error">Failed to load pricing rules</div></td></tr>';
+            }
+        }
+
+        async function simulatePrice() {
+            const sourcePrice = parseFloat(document.getElementById('simSourcePrice').value);
+            const source = document.getElementById('simSource').value;
+
+            if (!sourcePrice || sourcePrice <= 0) {
+                showToast('Please enter a valid price', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/pricing-rules/simulate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sourcePrice, source })
+                });
+
+                const data = await response.json();
+
+                const resultHtml = `
+                    <div class="alert alert-success" style="margin-top: 1rem;">
+                        <strong>Price Calculation</strong><br>
+                        Source Price: $${sourcePrice.toFixed(2)}<br>
+                        Landed Cost: $${(data.landedCost || 0).toFixed(2)}<br>
+                        Final Price: $${(data.finalPrice || 0).toFixed(2)}<br>
+                        Compare At: $${(data.compareAt || 0).toFixed(2)}<br>
+                        <strong>Margin: ${(data.margin || 0).toFixed(1)}%</strong>
+                    </div>
+                `;
+                document.getElementById('simulatorResult').innerHTML = resultHtml;
+            } catch (error) {
+                showToast('Failed to simulate price', 'error');
+            }
+        }
+
+        // SHIPPING
+        async function loadShippingRules() {
+            try {
+                const response = await fetch(`${API_BASE}/shipping-rules`);
+                const data = await response.json();
+
+                const tbody = document.querySelector('#shippingTable tbody');
+                if (data.rules && data.rules.length > 0) {
+                    tbody.innerHTML = data.rules.map((rule, idx) => `
+                        <tr>
+                            <td><span class="badge badge-info">${rule.source}</span></td>
+                            <td>${rule.region}</td>
+                            <td>${rule.method}</td>
+                            <td>$${(rule.cost || 0).toFixed(2)}</td>
+                            <td>${rule.minDays}</td>
+                            <td>${rule.maxDays}</td>
+                            <td>${rule.label}</td>
+                            <td><span class="badge ${rule.active ? 'badge-success' : 'badge-warning'}">${rule.active ? 'Active' : 'Inactive'}</span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn btn-small btn-secondary" onclick="editShippingRule(${idx})">Edit</button>
+                                    <button class="btn btn-small btn-danger" onclick="deleteShippingRule(${idx})">Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">No shipping rules</td></tr>';
+                }
+            } catch (error) {
+                console.error('Shipping rules error:', error);
+                document.querySelector('#shippingTable tbody').innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;"><div class="alert alert-error">Failed to load shipping rules</div></td></tr>';
+            }
+        }
+
+        // MAPPING
+        async function loadMapping() {
+            try {
+                const response = await fetch(`${API_BASE}/mappings?limit=100`);
+                const data = await response.json();
+
+                const tbody = document.querySelector('#mappingTable tbody');
+                if (data.mappings && data.mappings.length > 0) {
+                    tbody.innerHTML = data.mappings.map(mapping => `
+                        <tr>
+                            <td><span class="badge badge-info">${mapping.source}</span></td>
+                            <td>${mapping.sourceId}</td>
+                            <td>${mapping.shopifyProductId || '-'}</td>
+                            <td>${mapping.handle || '-'}</td>
+                            <td><a href="${mapping.sourceUrl}" target="_blank" style="color: var(--primary);">View</a></td>
+                            <td>${mapping.shopifyUrl ? `<a href="${mapping.shopifyUrl}" target="_blank" style="color: var(--primary);">View</a>` : '-'}</td>
+                            <td>${mapping.mappedAt ? new Date(mapping.mappedAt).toLocaleDateString() : '-'}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No mappings</td></tr>';
+                }
+
+                // Stats
+                const stats = {};
+                if (data.mappings) {
+                    data.mappings.forEach(m => {
+                        stats[m.source] = (stats[m.source] || 0) + 1;
+                    });
+                }
+
+                const statsHtml = Object.entries(stats).map(([source, count]) => `
+                    <div style="margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span>${source}</span>
+                            <strong>${count}</strong>
+                        </div>
+                        <div style="background: var(--light-bg); height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div style="background: var(--primary); height: 100%; width: ${(count / (data.mappings.length || 1)) * 100}%;"></div>
+                        </div>
+                    </div>
+                `).join('');
+
+                document.getElementById('mappingStats').innerHTML = statsHtml || '<p>No mapping data</p>';
+            } catch (error) {
+                console.error('Mapping error:', error);
+                document.querySelector('#mappingTable tbody').innerHTML = '<tr><td colspan="7"><div class="alert alert-error">Failed to load mappings</div></td></tr>';
+            }
+        }
+
+        // ROUTING
+        async function loadRouting() {
+            try {
+                const response = await fetch(`${API_BASE}/orders`);
+                const data = await response.json();
+
+                const tbody = document.querySelector('#routingTable tbody');
+                if (data.orders && data.orders.length > 0) {
+                    tbody.innerHTML = data.orders.map(order => `
+                        <tr>
+                            <td><strong>${order.orderNumber}</strong></td>
+                            <td><span class="badge badge-info">${order.source}</span></td>
+                            <td><span class="badge ${getStatusBadgeClass(order.status)}">${order.status}</span></td>
+                            <td>${order.supplierOrderId || '-'}</td>
+                            <td>${order.tracking || '-'}</td>
+                            <td>${new Date(order.date).toLocaleDateString()}</td>
+                            <td>
+                                <button class="btn btn-small btn-secondary" onclick="editRouting('${order.id}')">Edit</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No orders</td></tr>';
+                }
+            } catch (error) {
+                console.error('Routing error:', error);
+                document.querySelector('#routingTable tbody').innerHTML = '<tr><td colspan="7"><div class="alert alert-error">Failed to load orders</div></td></tr>';
+            }
+        }
+
+        function getStatusBadgeClass(status) {
+            const map = {
+                'pending': 'badge-warning',
+                'processing': 'badge-info',
+                'shipped': 'badge-success',
+                'delivered': 'badge-success',
+                'issue': 'badge-danger'
+            };
+            return map[status] || 'badge-info';
+        }
+
+        // LOGS
+        async function loadLogs() {
+            try {
+                const response = await fetch(`${API_BASE}/sync-logs?limit=50`);
+                const data = await response.json();
+
+                const tbody = document.querySelector('#logsTable tbody');
+                if (data.logs && data.logs.length > 0) {
+                    tbody.innerHTML = data.logs.map(log => `
+                        <tr>
+                            <td>${new Date(log.timestamp).toLocaleString()}</td>
+                            <td><span class="badge badge-info">${log.source}</span></td>
+                            <td>${log.productId}</td>
+                            <td>${log.action}</td>
+                            <td><span class="badge ${log.status === 'success' ? 'badge-success' : 'badge-danger'}">${log.status}</span></td>
+                            <td style="font-size: 0.75rem;">${log.details || '-'}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No logs</td></tr>';
+                }
+
+                // Failures
+                const failureResponse = await fetch(`${API_BASE}/failures?limit=50`);
+                const failureData = await failureResponse.json();
+
+                const failureTbody = document.querySelector('#failuresTable tbody');
+                if (failureData.failures && failureData.failures.length > 0) {
+                    failureTbody.innerHTML = failureData.failures.map(failure => `
+                        <tr>
+                            <td><span class="badge badge-info">${failure.source}</span></td>
+                            <td>${failure.endpoint}</td>
+                            <td>${failure.errorType}</td>
+                            <td style="font-size: 0.75rem; max-width: 200px;">${failure.message}</td>
+                            <td><span class="badge ${failure.resolved ? 'badge-success' : 'badge-warning'}">${failure.resolved ? 'Resolved' : 'Open'}</span></td>
+                            <td>${new Date(failure.date).toLocaleDateString()}</td>
+                            <td>
+                                ${!failure.resolved ? `<button class="btn btn-small btn-success" onclick="resolveFailure('${failure.id}')">Resolve</button>` : '-'}
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    failureTbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No failures</td></tr>';
+                }
+            } catch (error) {
+                console.error('Logs error:', error);
+                document.querySelector('#logsTable tbody').innerHTML = '<tr><td colspan="6"><div class="alert alert-error">Failed to load logs</div></td></tr>';
+            }
+        }
+
+        // SETTINGS
+        async function loadSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                const data = await response.json();
+
+                document.getElementById('systemVersion').textContent = data.version || '1.0.0';
+                document.getElementById('systemUptime').textContent = data.uptime || '24h';
+            } catch (error) {
+                console.error('Settings error:', error);
+            }
+        }
+
+        // ACTIONS
+        async function resyncProduct(source, sourceId) {
+            if (!confirm('Resync this product?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/sync/resync/${source}/${sourceId}`, { method: 'POST' });
+                if (response.ok) {
+                    showToast('Resync initiated', 'success');
+                    loadSyncCenter();
+                } else {
+                    showToast('Resync failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error resyncing product', 'error');
+            }
+        }
+
+        async function deleteMapping(id) {
+            if (!confirm('Delete this mapping?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/mappings/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    showToast('Mapping deleted', 'success');
+                    loadSyncCenter();
+                } else {
+                    showToast('Delete failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error deleting mapping', 'error');
+            }
+        }
+
+        async function submitManualSync() {
+            const source = document.getElementById('manualSyncSource').value;
+            const sourceId = document.getElementById('manualSyncProductId').value;
+
+            if (!source || !sourceId) {
+                showToast('Fill in all fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/sync/resync/${source}/${sourceId}`, { method: 'POST' });
+                if (response.ok) {
+                    showToast('Sync initiated', 'success');
+                    closeModal('manualSyncModal');
+                    loadSyncCenter();
+                } else {
+                    showToast('Sync failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error initiating sync', 'error');
+            }
+        }
+
+        async function submitPricingRule() {
+            const source = document.getElementById('pricingRuleSource').value;
+            const markup = parseFloat(document.getElementById('pricingRuleMarkup').value);
+
+            if (!markup) {
+                showToast('Enter a markup percentage', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/pricing-rules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        source: source || null,
+                        category: document.getElementById('pricingRuleCategory').value || null,
+                        brand: document.getElementById('pricingRuleBrand').value || null,
+                        markup,
+                        minMargin: parseFloat(document.getElementById('pricingRuleMinMargin').value) || 0,
+                        priceFloor: parseFloat(document.getElementById('pricingRuleFloor').value) || 0,
+                        roundTo: document.getElementById('pricingRuleRound').value,
+                        active: document.getElementById('pricingRuleActive').checked
+                    })
+                });
+
+                if (response.ok) {
+                    showToast('Pricing rule saved', 'success');
+                    closeModal('pricingRuleModal');
+                    loadPricingRules();
+                } else {
+                    showToast('Save failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error saving pricing rule', 'error');
+            }
+        }
+
+        async function submitShippingRule() {
+            const source = document.getElementById('shippingRuleSource').value;
+            const cost = parseFloat(document.getElementById('shippingRuleCost').value);
+
+            if (!source || cost === undefined) {
+                showToast('Fill in required fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/shipping-rules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        source,
+                        region: document.getElementById('shippingRuleRegion').value,
+                        method: document.getElementById('shippingRuleMethod').value,
+                        cost,
+                        minDays: parseInt(document.getElementById('shippingRuleMinDays').value),
+                        maxDays: parseInt(document.getElementById('shippingRuleMaxDays').value),
+                        label: document.getElementById('shippingRuleLabel').value,
+                        active: document.getElementById('shippingRuleActive').checked
+                    })
+                });
+
+                if (response.ok) {
+                    showToast('Shipping rule saved', 'success');
+                    closeModal('shippingRuleModal');
+                    loadShippingRules();
+                } else {
+                    showToast('Save failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error saving shipping rule', 'error');
+            }
+        }
+
+        async function submitRouting() {
+            try {
+                const response = await fetch(`${API_BASE}/orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderNumber: document.getElementById('routingOrderNumber').value,
+                        source: document.getElementById('routingSource').value,
+                        status: document.getElementById('routingStatus').value,
+                        supplierOrderId: document.getElementById('routingSupplierOrderId').value,
+                        tracking: document.getElementById('routingTracking').value,
+                        notes: document.getElementById('routingNotes').value
+                    })
+                });
+
+                if (response.ok) {
+                    showToast('Routing saved', 'success');
+                    closeModal('routingModal');
+                    loadRouting();
+                } else {
+                    showToast('Save failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error saving routing', 'error');
+            }
+        }
+
+        async function resolveFailure(id) {
+            if (!confirm('Mark as resolved?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/failures/${id}/resolve`, { method: 'POST' });
+                if (response.ok) {
+                    showToast('Failure resolved', 'success');
+                    loadLogs();
+                } else {
+                    showToast('Failed to resolve', 'error');
+                }
+            } catch (error) {
+                showToast('Error resolving failure', 'error');
+            }
+        }
+
+        async function clearCache() {
+            if (!confirm('Clear all caches?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/cache/clear`, { method: 'POST' });
+                if (response.ok) {
+                    showToast('Caches cleared', 'success');
+                } else {
+                    showToast('Failed to clear caches', 'error');
+                }
+            } catch (error) {
+                showToast('Error clearing caches', 'error');
+            }
+        }
+
+        async function runHealthCheck() {
+            const resultDiv = document.getElementById('healthCheckResult');
+            resultDiv.innerHTML = '<div class="loading"><div class="loading-text"><span class="spinner"></span> Running health check...</div></div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/source-health`);
+                const data = await response.json();
+
+                const html = `
+                    <div style="margin-top: 1rem;">
+                        ${Object.entries(data.sources || {}).map(([source, status]) => `
+                            <div style="margin-bottom: 0.5rem;">
+                                <span class="status-dot ${status.online ? 'online' : 'offline'}"></span>
+                                <strong>${source}</strong>: ${status.online ? 'Online' : 'Offline'}
+                                ${status.message ? ` - ${status.message}` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="alert alert-error">Health check failed</div>';
+            }
+        }
+
+        // MODALS
+        function openManualSyncModal() {
+            document.getElementById('manualSyncModal').classList.add('active');
+        }
+
+        function openPricingRuleModal() {
+            document.getElementById('pricingRuleModal').classList.add('active');
+        }
+
+        function openShippingRuleModal() {
+            document.getElementById('shippingRuleModal').classList.add('active');
+        }
+
+        function openRoutingModal() {
+            document.getElementById('routingModal').classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // Close modals on backdrop click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // UTILS
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        function updateLastUpdate() {
+            document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        function setupAutoRefresh() {
+            dashboardRefreshInterval = setInterval(() => {
+                if (currentModule === 'dashboard') {
+                    loadDashboard();
+                }
+                updateLastUpdate();
+            }, 30000);
+        }
+
+        // Cleanup
+        window.addEventListener('beforeunload', () => {
+            if (dashboardRefreshInterval) clearInterval(dashboardRefreshInterval);
+        });
+    </script>
 </body>
 </html>

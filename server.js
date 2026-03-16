@@ -1,8 +1,7 @@
 // ============================================================
-// DealsHub â Main Server v2.1 (FASE 4 â Hybrid Commerce Backend)
+// DealsHub — Main Server (Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
-// FASE 4: Enhanced pricing, shipping, admin endpoints
 // ============================================================
 
 const express = require('express');
@@ -27,14 +26,11 @@ const rateLimits = new Map();
 app.use((req, res, next) => {
   const ip = req.ip || req.connection.remoteAddress;
   const now = Date.now();
-  const windowMs = 60000;
+  const windowMs = 60000; // 1 min
   const maxRequests = 120;
   const key = `${ip}`;
   const record = rateLimits.get(key) || { count: 0, resetAt: now + windowMs };
-  if (now > record.resetAt) {
-    record.count = 0;
-    record.resetAt = now + windowMs;
-  }
+  if (now > record.resetAt) { record.count = 0; record.resetAt = now + windowMs; }
   record.count++;
   rateLimits.set(key, record);
   if (record.count > maxRequests) {
@@ -47,9 +43,10 @@ app.use((req, res, next) => {
 const logger = require('./src/utils/logger');
 const { searchCache, productCache } = require('./src/utils/cache');
 const { initAdapters, getAdapter, getAllAdapters, VALID_SOURCES } = require('./src/adapters');
-const { prepareCart, fixAllOldProducts } = require('./src/services/shopify-sync');
-const { calculateFinalPrice, parsePrice, getPricingRules, setPricingOverride, removePricingOverride, getAllOverrides, simulatePrice } = require('./src/utils/pricing');
-const { getShippingEstimate, getReturnPolicy, getShippingOptions, getShippingSummaryForPDP, calculateDeliveryEstimate, CUSTOMER_SHIPPING_PROFILES, RETURN_POLICIES, SUPPLIER_SHIPPING_COSTS } = require('./src/services/shipping');
+const { prepareCart } = require('./src/services/shopify-sync');
+const { calculateFinalPrice, parsePrice } = require('./src/utils/pricing');
+const { getShippingEstimate, getReturnPolicy, getShippingOptions } = require('./src/services/shipping');
+const adminRouter = require('./src/routes/admin');
 
 // Initialize adapters
 initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
@@ -58,15 +55,18 @@ initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    version: '2.1.0',
+    version: '2.0.0',
     sources: VALID_SOURCES,
     cacheSize: { search: searchCache.size, product: productCache.size },
     uptime: process.uptime()
   });
 });
 
+// ---- ADMIN ROUTES ----
+app.use('/admin/api', adminRouter);
+
 // ============================================================
-// CAPA A â LIVE DISCOVERY LAYER
+// CAPA A — LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -78,6 +78,7 @@ app.get('/api/search', async (req, res) => {
   const limitNum = Math.min(parseInt(limit) || 20, 50);
   const cacheKey = `search:${q}:${sources.join(',')}:${page}:${limitNum}`;
 
+  // Check cache
   const cached = searchCache.get(cacheKey);
   if (cached) return res.json(cached);
 
@@ -98,6 +99,7 @@ app.get('/api/search', async (req, res) => {
       }
     });
 
+    // Interleave results from different sources for variety
     if (sources.length > 1) {
       allResults = interleaveResults(allResults, sources);
     }
@@ -146,8 +148,7 @@ app.get('/api/product/:id', async (req, res) => {
     if (product.price) {
       const pricing = calculateFinalPrice(product.price, source, {
         originalPrice: product.originalPrice,
-        shippingCost: product.shippingData?.cost || 0,
-        sourceId: id
+        shippingCost: product.shippingData?.cost || 0
       });
       product.displayPrice = `$${pricing.price.toFixed(2)}`;
       product.displayCompareAt = pricing.compareAt ? `$${pricing.compareAt.toFixed(2)}` : null;
@@ -158,9 +159,6 @@ app.get('/api/product/:id', async (req, res) => {
         margin: pricing.marginPct
       };
     }
-
-    // Add shipping summary for PDP display
-    product.shippingSummary = getShippingSummaryForPDP(source, product);
 
     productCache.set(cacheKey, product);
     res.json(product);
@@ -208,7 +206,7 @@ app.get('/api/trending', async (req, res) => {
     );
     const all = interleaveFromSettled(results, 18);
     const response = { results: all, section: 'trending' };
-    searchCache.set(cacheKey, response, 600000);
+    searchCache.set(cacheKey, response, 600000); // 10 min
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -309,7 +307,7 @@ app.get('/api/flash-deals', async (req, res) => {
     );
     const all = interleaveFromSettled(results, 12);
     const response = { results: all, section: 'flash-deals' };
-    searchCache.set(cacheKey, response, 300000);
+    searchCache.set(cacheKey, response, 300000); // 5 min
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -335,26 +333,31 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B â ON-DEMAND SYNC LAYER
+// CAPA B — ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
 app.post('/api/prepare-cart', async (req, res) => {
   const { source, sourceId, selectedVariant, quantity = 1 } = req.body;
+
   if (!source || !sourceId) {
     return res.status(400).json({ error: 'Missing source or sourceId' });
   }
+
   if (!VALID_SOURCES.includes(source.toLowerCase())) {
     return res.status(400).json({ error: `Invalid source: ${source}` });
   }
 
   try {
+    // 1. Get full product data from source
     const adapter = getAdapter(source.toLowerCase());
     const productData = await adapter.getProduct(sourceId);
+
     if (!productData) {
       return res.status(404).json({ error: 'Product not found on source' });
     }
 
+    // 2. Sync to Shopify and get cart-ready data
     const result = await prepareCart({
       source: source.toLowerCase(),
       sourceId: String(sourceId),
@@ -366,8 +369,7 @@ app.post('/api/prepare-cart', async (req, res) => {
     logger.info('cart', 'Cart prepared', {
       source, sourceId,
       variantId: result.shopifyVariantId,
-      price: result.priceSnapshot.price,
-      margin: result._internal.marginPct
+      price: result.priceSnapshot.price
     });
 
     res.json(result);
@@ -380,6 +382,7 @@ app.post('/api/prepare-cart', async (req, res) => {
 // ---- LEGACY: create-and-add (backward compatible) ----
 app.post('/api/create-and-add', async (req, res) => {
   const { title, price, originalPrice, image, source, source_url, sourcePlatform, sourceUrl, product_id, variant_title } = req.body;
+
   if (!title || !price) {
     return res.status(400).json({ error: 'Missing title or price' });
   }
@@ -388,6 +391,7 @@ app.post('/api/create-and-add', async (req, res) => {
   const actualSourceUrl = sourceUrl || source_url || '';
 
   try {
+    // Build minimal product data for sync
     const productData = {
       source: actualSource.toLowerCase(),
       sourceId: String(product_id || Date.now()),
@@ -431,11 +435,12 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D â OPERATIONS LAYER (Admin endpoints)
+// CAPA D — OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
 app.get('/api/admin/source-health', async (req, res) => {
+  // Same as public but with more detail
   const health = {};
   const adapters = getAllAdapters();
   await Promise.allSettled(
@@ -443,7 +448,11 @@ app.get('/api/admin/source-health', async (req, res) => {
       const start = Date.now();
       try {
         const results = await adapter.search('test', 1);
-        health[name] = { status: 'ok', latencyMs: Date.now() - start, resultCount: results.length, lastChecked: new Date().toISOString() };
+        health[name] = {
+          status: 'ok', latencyMs: Date.now() - start,
+          resultCount: results.length,
+          lastChecked: new Date().toISOString()
+        };
       } catch (e) {
         health[name] = { status: 'error', latencyMs: Date.now() - start, error: e.message };
       }
@@ -452,7 +461,7 @@ app.get('/api/admin/source-health', async (req, res) => {
   res.json({ sources: health, cache: { search: searchCache.size, product: productCache.size } });
 });
 
-// ---- SHIPPING & RETURNS (public) ----
+// ---- SHIPPING & RETURNS ----
 app.get('/api/shipping/:source', (req, res) => {
   const source = req.params.source.toLowerCase();
   if (!VALID_SOURCES.includes(source)) {
@@ -464,16 +473,6 @@ app.get('/api/shipping/:source', (req, res) => {
   res.json({ source, shipping: estimate, returnPolicy, allOptions: options });
 });
 
-// ---- NEW: Shipping summary for PDP (richer data) ----
-app.get('/api/shipping-summary/:source', (req, res) => {
-  const source = req.params.source.toLowerCase();
-  if (!VALID_SOURCES.includes(source)) {
-    return res.status(400).json({ error: 'Invalid source' });
-  }
-  const summary = getShippingSummaryForPDP(source);
-  res.json(summary);
-});
-
 // ---- ORDER STATUS (proxy to Shopify) ----
 app.get('/api/order-status', async (req, res) => {
   const { order } = req.query;
@@ -481,6 +480,7 @@ app.get('/api/order-status', async (req, res) => {
 
   const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
   const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+
   if (!shopifyDomain || !shopifyToken) {
     return res.status(503).json({ error: 'Shopify not configured' });
   }
@@ -523,27 +523,7 @@ app.get('/api/order-status', async (req, res) => {
   }
 });
 
-// ---- STATIC: Public assets ----
-const https = require('https');
-app.get('/static/dealshub-product.js', (req, res) => {
-  const cdnUrl = 'https://cdn.jsdelivr.net/gh/mredgarpy/dealshub-search@main/public/dealshub-product.js';
-  https.get(cdnUrl, (cdnRes) => {
-    if (cdnRes.statusCode >= 300 && cdnRes.statusCode < 400 && cdnRes.headers.location) {
-      https.get(cdnRes.headers.location, (finalRes) => {
-        res.set('Content-Type', 'application/javascript');
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Cache-Control', 'public, max-age=300');
-        finalRes.pipe(res);
-      }).on('error', () => res.status(500).send('// CDN error'));
-    } else {
-      res.set('Content-Type', 'application/javascript');
-      res.set('Access-Control-Allow-Origin', '*');
-      res.set('Cache-Control', 'public, max-age=300');
-      cdnRes.pipe(res);
-    }
-  }).on('error', () => res.status(500).send('// CDN error'));
-});
-
+// ---- STATIC: Public assets (served with CORS for Shopify storefront) ----
 app.use('/static', express.static(path.join(__dirname, 'public'), {
   maxAge: '1h',
   setHeaders: (res) => {
@@ -589,70 +569,7 @@ app.get('/api/admin/stats', (req, res) => {
   });
 });
 
-// ============================================================
-// FASE 4 â NEW ADMIN ENDPOINTS
-// ============================================================
-
-// ---- ADMIN: Pricing Rules ----
-app.get('/api/admin/pricing-rules', (req, res) => {
-  const rules = getPricingRules();
-  const overrides = getAllOverrides();
-  res.json({ rules, overrides, sources: VALID_SOURCES });
-});
-
-// ---- ADMIN: Set Pricing Override ----
-app.post('/api/admin/pricing-override', (req, res) => {
-  const { key, fixedPrice, fixedMarkup, disabled } = req.body;
-  if (!key) return res.status(400).json({ error: 'Missing key (format: source:sourceId)' });
-  setPricingOverride(key, { fixedPrice, fixedMarkup, disabled });
-  res.json({ success: true, key, override: { fixedPrice, fixedMarkup, disabled } });
-});
-
-// ---- ADMIN: Remove Pricing Override ----
-app.delete('/api/admin/pricing-override/:key', (req, res) => {
-  const removed = removePricingOverride(req.params.key);
-  res.json({ success: removed, key: req.params.key });
-});
-
-// ---- ADMIN: Simulate Price ----
-app.post('/api/admin/simulate-price', (req, res) => {
-  const { sourcePrice, source, targetMarginPct, originalPrice, shippingCost } = req.body;
-  if (!sourcePrice || !source) {
-    return res.status(400).json({ error: 'Missing sourcePrice or source' });
-  }
-
-  const simulation = simulatePrice(sourcePrice, source, targetMarginPct);
-  const fullCalc = calculateFinalPrice(sourcePrice, source, {
-    originalPrice: originalPrice || 0,
-    shippingCost: shippingCost || 0
-  });
-
-  res.json({ simulation, fullCalculation: fullCalc });
-});
-
-// ---- ADMIN: Shipping Profiles ----
-app.get('/api/admin/shipping-profiles', (req, res) => {
-  res.json({
-    customerFacing: CUSTOMER_SHIPPING_PROFILES,
-    supplierCosts: SUPPLIER_SHIPPING_COSTS,
-    returnPolicies: RETURN_POLICIES
-  });
-});
-
-// ---- ADMIN: Fix Old Products ----
-app.post('/api/admin/fix-old-products', async (req, res) => {
-  try {
-    logger.info('admin', 'Starting old product fix job');
-    const results = await fixAllOldProducts();
-    logger.info('admin', 'Old product fix complete', results);
-    res.json({ success: true, ...results });
-  } catch (e) {
-    logger.error('admin', 'Fix old products failed', { error: e.message });
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ---- ADMIN: Push Theme Asset ----
+// ---- ADMIN: Push Theme Asset (server-side Shopify API call) ----
 app.put('/api/admin/theme-asset', async (req, res) => {
   const { key, value } = req.body;
   if (!key || !value) return res.status(400).json({ error: 'Missing key or value' });
@@ -660,6 +577,7 @@ app.put('/api/admin/theme-asset', async (req, res) => {
   const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
   const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
   const themeId = process.env.SHOPIFY_THEME_ID || '157178462339';
+
   if (!shopifyDomain || !shopifyToken) {
     return res.status(503).json({ error: 'Shopify not configured' });
   }
@@ -669,7 +587,10 @@ app.put('/api/admin/theme-asset', async (req, res) => {
     const url = `https://${shopifyDomain}/admin/api/2024-01/themes/${themeId}/assets.json`;
     const response = await fetch(url, {
       method: 'PUT',
-      headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' },
+      headers: {
+        'X-Shopify-Access-Token': shopifyToken,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ asset: { key, value } })
     });
 
@@ -696,6 +617,7 @@ app.get('/api/admin/theme-asset', async (req, res) => {
   const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
   const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
   const themeId = process.env.SHOPIFY_THEME_ID || '157178462339';
+
   if (!shopifyDomain || !shopifyToken) {
     return res.status(503).json({ error: 'Shopify not configured' });
   }
@@ -703,9 +625,14 @@ app.get('/api/admin/theme-asset', async (req, res) => {
   try {
     const fetch = require('node-fetch');
     const url = `https://${shopifyDomain}/admin/api/2024-01/themes/${themeId}/assets.json?asset[key]=${encodeURIComponent(key)}`;
-    const response = await fetch(url, { headers: { 'X-Shopify-Access-Token': shopifyToken } });
+    const response = await fetch(url, {
+      headers: { 'X-Shopify-Access-Token': shopifyToken }
+    });
 
-    if (!response.ok) return res.status(response.status).json({ error: 'Asset not found' });
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Asset not found' });
+    }
+
     const data = await response.json();
     res.json({ asset: data.asset });
   } catch (e) {
@@ -718,6 +645,7 @@ app.get('/api/admin/theme-assets', async (req, res) => {
   const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
   const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
   const themeId = process.env.SHOPIFY_THEME_ID || '157178462339';
+
   if (!shopifyDomain || !shopifyToken) {
     return res.status(503).json({ error: 'Shopify not configured' });
   }
@@ -725,7 +653,9 @@ app.get('/api/admin/theme-assets', async (req, res) => {
   try {
     const fetch = require('node-fetch');
     const url = `https://${shopifyDomain}/admin/api/2024-01/themes/${themeId}/assets.json`;
-    const response = await fetch(url, { headers: { 'X-Shopify-Access-Token': shopifyToken } });
+    const response = await fetch(url, {
+      headers: { 'X-Shopify-Access-Token': shopifyToken }
+    });
     const data = await response.json();
     const keys = data.assets.map(a => a.key).sort();
     res.json({ total: keys.length, assets: keys });
@@ -737,6 +667,7 @@ app.get('/api/admin/theme-assets', async (req, res) => {
 // ============================================================
 // HELPERS
 // ============================================================
+
 function interleaveResults(results, sources) {
   const grouped = {};
   results.forEach(r => {
@@ -771,95 +702,8 @@ function interleaveFromSettled(results, maxTotal = 18) {
 // START
 // ============================================================
 const PORT = process.env.PORT || 10000;
-
-// ---- THEME ASSET PUSH (temporary) ----
-app.put('/api/admin/push-theme-asset', async (req, res) => {
-  try {
-    const { key, value } = req.body;
-    if (!key || !value) return res.status(400).json({ error: 'key and value required' });
-    
-    const STORE = process.env.SHOPIFY_STORE_DOMAIN || '1rnmax-5z.myshopify.com';
-    const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
-    const THEME = process.env.SHOPIFY_THEME_ID || '157178462339';
-    
-    if (!TOKEN) return res.status(500).json({ error: 'SHOPIFY_ADMIN_TOKEN not configured' });
-    
-    const https = require('https');
-    const body = JSON.stringify({ asset: { key, value } });
-    
-    const result = await new Promise((resolve, reject) => {
-      const opts = {
-        hostname: STORE,
-        path: '/admin/api/2024-01/themes/' + THEME + '/assets.json',
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': TOKEN,
-          'Content-Length': Buffer.byteLength(body)
-        }
-      };
-      const r = https.request(opts, (resp) => {
-        let d = '';
-        resp.on('data', chunk => d += chunk);
-        resp.on('end', () => resolve({ status: resp.statusCode, body: d }));
-      });
-      r.on('error', reject);
-      r.write(body);
-      r.end();
-    });
-    
-    res.json({ ok: result.status < 300, key, shopifyStatus: result.status });
-  } catch(err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---- PAGE CREATE (temporary) ----
-app.post('/api/admin/create-page', async (req, res) => {
-  try {
-    const { title, handle, body_html, template_suffix } = req.body;
-    if (!title) return res.status(400).json({ error: 'title required' });
-    
-    const STORE = process.env.SHOPIFY_STORE_DOMAIN || '1rnmax-5z.myshopify.com';
-    const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN;
-    
-    if (!TOKEN) return res.status(500).json({ error: 'SHOPIFY_ADMIN_TOKEN not configured' });
-    
-    const https = require('https');
-    const pageData = { page: { title, handle: handle || '', body_html: body_html || '', published: true } };
-    if (template_suffix) pageData.page.template_suffix = template_suffix;
-    const body = JSON.stringify(pageData);
-    
-    const result = await new Promise((resolve, reject) => {
-      const opts = {
-        hostname: STORE,
-        path: '/admin/api/2024-01/pages.json',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': TOKEN,
-          'Content-Length': Buffer.byteLength(body)
-        }
-      };
-      const r = https.request(opts, (resp) => {
-        let d = '';
-        resp.on('data', chunk => d += chunk);
-        resp.on('end', () => resolve({ status: resp.statusCode, body: d }));
-      });
-      r.on('error', reject);
-      r.write(body);
-      r.end();
-    });
-    
-    const parsed = JSON.parse(result.body);
-    res.json({ ok: result.status < 300, shopifyStatus: result.status, page: parsed.page ? { id: parsed.page.id, handle: parsed.page.handle, title: parsed.page.title } : parsed });
-  } catch(err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.listen(PORT, () => {
-  logger.info('server', `StyleHub backend v2.1 running on port ${PORT}`);
+  logger.info('server', `StyleHub backend v2.0 running on port ${PORT}`);
   logger.info('server', `Sources: ${VALID_SOURCES.join(', ')}`);
   logger.info('server', `Shopify: ${process.env.SHOPIFY_STORE_DOMAIN ? 'configured' : 'NOT configured'}`);
 });

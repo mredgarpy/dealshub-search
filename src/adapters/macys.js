@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — Macy's Adapter (via RapidAPI)
+// DealsHub â Macy's Adapter (via RapidAPI)
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
@@ -24,12 +24,13 @@ class MacysAdapter extends BaseAdapter {
     return products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }
 
-  async getProduct(productId) {
+  async getProduct(productId, options = {}) {
     const url = `https://${API_HOST}/product?productId=${encodeURIComponent(productId)}`;
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
     if (!data?.product) {
       // Try search fallback
-      const searchUrl = `https://${API_HOST}/search?keyword=${encodeURIComponent(productId)}&pageSize=1&requestType=search`;
+      const searchQuery = options.title || productId;
+      const searchUrl = `https://${API_HOST}/search?keyword=${encodeURIComponent(searchQuery)}&pageSize=1&requestType=search`;
       const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
       const items = sData?.searchresultgroups?.[0]?.products?.product || sData?.products?.product;
       if (items?.[0]) return this.normalizeProductFromSearch(items[0]);
@@ -76,7 +77,7 @@ class MacysAdapter extends BaseAdapter {
     p.category = d.detail?.typeName || null;
     p.breadcrumbs = d.detail?.categoryBreadcrumbs?.map(b => b.name) || [];
 
-    // Description — combine description, shortDescription, and additional details
+    // Description â combine description, shortDescription, and additional details
     const descParts = [];
     if (d.detail?.description) descParts.push(d.detail.description);
     if (d.detail?.shortDescription && d.detail.shortDescription !== d.detail?.description) {
@@ -89,7 +90,7 @@ class MacysAdapter extends BaseAdapter {
     if (d.detail?.countryOfOrigin) descParts.push(`Origin: ${d.detail.countryOfOrigin}`);
     p.description = descParts.join('\n\n') || '';
 
-    // Bullets — bulletText array + product attributes
+    // Bullets â bulletText array + product attributes
     p.bullets = [];
     if (Array.isArray(d.detail?.bulletText) && d.detail.bulletText.length) {
       p.bullets = d.detail.bulletText.filter(b => b && typeof b === 'string');

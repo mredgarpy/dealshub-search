@@ -68,15 +68,55 @@ class AmazonAdapter extends BaseAdapter {
     p.brand = d.product_brand || null;
     p.category = d.product_category || null;
     p.breadcrumbs = d.product_category ? d.product_category.split(' > ') : [];
-    p.description = d.product_description || d.about_item?.join('\n') || '';
-    p.bullets = d.about_item || [];
-    p.images = d.product_photos || (d.product_photo ? [d.product_photo] : []);
+
+    // Description — combine about_item bullets + product_description + product_information
+    const descParts = [];
+    if (d.product_description) descParts.push(d.product_description);
+    if (d.product_information && typeof d.product_information === 'object') {
+      const infoLines = Object.entries(d.product_information)
+        .filter(([k, v]) => v && typeof v === 'string')
+        .map(([k, v]) => `${k}: ${v}`);
+      if (infoLines.length) descParts.push(infoLines.join('\n'));
+    }
+    p.description = descParts.join('\n\n') || '';
+
+    // Bullets from about_item array
+    p.bullets = [];
+    if (Array.isArray(d.about_item)) {
+      p.bullets = d.about_item.filter(b => b && typeof b === 'string' && b.trim().length > 0);
+    }
+    // Also extract from product_details if available
+    if (d.product_details && typeof d.product_details === 'object') {
+      Object.entries(d.product_details).forEach(([k, v]) => {
+        if (v && typeof v === 'string') p.bullets.push(`${k}: ${v}`);
+      });
+    }
+
+    // Images — product_photos is primary, fallback to product_photo
+    p.images = [];
+    if (Array.isArray(d.product_photos)) {
+      p.images = d.product_photos.filter(Boolean);
+    } else if (d.product_photo) {
+      p.images = [d.product_photo];
+    }
     p.primaryImage = p.images[0] || '';
+
+    // Price
     p.price = parsePrice(d.product_price);
     p.originalPrice = parsePrice(d.product_original_price);
+    if (!p.originalPrice && d.product_original_price_raw) {
+      p.originalPrice = parsePrice(d.product_original_price_raw);
+    }
+
+    // Rating & reviews
     p.rating = d.product_star_rating ? parseFloat(d.product_star_rating) : null;
-    p.reviews = d.product_num_ratings || 0;
+    p.reviews = d.product_num_ratings || d.product_num_reviews || 0;
+
+    // Badge
     p.badge = d.is_best_seller ? 'Best Seller' : (d.is_amazon_choice ? "Amazon's Choice" : null);
+    if (!p.badge && d.climate_pledge_friendly) p.badge = 'Climate Pledge';
+
+    // Availability
     p.availability = d.product_availability || null;
     p.stockSignal = d.product_availability?.toLowerCase().includes('in stock') ? 'in_stock' :
                     d.product_availability?.toLowerCase().includes('out') ? 'out_of_stock' : 'unknown';
@@ -108,22 +148,48 @@ class AmazonAdapter extends BaseAdapter {
       }));
     }
 
-    // Shipping
+    // Shipping & delivery
     if (d.delivery_info) {
       p.deliveryEstimate.label = d.delivery_info;
+      // Try to parse min/max from "Delivery by Mon, Jan 5 - Fri, Jan 9" format
+      const match = d.delivery_info.match(/(\d+)\s*-\s*(\d+)/);
+      if (match) {
+        p.deliveryEstimate.minDays = parseInt(match[1]);
+        p.deliveryEstimate.maxDays = parseInt(match[2]);
+      }
+    }
+    if (!p.deliveryEstimate.label) {
+      p.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days' };
     }
     p.shippingData.note = d.is_prime ? 'FREE Prime Shipping' : 'Standard Shipping';
+    p.shippingData.cost = d.is_prime ? 0 : null;
+    p.shippingData.method = d.is_prime ? 'Prime' : 'Standard';
 
     // Return policy
     p.returnPolicy.summary = 'Free returns within 30 days';
     p.returnPolicy.window = 30;
 
-    // Seller
+    // Seller info
     if (d.sold_by) p.sellerData.name = d.sold_by;
+    if (d.fulfilled_by) p.sellerData.fulfilled = d.fulfilled_by;
 
     p.sourceUrl = d.product_url || `https://www.amazon.com/dp/${p.sourceId}`;
     p.normalizedHandle = this._makeHandle(p.title);
-    p.rawSourceMeta = { asin: d.asin, isPrime: d.is_prime };
+    p.rawSourceMeta = {
+      asin: d.asin,
+      isPrime: d.is_prime || false,
+      isBestSeller: d.is_best_seller || false,
+      isAmazonChoice: d.is_amazon_choice || false,
+      climatePledge: d.climate_pledge_friendly || false,
+      soldBy: d.sold_by || null,
+      fulfilledBy: d.fulfilled_by || null,
+      productDimensions: d.product_dimensions || null,
+      itemWeight: d.item_weight || null,
+      itemModelNumber: d.item_model_number || null,
+      manufacturer: d.manufacturer || null,
+      countryOfOrigin: d.country_of_origin || null,
+      dateFirstAvailable: d.date_first_available || null
+    };
     return p;
   }
 
@@ -134,7 +200,7 @@ class AmazonAdapter extends BaseAdapter {
     product.sourceName = 'Amazon';
     product.title = p.product_title || '';
     product.brand = p.product_brand || null;
-    product.images = p.product_photo ? [p.product_photo] : (p.product_photos || []);
+    product.images = p.product_photo ? [p.product_photo] : [];
     product.primaryImage = product.images[0] || '';
     product.price = parsePrice(p.product_price);
     product.originalPrice = parsePrice(p.product_original_price);
@@ -143,10 +209,13 @@ class AmazonAdapter extends BaseAdapter {
     product.badge = p.is_best_seller ? 'Best Seller' : (p.is_amazon_choice ? "Amazon's Choice" : null);
     product.availability = 'In Stock';
     product.stockSignal = 'in_stock';
+    product.description = p.product_description || '';
+    product.bullets = Array.isArray(p.about_item) ? p.about_item : [];
     product.sourceUrl = p.product_url || `https://www.amazon.com/dp/${product.sourceId}`;
     product.normalizedHandle = this._makeHandle(product.title);
-    product.returnPolicy.summary = 'Free returns within 30 days';
-    product.shippingData.note = 'Standard Shipping';
+    product.returnPolicy = { summary: 'Free returns within 30 days', window: 30 };
+    product.shippingData.note = p.is_prime ? 'FREE Prime Shipping' : 'Standard Shipping';
+    product.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days' };
     return product;
   }
 

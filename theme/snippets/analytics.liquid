@@ -1,92 +1,307 @@
 {% comment %}
-  DealsHub — Analytics & Tracking Snippet
+  DealsHub — Analytics & Tracking Snippet (FASE 7)
   Include in theme.liquid head: {% render 'analytics' %}
+
+  Supports: GA4, Meta Pixel, TikTok Pixel
+  All pixels respect consent state from DHConsent manager.
+  Ecommerce events follow GA4 enhanced ecommerce spec.
 {% endcomment %}
 
-{% if section.settings.ga_id or settings.ga_id %}
-<!-- Google Analytics 4 -->
-<script async src="https://www.googletagmanager.com/gtag/js?id={{ section.settings.ga_id | default: settings.ga_id }}"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', '{{ section.settings.ga_id | default: settings.ga_id }}');
-</script>
-{% endif %}
+{%- assign ga_id = settings.dh_ga4_id | default: '' -%}
+{%- assign meta_pixel_id = settings.dh_meta_pixel_id | default: '' -%}
+{%- assign tiktok_pixel_id = settings.dh_tiktok_pixel_id | default: '' -%}
 
-<!-- DealsHub Analytics -->
+<!-- DealsHub Analytics Engine v2.0 -->
 <script>
 (function() {
   'use strict';
+
+  /* ====================================================
+     CONSENT MANAGER INTEGRATION
+     ==================================================== */
+  function hasConsent(category) {
+    if (window.DHConsent && typeof window.DHConsent.hasConsent === 'function') {
+      return window.DHConsent.hasConsent(category);
+    }
+    return false;
+  }
+
+  function onConsent(callback) {
+    if (window.DHConsent && typeof window.DHConsent.onUpdate === 'function') {
+      window.DHConsent.onUpdate(callback);
+    }
+  }
+
+  /* ====================================================
+     GA4 INITIALIZATION (gated by analytics consent)
+     ==================================================== */
+  var GA_ID = {{ ga_id | json }};
+
+  function initGA4() {
+    if (!GA_ID || !hasConsent('analytics')) return;
+    if (window._dh_ga4_loaded) return;
+    window._dh_ga4_loaded = true;
+
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+    document.head.appendChild(s);
+
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function() { dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', GA_ID, {
+      send_page_view: true,
+      cookie_flags: 'SameSite=None;Secure',
+      anonymize_ip: true
+    });
+  }
+
+  /* ====================================================
+     META PIXEL INITIALIZATION (gated by marketing consent)
+     ==================================================== */
+  var META_PIXEL_ID = {{ meta_pixel_id | json }};
+
+  function initMetaPixel() {
+    if (!META_PIXEL_ID || !hasConsent('marketing')) return;
+    if (window._dh_meta_loaded) return;
+    window._dh_meta_loaded = true;
+
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+    n.push+n=n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+    document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', META_PIXEL_ID);
+    fbq('track', 'PageView');
+  }
+
+  /* ====================================================
+     TIKTOK PIXEL INITIALIZATION (gated by marketing consent)
+     ==================================================== */
+  var TIKTOK_PIXEL_ID = {{ tiktok_pixel_id | json }};
+
+  function initTikTokPixel() {
+    if (!TIKTOK_PIXEL_ID || !hasConsent('marketing')) return;
+    if (window._dh_tt_loaded) return;
+    window._dh_tt_loaded = true;
+
+    !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];
+    ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group",
+    "enableCookie","disableCookie"];ttq.setAndDefer=function(t,e){t[e]=function(){
+    t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)
+    ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;
+    n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};ttq.load=function(e,n){
+    var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{};ttq._i[e]=[];
+    ttq._i[e]._u=i;ttq._t=ttq._t||{};ttq._t[e+""]=+new Date;ttq._o=ttq._o||{};ttq._o[e+""]=n||{};
+    var o=document.createElement("script");o.type="text/javascript";o.async=!0;o.src=i+"?sdkid="+e+"&lib="+t;
+    var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
+    ttq.load(TIKTOK_PIXEL_ID);ttq.page();}(window,document,'ttq');
+  }
+
+  /* ====================================================
+     INITIALIZE ALL PIXELS
+     ==================================================== */
+  function initAllPixels() {
+    initGA4();
+    initMetaPixel();
+    initTikTokPixel();
+  }
+
+  // Listen for consent updates
+  onConsent(initAllPixels);
+
+  // Try immediately in case consent was already given
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAllPixels);
+  } else {
+    initAllPixels();
+  }
+
+  /* ====================================================
+     DEALSHUB ANALYTICS API
+     Enhanced ecommerce events (GA4 spec)
+     ==================================================== */
   window.DHAnalytics = {
-    events: [],
+    _queue: [],
 
     track: function(event, data) {
       data = data || {};
       data.timestamp = new Date().toISOString();
       data.page = window.location.pathname;
-      data.referrer = document.referrer;
-      this.events.push({ event: event, data: data });
+      this._queue.push({ event: event, data: data });
 
-      // Push to GA4 if available
-      if (typeof gtag === 'function') {
+      // GA4
+      if (hasConsent('analytics') && typeof gtag === 'function') {
         gtag('event', event, data);
       }
 
-      // Push to dataLayer for GTM
+      // DataLayer (for GTM)
       if (window.dataLayer) {
-        window.dataLayer.push({ event: 'dh_' + event, ...data });
+        window.dataLayer.push(Object.assign({ event: 'dh_' + event }, data));
       }
+
+      // Meta Pixel mapping
+      if (hasConsent('marketing') && typeof fbq === 'function') {
+        var metaEvent = this._mapToMeta(event, data);
+        if (metaEvent) fbq('track', metaEvent.name, metaEvent.params);
+      }
+
+      // TikTok Pixel mapping
+      if (hasConsent('marketing') && window.ttq) {
+        var ttEvent = this._mapToTikTok(event, data);
+        if (ttEvent) ttq.track(ttEvent.name, ttEvent.params);
+      }
+    },
+
+    _mapToMeta: function(event, data) {
+      var map = {
+        'view_item': { name: 'ViewContent', params: { content_ids: [data.item_id], content_type: 'product', value: data.price, currency: 'USD' }},
+        'add_to_cart': { name: 'AddToCart', params: { content_ids: [data.item_id], content_type: 'product', value: data.price, currency: 'USD' }},
+        'begin_checkout': { name: 'InitiateCheckout', params: { value: data.value, currency: 'USD', num_items: data.items_count }},
+        'purchase': { name: 'Purchase', params: { value: data.value, currency: 'USD', content_ids: data.item_ids }},
+        'search': { name: 'Search', params: { search_string: data.search_term }},
+        'add_to_wishlist': { name: 'AddToWishlist', params: { content_ids: [data.item_id], value: data.price, currency: 'USD' }}
+      };
+      return map[event] || null;
+    },
+
+    _mapToTikTok: function(event, data) {
+      var map = {
+        'view_item': { name: 'ViewContent', params: { content_id: data.item_id, content_type: 'product', value: data.price, currency: 'USD' }},
+        'add_to_cart': { name: 'AddToCart', params: { content_id: data.item_id, content_type: 'product', value: data.price, currency: 'USD' }},
+        'begin_checkout': { name: 'InitiateCheckout', params: { value: data.value, currency: 'USD' }},
+        'purchase': { name: 'CompletePayment', params: { value: data.value, currency: 'USD' }},
+        'search': { name: 'Search', params: { query: data.search_term }}
+      };
+      return map[event] || null;
+    },
+
+    /* ---- ECOMMERCE EVENT HELPERS ---- */
+
+    trackPageView: function() {
+      this.track('page_view', { page_title: document.title });
     },
 
     trackSearch: function(query, resultCount, sources) {
       this.track('search', {
         search_term: query,
         result_count: resultCount,
-        sources: sources
+        sources: Array.isArray(sources) ? sources.join(',') : sources
       });
     },
 
     trackProductView: function(product) {
       this.track('view_item', {
-        item_id: product.id,
+        item_id: product.id || product.sourceId,
         item_name: product.title,
-        item_brand: product.brand,
-        item_category: product.category,
-        price: product.price,
-        source: product.source
+        item_brand: product.brand || '',
+        item_category: product.category || '',
+        price: parseFloat(product.price) || 0,
+        source: product.source || '',
+        currency: 'USD',
+        items: [{
+          item_id: product.id || product.sourceId,
+          item_name: product.title,
+          item_brand: product.brand || '',
+          price: parseFloat(product.price) || 0
+        }]
       });
     },
 
-    trackAddToCart: function(product, variant) {
+    trackAddToCart: function(product, variant, quantity) {
       this.track('add_to_cart', {
-        item_id: product.id,
+        item_id: product.id || product.sourceId,
         item_name: product.title,
-        price: product.price,
-        source: product.source,
-        variant: variant
+        price: parseFloat(product.price) || 0,
+        source: product.source || '',
+        variant: variant || '',
+        quantity: quantity || 1,
+        currency: 'USD',
+        value: parseFloat(product.price) || 0,
+        items: [{
+          item_id: product.id || product.sourceId,
+          item_name: product.title,
+          price: parseFloat(product.price) || 0,
+          quantity: quantity || 1
+        }]
       });
     },
 
-    trackBeginCheckout: function(product) {
-      this.track('begin_checkout', {
+    trackRemoveFromCart: function(product) {
+      this.track('remove_from_cart', {
         item_id: product.id,
         item_name: product.title,
-        price: product.price,
-        source: product.source
+        price: parseFloat(product.price) || 0,
+        currency: 'USD'
+      });
+    },
+
+    trackBeginCheckout: function(cart) {
+      this.track('begin_checkout', {
+        value: parseFloat(cart.total) || 0,
+        items_count: cart.item_count || 0,
+        currency: 'USD',
+        item_ids: (cart.items || []).map(function(i) { return i.id; })
+      });
+    },
+
+    trackPurchase: function(order) {
+      this.track('purchase', {
+        transaction_id: order.id || order.order_number,
+        value: parseFloat(order.total) || 0,
+        tax: parseFloat(order.tax) || 0,
+        shipping: parseFloat(order.shipping) || 0,
+        currency: 'USD',
+        item_ids: (order.items || []).map(function(i) { return i.id; }),
+        items: order.items || []
       });
     },
 
     trackWishlist: function(product, action) {
-      this.track('wishlist_' + action, {
-        item_id: product.id,
+      var eventName = action === 'remove' ? 'remove_from_wishlist' : 'add_to_wishlist';
+      this.track(eventName, {
+        item_id: product.id || product.sourceId,
         item_name: product.title,
-        source: product.source
+        price: parseFloat(product.price) || 0,
+        source: product.source || ''
+      });
+    },
+
+    trackShare: function(product, method) {
+      this.track('share', {
+        method: method || 'unknown',
+        content_type: 'product',
+        item_id: product.id || product.sourceId
+      });
+    },
+
+    trackNewsletterSignup: function(location) {
+      this.track('newsletter_signup', {
+        signup_location: location || 'unknown'
+      });
+      if (hasConsent('marketing') && typeof fbq === 'function') {
+        fbq('track', 'Lead', { content_name: 'newsletter' });
+      }
+    },
+
+    trackPromoView: function(promoName, position) {
+      this.track('view_promotion', {
+        promotion_name: promoName,
+        creative_slot: position
+      });
+    },
+
+    trackPromoClick: function(promoName, position) {
+      this.track('select_promotion', {
+        promotion_name: promoName,
+        creative_slot: position
       });
     }
   };
 
   // Auto-track page views
-  window.DHAnalytics.track('page_view');
+  window.DHAnalytics.trackPageView();
+
 })();
 </script>

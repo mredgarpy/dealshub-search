@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — AliExpress Adapter (AliExpress DataHub via RapidAPI)
+// DealsHub â AliExpress Adapter (AliExpress DataHub via RapidAPI)
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
@@ -33,7 +33,7 @@ class AliExpressAdapter extends BaseAdapter {
     return [];
   }
 
-  async getProduct(productId) {
+  async getProduct(productId, options = {}) {
     const url = `https://${SEARCH_HOST}/item/detail?itemId=${encodeURIComponent(productId)}`;
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
     if (data?.result) return this.normalizeProduct(data.result);
@@ -41,6 +41,17 @@ class AliExpressAdapter extends BaseAdapter {
     const url2 = `https://${SEARCH_HOST}/item/detail2?itemId=${encodeURIComponent(productId)}`;
     const data2 = await this.fetchJSON(url2, { headers: this.rapidHeaders(SEARCH_HOST) });
     if (data2?.result) return this.normalizeProduct(data2.result);
+    // Fallback: search by title hint if available
+    if (options.title) {
+      const searchUrl = `https://${SEARCH_HOST}/item/search?q=${encodeURIComponent(options.title)}&page=1&sort=default`;
+      const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(SEARCH_HOST) });
+      const items = sData?.result?.resultList;
+      if (items?.[0]) {
+        const item = items[0].item || items[0];
+        logger.warn('aliexpress', `Detail API failed for ${productId}, using search fallback`);
+        return this._normalizeProductFallback(item);
+      }
+    }
     logger.warn('aliexpress', `Product not found: ${productId}`);
     return null;
   }
@@ -81,18 +92,18 @@ class AliExpressAdapter extends BaseAdapter {
     p.brand = d.storeName || d.store?.name || d.storeModule?.storeName || null;
     p.category = d.categoryName || d.item?.categoryName || null;
 
-    // Breadcrumbs — try multiple shapes
+    // Breadcrumbs â try multiple shapes
     if (d.breadcrumbs?.length) {
       p.breadcrumbs = d.breadcrumbs.map(b => b.name || b.title || b).filter(Boolean);
     } else if (d.crossLinkGroupList?.length) {
       p.breadcrumbs = d.crossLinkGroupList.map(g => g.name).filter(Boolean);
     }
 
-    // Description — combine all available text fields
+    // Description â combine all available text fields
     const descParts = [];
     if (d.description) descParts.push(d.description);
     if (d.item?.description) descParts.push(d.item.description);
-    // descriptionModule often has HTML content URL — store it in rawSourceMeta
+    // descriptionModule often has HTML content URL â store it in rawSourceMeta
     if (d.descriptionModule?.descriptionUrl) {
       descParts.push('[Full description available]');
     }
@@ -108,7 +119,7 @@ class AliExpressAdapter extends BaseAdapter {
     if (d.pageModule?.description) descParts.push(d.pageModule.description);
     p.description = descParts.join('\n\n') || '';
 
-    // Bullets — features array, specs, key attributes
+    // Bullets â features array, specs, key attributes
     p.bullets = [];
     if (Array.isArray(d.features) && d.features.length) {
       p.bullets = d.features.filter(f => f && typeof f === 'string' && f.trim().length > 0);
@@ -126,7 +137,7 @@ class AliExpressAdapter extends BaseAdapter {
       p.bullets.unshift(d.titleModule.subject);
     }
 
-    // Images — multiple sources
+    // Images â multiple sources
     const imgSources = d.images || d.imagePathList || d.imageModule?.imagePathList || [];
     p.images = imgSources.map(img => {
       if (typeof img === 'string') return img;
@@ -136,7 +147,7 @@ class AliExpressAdapter extends BaseAdapter {
     p.images = p.images.map(url => url.startsWith('//') ? 'https:' + url : url);
     p.primaryImage = p.images[0] || '';
 
-    // Price — multiple response shapes
+    // Price â multiple response shapes
     p.price = parsePrice(
       d.price?.minPrice || d.price?.minAmount?.value || d.currentPrice ||
       d.salePrice || d.priceModule?.minPrice || d.priceModule?.actMinPrice
@@ -169,7 +180,7 @@ class AliExpressAdapter extends BaseAdapter {
       p.stockSignal = 'out_of_stock';
     }
 
-    // Variants / SKU — skuModule (detail endpoint) or productSKUPropertyList
+    // Variants / SKU â skuModule (detail endpoint) or productSKUPropertyList
     if (d.skuModule?.productSKUPropertyList) {
       d.skuModule.productSKUPropertyList.forEach(prop => {
         const option = {
@@ -195,7 +206,7 @@ class AliExpressAdapter extends BaseAdapter {
       }));
     }
 
-    // Shipping — shippingModule or deliveryModule
+    // Shipping â shippingModule or deliveryModule
     const ship = d.shippingModule || d.deliveryModule;
     if (ship) {
       p.shippingData.cost = ship.freightAmount != null ? parseFloat(ship.freightAmount) : null;
@@ -226,7 +237,7 @@ class AliExpressAdapter extends BaseAdapter {
     p.sourceUrl = `https://www.aliexpress.com/item/${p.sourceId}.html`;
     p.normalizedHandle = this._makeHandle(p.title);
 
-    // Raw source meta — all extra fields for operations layer
+    // Raw source meta â all extra fields for operations layer
     p.rawSourceMeta = {
       itemId: p.sourceId,
       tradeCount: tradeNum,

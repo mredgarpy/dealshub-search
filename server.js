@@ -138,7 +138,7 @@ app.get('/api/product/:id', async (req, res) => {
   try {
     const adapter = getAdapter(source);
     if (!adapter) return res.status(400).json({ error: `Source ${source} not available` });
-    
+
     const product = await adapter.getProduct(id);
     if (!product) {
       return res.status(404).json({ error: 'Product not found', source, id });
@@ -225,16 +225,6 @@ app.get('/api/bestsellers', async (req, res) => {
       Object.entries(queries).map(([source, q]) => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(q, 6) : Promise.resolve([]);
-      })
-    );
-    const all = interleaveFromSettled(results, 18);
-    const response = { results: all, section: 'bestsellers' };
-    searchCache.set(cacheKey, response, 600000);
-    res.json(response);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});     return adapter ? adapter.search(q, 6) : Promise.resolve([]);
       })
     );
     const all = interleaveFromSettled(results, 18);

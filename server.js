@@ -55,7 +55,7 @@ initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    version: '2.2.0',
+    version: '2.3.0',
     sources: VALID_SOURCES,
     cacheSize: { search: searchCache.size, product: productCache.size },
     uptime: process.uptime()
@@ -93,7 +93,9 @@ app.get('/api/search', async (req, res) => {
     let allResults = [];
     results.forEach((r, i) => {
       if (r.status === 'fulfilled' && Array.isArray(r.value)) {
-        allResults.push(...r.value);
+        // Filter out products with missing/zero prices
+        const valid = r.value.filter(p => p && p.title && p.price && p.price !== '$0.00' && p.price !== '$NaN');
+        allResults.push(...valid);
       } else {
         logger.warn('search', `Source ${sources[i]} failed`, { reason: r.reason?.message });
       }
@@ -566,7 +568,7 @@ app.get('/api/admin/stats', (req, res) => {
     cache: { search: searchCache.size, product: productCache.size },
     sources: VALID_SOURCES,
     uptime: process.uptime(),
-    version: '2.2.0'
+    version: '2.3.0'
   });
 });
 
@@ -696,7 +698,9 @@ function interleaveResults(results, sources) {
 }
 
 function interleaveFromSettled(results, maxTotal = 18) {
-  const arrays = results.map(r => (r.status === 'fulfilled' && Array.isArray(r.value)) ? r.value : []);
+  const arrays = results.map(r => (r.status === 'fulfilled' && Array.isArray(r.value))
+    ? r.value.filter(p => p && p.title && p.price && p.price !== '$0.00' && p.price !== '$NaN')
+    : []);
   const interleaved = [];
   const maxLen = Math.max(...arrays.map(a => a.length), 0);
   for (let i = 0; i < maxLen && interleaved.length < maxTotal; i++) {
@@ -710,9 +714,29 @@ function interleaveFromSettled(results, maxTotal = 18) {
 // ============================================================
 // START
 // ============================================================
+// ---- WARM-UP: Pre-populate cache on startup to reduce perceived cold start ----
+async function warmUpCache() {
+  logger.info('server', 'Warming up cache...');
+  try {
+    const adapter = getAdapter('amazon');
+    if (adapter) {
+      const results = await adapter.search('trending deals', 6);
+      if (results.length > 0) {
+        const valid = results.filter(p => p && p.title && p.price && p.price !== '$0.00');
+        searchCache.set('trending', { results: valid, section: 'trending' }, 600000);
+        logger.info('server', `Warm-up: cached ${valid.length} trending results`);
+      }
+    }
+  } catch (e) {
+    logger.warn('server', 'Warm-up failed (non-critical)', { error: e.message });
+  }
+}
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  logger.info('server', `StyleHub backend v2.2 running on port ${PORT}`);
+  logger.info('server', `StyleHub backend v2.3 running on port ${PORT}`);
   logger.info('server', `Sources: ${VALID_SOURCES.join(', ')}`);
   logger.info('server', `Shopify: ${process.env.SHOPIFY_STORE_DOMAIN ? 'configured' : 'NOT configured'}`);
+  // Warm up cache after server starts (don't await — let it run in background)
+  setTimeout(warmUpCache, 2000);
 });

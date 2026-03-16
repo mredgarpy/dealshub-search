@@ -17,14 +17,29 @@ class SephoraAdapter extends BaseAdapter {
     return data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }
 
-  async getProduct(skuId) {
-    const url = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(skuId)}&preferedSku=${encodeURIComponent(skuId)}`;
+  async getProduct(id) {
+    // id can be productId (P######) or skuId (numeric). Try detail with productId first.
+    const isProductId = /^P\d+$/i.test(id);
+    const productIdParam = isProductId ? id : id;
+    const skuParam = isProductId ? '' : id;
+    const url = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(productIdParam)}${skuParam ? '&preferedSku=' + encodeURIComponent(skuParam) : ''}`;
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
     if (data?.currentSku) return this.normalizeProduct(data);
-    // Try search fallback
-    const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(skuId)}&pageIndex=0&pageSize=1`;
-    const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
-    if (sData?.products?.[0]) return this.normalizeProductFromSearch(sData.products[0]);
+    // If numeric skuId failed as productId, try search fallback to find the real productId
+    if (!isProductId) {
+      const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(id)}&pageIndex=0&pageSize=1`;
+      const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
+      if (sData?.products?.[0]) {
+        const realProductId = sData.products[0].productId;
+        if (realProductId && realProductId !== id) {
+          // Retry with the real productId
+          const retryUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(realProductId)}&preferedSku=${encodeURIComponent(id)}`;
+          const retryData = await this.fetchJSON(retryUrl, { headers: this.rapidHeaders(API_HOST) });
+          if (retryData?.currentSku) return this.normalizeProduct(retryData);
+        }
+        return this.normalizeProductFromSearch(sData.products[0]);
+      }
+    }
     return null;
   }
 
@@ -34,7 +49,7 @@ class SephoraAdapter extends BaseAdapter {
     const origPrice = parsePrice(p.currentSku?.valuePrice);
     const img = p.currentSku?.skuImages?.image450 || p.heroImage || p.image450 || '';
     return {
-      id: p.currentSku?.skuId || p.productId || '',
+      id: p.productId || p.currentSku?.skuId || '',
       title: p.displayName || p.productName || '',
       price: price ? `$${price.toFixed(2)}` : null,
       originalPrice: origPrice && origPrice > (price || 0) ? `$${origPrice.toFixed(2)}` : null,

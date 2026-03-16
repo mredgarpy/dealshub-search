@@ -63,7 +63,7 @@ app.get('/health', (req, res) => {
 });
 
 // ---- ADMIN ROUTES ----
-app.use('/admin/api', adminRouter);
+app.use('/api/admin', adminRouter);
 
 // ============================================================
 // CAPA A — LIVE DISCOVERY LAYER

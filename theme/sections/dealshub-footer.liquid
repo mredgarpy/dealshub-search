@@ -1,0 +1,120 @@
+{% comment %}
+  DealsHub — Footer Section (English)
+  Replaces the Spanish footer with a clean English version.
+{% endcomment %}
+
+<footer class="dh-footer">
+  <style>
+    .dh-footer{background:#1a1a2e;color:#ccc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:48px 0 0}
+    .dh-footer__inner{max-width:1200px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:40px}
+    .dh-footer__col h3{color:#fff;font-size:16px;font-weight:700;margin:0 0 16px;letter-spacing:.02em}
+    .dh-footer__col p{font-size:14px;line-height:1.6;color:#999;margin:0 0 16px}
+    .dh-footer__col a{color:#ccc;text-decoration:none;font-size:14px;display:block;padding:4px 0;transition:color .2s}
+    .dh-footer__col a:hover{color:#e53e3e}
+    .dh-footer__newsletter{margin-top:8px}
+    .dh-footer__newsletter-label{font-size:14px;font-weight:600;color:#fff;margin-bottom:8px;display:block}
+    .dh-footer__newsletter-form{display:flex;gap:0}
+    .dh-footer__newsletter-input{flex:1;padding:10px 14px;border:1px solid #333;border-right:none;border-radius:6px 0 0 6px;background:#0d0d1a;color:#fff;font-size:14px;outline:none}
+    .dh-footer__newsletter-input::placeholder{color:#666}
+    .dh-footer__newsletter-input:focus{border-color:#e53e3e}
+    .dh-footer__newsletter-btn{padding:10px 18px;background:#e53e3e;color:#fff;border:none;border-radius:0 6px 6px 0;font-weight:700;font-size:14px;cursor:pointer;transition:background .2s}
+    .dh-footer__newsletter-btn:hover{background:#c53030}
+    .dh-footer__bottom{border-top:1px solid #2a2a3e;margin-top:40px;padding:20px 24px;text-align:center}
+    .dh-footer__bottom-inner{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+    .dh-footer__copy{font-size:13px;color:#666}
+    .dh-footer__social{display:flex;gap:12px}
+    .dh-footer__social a{width:36px;height:36px;border-radius:50%;background:#2a2a3e;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:13px;font-weight:700;text-decoration:none;transition:background .2s,color .2s}
+    .dh-footer__social a:hover{background:#e53e3e;color:#fff}
+    .dh-footer__icon{display:inline-flex;align-items:center;gap:8px}
+    .dh-footer__icon svg{flex-shrink:0}
+    @media(max-width:768px){
+      .dh-footer__inner{grid-template-columns:1fr 1fr;gap:24px}
+    }
+    @media(max-width:480px){
+      .dh-footer__inner{grid-template-columns:1fr;gap:20px}
+      .dh-footer__bottom-inner{flex-direction:column;text-align:center}
+    }
+  </style>
+
+  <div class="dh-footer__inner">
+    <div class="dh-footer__col">
+      <h3>STYLEHUB MIAMI</h3>
+      <p>Your #1 destination for the best deals on fashion, beauty, electronics and more from top brands.</p>
+      <div class="dh-footer__newsletter">
+        <span class="dh-footer__newsletter-label">Get exclusive deals</span>
+        <form class="dh-footer__newsletter-form" action="#" method="post" id="dh-footer-newsletter">
+          <input type="email" class="dh-footer__newsletter-input" placeholder="Your email..." required aria-label="Email for newsletter">
+          <button type="submit" class="dh-footer__newsletter-btn">OK</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="dh-footer__col">
+      <h3>Categories</h3>
+      <a href="/collections/fashion">Fashion</a>
+      <a href="/collections/beauty">Beauty</a>
+      <a href="/collections/electronics">Electronics</a>
+      <a href="/collections/home">Home</a>
+      <a href="/collections/sports">Sports</a>
+      <a href="/pages/search-results?category=flash-deals">Flash Deals</a>
+    </div>
+
+    <div class="dh-footer__col">
+      <h3>My Account</h3>
+      <a href="/account/orders" class="dh-footer__icon">📦 My Orders</a>
+      <a href="/pages/wishlist" class="dh-footer__icon">❤️ My Wishlist</a>
+      <a href="/account/addresses" class="dh-footer__icon">📍 My Addresses</a>
+      <a href="/account" class="dh-footer__icon">🔒 Account</a>
+      <a href="/pages/tracking" class="dh-footer__icon" style="color:#e53e3e">📦 Track Order</a>
+    </div>
+
+    <div class="dh-footer__col">
+      <h3>Help</h3>
+      <a href="/pages/tracking">Track My Order</a>
+      <a href="/pages/help-center">Help Center</a>
+      <a href="/policies/shipping-policy">Shipping Policy</a>
+      <a href="/policies/refund-policy">Returns & Refunds</a>
+      <a href="/pages/contact">Contact Us</a>
+    </div>
+  </div>
+
+  <div class="dh-footer__bottom">
+    <div class="dh-footer__bottom-inner">
+      <div class="dh-footer__copy">&copy; {{ 'now' | date: '%Y' }} STYLEHUB MIAMI. All rights reserved.</div>
+      <div class="dh-footer__social">
+        <a href="#" aria-label="Instagram" title="Instagram">IG</a>
+        <a href="#" aria-label="TikTok" title="TikTok">TT</a>
+        <a href="#" aria-label="Facebook" title="Facebook">FB</a>
+        <a href="#" aria-label="X / Twitter" title="X">X</a>
+      </div>
+      <div class="dh-footer__copy">Powered by Shopify &bull; Miami, FL</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var form = document.getElementById('dh-footer-newsletter');
+  if(form){
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var email = form.querySelector('input[type="email"]').value;
+      if(email && window.DHAnalytics){
+        window.DHAnalytics.trackNewsletterSignup('footer');
+      }
+      var btn = form.querySelector('button');
+      btn.textContent = '✓';
+      btn.style.background = '#22c55e';
+      setTimeout(function(){ btn.textContent = 'OK'; btn.style.background = '#e53e3e'; }, 2000);
+    });
+  }
+})();
+</script>
+
+{% schema %}
+{
+  "name": "DealsHub Footer",
+  "tag": "section",
+  "class": "dh-footer-section"
+}
+{% endschema %}

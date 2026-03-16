@@ -71,8 +71,8 @@ async function createShopifyProduct(productData, pricingResult) {
         price: vPrice.price.toFixed(2),
         compare_at_price: vPrice.compareAt ? vPrice.compareAt.toFixed(2) : null,
         sku: `DH-${source.toUpperCase()}-${sourceId}-${v.id || i}`,
-        inventory_management: 'shopify',  // CRITICAL FIX: Must be 'shopify' not null
-        inventory_policy: 'deny',
+        inventory_management: 'shopify',
+        inventory_policy: 'continue',  // CRITICAL: allow selling even if inventory=0 (dropship model)
         requires_shipping: true,
         weight: 0.5,
         weight_unit: 'lb',
@@ -85,8 +85,8 @@ async function createShopifyProduct(productData, pricingResult) {
       price: pricingResult.price.toFixed(2),
       compare_at_price: pricingResult.compareAt ? pricingResult.compareAt.toFixed(2) : null,
       sku: `DH-${source.toUpperCase()}-${sourceId}`,
-      inventory_management: 'shopify',  // CRITICAL FIX
-      inventory_policy: 'deny',
+      inventory_management: 'shopify',
+      inventory_policy: 'continue',  // CRITICAL: allow selling even if inventory=0 (dropship model)
       requires_shipping: true,
       weight: 0.5,
       weight_unit: 'lb'
@@ -133,7 +133,15 @@ async function createShopifyProduct(productData, pricingResult) {
         { namespace: 'dealshub', key: 'margin_rule', value: pricingResult.rule || source, type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'sync_status', value: 'synced', type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'delivery_min_days', value: String(productData.deliveryEstimate?.minDays || ''), type: 'single_line_text_field' },
-        { namespace: 'dealshub', key: 'delivery_max_days', value: String(productData.deliveryEstimate?.maxDays || ''), type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'delivery_max_days', value: String(productData.deliveryEstimate?.minDays || ''), type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'delivery_label', value: productData.deliveryEstimate?.label || '', type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'shipping_note', value: productData.shippingData?.note || '', type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'return_window', value: String(productData.returnPolicy?.window || ''), type: 'single_line_text_field' }
+      ]
+    }
+  };
+
+  logger.info('Data.deliveryEstimate?.maxDays || ''), type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'delivery_label', value: productData.deliveryEstimate?.label || '', type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'shipping_note', value: productData.shippingData?.note || '', type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'return_window', value: String(productData.returnPolicy?.window || ''), type: 'single_line_text_field' }
@@ -241,6 +249,48 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
       originalPrice: productData.originalPrice
     });
     logSync(source, sourceId, 'create', 'success', { shopifyId: mapping.shopifyProductId });
+  } else if (forceResync && mapping.shopifyProductId) {
+    // Repair existing product: ensure inventory_policy=continue and stock > 0
+    try {
+      const productResp = await shopifyAPI(`/products/${mapping.shopifyProductId}.json?fields=id,variants`);
+      const variants = productResp?.product?.variants || [];
+      for (const v of variants) {
+        // Update variant to allow overselling (dropship model)
+        if (v.inventory_policy !== 'continue') {
+          await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
+            variant: { id: v.id, inventory_policy: 'continue' }
+          });
+          logger.info('sync', `Repaired variant ${v.id}: inventory_policy -> continue`);
+        }
+        // Also ensure inventory is set
+        try {
+          await shopifyAPI('/inventory_levels/set.json', 'POST', {
+            location_id: LOCATION_ID(),
+            inventory_item_id: v.inventory_item_id,
+            available: 9999
+          });
+        } catch (invErr) {
+          logger.warn('sync', `Inventory repair skipped for ${v.id}`, { error: invErr.message });
+        }
+      }
+      // Update mapping variants
+      mapping.variants = variants.map(v => ({ id: v.id, title: v.title, price: v.price }));
+      syncCache.set(cacheKey, mapping, 3600000);
+      logSync(source, sourceId, 'repair', 'success', { shopifyId: mapping.shopifyProductId });
+    } catch (repairErr) {
+      logger.error('sync', 'Product repair failed, recreating', { error: repairErr.message });
+      // If repair fails, try to create fresh
+      mapping = await createShopifyProduct(productData, pricingResult);
+      upsertMapping({
+        source, sourceId,
+        shopifyProductId: mapping.shopifyProductId,
+        shopifyVariantId: mapping.shopifyVariantId,
+        handle: mapping.handle,
+        price: pricingResult.price,
+        originalPrice: productData.originalPrice
+      });
+      logSync(source, sourceId, 'recreate', 'success', { shopifyId: mapping.shopifyProductId });
+    }
   }
 
   // Determine which variant to use

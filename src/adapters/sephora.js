@@ -67,7 +67,7 @@ class SephoraAdapter extends BaseAdapter {
         // If no exact ID match but we have a title hint, use the first result
       if (!match && options.title) {
         logger.info('sephora', `No exact ID match for ${id}, using first search result for title "${options.title}"`);
-        match = sData.products[0];
+        let match = sData.products[0];
       }
       if (!match) {
         logger.warn('sephora', `No match found for ${id} in search fallback (${sData.products.length} results)`);

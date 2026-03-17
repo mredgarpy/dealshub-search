@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub — Main Server (Hybrid Commerce Backend)
+// DealsHub â Main Server (Hybrid Commerce Backend)
 // ============================================================
 // Architecture: Live Discovery + On-Demand Sync + Shopify Commerce
 // ============================================================
@@ -125,7 +125,7 @@ app.get('/health', (req, res) => {
 app.use('/api/admin', adminRouter);
 
 // ============================================================
-// CAPA A — LIVE DISCOVERY LAYER
+// CAPA A â LIVE DISCOVERY LAYER
 // ============================================================
 
 // ---- UNIFIED SEARCH ----
@@ -394,7 +394,7 @@ app.get('/api/source-health', async (req, res) => {
 });
 
 // ============================================================
-// CAPA B — ON-DEMAND SYNC LAYER
+// CAPA B â ON-DEMAND SYNC LAYER
 // ============================================================
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
@@ -497,7 +497,7 @@ app.post('/api/create-and-add', async (req, res) => {
 });
 
 // ============================================================
-// CAPA D — OPERATIONS LAYER (Admin endpoints)
+// CAPA D â OPERATIONS LAYER (Admin endpoints)
 // ============================================================
 
 // ---- ADMIN: Source Health Dashboard ----
@@ -791,11 +791,36 @@ async function warmUpCache() {
   }
 }
 
+
+// ---- ADMIN: THEME FILE UPDATE (temporary) ----
+app.post('/api/admin/theme-update', express.json(), async (req, res) => {
+  try {
+    const adminToken = process.env.SHOPIFY_ADMIN_TOKEN;
+    const storeDomain = process.env.SHOPIFY_STORE_DOMAIN;
+    const themeId = '157178462339';
+    if (!adminToken || !storeDomain) return res.status(500).json({ error: 'Missing Shopify credentials' });
+    const { key, replacements } = req.body;
+    if (!key || !replacements || !Array.isArray(replacements)) return res.status(400).json({ error: 'Need key and replacements array [{from, to}]' });
+    const getUrl = 'https://' + storeDomain + '/admin/api/2024-01/themes/' + themeId + '/assets.json?asset[key]=' + encodeURIComponent(key);
+    const getResp = await fetch(getUrl, { headers: { 'X-Shopify-Access-Token': adminToken, 'Content-Type': 'application/json' } });
+    if (!getResp.ok) { const e = await getResp.text(); return res.status(getResp.status).json({ error: 'GET failed', detail: e.substring(0, 300) }); }
+    const assetData = await getResp.json();
+    let value = assetData.asset.value;
+    const applied = [];
+    for (const r of replacements) { const b = value; value = value.split(r.from).join(r.to); if (value !== b) applied.push(r.from + ' -> ' + r.to); }
+    if (applied.length === 0) return res.json({ message: 'No changes needed', key });
+    const putUrl = 'https://' + storeDomain + '/admin/api/2024-01/themes/' + themeId + '/assets.json';
+    const putResp = await fetch(putUrl, { method: 'PUT', headers: { 'X-Shopify-Access-Token': adminToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ asset: { key, value } }) });
+    if (!putResp.ok) { const e = await putResp.text(); return res.status(putResp.status).json({ error: 'PUT failed', detail: e.substring(0, 300) }); }
+    res.json({ success: true, key, applied });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   logger.info('server', `StyleHub backend v2.3 running on port ${PORT}`);
   logger.info('server', `Sources: ${VALID_SOURCES.join(', ')}`);
   logger.info('server', `Shopify: ${process.env.SHOPIFY_STORE_DOMAIN ? 'configured' : 'NOT configured'}`);
-  // Warm up cache after server starts (don't await — let it run in background)
+  // Warm up cache after server starts (don't await â let it run in background)
   setTimeout(warmUpCache, 2000);
 });

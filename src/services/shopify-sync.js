@@ -36,6 +36,27 @@ async function shopifyAPI(endpoint, method = 'GET', body = null) {
   return text ? JSON.parse(text) : {};
 }
 
+// ---- SET INVENTORY LEVEL (BACKUP) ----
+async function setInventoryAvailable(inventoryItemId, quantity = 999) {
+  if (!inventoryItemId) return;
+  try {
+    // Get current inventory level
+    const levels = await shopifyAPI(`/inventory_levels.json?inventory_item_ids=${inventoryItemId}`);
+    const level = levels?.inventory_levels?.[0];
+    if (level && level.available < quantity) {
+      await shopifyAPI('/inventory_levels/set.json', 'POST', {
+        location_id: LOCATION_ID(),
+        inventory_item_id: inventoryItemId,
+        available: quantity
+      });
+      logger.info('sync', `Set inventory to ${quantity} for item ${inventoryItemId}`);
+    }
+  } catch (e) {
+    // If inventory API fails, it's ok â inventory_management=null should handle it
+    logger.debug('sync', `Inventory set failed (may be untracked): ${e.message}`);
+  }
+}
+
 // ---- CHECK IF PRODUCT ALREADY SYNCED ----
 async function findExistingProduct(source, sourceId) {
   const cacheKey = `mapping:${source}:${sourceId}`;
@@ -192,9 +213,21 @@ async function createShopifyProduct(productData, pricingResult) {
     throw new Error('Product creation returned no product');
   }
 
-  // inventory_management=null means Shopify does not track inventory
-  // No inventory API calls needed â product is always purchasable
-  logger.info('sync', 'Product created with untracked inventory (dropship model)', {
+  // Force-verify inventory settings on each variant after creation
+  // Shopify may override inventory_management based on store settings
+  for (const v of product.variants) {
+    try {
+      // Always PUT to ensure inventory_management=null sticks
+      await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
+        variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
+      });
+      // Also set inventory level high as backup (in case Shopify tracks it anyway)
+      await setInventoryAvailable(v.inventory_item_id, 999);
+    } catch (invErr) {
+      logger.warn('sync', `Post-create inventory fix for variant ${v.id} failed`, { error: invErr.message });
+    }
+  }
+  logger.info('sync', 'Product created with forced untracked inventory (dropship model)', {
     productId: product.id,
     variantCount: product.variants.length
   });
@@ -263,6 +296,25 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     }
   }
 
+  // If no mapping found in cache/DB, try Shopify tag search before creating
+  if (!mapping) {
+    mapping = await findExistingProduct(source, sourceId);
+    if (mapping) {
+      logger.info('sync', 'Found existing product via Shopify tag search (DB was empty)', { source, sourceId, shopifyId: mapping.shopifyProductId });
+      // Persist to DB so we don't search again
+      upsertMapping({
+        source, sourceId,
+        shopifyProductId: mapping.shopifyProductId,
+        shopifyVariantId: mapping.shopifyVariantId,
+        handle: mapping.handle,
+        price: pricingResult.price,
+        originalPrice: productData.originalPrice
+      });
+      // Force repair this found product
+      forceResync = true;
+    }
+  }
+
   if (!mapping) {
     // Create new product in Shopify
     mapping = await createShopifyProduct(productData, pricingResult);
@@ -277,18 +329,22 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     });
     logSync(source, sourceId, 'create', 'success', { shopifyId: mapping.shopifyProductId });
   } else if (forceResync && mapping.shopifyProductId) {
-    // Repair existing product: ensure inventory_management=null, inventory_policy=continue
+    // Repair existing product: ALWAYS force inventory_management=null, inventory_policy=continue, and set stock
     try {
       const productResp = await shopifyAPI(`/products/${mapping.shopifyProductId}.json?fields=id,variants`);
       const variants = productResp?.product?.variants || [];
       for (const v of variants) {
-        const needsRepair = v.inventory_policy !== 'continue' || v.inventory_management !== null;
-        if (needsRepair) {
-          await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
-            variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
-          });
-          logger.info('sync', `Repaired variant ${v.id}: untracked inventory + continue policy`);
-        }
+        // ALWAYS force-update â don't trust current state
+        logger.info('sync', `Force-repairing variant ${v.id}`, {
+          currentPolicy: v.inventory_policy,
+          currentMgmt: v.inventory_management
+        });
+        await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
+          variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
+        });
+        // Also set inventory high as backup
+        await setInventoryAvailable(v.inventory_item_id, 999);
+        logger.info('sync', `Repaired variant ${v.id}: forced untracked + 999 stock backup`);
       }
       // Update mapping variants
       mapping.variants = variants.map(v => ({ id: v.id, title: v.title, price: v.price }));

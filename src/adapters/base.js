@@ -30,8 +30,17 @@ class BaseAdapter {
         logger.warn('adapter', `${this.name} HTTP ${resp.status}`, { url: url.split('?')[0] });
         return null;
       }
+      // Handle 204 No Content (some APIs return 2xx but empty body)
+      if (resp.status === 204) {
+        logger.warn('adapter', `${this.name} HTTP 204 No Content`, { url: url.split('?')[0] });
+        return null;
+      }
       // Get raw text first to handle truncated JSON gracefully
       const text = await resp.text();
+      if (!text || text.length === 0) {
+        logger.warn('adapter', `${this.name} empty response body`, { url: url.split('?')[0] });
+        return null;
+      }
       try {
         return JSON.parse(text);
       } catch (parseErr) {

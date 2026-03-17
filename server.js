@@ -51,65 +51,6 @@ const adminRouter = require('./src/routes/admin');
 // Initialize adapters
 initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
 
-// ---- DEBUG: Raw API test ----
-app.get('/api/debug/raw-test', async (req, res) => {
-  const { source = 'aliexpress', q = 'iphone' } = req.query;
-  const fetch = require('node-fetch');
-  const key = process.env.RAPIDAPI_KEY;
-  const tests = [];
-
-  const endpoints = {
-    aliexpress: [
-      { host: 'aliexpress-datahub.p.rapidapi.com', path: '/item_search_3?q=' + encodeURIComponent(q) + '&page=1&sort=default' },
-      { host: 'aliexpress-datahub.p.rapidapi.com', path: '/item_search_2?q=' + encodeURIComponent(q) + '&page=1&sort=default' }
-    ],
-    macys: [
-      { host: 'macys4.p.rapidapi.com', path: '/api/search/product/?q=' + encodeURIComponent(q) + '&currencyCode=USD&regionCode=US&perPage=3&pageIndex=1' }
-    ]
-  };
-
-  const toTest = endpoints[source] || endpoints.aliexpress;
-
-  for (const ep of toTest) {
-    const url = 'https://' + ep.host + ep.path;
-    const start = Date.now();
-    try {
-      const resp = await fetch(url, {
-        headers: {
-          'x-rapidapi-key': key,
-          'x-rapidapi-host': ep.host
-        },
-        timeout: 15000
-      });
-      const ms = Date.now() - start;
-      const bodyText = await resp.text();
-      const bodyPreview = bodyText.substring(0, 500);
-      tests.push({
-        url: url.split('?')[0],
-        status: resp.status,
-        statusText: resp.statusText,
-        latencyMs: ms,
-        bodyPreview,
-        headers: Object.fromEntries(resp.headers.entries())
-      });
-    } catch (e) {
-      tests.push({
-        url: url.split('?')[0],
-        error: e.message,
-        latencyMs: Date.now() - start
-      });
-    }
-  }
-
-  res.json({
-    source,
-    query: q,
-    keyPresent: !!key,
-    keyPrefix: key ? key.substring(0, 8) + '...' : 'MISSING',
-    tests
-  });
-});
-
 // ---- HEALTH ----
 app.get('/health', (req, res) => {
   res.json({
@@ -523,6 +464,75 @@ app.get('/api/admin/source-health', async (req, res) => {
   res.json({ sources: health, cache: { search: searchCache.size, product: productCache.size } });
 });
 
+// ---- DEBUG: Raw API Response Diagnostic ----
+app.get('/api/debug/raw-search', async (req, res) => {
+  const { store, q = 'shoes' } = req.query;
+  const source = (store || 'aliexpress').toLowerCase();
+  if (!VALID_SOURCES.includes(source)) {
+    return res.status(400).json({ error: `Invalid source: ${source}` });
+  }
+
+  const fetch = require('node-fetch');
+  const rapidApiKey = process.env.RAPIDAPI_KEY;
+
+  const hosts = {
+    aliexpress: 'aliexpress-datahub.p.rapidapi.com',
+    macys: 'macys4.p.rapidapi.com',
+    amazon: 'real-time-amazon-data.p.rapidapi.com',
+    sephora: 'sephora.p.rapidapi.com',
+    shein: 'unofficial-shein.p.rapidapi.com'
+  };
+
+  const urls = {
+    aliexpress: `https://${hosts.aliexpress}/item/search?q=${encodeURIComponent(q)}&page=1&sort=default`,
+    macys: `https://${hosts.macys}/search?keyword=${encodeURIComponent(q)}&pageSize=3&requestType=search`,
+    amazon: `https://${hosts.amazon}/search?query=${encodeURIComponent(q)}&page=1&country=US&sort_by=RELEVANCE`,
+    sephora: `https://${hosts.sephora}/us/products/v2/search?q=${encodeURIComponent(q)}&pageIndex=0&pageSize=3`,
+    shein: `https://${hosts.shein}/products/search?keywords=${encodeURIComponent(q)}&language=en&country=US&currency=USD&page=1&limit=3`
+  };
+
+  const url = urls[source];
+  const host = hosts[source];
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const start = Date.now();
+    const resp = await fetch(url, {
+      headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': host },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    const latency = Date.now() - start;
+    const text = await resp.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch (e) { /* not json */ }
+
+    res.json({
+      source,
+      query: q,
+      url: url.replace(rapidApiKey, 'REDACTED'),
+      status: resp.status,
+      statusText: resp.statusText,
+      latencyMs: latency,
+      headers: Object.fromEntries([...resp.headers.entries()].filter(([k]) =>
+        ['content-type', 'x-ratelimit-remaining', 'x-ratelimit-limit', 'x-ratelimit-reset',
+         'x-rapidapi-proxy-response', 'x-rapidapi-subscription'].some(h => k.toLowerCase().includes(h))
+      )),
+      responsePreview: json ? {
+        topLevelKeys: Object.keys(json),
+        hasProducts: !!(json.data?.products || json.products || json.result?.resultList ||
+                       json.searchresultgroups || json.info?.products || json.items),
+        sampleData: JSON.stringify(json).substring(0, 3000)
+      } : {
+        rawText: text.substring(0, 2000)
+      }
+    });
+  } catch (e) {
+    res.json({ source, error: e.message, type: e.name });
+  }
+});
+
 // ---- SHIPPING & RETURNS ----
 app.get('/api/shipping/:source', (req, res) => {
   const source = req.params.source.toLowerCase();
@@ -770,27 +780,43 @@ function interleaveFromSettled(results, maxTotal = 18) {
   return interleaved;
 }
 
-// ============================================================
-// START
-// ============================================================
-// ---- WARM-UP: Pre-populate cache on startup to reduce perceived cold start ----
-async function warmUpCache() {
-  logger.info('server', 'Warming up cache...');
-  try {
-    const adapter = getAdapter('amazon');
-    if (adapter) {
-      const results = await adapter.search('trending deals', 6);
-      if (results.length > 0) {
-        const valid = results.filter(p => p && p.title && p.price && p.price !== '$0.00');
-        searchCache.set('trending', { results: valid, section: 'trending' }, 600000);
-        logger.info('server', `Warm-up: cached ${valid.length} trending results`);
-      }
-    }
-  } catch (e) {
-    logger.warn('server', 'Warm-up failed (non-critical)', { error: e.message });
+// ---- SHOPIFY OAUTH: App install/reinstall flow for scope approval ----
+app.get('/', (req, res) => {
+  const { shop, hmac, host } = req.query;
+  if (shop) {
+    const clientId = process.env.SHOPIFY_CLIENT_ID;
+    const scopes = 'read_all_orders,read_customers,read_fulfillments,write_fulfillments,read_orders,write_orders,read_products,write_products,read_content,write_content,read_themes,write_themes';
+    const redirectUri = 'https://dealshub-search.onrender.com/oauth/callback';
+    const authUrl = 'https://' + shop + '/admin/oauth/authorize?client_id=' + clientId + '&scope=' + scopes + '&redirect_uri=' + encodeURIComponent(redirectUri);
+    return res.redirect(authUrl);
   }
-}
+  res.json({ status: 'DealsHub Backend v2.3', endpoints: ['/api/search', '/api/trending', '/api/bestsellers', '/api/new-arrivals', '/api/featured', '/api/product', '/api/prepare-cart'] });
+});
 
+app.get('/oauth/callback', async (req, res) => {
+  const { code, shop, hmac } = req.query;
+  if (!code || !shop) return res.status(400).send('Missing code or shop parameter');
+  try {
+    const clientId = process.env.SHOPIFY_CLIENT_ID;
+    const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+    const tokenResp = await fetch('https://' + shop + '/admin/oauth/access_tokens.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code: code })
+    });
+    const tokenData = await tokenResp.json();
+    if (tokenData.access_token) {
+      logger.info('oauth', 'New access token obtained for ' + shop + ': ' + tokenData.access_token.substring(0, 15) + '...');
+      res.send('<h2>DealsHub App Installed Successfully</h2><p>Access token obtained. First 15 chars: <code>' + tokenData.access_token.substring(0, 15) + '...</code></p><p>Full token (update in Render env vars): <code>' + tokenData.access_token + '</code></p><p>Scopes: ' + (tokenData.scope || 'unknown') + '</p><p><a href="https://admin.shopify.com/store/' + shop.replace('.myshopify.com', '') + '">Back to Shopify Admin</a></p>');
+    } else {
+      logger.error('oauth', 'Token exchange failed', tokenData);
+      res.status(500).send('<h2>Token Exchange Failed</h2><pre>' + JSON.stringify(tokenData, null, 2) + '</pre>');
+    }
+  } catch (err) {
+    logger.error('oauth', 'OAuth callback error', { error: err.message });
+    res.status(500).send('OAuth error: ' + err.message);
+  }
+});
 
 // ---- ADMIN: THEME FILE UPDATE (temporary) ----
 app.post('/api/admin/theme-update', express.json(), async (req, res) => {
@@ -815,6 +841,27 @@ app.post('/api/admin/theme-update', express.json(), async (req, res) => {
     res.json({ success: true, key, applied });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ============================================================
+// START
+// ============================================================
+// ---- WARM-UP: Pre-populate cache on startup to reduce perceived cold start ----
+async function warmUpCache() {
+  logger.info('server', 'Warming up cache...');
+  try {
+    const adapter = getAdapter('amazon');
+    if (adapter) {
+      const results = await adapter.search('trending deals', 6);
+      if (results.length > 0) {
+        const valid = results.filter(p => p && p.title && p.price && p.price !== '$0.00');
+        searchCache.set('trending', { results: valid, section: 'trending' }, 600000);
+        logger.info('server', `Warm-up: cached ${valid.length} trending results`);
+      }
+    }
+  } catch (e) {
+    logger.warn('server', 'Warm-up failed (non-critical)', { error: e.message });
+  }
+}
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {

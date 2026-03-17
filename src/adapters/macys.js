@@ -26,11 +26,17 @@ class MacysAdapter extends BaseAdapter {
       logger.info('macys', `Search attempt via ${path}`, { query, url: url.substring(0, 120) });
 
       try {
-        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+        const data = await this.fetchJSON(url, { headers: { ...this.rapidHeaders(API_HOST), 'Content-Type': 'application/json' } });
 
         if (!data) {
           logger.warn('macys', `${path} returned null (HTTP error or timeout)`, { query });
           continue;
+        }
+
+        // Rate limit check
+        if (data.message && data.message.includes('rate limit')) {
+          logger.warn('macys', `Rate limited on search`, { query, message: data.message });
+          return []; // Don't retry other paths â rate limit is account-wide
         }
 
         // Log the response shape for debugging
@@ -76,19 +82,39 @@ class MacysAdapter extends BaseAdapter {
     // Correct endpoint: /api/products/{productId} (path-based, no trailing slash)
     const url = `https://${API_HOST}/api/products/${encodeURIComponent(productId)}`;
     logger.info('macys', 'getProduct attempt', { productId });
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
-    // Detail response may wrap in result or return product directly
-    const product = data?.result || data?.product || data;
-    if (product?.detail || product?.identifier) return this.normalizeProduct(product);
-    // Fallback: search by ID (use no-trailing-slash path)
-    const searchUrl = `https://${API_HOST}/api/search/product?q=${encodeURIComponent(productId)}&currencyCode=USD&regionCode=US&perPage=3&pageIndex=1`;
-    const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
-    const items = sData?.result?.products;
-    if (items?.length) {
-      // Try to find exact match by productId
-      const exact = items.find(p => String(p.identifier?.productId || p.id) === String(productId));
-      const best = exact || items[0];
-      return this.normalizeProductFromSearch(best);
+    try {
+      const data = await this.fetchJSON(url, { headers: { ...this.rapidHeaders(API_HOST), 'Content-Type': 'application/json' } });
+
+      // Rate limit check
+      if (data?.message && data.message.includes('rate limit')) {
+        logger.warn('macys', 'Rate limited on product detail', { productId, message: data.message });
+        // Fall through to search fallback
+      } else {
+        // New API shape: { status: "success", data: { id, identifier, detail, pricing, imagery, ... } }
+        const product = data?.data || data?.result || data?.product || data;
+        if (product?.detail || product?.identifier) {
+          logger.info('macys', 'getProduct success via detail endpoint', { productId });
+          return this.normalizeProduct(product);
+        }
+        logger.warn('macys', 'Product detail returned unexpected shape', { productId, keys: Object.keys(data || {}) });
+      }
+    } catch (e) {
+      logger.warn('macys', 'Product detail endpoint failed', { productId, error: e.message });
+    }
+
+    // Fallback: search by ID (use trailing-slash path + Content-Type header)
+    try {
+      const searchUrl = `https://${API_HOST}/api/search/product/?q=${encodeURIComponent(productId)}&currencyCode=USD&regionCode=US&perPage=3&pageIndex=1`;
+      const sData = await this.fetchJSON(searchUrl, { headers: { ...this.rapidHeaders(API_HOST), 'Content-Type': 'application/json' } });
+      const items = sData?.result?.products;
+      if (items?.length) {
+        const exact = items.find(p => String(p.identifier?.productId || p.id) === String(productId));
+        const best = exact || items[0];
+        logger.info('macys', 'getProduct success via search fallback', { productId });
+        return this.normalizeProductFromSearch(best);
+      }
+    } catch (e) {
+      logger.warn('macys', 'Search fallback also failed', { productId, error: e.message });
     }
     return null;
   }

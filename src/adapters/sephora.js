@@ -17,26 +17,42 @@ class SephoraAdapter extends BaseAdapter {
     return data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }
 
-  async getProduct(id, options = {}) {
+  async getProduct(id) {
     // id can be productId (P######) or skuId (numeric)
     const isProductId = /^P\d+$/i.test(id);
 
-    // ATTEMPT 1: Try detail endpoint with resilient JSON parsing
+    // ATTEMPT 1: Try detail endpoint directly
     const productIdParam = isProductId ? id : id;
     const skuParam = isProductId ? '' : id;
-    const detailUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(productIdParam)}${skuParam ? '&preferedSku=' + encodeURIComponent(skuParam) : ''}`;
-    const { data, rawText } = await this._fetchDetailResilient(detailUrl);
+    const url = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(productIdParam)}${skuParam ? '&preferedSku=' + encodeURIComponent(skuParam) : ''}`;
+    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
     if (data?.currentSku) return this.normalizeProduct(data);
 
-    // Extract displayName from partial/truncated JSON response
-    let searchQuery = data?.displayName || null;
-    if (!searchQuery && rawText) {
-      const m = rawText.match(/"displayName"\s*:\s*"([^"]+)"/);
-      if (m) searchQuery = m[1];
+    // If detail returned partial data with enough info, try to normalize it directly
+    if (data && data.displayName && data.productId) {
+      logger.warn('sephora', `Truncated JSON from detail API, extracting partial data`, { textLen: JSON.stringify(data).length });
+      try {
+        const partial = this.normalizeProductFromSearch({
+          productId: data.productId,
+          displayName: data.displayName,
+          brandName: data.brandName,
+          listPrice: data.listPrice || data.currentSku?.listPrice,
+          heroImage: data.heroImage,
+          rating: data.rating,
+          reviews: data.reviews,
+          currentSku: data.currentSku || null,
+          longDescription: data.longDescription,
+          shortDescription: data.shortDescription
+        });
+        if (partial && partial.title) return partial;
+      } catch (partialErr) {
+        logger.debug('sephora', 'Partial normalization failed', { error: partialErr.message });
+      }
     }
-    searchQuery = searchQuery || options.title || id;
 
-    // ATTEMPT 2: Search fallback using displayName or id
+    // ATTEMPT 2: Search fallback â works for both productId and skuId formats
+    // Use the product name from detail response if available, otherwise search by ID
+    const searchQuery = data?.displayName || id;
     const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(searchQuery)}&pageIndex=0&pageSize=5`;
     const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
 
@@ -45,45 +61,26 @@ class SephoraAdapter extends BaseAdapter {
       const exactMatch = sData.products.find(p =>
         p.productId === id || String(p.currentSku?.skuId) === String(id)
       );
-      const bestMatch = exactMatch || sData.products[0];
+
+      // CRITICAL: Only use exact match. Never fall back to products[0] â wrong product = wrong Shopify sync
+      if (!exactMatch) {
+        logger.warn('sephora', `No exact match found for ${id} in search fallback (${sData.products.length} results). Refusing to guess.`);
+        return null;
+      }
 
       // If we found a different productId, try detail again with it
-      if (!isProductId && bestMatch.productId && bestMatch.productId !== id) {
-        const retryUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(bestMatch.productId)}&preferedSku=${encodeURIComponent(id)}`;
+      if (!isProductId && exactMatch.productId && exactMatch.productId !== id) {
+        const retryUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(exactMatch.productId)}&preferedSku=${encodeURIComponent(id)}`;
         const retryData = await this.fetchJSON(retryUrl, { headers: this.rapidHeaders(API_HOST) });
         if (retryData?.currentSku) return this.normalizeProduct(retryData);
       }
 
-      // Fall back to search-based normalization (still provides usable product data)
-      logger.warn('sephora', `Detail API failed for ${id}, using search fallback`);
-      return this.normalizeProductFromSearch(bestMatch);
+      // Fall back to search-based normalization with exact match only
+      logger.warn('sephora', `Detail API failed for ${id}, using exact search match fallback`);
+      return this.normalizeProductFromSearch(exactMatch);
     }
 
     return null;
-  }
-
-  async _fetchDetailResilient(url) {
-    try {
-      const response = await fetch(url, {
-        headers: this.rapidHeaders(API_HOST),
-        signal: AbortSignal.timeout(this.config?.timeout || 18000)
-      });
-      if (!response.ok) {
-        logger.error('sephora', `Detail API HTTP ${response.status}`, { url: url.substring(0, 80) });
-        return { data: null, rawText: '' };
-      }
-      const rawText = await response.text();
-      try {
-        const data = JSON.parse(rawText);
-        return { data, rawText };
-      } catch (e) {
-        logger.warn('sephora', 'Truncated JSON from detail API, extracting partial data', { textLen: rawText.length });
-        return { data: null, rawText };
-      }
-    } catch (e) {
-      logger.error('sephora', 'Detail fetch error', { error: e.message });
-      return { data: null, rawText: '' };
-    }
   }
 
   normalizeSearchResult(p) {

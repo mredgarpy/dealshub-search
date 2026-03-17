@@ -1,6 +1,7 @@
 // ============================================================
 // DealsHub â Macy's Adapter (via RapidAPI)
-// Corrected API paths: /api/search/product/ and /api/products/{id}
+// Fixed: removed trailing slashes to prevent redirect stripping query params
+// Added retry logic and verbose logging
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
@@ -8,31 +9,79 @@ const logger = require('../utils/logger');
 
 const API_HOST = 'macys4.p.rapidapi.com';
 
+// Try both URL patterns â without trailing slash first (avoids redirect stripping query params)
+const SEARCH_PATHS = [
+  '/api/search/product',   // No trailing slash â preferred
+  '/api/search/product/'   // With trailing slash â fallback
+];
+
 class MacysAdapter extends BaseAdapter {
   constructor(config) { super('macys', { ...config, timeout: 18000 }); }
 
   async search(query, limit = 12) {
-    // Correct endpoint: /api/search/product/ with q= param
-    const url = `https://${API_HOST}/api/search/product/?q=${encodeURIComponent(query)}&currencyCode=USD&regionCode=US&perPage=${limit}&pageIndex=1`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
-    // Response shape: { result: { products: [...] } }
-    let products = data?.result?.products;
-    if (!products || !Array.isArray(products) || products.length === 0) {
-      logger.warn('macys', 'Search returned no results', { query, hasData: !!data, keys: data ? Object.keys(data) : [] });
-      return [];
+    const params = `q=${encodeURIComponent(query)}&currencyCode=USD&regionCode=US&perPage=${limit}&pageIndex=1`;
+
+    for (const path of SEARCH_PATHS) {
+      const url = `https://${API_HOST}${path}?${params}`;
+      logger.info('macys', `Search attempt via ${path}`, { query, url: url.substring(0, 120) });
+
+      try {
+        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+
+        if (!data) {
+          logger.warn('macys', `${path} returned null (HTTP error or timeout)`, { query });
+          continue;
+        }
+
+        // Log the response shape for debugging
+        const resultKeys = data.result ? Object.keys(data.result) : [];
+        const productCount = data.result?.products?.length || 0;
+        const tagsQ = data.result?.tags?.q || null;
+        logger.info('macys', `${path} response shape`, {
+          query,
+          hasResult: !!data.result,
+          resultKeys,
+          productCount,
+          tagsQ,
+          paginationTotal: data.result?.pagination?.totalProducts || 0
+        });
+
+        let products = data?.result?.products;
+        if (products && Array.isArray(products) && products.length > 0) {
+          logger.info('macys', `Search success via ${path}`, { query, count: products.length });
+          return products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
+        }
+
+        // If tagsQ is null, it means the query param wasn't received â try next path
+        if (tagsQ === null || tagsQ === undefined) {
+          logger.warn('macys', `${path} tags.q is null â query param likely stripped by redirect`, { query });
+          continue;
+        }
+
+        // If tagsQ exists but products empty, the query genuinely returned no results
+        logger.warn('macys', `${path} returned 0 products for query`, { query, tagsQ });
+        return [];
+
+      } catch (e) {
+        logger.warn('macys', `${path} exception`, { error: e.message, query });
+        continue;
+      }
     }
-    return products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
+
+    logger.warn('macys', 'All search paths failed', { query });
+    return [];
   }
 
   async getProduct(productId) {
-    // Correct endpoint: /api/products/{productId} (path-based)
+    // Correct endpoint: /api/products/{productId} (path-based, no trailing slash)
     const url = `https://${API_HOST}/api/products/${encodeURIComponent(productId)}`;
+    logger.info('macys', 'getProduct attempt', { productId });
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
     // Detail response may wrap in result or return product directly
     const product = data?.result || data?.product || data;
     if (product?.detail || product?.identifier) return this.normalizeProduct(product);
-    // Fallback: search by ID
-    const searchUrl = `https://${API_HOST}/api/search/product/?q=${encodeURIComponent(productId)}&currencyCode=USD&regionCode=US&perPage=3&pageIndex=1`;
+    // Fallback: search by ID (use no-trailing-slash path)
+    const searchUrl = `https://${API_HOST}/api/search/product?q=${encodeURIComponent(productId)}&currencyCode=USD&regionCode=US&perPage=3&pageIndex=1`;
     const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
     const items = sData?.result?.products;
     if (items?.length) {

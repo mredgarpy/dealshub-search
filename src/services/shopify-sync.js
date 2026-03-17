@@ -1,5 +1,5 @@
 // ============================================================
-// StyleHub — Shopify Sync Service (On-Demand Product Creation)
+// StyleHub â Shopify Sync Service (On-Demand Product Creation)
 // ============================================================
 // Creates/updates products in Shopify ONLY when user wants to buy
 // Handles: deduplication, inventory, variants, metafields
@@ -42,15 +42,58 @@ async function findExistingProduct(source, sourceId) {
   const cached = syncCache.get(cacheKey);
   if (cached) return cached;
 
-  // Search by metafield
+  // Strategy 1: Search by tags (products are tagged with source-id:XXXX on creation)
   try {
-    const query = encodeURIComponent(`metafield:dealshub.source_product_id:${sourceId}`);
-    const data = await shopifyAPI(`/products.json?limit=1&status=any&fields=id,handle,variants,status`);
-    // Metafield search via GraphQL would be better; for now use tag-based lookup
-    // We'll also try handle-based lookup
+    const tagFilter = encodeURIComponent(`source-id:${sourceId}`);
+    const data = await shopifyAPI(
+      `/products.json?limit=5&status=any&fields=id,handle,variants,status,tags&tag=${tagFilter}`
+    );
+    if (data?.products?.length > 0) {
+      // Verify the match â tags could partially collide on short IDs
+      const match = data.products.find(p => {
+        const tags = (p.tags || '').split(',').map(t => t.trim());
+        return tags.includes(`source-id:${sourceId}`) && tags.includes(`source:${source}`);
+      });
+      if (match && match.status !== 'archived') {
+        const mapping = {
+          shopifyProductId: match.id,
+          shopifyVariantId: match.variants?.[0]?.id || null,
+          handle: match.handle,
+          variants: (match.variants || []).map(v => ({ id: v.id, title: v.title, price: v.price }))
+        };
+        syncCache.set(cacheKey, mapping, 3600000);
+        logger.info('sync', 'Found existing product via tag search', { source, sourceId, shopifyId: match.id });
+        return mapping;
+      }
+    }
   } catch (e) {
-    logger.debug('sync', 'Existing product search failed', { error: e.message });
+    logger.debug('sync', 'Tag-based product search failed', { error: e.message });
   }
+
+  // Strategy 2: Check persistent DB mapping (belt-and-suspenders with prepareCart)
+  try {
+    const dbMapping = findMapping(source, sourceId);
+    if (dbMapping && dbMapping.shopify_product_id) {
+      // Verify the Shopify product still exists
+      const check = await shopifyAPI(`/products/${dbMapping.shopify_product_id}.json?fields=id,handle,variants,status`);
+      if (check?.product && check.product.status !== 'archived') {
+        const mapping = {
+          shopifyProductId: check.product.id,
+          shopifyVariantId: dbMapping.shopify_variant_id || check.product.variants?.[0]?.id,
+          handle: check.product.handle,
+          variants: (check.product.variants || []).map(v => ({ id: v.id, title: v.title, price: v.price }))
+        };
+        syncCache.set(cacheKey, mapping, 3600000);
+        logger.info('sync', 'Found existing product via DB mapping', { source, sourceId, shopifyId: check.product.id });
+        return mapping;
+      } else {
+        logger.warn('sync', 'DB mapping points to archived/deleted product', { source, sourceId, shopifyId: dbMapping.shopify_product_id });
+      }
+    }
+  } catch (e) {
+    logger.debug('sync', 'DB-based product lookup failed', { error: e.message });
+  }
+
   return null;
 }
 
@@ -202,7 +245,7 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     shippingCost: productData.shippingData?.cost || 0
   });
 
-  // Check for existing synced product — DB first, then cache
+  // Check for existing synced product â DB first, then cache
   const cacheKey = `mapping:${source}:${sourceId}`;
 
   // If forceResync, invalidate stale mapping that may point to deleted variant

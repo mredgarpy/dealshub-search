@@ -29,56 +29,108 @@ class AliExpressAdapter extends BaseAdapter {
   }
 
   async search(query, limit = 12) {
-    // Try each search endpoint in fallback chain
+    // Try each search endpoint with retry logic
     for (const endpoint of SEARCH_ENDPOINTS) {
-      try {
-        const url = `https://${SEARCH_HOST}${endpoint}?q=${encodeURIComponent(query)}&page=1&sort=default`;
-        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
-        if (!data?.result) continue;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const url = `https://${SEARCH_HOST}${endpoint}?q=${encodeURIComponent(query)}&page=1&sort=default`;
+          logger.info('aliexpress', `Search attempt ${attempt} via ${endpoint}`, { query });
+          const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
 
-        // Check for API-level error
-        if (data.result.status?.data === 'error' || data.result.status?.code >= 5000) {
-          logger.warn('aliexpress', `${endpoint} returned error code ${data.result.status?.code}`, { query });
-          continue; // Try next endpoint
-        }
+          if (!data) {
+            logger.warn('aliexpress', `${endpoint} returned null (HTTP error or timeout)`, { query, attempt });
+            if (attempt === 1) { await this._delay(1000); continue; }
+            break; // Move to next endpoint
+          }
 
-        // item_search_3 shape: items are numerically indexed directly in result
-        // { result: { status: {...}, settings: {...}, 0: { item: {...} }, 1: { item: {...} }, ... } }
-        const items = this._extractSearchItems(data.result);
-        if (items.length > 0) {
-          logger.info('aliexpress', `Search success via ${endpoint}`, { query, count: items.length });
-          return items.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
-        }
+          if (!data.result) {
+            logger.warn('aliexpress', `${endpoint} no result key`, { query, keys: Object.keys(data) });
+            break;
+          }
 
-        // Also try legacy resultList shape (older endpoints)
-        if (data.result.resultList) {
-          const legacyItems = data.result.resultList.slice(0, limit).map(p => this.normalizeSearchResult(p.item || p)).filter(Boolean);
-          if (legacyItems.length > 0) return legacyItems;
+          // Check for API-level error
+          const statusCode = data.result.status?.code;
+          if (data.result.status?.data === 'error' || (statusCode && statusCode >= 5000)) {
+            logger.warn('aliexpress', `${endpoint} API error code ${statusCode}`, { query });
+            break; // Try next endpoint
+          }
+
+          // Extract items from ALL possible response shapes
+          const items = this._extractSearchItems(data.result);
+          if (items.length > 0) {
+            logger.info('aliexpress', `Search success via ${endpoint}`, { query, count: items.length, attempt });
+            return items.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
+          }
+
+          logger.warn('aliexpress', `${endpoint} returned 0 items`, {
+            query, attempt,
+            resultKeys: Object.keys(data.result),
+            hasResultList: !!data.result.resultList,
+            resultListType: data.result.resultList ? typeof data.result.resultList : 'N/A',
+            statusData: data.result.status?.data
+          });
+          break; // No items, try next endpoint
+        } catch (e) {
+          logger.warn('aliexpress', `${endpoint} exception`, { error: e.message, query, attempt });
+          if (attempt === 1) { await this._delay(1000); continue; }
         }
-      } catch (e) {
-        logger.warn('aliexpress', `${endpoint} failed`, { error: e.message, query });
       }
     }
     logger.warn('aliexpress', 'All search endpoints failed', { query });
     return [];
   }
 
-  // Extract items from numerically-indexed result object
+  // Extract items from all known response shapes
   _extractSearchItems(result) {
-    const items = [];
-    // Items are at result[0], result[1], result[2]... each with { item: {...} }
+    let items = [];
+
+    // SHAPE 1 (PRIMARY): result.resultList â array of { item: {...} }
+    // This is the confirmed shape for item_search_3 as of 2026-03-17
+    if (result.resultList) {
+      const rl = result.resultList;
+      if (Array.isArray(rl) && rl.length > 0) {
+        items = rl.map(entry => entry?.item || entry).filter(i => i && (i.itemId || i.productId || i.title));
+        if (items.length > 0) return items;
+      }
+      // resultList might be an object with numeric keys (rare)
+      if (typeof rl === 'object' && !Array.isArray(rl)) {
+        const numKeys = Object.keys(rl).filter(k => /^\d+$/.test(k)).sort((a, b) => Number(a) - Number(b));
+        for (const k of numKeys) {
+          const entry = rl[k];
+          if (entry?.item) items.push(entry.item);
+          else if (entry?.itemId) items.push(entry);
+        }
+        if (items.length > 0) return items;
+      }
+    }
+
+    // SHAPE 2: Numerically indexed items directly on result object
+    // { result: { 0: { item: {...} }, 1: { item: {...} }, ... } }
     for (let i = 0; i < 60; i++) {
       if (result[i]?.item) {
         items.push(result[i].item);
       } else if (result[i] && !result[i].item && result[i].itemId) {
-        // Some endpoints put item data directly
         items.push(result[i]);
       } else if (i > 0 && !result[i]) {
-        break; // No more items
+        break;
       }
     }
+    if (items.length > 0) return items;
+
+    // SHAPE 3: result.items array
+    if (Array.isArray(result.items) && result.items.length > 0) {
+      return result.items.filter(i => i && (i.itemId || i.title));
+    }
+
+    // SHAPE 4: result.data.resultList or result.data.items
+    if (result.data?.resultList && Array.isArray(result.data.resultList)) {
+      return result.data.resultList.map(e => e?.item || e).filter(i => i && (i.itemId || i.title));
+    }
+
     return items;
   }
+
+  _delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
   async getProduct(productId) {
     // Try each detail endpoint in fallback chain

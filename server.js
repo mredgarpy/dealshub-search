@@ -51,6 +51,65 @@ const adminRouter = require('./src/routes/admin');
 // Initialize adapters
 initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
 
+// ---- DEBUG: Raw API test ----
+app.get('/api/debug/raw-test', async (req, res) => {
+  const { source = 'aliexpress', q = 'iphone' } = req.query;
+  const fetch = require('node-fetch');
+  const key = process.env.RAPIDAPI_KEY;
+  const tests = [];
+
+  const endpoints = {
+    aliexpress: [
+      { host: 'aliexpress-datahub.p.rapidapi.com', path: '/item_search_3?q=' + encodeURIComponent(q) + '&page=1&sort=default' },
+      { host: 'aliexpress-datahub.p.rapidapi.com', path: '/item_search_2?q=' + encodeURIComponent(q) + '&page=1&sort=default' }
+    ],
+    macys: [
+      { host: 'macys4.p.rapidapi.com', path: '/api/search/product/?q=' + encodeURIComponent(q) + '&currencyCode=USD&regionCode=US&perPage=3&pageIndex=1' }
+    ]
+  };
+
+  const toTest = endpoints[source] || endpoints.aliexpress;
+
+  for (const ep of toTest) {
+    const url = 'https://' + ep.host + ep.path;
+    const start = Date.now();
+    try {
+      const resp = await fetch(url, {
+        headers: {
+          'x-rapidapi-key': key,
+          'x-rapidapi-host': ep.host
+        },
+        timeout: 15000
+      });
+      const ms = Date.now() - start;
+      const bodyText = await resp.text();
+      const bodyPreview = bodyText.substring(0, 500);
+      tests.push({
+        url: url.split('?')[0],
+        status: resp.status,
+        statusText: resp.statusText,
+        latencyMs: ms,
+        bodyPreview,
+        headers: Object.fromEntries(resp.headers.entries())
+      });
+    } catch (e) {
+      tests.push({
+        url: url.split('?')[0],
+        error: e.message,
+        latencyMs: Date.now() - start
+      });
+    }
+  }
+
+  res.json({
+    source,
+    query: q,
+    keyPresent: !!key,
+    keyPrefix: key ? key.substring(0, 8) + '...' : 'MISSING',
+    tests
+  });
+});
+
 // ---- HEALTH ----
 app.get('/health', (req, res) => {
   res.json({

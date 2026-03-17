@@ -8,13 +8,14 @@ if(!container)return;
 var params=new URLSearchParams(window.location.search);
 var productId=params.get('id');
 var store=params.get('store')||'amazon';
+    var titleHint=params.get('title')||'';
 if(!productId){container.innerHTML='<div style="text-align:center;padding:60px 20px"><h2>Product Not Found</h2><p>No product ID specified.</p><a href="/" style="color:#e53e3e">Back to Home</a></div>';return}
 
 // Show skeleton
 container.innerHTML=skeletonHTML();
 
 // Fetch product
-fetch(API+'/api/product/'+encodeURIComponent(productId)+'?store='+encodeURIComponent(store),{signal:AbortSignal.timeout(20000)})
+fetch(API+'/api/product/'+encodeURIComponent(productId)+'?store='+encodeURIComponent(store)+(titleHint?'&title='+encodeURIComponent(titleHint):''),{signal:AbortSignal.timeout(20000)})
 .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
 .then(function(data){
   var p=data;

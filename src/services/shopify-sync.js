@@ -114,8 +114,8 @@ async function createShopifyProduct(productData, pricingResult) {
         price: vPrice.price.toFixed(2),
         compare_at_price: vPrice.compareAt ? vPrice.compareAt.toFixed(2) : null,
         sku: `DH-${source.toUpperCase()}-${sourceId}-${v.id || i}`,
-        inventory_management: 'shopify',
-        inventory_policy: 'continue',  // CRITICAL: allow selling even if inventory=0 (dropship model)
+        inventory_management: null,  // Don't track inventory â dropship model
+        inventory_policy: 'continue',
         requires_shipping: true,
         weight: 0.5,
         weight_unit: 'lb',
@@ -128,8 +128,8 @@ async function createShopifyProduct(productData, pricingResult) {
       price: pricingResult.price.toFixed(2),
       compare_at_price: pricingResult.compareAt ? pricingResult.compareAt.toFixed(2) : null,
       sku: `DH-${source.toUpperCase()}-${sourceId}`,
-      inventory_management: 'shopify',
-      inventory_policy: 'continue',  // CRITICAL: allow selling even if inventory=0 (dropship model)
+      inventory_management: null,  // Don't track inventory â dropship model
+      inventory_policy: 'continue',
       requires_shipping: true,
       weight: 0.5,
       weight_unit: 'lb'
@@ -192,29 +192,12 @@ async function createShopifyProduct(productData, pricingResult) {
     throw new Error('Product creation returned no product');
   }
 
-  // ---- SET INVENTORY FOR ALL VARIANTS ----
-  const locationId = LOCATION_ID();
-  for (const variant of product.variants) {
-    try {
-      await shopifyAPI('/inventory_levels/set.json', 'POST', {
-        location_id: locationId,
-        inventory_item_id: variant.inventory_item_id,
-        available: 9999
-      });
-      logger.info('sync', `Inventory set for variant ${variant.id}`, { available: 9999 });
-    } catch (invErr) {
-      logger.error('sync', `Inventory set failed for variant ${variant.id}`, { error: invErr.message });
-      // FALLBACK: Try to update inventory item to not track
-      try {
-        await shopifyAPI(`/inventory_items/${variant.inventory_item_id}.json`, 'PUT', {
-          inventory_item: { tracked: false }
-        });
-        logger.info('sync', `Fallback: Set variant ${variant.id} to untracked`);
-      } catch (e2) {
-        logger.error('sync', `Fallback also failed for variant ${variant.id}`, { error: e2.message });
-      }
-    }
-  }
+  // inventory_management=null means Shopify does not track inventory
+  // No inventory API calls needed â product is always purchasable
+  logger.info('sync', 'Product created with untracked inventory (dropship model)', {
+    productId: product.id,
+    variantCount: product.variants.length
+  });
 
   // Cache the mapping
   const mapping = {
@@ -234,8 +217,17 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     throw new Error('Shopify not configured');
   }
 
-  // Calculate final pricing
-  const sourcePrice = productData.price;
+  // Calculate final pricing â try numeric price, then parse displayPrice/string price
+  let sourcePrice = productData.price;
+  if (typeof sourcePrice === 'string') {
+    sourcePrice = parseFloat(sourcePrice.replace(/[^0-9.]/g, ''));
+  }
+  if ((!sourcePrice || sourcePrice <= 0) && productData.displayPrice) {
+    sourcePrice = parseFloat(String(productData.displayPrice).replace(/[^0-9.]/g, ''));
+  }
+  if ((!sourcePrice || sourcePrice <= 0) && productData.pricingMeta?.sourcePrice) {
+    sourcePrice = productData.pricingMeta.sourcePrice;
+  }
   if (!sourcePrice || sourcePrice <= 0) {
     throw new Error('Invalid product price');
   }
@@ -285,27 +277,17 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     });
     logSync(source, sourceId, 'create', 'success', { shopifyId: mapping.shopifyProductId });
   } else if (forceResync && mapping.shopifyProductId) {
-    // Repair existing product: ensure inventory_policy=continue and stock > 0
+    // Repair existing product: ensure inventory_management=null, inventory_policy=continue
     try {
       const productResp = await shopifyAPI(`/products/${mapping.shopifyProductId}.json?fields=id,variants`);
       const variants = productResp?.product?.variants || [];
       for (const v of variants) {
-        // Update variant to allow overselling (dropship model)
-        if (v.inventory_policy !== 'continue') {
+        const needsRepair = v.inventory_policy !== 'continue' || v.inventory_management !== null;
+        if (needsRepair) {
           await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
-            variant: { id: v.id, inventory_policy: 'continue' }
+            variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
           });
-          logger.info('sync', `Repaired variant ${v.id}: inventory_policy -> continue`);
-        }
-        // Also ensure inventory is set
-        try {
-          await shopifyAPI('/inventory_levels/set.json', 'POST', {
-            location_id: LOCATION_ID(),
-            inventory_item_id: v.inventory_item_id,
-            available: 9999
-          });
-        } catch (invErr) {
-          logger.warn('sync', `Inventory repair skipped for ${v.id}`, { error: invErr.message });
+          logger.info('sync', `Repaired variant ${v.id}: untracked inventory + continue policy`);
         }
       }
       // Update mapping variants

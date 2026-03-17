@@ -8,26 +8,65 @@ const logger = require('../utils/logger');
 const API_HOST = 'unofficial-shein.p.rapidapi.com';
 
 class SheinAdapter extends BaseAdapter {
-  constructor(config) { super('shein', { ...config, timeout: 18000 }); }
+  constructor(config) { super('shein', { ...config, timeout: 20000 }); }
 
   async search(query, limit = 12) {
-    const url = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(query)}&language=en&country=US&currency=USD&page=1&limit=${limit}`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
-    if (!data?.info?.products) {
-      // Try alternate response shape
-      if (data?.products) return data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
-      return [];
+    // Retry up to 2 times for intermittent SHEIN API failures
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const url = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(query)}&language=en&country=US&currency=USD&page=1&limit=${limit}`;
+        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+
+        // Try multiple response shapes
+        if (data?.info?.products?.length) {
+          return data.info.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
+        }
+        if (data?.products?.length) {
+          return data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
+        }
+        // Response came back but empty â could be transient
+        if (data && attempt < 2) {
+          logger.warn('shein', `Search returned empty on attempt ${attempt}, retrying...`, { query });
+          await new Promise(r => setTimeout(r, 1000)); // Brief delay before retry
+          continue;
+        }
+        return [];
+      } catch (e) {
+        if (attempt < 2) {
+          logger.warn('shein', `Search attempt ${attempt} failed, retrying...`, { error: e.message, query });
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+        logger.error('shein', 'Search failed after retries', { error: e.message, query });
+        return [];
+      }
     }
-    return data.info.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
+    return [];
   }
 
-  async getProduct(productId, options = {}) {
-    const url = `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
-    if (data?.info) return this.normalizeProduct(data.info);
+  async getProduct(productId) {
+    // Retry up to 2 times for detail endpoint
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const url = `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD`;
+        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+        if (data?.info) return this.normalizeProduct(data.info);
+        if (data && attempt < 2) {
+          logger.warn('shein', `Detail returned empty on attempt ${attempt}, retrying...`, { productId });
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+      } catch (e) {
+        if (attempt < 2) {
+          logger.warn('shein', `Detail attempt ${attempt} failed, retrying...`, { error: e.message, productId });
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+      }
+    }
     // Fallback to search
-    const searchQuery = options.title || productId;
-    const searchUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(searchQuery)}&language=en&country=US&currency=USD&page=1&limit=1`;
+    logger.warn('shein', `Detail failed for ${productId}, trying search fallback`);
+    const searchUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&page=1&limit=1`;
     const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
     if (sData?.info?.products?.[0]) return this.normalizeProductFromSearch(sData.info.products[0]);
     return null;

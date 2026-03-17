@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub â Sephora Adapter (via RapidAPI)
+// DealsHub Ã¢ÂÂ Sephora Adapter (via RapidAPI)
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
@@ -50,7 +50,7 @@ class SephoraAdapter extends BaseAdapter {
       }
     }
 
-    // ATTEMPT 2: Search fallback â works for both productId and skuId formats
+    // ATTEMPT 2: Search fallback Ã¢ÂÂ works for both productId and skuId formats
     // Use the product name from detail response if available, otherwise search by ID
     const searchQuery = options.title || data?.displayName || id;
     const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(searchQuery)}&pageIndex=0&pageSize=5`;
@@ -58,35 +58,24 @@ class SephoraAdapter extends BaseAdapter {
 
     if (sData?.products?.length) {
       // Try to find exact match by productId or skuId
-      const exactMatch = sData.products.find(p =>
+      let match = sData.products.find(p =>
         p.productId === id || String(p.currentSku?.skuId) === String(id)
       );
 
-      // CRITICAL: Only use exact match. Never fall back to products[0] â wrong product = wrong Shopify sync
-      if (!exactMatch) {
-        // If no exact ID match but we have a title hint, use the first result
+      // If no exact ID match but we have a title hint, use the first result
+      // (search by exact product name is highly likely to return the right product first)
       if (!match && options.title) {
         logger.info('sephora', `No exact ID match for ${id}, using first search result for title "${options.title}"`);
-        let match = sData.products[0];
-      }
-      if (!match) {
-        logger.warn('sephora', `No match found for ${id} in search fallback (${sData.products.length} results)`);
-      }
-        return null;
+        match = sData.products[0];
       }
 
-      // If we found a different productId, try detail again with it
-      if (!isProductId && exactMatch.productId && exactMatch.productId !== id) {
-        const retryUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(exactMatch.productId)}&preferedSku=${encodeURIComponent(id)}`;
-        const retryData = await this.fetchJSON(retryUrl, { headers: this.rapidHeaders(API_HOST) });
-        if (retryData?.currentSku) return this.normalizeProduct(retryData);
+      if (match) {
+        logger.info('sephora', `Search fallback found product: ${match.displayName} (${match.productId})`);
+        return this.normalizeProductFromSearch(match);
       }
-
-      // Fall back to search-based normalization with exact match only
-      logger.warn('sephora', `Detail API failed for ${id}, using exact search match fallback`);
-      return this.normalizeProductFromSearch(exactMatch);
     }
 
+    logger.warn('sephora', `No results found for ${id} via search fallback`);
     return null;
   }
 
@@ -132,7 +121,7 @@ class SephoraAdapter extends BaseAdapter {
       p.breadcrumbs = [d.parentCategory.displayName].filter(Boolean);
     }
 
-    // Description â combine all text fields for rich content
+    // Description Ã¢ÂÂ combine all text fields for rich content
     const descParts = [];
     if (d.longDescription) descParts.push(d.longDescription);
     if (d.shortDescription && d.shortDescription !== d.longDescription) descParts.push(d.shortDescription);
@@ -140,7 +129,7 @@ class SephoraAdapter extends BaseAdapter {
     if (d.ingredientDesc) descParts.push(`Ingredients: ${d.ingredientDesc}`);
     p.description = descParts.join('\n\n') || '';
 
-    // Bullets â quick look + key details
+    // Bullets Ã¢ÂÂ quick look + key details
     p.bullets = [];
     if (d.quickLookDescription) p.bullets.push(d.quickLookDescription);
     // Size / value info
@@ -161,7 +150,7 @@ class SephoraAdapter extends BaseAdapter {
       });
     }
 
-    // Images â collect from multiple sources
+    // Images Ã¢ÂÂ collect from multiple sources
     p.images = [];
     const skuImgs = d.currentSku?.skuImages;
     if (skuImgs?.image450) p.images.push(skuImgs.image450);

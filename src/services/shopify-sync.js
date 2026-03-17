@@ -1,8 +1,9 @@
 // ============================================================
-// StyleHub â Shopify Sync Service (On-Demand Product Creation)
-// ============================================================
+// StyleHub — Shopify Sync Service (On-Demand Product Creation)
+// =============================================================
 // Creates/updates products in Shopify ONLY when user wants to buy
 // Handles: deduplication, inventory, variants, metafields
+// FIX v1.1: Added storefront propagation wait after new product creation
 
 const fetch = require('node-fetch');
 const logger = require('../utils/logger');
@@ -11,10 +12,10 @@ const { syncCache } = require('../utils/cache');
 const { findMapping, upsertMapping, logSync } = require('../utils/db');
 
 const SHOPIFY_DOMAIN = () => process.env.SHOPIFY_STORE_DOMAIN;
-const SHOPIFY_TOKEN = () => process.env.SHOPIFY_ADMIN_TOKEN;
-const LOCATION_ID = () => parseInt(process.env.SHOPIFY_LOCATION_ID || '84042121347');
-const CUSTOM_DOMAIN = () => process.env.SHOPIFY_CUSTOM_DOMAIN || 'stylehubmiami.com';
-const API_VERSION = '2024-01';
+const SHOPIFY_TOKEN  = () => process.env.SHOPIFY_ADMIN_TOKEN;
+const LOCATION_ID    = () => parseInt(process.env.SHOPIFY_LOCATION_ID || '84042121347');
+const CUSTOM_DOMAIN  = () => process.env.SHOPIFY_CUSTOM_DOMAIN || 'stylehubmiami.com';
+const API_VERSION    = '2024-01';
 
 // ---- SHOPIFY API HELPER ----
 async function shopifyAPI(endpoint, method = 'GET', body = null) {
@@ -36,11 +37,50 @@ async function shopifyAPI(endpoint, method = 'GET', body = null) {
   return text ? JSON.parse(text) : {};
 }
 
+// ---- SLEEP UTILITY ----
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ---- WAIT FOR STOREFRONT PROPAGATION (NEW — fixes 422 race condition) ----
+async function waitForStorefrontPropagation(handle, variantId, maxWaitMs = 10000) {
+  const startTime = Date.now();
+  const interval = 1500;
+  let attempts = 0;
+
+  while (Date.now() - startTime < maxWaitMs) {
+    attempts++;
+    try {
+      const resp = await fetch(`https://${CUSTOM_DOMAIN()}/products/${handle}.json`, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const found = data.product && data.product.variants &&
+          data.product.variants.some(v => v.id === variantId);
+        if (found) {
+          logger.info('sync', `Storefront propagation confirmed in ${Date.now() - startTime}ms (${attempts} attempts)`, { handle, variantId });
+          return true;
+        }
+      }
+    } catch (e) {
+      // keep trying — storefront may not be ready yet
+      logger.debug('sync', `Propagation check attempt ${attempts} failed: ${e.message}`);
+    }
+    await sleep(interval);
+  }
+
+  // Final fallback: even if storefront check fails, add a minimum safety delay
+  logger.warn('sync', `Storefront propagation not confirmed after ${maxWaitMs}ms (${attempts} attempts) — proceeding with safety delay`, { handle, variantId });
+  await sleep(3000);
+  return false;
+}
+
 // ---- SET INVENTORY LEVEL (BACKUP) ----
 async function setInventoryAvailable(inventoryItemId, quantity = 999) {
   if (!inventoryItemId) return;
   try {
-    // Get current inventory level
     const levels = await shopifyAPI(`/inventory_levels.json?inventory_item_ids=${inventoryItemId}`);
     const level = levels?.inventory_levels?.[0];
     if (level && level.available < quantity) {
@@ -52,7 +92,6 @@ async function setInventoryAvailable(inventoryItemId, quantity = 999) {
       logger.info('sync', `Set inventory to ${quantity} for item ${inventoryItemId}`);
     }
   } catch (e) {
-    // If inventory API fails, it's ok â inventory_management=null should handle it
     logger.debug('sync', `Inventory set failed (may be untracked): ${e.message}`);
   }
 }
@@ -63,14 +102,13 @@ async function findExistingProduct(source, sourceId) {
   const cached = syncCache.get(cacheKey);
   if (cached) return cached;
 
-  // Strategy 1: Search by tags (products are tagged with source-id:XXXX on creation)
+  // Strategy 1: Search by tags
   try {
     const tagFilter = encodeURIComponent(`source-id:${sourceId}`);
     const data = await shopifyAPI(
       `/products.json?limit=5&status=any&fields=id,handle,variants,status,tags&tag=${tagFilter}`
     );
     if (data?.products?.length > 0) {
-      // Verify the match â tags could partially collide on short IDs
       const match = data.products.find(p => {
         const tags = (p.tags || '').split(',').map(t => t.trim());
         return tags.includes(`source-id:${sourceId}`) && tags.includes(`source:${source}`);
@@ -91,11 +129,10 @@ async function findExistingProduct(source, sourceId) {
     logger.debug('sync', 'Tag-based product search failed', { error: e.message });
   }
 
-  // Strategy 2: Check persistent DB mapping (belt-and-suspenders with prepareCart)
+  // Strategy 2: Check persistent DB mapping
   try {
     const dbMapping = findMapping(source, sourceId);
     if (dbMapping && dbMapping.shopify_product_id) {
-      // Verify the Shopify product still exists
       const check = await shopifyAPI(`/products/${dbMapping.shopify_product_id}.json?fields=id,handle,variants,status`);
       if (check?.product && check.product.status !== 'archived') {
         const mapping = {
@@ -108,26 +145,14 @@ async function findExistingProduct(source, sourceId) {
         logger.info('sync', 'Found existing product via DB mapping', { source, sourceId, shopifyId: check.product.id });
         return mapping;
       } else {
-        logger.warn('sync', 'DB mapping points to archived/deleted product', { source, sourceId, shopifyId: dbMapping.shopify_product_id });
-      }
-    }
-  } catch (e) {
-    logger.debug('sync', 'DB-based product lookup failed', { error: e.message });
-  }
-
-  return null;
-}
-
-// ---- CREATE PRODUCT IN SHOPIFY ----
-async function createShopifyProduct(productData, pricingResult) {
-  const { source, sourceId, title, images, primaryImage, brand,
-          description, bullets, options, variants: sourceVariants } = productData;
+        logger.warn('sync', 'DB mapping points to archived/deleted product', { source, sourceId, shopifyId: dbMapping.shopify_product,
+    brand, description, bullets, options,
+    variants: sourceVariants
+  } = productData;
 
   // Build Shopify product payload
   const shopifyVariants = [];
-
   if (sourceVariants && sourceVariants.length > 0) {
-    // Create variants from source data
     sourceVariants.slice(0, 100).forEach((v, i) => {
       const vPrice = v.price ? calculateFinalPrice(v.price, source) : pricingResult;
       shopifyVariants.push({
@@ -135,7 +160,7 @@ async function createShopifyProduct(productData, pricingResult) {
         price: vPrice.price.toFixed(2),
         compare_at_price: vPrice.compareAt ? vPrice.compareAt.toFixed(2) : null,
         sku: `DH-${source.toUpperCase()}-${sourceId}-${v.id || i}`,
-        inventory_management: null,  // Don't track inventory â dropship model
+        inventory_management: null,
         inventory_policy: 'continue',
         requires_shipping: true,
         weight: 0.5,
@@ -144,12 +169,11 @@ async function createShopifyProduct(productData, pricingResult) {
       });
     });
   } else {
-    // Single variant (default)
     shopifyVariants.push({
       price: pricingResult.price.toFixed(2),
       compare_at_price: pricingResult.compareAt ? pricingResult.compareAt.toFixed(2) : null,
       sku: `DH-${source.toUpperCase()}-${sourceId}`,
-      inventory_management: null,  // Don't track inventory â dropship model
+      inventory_management: null,
       inventory_policy: 'continue',
       requires_shipping: true,
       weight: 0.5,
@@ -168,7 +192,10 @@ async function createShopifyProduct(productData, pricingResult) {
   // Product options
   const shopifyOptions = [];
   if (sourceVariants && sourceVariants.length > 0) {
-    shopifyOptions.push({ name: (options?.[0]?.name) || 'Option', values: sourceVariants.map(v => v.title) });
+    shopifyOptions.push({
+      name: (options?.[0]?.name) || 'Option',
+      values: sourceVariants.map(v => v.title)
+    });
   }
 
   const payload = {
@@ -214,33 +241,49 @@ async function createShopifyProduct(productData, pricingResult) {
   }
 
   // Force-verify inventory settings on each variant after creation
-  // Shopify may override inventory_management based on store settings
   for (const v of product.variants) {
     try {
-      // Always PUT to ensure inventory_management=null sticks
       await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
         variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
       });
-      // Also set inventory level high as backup (in case Shopify tracks it anyway)
       await setInventoryAvailable(v.inventory_item_id, 999);
     } catch (invErr) {
       logger.warn('sync', `Post-create inventory fix for variant ${v.id} failed`, { error: invErr.message });
     }
   }
+
   logger.info('sync', 'Product created with forced untracked inventory (dropship model)', {
     productId: product.id,
     variantCount: product.variants.length
   });
+
+  // ============================================================
+  // FIX v1.1: Wait for storefront propagation before returning
+  // This prevents the 422 race condition where cart/add.js
+  // is called before Shopify's storefront knows about the variant
+  // ============================================================
+  const propagated = await waitForStorefrontPropagation(
+    product.handle,
+    product.variants[0].id,
+    10000 // max 10 seconds
+  );
+
+  if (!propagated) {
+    logger.warn('sync', 'Product created but storefront propagation uncertain — client may need to retry', {
+      productId: product.id,
+      handle: product.handle
+    });
+  }
 
   // Cache the mapping
   const mapping = {
     shopifyProductId: product.id,
     shopifyVariantId: product.variants[0]?.id,
     handle: product.handle,
-    variants: product.variants.map(v => ({ id: v.id, title: v.title, price: v.price }))
+    variants: product.variants.map(v => ({ id: v.id, title: v.title, price: v.price })),
+    isNewlyCreated: true // Signal to frontend that this is new
   };
   syncCache.set(`mapping:${source}:${sourceId}`, mapping, 3600000);
-
   return mapping;
 }
 
@@ -250,7 +293,7 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     throw new Error('Shopify not configured');
   }
 
-  // Calculate final pricing â try numeric price, then parse displayPrice/string price
+  // Calculate final pricing
   let sourcePrice = productData.price;
   if (typeof sourcePrice === 'string') {
     sourcePrice = parseFloat(sourcePrice.replace(/[^0-9.]/g, ''));
@@ -270,10 +313,8 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     shippingCost: productData.shippingData?.cost || 0
   });
 
-  // Check for existing synced product â DB first, then cache
   const cacheKey = `mapping:${source}:${sourceId}`;
 
-  // If forceResync, invalidate stale mapping that may point to deleted variant
   if (forceResync) {
     syncCache.del(cacheKey);
     logger.info('sync', 'Force resync: cache cleared', { source, sourceId });
@@ -282,7 +323,6 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
   let mapping = forceResync ? null : syncCache.get(cacheKey);
 
   if (!mapping) {
-    // Check persistent DB
     const dbMapping = findMapping(source, sourceId);
     if (dbMapping && dbMapping.shopify_product_id && dbMapping.shopify_variant_id) {
       mapping = {
@@ -296,12 +336,10 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     }
   }
 
-  // If no mapping found in cache/DB, try Shopify tag search before creating
   if (!mapping) {
     mapping = await findExistingProduct(source, sourceId);
     if (mapping) {
       logger.info('sync', 'Found existing product via Shopify tag search (DB was empty)', { source, sourceId, shopifyId: mapping.shopifyProductId });
-      // Persist to DB so we don't search again
       upsertMapping({
         source, sourceId,
         shopifyProductId: mapping.shopifyProductId,
@@ -310,15 +348,13 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
         price: pricingResult.price,
         originalPrice: productData.originalPrice
       });
-      // Force repair this found product
       forceResync = true;
     }
   }
 
   if (!mapping) {
-    // Create new product in Shopify
+    // Create new product — includes propagation wait (FIX v1.1)
     mapping = await createShopifyProduct(productData, pricingResult);
-    // Persist to DB
     upsertMapping({
       source, sourceId,
       shopifyProductId: mapping.shopifyProductId,
@@ -329,30 +365,23 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     });
     logSync(source, sourceId, 'create', 'success', { shopifyId: mapping.shopifyProductId });
   } else if (forceResync && mapping.shopifyProductId) {
-    // Repair existing product: ALWAYS force inventory_management=null, inventory_policy=continue, and set stock
+    // Repair existing product
     try {
       const productResp = await shopifyAPI(`/products/${mapping.shopifyProductId}.json?fields=id,variants`);
       const variants = productResp?.product?.variants || [];
       for (const v of variants) {
-        // ALWAYS force-update â don't trust current state
-        logger.info('sync', `Force-repairing variant ${v.id}`, {
-          currentPolicy: v.inventory_policy,
-          currentMgmt: v.inventory_management
-        });
+        logger.info('sync', `Force-repairing variant ${v.id}`, { currentPolicy: v.inventory_policy, currentMgmt: v.inventory_management });
         await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
           variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
         });
-        // Also set inventory high as backup
         await setInventoryAvailable(v.inventory_item_id, 999);
         logger.info('sync', `Repaired variant ${v.id}: forced untracked + 999 stock backup`);
       }
-      // Update mapping variants
       mapping.variants = variants.map(v => ({ id: v.id, title: v.title, price: v.price }));
       syncCache.set(cacheKey, mapping, 3600000);
       logSync(source, sourceId, 'repair', 'success', { shopifyId: mapping.shopifyProductId });
     } catch (repairErr) {
       logger.error('sync', 'Product repair failed, recreating', { error: repairErr.message });
-      // If repair fails, try to create fresh
       mapping = await createShopifyProduct(productData, pricingResult);
       upsertMapping({
         source, sourceId,
@@ -366,11 +395,31 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     }
   }
 
-  // Determine which variant to use
+  // Determine which variant to use — FIX v1.1: Flexible variant matching
   let variantId = mapping.shopifyVariantId;
   if (selectedVariantId && mapping.variants?.length > 1) {
-    const match = mapping.variants.find(v => v.title === selectedVariantId);
-    if (match) variantId = match.id;
+    const normalizedInput = String(selectedVariantId).trim().toLowerCase();
+    const match = mapping.variants.find(v => {
+      const vTitle = (v.title || '').trim().toLowerCase();
+      // Exact match
+      if (vTitle === normalizedInput) return true;
+      // "Option: Black" matches "Black"
+      if (vTitle === 'option: ' + normalizedInput) return true;
+      // "Black" matches "Option: Black"
+      if ('option: ' + vTitle === normalizedInput) return true;
+      // Partial contains
+      if (vTitle.includes(normalizedInput) || normalizedInput.includes(vTitle)) return true;
+      // Strip "Option: " prefix from both and compare
+      const stripPrefix = s => s.replace(/^option:\s*/i, '');
+      if (stripPrefix(vTitle) === stripPrefix(normalizedInput)) return true;
+      return false;
+    });
+    if (match) {
+      variantId = match.id;
+      logger.info('sync', `Variant matched: "${selectedVariantId}" → variant ${match.id} ("${match.title}")`);
+    } else {
+      logger.warn('sync', `No variant match for "${selectedVariantId}" among: ${mapping.variants.map(v => v.title).join(', ')}`);
+    }
   }
 
   return {
@@ -380,6 +429,7 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     handle: mapping.handle,
     quantity,
     availability: true,
+    isNewlyCreated: !!mapping.isNewlyCreated, // FIX v1.1: signal to frontend
     priceSnapshot: {
       price: pricingResult.price,
       compareAt: pricingResult.compareAt,

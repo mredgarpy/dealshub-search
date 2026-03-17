@@ -1,4 +1,4 @@
-/* DealsHub PDP v1.0 — Self-contained Product Detail Page */
+/* DealsHub PDP v1.0 â Self-contained Product Detail Page */
 (function(){
 'use strict';
 var API='https://dealshub-search.onrender.com';
@@ -275,23 +275,26 @@ function bindEvents(p,imgs){
     })
     .then(function(r){if(!r.ok)throw new Error('Sync error ('+r.status+')');return r.json()})
     .then(function(data){
-      if(!data.shopifyVariantId)throw new Error(data.error||'Sync failed — no variant ID');
+      if(!data.shopifyVariantId)throw new Error(data.error||'Sync failed â no variant ID');
       savedVariantId=data.shopifyVariantId;
-      return fetch('/cart/add.js',{
+      // On retry, wait 1.5s for Shopify inventory propagation before cart/add
+      var cartFetch=function(){return fetch('/cart/add.js',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({items:[{id:data.shopifyVariantId,quantity:1,properties:{_source:store,_source_id:productId}}]})
-      });
+      })};
+      if(isRetry)return new Promise(function(res){setTimeout(function(){res(cartFetch())},1500)});
+      return cartFetch();
     })
     .then(function(r){
       if(!r.ok){
         return r.json().then(function(errData){
           // 422 = variant invalid/out of stock. Retry once with force resync
           if(r.status===422&&!isRetry){
-            console.warn('Cart 422, retrying with force resync...');
-            btn.textContent=origText;btn.disabled=false;btn.style.opacity='1';
-            btn.style.background=buyNow?'#1a1a1a':'#e53e3e';
-            doAddToCart(buyNow,true);
+            console.warn('Cart 422, retrying with force resync after delay...');
+            btn.textContent='Syncing...';
+            // Delay 2.5s to allow Shopify inventory propagation after backend repair
+            setTimeout(function(){doAddToCart(buyNow,true)},2500);
             return {_retrying:true};
           }
           throw new Error(errData.description||errData.message||'Could not add to cart ('+r.status+')');
@@ -316,7 +319,7 @@ function bindEvents(p,imgs){
     })
     .catch(function(err){
       console.error('Add to cart error:',err);
-      btn.textContent='Error — Try Again';btn.style.background='#dc2626';btn.disabled=false;btn.style.opacity='1';
+      btn.textContent='Error â Try Again';btn.style.background='#dc2626';btn.disabled=false;btn.style.opacity='1';
       setTimeout(function(){btn.textContent=origText;btn.style.background=buyNow?'#1a1a1a':'#e53e3e'},4000);
     });
   }

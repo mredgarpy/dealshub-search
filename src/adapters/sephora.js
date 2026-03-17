@@ -17,7 +17,7 @@ class SephoraAdapter extends BaseAdapter {
     return data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }
 
-  async getProduct(id) {
+  async getProduct(id, options = {}) {
     // id can be productId (P######) or skuId (numeric)
     const isProductId = /^P\d+$/i.test(id);
 
@@ -52,7 +52,7 @@ class SephoraAdapter extends BaseAdapter {
 
     // ATTEMPT 2: Search fallback â works for both productId and skuId formats
     // Use the product name from detail response if available, otherwise search by ID
-    const searchQuery = data?.displayName || id;
+    const searchQuery = options.title || data?.displayName || id;
     const searchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(searchQuery)}&pageIndex=0&pageSize=5`;
     const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
 
@@ -64,7 +64,14 @@ class SephoraAdapter extends BaseAdapter {
 
       // CRITICAL: Only use exact match. Never fall back to products[0] â wrong product = wrong Shopify sync
       if (!exactMatch) {
-        logger.warn('sephora', `No exact match found for ${id} in search fallback (${sData.products.length} results). Refusing to guess.`);
+        // If no exact ID match but we have a title hint, use the first result
+      if (!match && options.title) {
+        logger.info('sephora', `No exact ID match for ${id}, using first search result for title "${options.title}"`);
+        match = sData.products[0];
+      }
+      if (!match) {
+        logger.warn('sephora', `No match found for ${id} in search fallback (${sData.products.length} results)`);
+      }
         return null;
       }
 

@@ -149,12 +149,27 @@ class AliExpressAdapter extends BaseAdapter {
         // item_detail_2 shape: { result: { status, settings, item: {...}, sku: {...}, ... } }
         if (data.result.item) {
           logger.info('aliexpress', `Detail success via ${endpoint}`, { productId });
-          return this.normalizeProduct(data.result);
+          const product = this.normalizeProduct(data.result);
+          if (product && product.price) return product;
+          // Detail returned data but no price â try to fill price from search
+          if (product) {
+            logger.warn('aliexpress', `Detail returned no price via ${endpoint}, trying search for price`, { productId });
+            const priceProduct = await this._fillPriceFromSearch(product, productId);
+            if (priceProduct.price) return priceProduct;
+          }
+          // Continue to next endpoint if still no price
+          continue;
         }
 
         // Legacy shape: result directly is the product data
         if (data.result.itemId || data.result.title) {
-          return this.normalizeProduct(data.result);
+          const product = this.normalizeProduct(data.result);
+          if (product && product.price) return product;
+          if (product) {
+            const priceProduct = await this._fillPriceFromSearch(product, productId);
+            if (priceProduct.price) return priceProduct;
+          }
+          continue;
         }
       } catch (e) {
         logger.warn('aliexpress', `${endpoint} failed`, { error: e.message, productId });
@@ -510,6 +525,29 @@ class AliExpressAdapter extends BaseAdapter {
     p.sourceUrl = sr.url || `https://www.aliexpress.com/item/${p.sourceId}.html`;
     p.normalizedHandle = this._makeHandle(p.title);
     return p;
+  }
+
+  // Fill missing price from search results (detail API sometimes omits price/sku data)
+  async _fillPriceFromSearch(product, productId) {
+    try {
+      const searchResults = await this.search(productId, 5);
+      const match = searchResults.find(r => String(r.id) === String(productId));
+      if (match) {
+        if (!product.price && match.price) product.price = parsePrice(match.price);
+        if (!product.originalPrice && match.originalPrice) product.originalPrice = parsePrice(match.originalPrice);
+        if (!product.rating && match.rating) product.rating = match.rating;
+        if (!product.reviews && match.reviews) product.reviews = match.reviews;
+        if (!product.badge && match.badge) product.badge = match.badge;
+        if (!product.primaryImage && match.image) {
+          product.primaryImage = match.image;
+          if (!product.images.length) product.images = [match.image];
+        }
+        logger.info('aliexpress', 'Filled missing price from search', { productId, price: product.price });
+      }
+    } catch (e) {
+      logger.warn('aliexpress', 'Price fill from search failed', { productId, error: e.message });
+    }
+    return product;
   }
 
   _makeHandle(title) {

@@ -1,5 +1,7 @@
 // ============================================================
 // DealsHub â AliExpress Adapter (AliExpress DataHub via RapidAPI)
+// Corrected: underscore URL paths, new response shapes
+// Working endpoints: item_search_3, item_detail_2
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
@@ -7,71 +9,161 @@ const logger = require('../utils/logger');
 
 const SEARCH_HOST = 'aliexpress-datahub.p.rapidapi.com';
 
+// Endpoint fallback chains â ordered by reliability
+const SEARCH_ENDPOINTS = [
+  '/item_search_3',  // Confirmed working 2026-03-17
+  '/item_search_2',  // Returns 5003 intermittently
+  '/item_search_5',  // Alternate
+  '/item_search_4',  // Alternate
+];
+
+const DETAIL_ENDPOINTS = [
+  '/item_detail_2',  // Confirmed working 2026-03-17
+  '/item_detail_3',  // Alternate
+  '/item_detail_6',  // Alternate
+];
+
 class AliExpressAdapter extends BaseAdapter {
   constructor(config) {
-    super('aliexpress', config);
+    super('aliexpress', { ...config, timeout: 20000 });
   }
 
   async search(query, limit = 12) {
-    // Try primary search endpoint
-    const url = `https://${SEARCH_HOST}/item/search?q=${encodeURIComponent(query)}&page=1&sort=default`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
-    if (data?.result?.resultList) {
-      return data.result.resultList.slice(0, limit).map(p => this.normalizeSearchResult(p.item || p)).filter(Boolean);
+    // Try each search endpoint in fallback chain
+    for (const endpoint of SEARCH_ENDPOINTS) {
+      try {
+        const url = `https://${SEARCH_HOST}${endpoint}?q=${encodeURIComponent(query)}&page=1&sort=default`;
+        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
+        if (!data?.result) continue;
+
+        // Check for API-level error
+        if (data.result.status?.data === 'error' || data.result.status?.code >= 5000) {
+          logger.warn('aliexpress', `${endpoint} returned error code ${data.result.status?.code}`, { query });
+          continue; // Try next endpoint
+        }
+
+        // item_search_3 shape: items are numerically indexed directly in result
+        // { result: { status: {...}, settings: {...}, 0: { item: {...} }, 1: { item: {...} }, ... } }
+        const items = this._extractSearchItems(data.result);
+        if (items.length > 0) {
+          logger.info('aliexpress', `Search success via ${endpoint}`, { query, count: items.length });
+          return items.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
+        }
+
+        // Also try legacy resultList shape (older endpoints)
+        if (data.result.resultList) {
+          const legacyItems = data.result.resultList.slice(0, limit).map(p => this.normalizeSearchResult(p.item || p)).filter(Boolean);
+          if (legacyItems.length > 0) return legacyItems;
+        }
+      } catch (e) {
+        logger.warn('aliexpress', `${endpoint} failed`, { error: e.message, query });
+      }
     }
-    // Fallback: try /item/search2
-    const url2 = `https://${SEARCH_HOST}/item/search2?q=${encodeURIComponent(query)}&page=1&sort=default`;
-    const data2 = await this.fetchJSON(url2, { headers: this.rapidHeaders(SEARCH_HOST) });
-    if (data2?.result?.resultList) {
-      return data2.result.resultList.slice(0, limit).map(p => this.normalizeSearchResult(p.item || p)).filter(Boolean);
-    }
-    // Fallback: try alternative response shapes
-    if (data?.result?.items) {
-      return data.result.items.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
-    }
-    logger.warn('aliexpress', 'Search returned no results', { query });
+    logger.warn('aliexpress', 'All search endpoints failed', { query });
     return [];
   }
 
-  async getProduct(productId, options = {}) {
-    const url = `https://${SEARCH_HOST}/item/detail?itemId=${encodeURIComponent(productId)}`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
-    if (data?.result) return this.normalizeProduct(data.result);
-    // Fallback: try v2 endpoint
-    const url2 = `https://${SEARCH_HOST}/item/detail2?itemId=${encodeURIComponent(productId)}`;
-    const data2 = await this.fetchJSON(url2, { headers: this.rapidHeaders(SEARCH_HOST) });
-    if (data2?.result) return this.normalizeProduct(data2.result);
-    // Fallback: search by title hint if available
-    if (options.title) {
-      const searchUrl = `https://${SEARCH_HOST}/item/search?q=${encodeURIComponent(options.title)}&page=1&sort=default`;
-      const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(SEARCH_HOST) });
-      const items = sData?.result?.resultList;
-      if (items?.[0]) {
-        const item = items[0].item || items[0];
-        logger.warn('aliexpress', `Detail API failed for ${productId}, using search fallback`);
-        return this._normalizeProductFallback(item);
+  // Extract items from numerically-indexed result object
+  _extractSearchItems(result) {
+    const items = [];
+    // Items are at result[0], result[1], result[2]... each with { item: {...} }
+    for (let i = 0; i < 60; i++) {
+      if (result[i]?.item) {
+        items.push(result[i].item);
+      } else if (result[i] && !result[i].item && result[i].itemId) {
+        // Some endpoints put item data directly
+        items.push(result[i]);
+      } else if (i > 0 && !result[i]) {
+        break; // No more items
       }
     }
-    logger.warn('aliexpress', `Product not found: ${productId}`);
+    return items;
+  }
+
+  async getProduct(productId) {
+    // Try each detail endpoint in fallback chain
+    for (const endpoint of DETAIL_ENDPOINTS) {
+      try {
+        const url = `https://${SEARCH_HOST}${endpoint}?itemId=${encodeURIComponent(productId)}`;
+        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
+        if (!data?.result) continue;
+
+        // Check for API-level error
+        if (data.result.status?.data === 'error' || data.result.status?.code >= 5000) {
+          logger.warn('aliexpress', `${endpoint} returned error`, { productId });
+          continue;
+        }
+
+        // item_detail_2 shape: { result: { status, settings, item: {...}, sku: {...}, ... } }
+        if (data.result.item) {
+          logger.info('aliexpress', `Detail success via ${endpoint}`, { productId });
+          return this.normalizeProduct(data.result);
+        }
+
+        // Legacy shape: result directly is the product data
+        if (data.result.itemId || data.result.title) {
+          return this.normalizeProduct(data.result);
+        }
+      } catch (e) {
+        logger.warn('aliexpress', `${endpoint} failed`, { error: e.message, productId });
+      }
+    }
+
+    // Final fallback: search by productId
+    logger.warn('aliexpress', `All detail endpoints failed for ${productId}, trying search fallback`);
+    const searchResults = await this.search(productId, 3);
+    if (searchResults.length > 0) {
+      // Return first result as a product (limited data)
+      const best = searchResults.find(r => String(r.id) === String(productId)) || searchResults[0];
+      return this._searchResultToProduct(best);
+    }
+
     return null;
   }
 
+  // Normalize search result item â handles both new (item_search_3) and legacy shapes
   normalizeSearchResult(p) {
     if (!p) return null;
-    const price = parsePrice(p.price?.minPrice || p.price?.minAmount?.value || p.salePrice || p.sku?.def?.price);
-    const origPrice = parsePrice(p.price?.maxPrice || p.price?.maxAmount?.value || p.originalPrice);
-    const tradeCount = p.trade?.tradeCount || p.trade?.tradeDesc || 0;
+
+    // New shape from item_search_3:
+    // { itemId, title, sales, itemUrl, image, sku: { def: { price, promotionPrice } },
+    //   averageStarRate, type, delivery: { freeShipping, shippingFee }, sellingPoints: [] }
+    const price = parsePrice(
+      p.sku?.def?.promotionPrice || p.sku?.def?.price ||
+      p.price?.minPrice || p.price?.minAmount?.value || p.salePrice
+    );
+    const origPrice = parsePrice(
+      p.sku?.def?.price || p.price?.maxPrice || p.price?.maxAmount?.value || p.originalPrice
+    );
+    // If promo and orig are the same, no original
+    const finalOrigPrice = origPrice && origPrice > (price || 0) ? origPrice : null;
+
+    const salesCount = p.sales || 0;
+    const salesNum = typeof salesCount === 'string' ? parseInt(salesCount.replace(/[^0-9]/g, '')) || 0 : salesCount;
+    const tradeCount = p.trade?.tradeCount || p.trade?.tradeDesc || salesNum;
     const tradeNum = typeof tradeCount === 'string' ? parseInt(tradeCount.replace(/[^0-9]/g, '')) || 0 : tradeCount;
+
+    const rating = p.averageStarRate ? parseFloat(p.averageStarRate) :
+                   p.evaluation?.starRating ? parseFloat(p.evaluation.starRating) : null;
+
+    let imageUrl = p.image || (p.images?.[0]) || '';
+    if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl;
+
+    const itemId = String(p.itemId || p.productId || '');
+
     return {
-      id: String(p.itemId || p.productId || ''),
+      id: itemId,
       title: p.title || p.displayTitle || '',
       price: price ? `$${price.toFixed(2)}` : null,
-      originalPrice: origPrice && origPrice > (price || 0) ? `$${origPrice.toFixed(2)}` : null,
-      image: p.image || (p.images?.[0]) || '',
-      url: `https://www.aliexpress.com/item/${p.itemId || p.productId}.html`,
-      rating: p.evaluation?.starRating ? parseFloat(p.evaluation.starRating) : null,
+      originalPrice: finalOrigPrice ? `$${finalOrigPrice.toFixed(2)}` : null,
+      image: imageUrl,
+      url: p.itemUrl ? (p.itemUrl.startsWith('//') ? 'https:' + p.itemUrl : p.itemUrl) :
+           `https://www.aliexpress.com/item/${itemId}.html`,
+      rating: rating,
       reviews: p.evaluation?.totalCount || p.trade?.reviewCount || 0,
-      badge: tradeNum > 1000 ? 'Popular' : (p.evaluation?.starRating >= 4.5 ? 'Top Rated' : null),
+      badge: tradeNum > 1000 ? 'Popular' :
+             (rating && rating >= 4.5 ? 'Top Rated' :
+             (p.delivery?.freeShipping ? 'Free Shipping' : null)),
       source: 'aliexpress',
       sourceName: 'AliExpress',
       brand: p.store?.name || p.storeName || null
@@ -86,102 +178,140 @@ class AliExpressAdapter extends BaseAdapter {
   _normalizeProductInner(d) {
     const p = emptyProduct();
     p.source = 'aliexpress';
-    p.sourceId = String(d.itemId || d.productId || d.item?.itemId || '');
     p.sourceName = 'AliExpress';
-    p.title = d.title || d.subject || d.item?.title || '';
-    p.brand = d.storeName || d.store?.name || d.storeModule?.storeName || null;
-    p.category = d.categoryName || d.item?.categoryName || null;
 
-    // Breadcrumbs â try multiple shapes
-    if (d.breadcrumbs?.length) {
+    // item_detail_2 shape: data has { item, sku, seller, shipping, ... }
+    // Legacy shape: data IS the product directly
+    const item = d.item || d;
+    const skuData = d.sku || d.skuModule || {};
+    const sellerData = d.seller || d.store || d.storeModule || {};
+    const shippingData = d.shipping || d.shippingModule || d.deliveryModule || {};
+
+    p.sourceId = String(item.itemId || item.productId || d.itemId || d.productId || '');
+    p.title = item.title || item.subject || d.title || d.subject || '';
+    p.brand = sellerData.storeName || sellerData.name || d.storeName || d.store?.name || null;
+    p.category = item.catId ? `Category ${item.catId}` : d.categoryName || null;
+
+    // Breadcrumbs â item_detail_2 has item.breadcrumbs[]
+    if (item.breadcrumbs?.length) {
+      p.breadcrumbs = item.breadcrumbs.map(b => b.title || b.name || b).filter(Boolean);
+    } else if (d.breadcrumbs?.length) {
       p.breadcrumbs = d.breadcrumbs.map(b => b.name || b.title || b).filter(Boolean);
     } else if (d.crossLinkGroupList?.length) {
       p.breadcrumbs = d.crossLinkGroupList.map(g => g.name).filter(Boolean);
     }
 
-    // Description â combine all available text fields
+    // Description
     const descParts = [];
     if (d.description) descParts.push(d.description);
-    if (d.item?.description) descParts.push(d.item.description);
-    // descriptionModule often has HTML content URL â store it in rawSourceMeta
-    if (d.descriptionModule?.descriptionUrl) {
-      descParts.push('[Full description available]');
-    }
+    if (item.description) descParts.push(item.description);
     if (d.descriptionModule?.description) descParts.push(d.descriptionModule.description);
-    // productPropModule has key-value specs
-    if (d.productPropModule?.props?.length) {
-      const specLines = d.productPropModule.props
-        .filter(sp => sp.attrName && sp.attrValue)
-        .map(sp => `${sp.attrName}: ${sp.attrValue}`);
+    if (d.descriptionModule?.descriptionUrl) descParts.push('[Full description available]');
+    // Properties/specs
+    if (d.properties?.length) {
+      const specLines = d.properties.filter(sp => sp.name && sp.value).map(sp => `${sp.name}: ${sp.value}`);
       if (specLines.length) descParts.push(specLines.join('\n'));
     }
-    // pageModule may have description
+    if (d.productPropModule?.props?.length) {
+      const specLines = d.productPropModule.props.filter(sp => sp.attrName && sp.attrValue).map(sp => `${sp.attrName}: ${sp.attrValue}`);
+      if (specLines.length) descParts.push(specLines.join('\n'));
+    }
     if (d.pageModule?.description) descParts.push(d.pageModule.description);
     p.description = descParts.join('\n\n') || '';
 
-    // Bullets â features array, specs, key attributes
+    // Bullets
     p.bullets = [];
-    if (Array.isArray(d.features) && d.features.length) {
+    if (Array.isArray(d.features)) {
       p.bullets = d.features.filter(f => f && typeof f === 'string' && f.trim().length > 0);
     }
-    // Add specs as bullets if description is short
-    if (d.productPropModule?.props?.length) {
-      d.productPropModule.props.forEach(sp => {
-        if (sp.attrName && sp.attrValue) {
-          p.bullets.push(`${sp.attrName}: ${sp.attrValue}`);
-        }
+    if (d.properties?.length) {
+      d.properties.forEach(sp => {
+        if (sp.name && sp.value) p.bullets.push(`${sp.name}: ${sp.value}`);
       });
     }
-    // titleModule may have subject (subtitle)
+    if (d.productPropModule?.props?.length) {
+      d.productPropModule.props.forEach(sp => {
+        if (sp.attrName && sp.attrValue) p.bullets.push(`${sp.attrName}: ${sp.attrValue}`);
+      });
+    }
     if (d.titleModule?.subject && d.titleModule.subject !== p.title) {
       p.bullets.unshift(d.titleModule.subject);
     }
 
-    // Images â multiple sources
-    const imgSources = d.images || d.imagePathList || d.imageModule?.imagePathList || [];
+    // Images â item_detail_2 has item.images[]
+    const imgSources = item.images || d.images || d.imagePathList || d.imageModule?.imagePathList || [];
     p.images = imgSources.map(img => {
       if (typeof img === 'string') return img;
       return img.imgUrl || img.imageUrl || '';
     }).filter(Boolean);
-    // Ensure HTTPS
     p.images = p.images.map(url => url.startsWith('//') ? 'https:' + url : url);
     p.primaryImage = p.images[0] || '';
 
-    // Price â multiple response shapes
+    // Price â item_detail_2: sku.def.price (can be range "20.91 - 34.71"), sku.def.promotionPrice
+    const skuDef = skuData.def || {};
+    const defPrice = typeof skuDef.price === 'string' && skuDef.price.includes('-')
+      ? skuDef.price.split('-')[0].trim() // Take low end of range
+      : skuDef.price;
+    const defPromoPrice = typeof skuDef.promotionPrice === 'string' && skuDef.promotionPrice.includes('-')
+      ? skuDef.promotionPrice.split('-')[0].trim()
+      : skuDef.promotionPrice;
+
     p.price = parsePrice(
+      defPromoPrice || defPrice ||
       d.price?.minPrice || d.price?.minAmount?.value || d.currentPrice ||
       d.salePrice || d.priceModule?.minPrice || d.priceModule?.actMinPrice
     );
+    const origPriceRaw = typeof skuDef.price === 'string' && skuDef.price.includes('-')
+      ? skuDef.price.split('-')[1].trim() // Take high end as "original"
+      : skuDef.price;
     p.originalPrice = parsePrice(
-      d.price?.maxPrice || d.price?.maxAmount?.value || d.originalPrice ||
+      origPriceRaw || d.price?.maxPrice || d.price?.maxAmount?.value || d.originalPrice ||
       d.retailPrice || d.priceModule?.maxPrice
     );
-    // If originalPrice equals or is less than price, null it
     if (p.originalPrice && p.price && p.originalPrice <= p.price) p.originalPrice = null;
 
     // Rating
-    p.rating = d.evaluation?.starRating ? parseFloat(d.evaluation.starRating) :
+    p.rating = item.averageStarRate ? parseFloat(item.averageStarRate) :
+               d.evaluation?.starRating ? parseFloat(d.evaluation.starRating) :
                d.averageRating ? parseFloat(d.averageRating) :
                d.titleModule?.feedbackRating?.averageStar ? parseFloat(d.titleModule.feedbackRating.averageStar) : null;
     p.reviews = d.evaluation?.totalCount || d.reviews ||
                 d.titleModule?.feedbackRating?.totalValidNum || 0;
 
     // Badge
-    const tradeCount = d.trade?.tradeCount || d.titleModule?.tradeCount || 0;
-    const tradeNum = typeof tradeCount === 'string' ? parseInt(tradeCount.replace(/[^0-9]/g, '')) || 0 : tradeCount;
-    p.badge = tradeNum > 10000 ? 'Best Seller' :
-              tradeNum > 1000 ? 'Popular' :
+    const salesCount = item.sales || d.trade?.tradeCount || d.titleModule?.tradeCount || 0;
+    const salesNum = typeof salesCount === 'string' ? parseInt(salesCount.replace(/[^0-9]/g, '')) || 0 : salesCount;
+    p.badge = salesNum > 10000 ? 'Best Seller' :
+              salesNum > 1000 ? 'Popular' :
               (p.rating && p.rating >= 4.8 ? 'Top Rated' : null);
 
-    p.availability = 'In Stock';
-    p.stockSignal = 'in_stock';
-    if (d.quantityModule?.totalAvailQuantity === 0 || d.inventory === 0) {
+    // Availability â item_detail_2 has item.available
+    p.availability = item.available === false ? 'Out of Stock' : 'In Stock';
+    p.stockSignal = item.available === false ? 'out_of_stock' : 'in_stock';
+    if (skuDef.quantity === 0 || d.quantityModule?.totalAvailQuantity === 0 || d.inventory === 0) {
       p.availability = 'Out of Stock';
       p.stockSignal = 'out_of_stock';
     }
 
-    // Variants / SKU â skuModule (detail endpoint) or productSKUPropertyList
-    if (d.skuModule?.productSKUPropertyList) {
+    // Variants â item_detail_2: sku.base[] with { skuId, propMap, price, promotionPrice, quantity }
+    // Also sku.props[] for option definitions
+    if (skuData.props?.length) {
+      skuData.props.forEach(prop => {
+        const option = {
+          name: prop.name || prop.skuPropertyName || 'Option',
+          values: (prop.values || prop.skuPropertyValues || []).map(v => ({
+            value: v.name || v.propertyValueDefinitionName || v.propertyValueName || '',
+            image: v.image ? (v.image.startsWith('//') ? 'https:' + v.image : v.image) :
+                   v.skuPropertyImagePath ? (v.skuPropertyImagePath.startsWith('//') ? 'https:' + v.skuPropertyImagePath : v.skuPropertyImagePath) : null,
+            id: v.id || v.propertyValueId || null,
+            selected: false
+          }))
+        };
+        if (option.values.length) p.options.push(option);
+      });
+    }
+    // Legacy: productSKUPropertyList
+    if (!p.options.length && d.skuModule?.productSKUPropertyList) {
       d.skuModule.productSKUPropertyList.forEach(prop => {
         const option = {
           name: prop.skuPropertyName || 'Option',
@@ -196,24 +326,34 @@ class AliExpressAdapter extends BaseAdapter {
       });
     }
 
-    if (d.skuModule?.skuPriceList) {
+    // SKU variants
+    if (skuData.base?.length) {
+      p.variants = skuData.base.map(sku => ({
+        id: String(sku.skuId || ''),
+        title: sku.propMap || '',
+        price: parsePrice(sku.promotionPrice || sku.price) || p.price,
+        image: null,
+        available: (sku.quantity || 0) > 0
+      }));
+    } else if (d.skuModule?.skuPriceList) {
       p.variants = d.skuModule.skuPriceList.map(sku => ({
         id: String(sku.skuId || ''),
         title: sku.skuAttr || sku.skuPropIds || '',
-        price: parsePrice(sku.skuVal?.actSkuCalPrice || sku.skuVal?.skuCalPrice || sku.skuVal?.actSkuMultiCurrencyCalPrice) || p.price,
+        price: parsePrice(sku.skuVal?.actSkuCalPrice || sku.skuVal?.skuCalPrice) || p.price,
         image: null,
         available: (sku.skuVal?.availQuantity || 0) > 0
       }));
     }
 
-    // Shipping â shippingModule or deliveryModule
-    const ship = d.shippingModule || d.deliveryModule;
-    if (ship) {
-      p.shippingData.cost = ship.freightAmount != null ? parseFloat(ship.freightAmount) : null;
-      p.shippingData.method = ship.deliveryProviderName || ship.company || 'Standard';
-      p.shippingData.note = (p.shippingData.cost === 0 || ship.isFreeShipping) ? 'FREE Shipping' : 'Shipping calculated at checkout';
-      p.deliveryEstimate.minDays = ship.deliveryMinDay || ship.deliveryDayMin || 7;
-      p.deliveryEstimate.maxDays = ship.deliveryMaxDay || ship.deliveryDayMax || 21;
+    // Shipping
+    if (shippingData && Object.keys(shippingData).length) {
+      p.shippingData.cost = shippingData.freightAmount != null ? parseFloat(shippingData.freightAmount) :
+                            shippingData.shippingFee != null ? parseFloat(shippingData.shippingFee) : null;
+      p.shippingData.method = shippingData.deliveryProviderName || shippingData.company || 'Standard';
+      p.shippingData.note = (p.shippingData.cost === 0 || shippingData.isFreeShipping || shippingData.freeShipping)
+        ? 'FREE Shipping' : 'Shipping calculated at checkout';
+      p.deliveryEstimate.minDays = shippingData.deliveryMinDay || shippingData.deliveryDayMin || 7;
+      p.deliveryEstimate.maxDays = shippingData.deliveryMaxDay || shippingData.deliveryDayMax || 21;
       p.deliveryEstimate.label = `${p.deliveryEstimate.minDays}-${p.deliveryEstimate.maxDays} business days`;
     } else {
       p.deliveryEstimate = { minDays: 10, maxDays: 25, label: '10-25 business days' };
@@ -227,33 +367,36 @@ class AliExpressAdapter extends BaseAdapter {
     }
 
     // Seller
-    if (d.store || d.storeModule) {
-      const store = d.store || d.storeModule || {};
-      p.sellerData.name = store.name || store.storeName || null;
-      p.sellerData.rating = store.positiveRate ? parseFloat(store.positiveRate) :
-                            store.positiveNum ? parseFloat(store.positiveNum) : null;
+    if (sellerData && (sellerData.name || sellerData.storeName)) {
+      p.sellerData.name = sellerData.storeName || sellerData.name || null;
+      p.sellerData.rating = sellerData.positiveRate ? parseFloat(sellerData.positiveRate) :
+                            sellerData.positiveNum ? parseFloat(sellerData.positiveNum) : null;
     }
 
-    p.sourceUrl = `https://www.aliexpress.com/item/${p.sourceId}.html`;
+    const itemUrl = item.itemUrl || d.itemUrl || '';
+    p.sourceUrl = itemUrl ? (itemUrl.startsWith('//') ? 'https:' + itemUrl : itemUrl) :
+                  `https://www.aliexpress.com/item/${p.sourceId}.html`;
     p.normalizedHandle = this._makeHandle(p.title);
 
-    // Raw source meta â all extra fields for operations layer
+    // Raw source meta
     p.rawSourceMeta = {
       itemId: p.sourceId,
-      tradeCount: tradeNum,
-      totalAvailQuantity: d.quantityModule?.totalAvailQuantity || null,
-      storeId: d.store?.storeId || d.storeModule?.storeId || null,
+      salesCount: salesNum,
+      totalAvailQuantity: skuDef.quantity || d.quantityModule?.totalAvailQuantity || null,
+      storeId: sellerData.storeId || d.storeModule?.storeId || null,
       storeName: p.sellerData.name,
       storePositiveRate: p.sellerData.rating,
-      storeFollowers: d.store?.followers || d.storeModule?.followingNumber || null,
+      storeFollowers: sellerData.followers || d.storeModule?.followingNumber || null,
       buyerProtection: d.buyerProtectionModule?.desc || null,
       freightCommitment: d.buyerProtectionModule?.freightCommitment || false,
       descriptionUrl: d.descriptionModule?.descriptionUrl || null,
-      categoryId: d.categoryId || null,
+      categoryId: item.catId || d.categoryId || null,
       wishlistCount: d.wishListModule?.itemWishCount || d.wishCount || null,
       originCountry: d.originModule?.originCountry || null,
-      hasVideo: !!(d.imageModule?.videoUrl || d.videoModule),
-      videoUrl: d.imageModule?.videoUrl || d.videoModule?.videoUrl || null
+      hasVideo: !!(item.video || d.imageModule?.videoUrl || d.videoModule),
+      videoUrl: item.video || d.imageModule?.videoUrl || d.videoModule?.videoUrl || null,
+      skuCount: (skuData.base?.length || d.skuModule?.skuPriceList?.length || 0),
+      available: item.available
     };
 
     return p;
@@ -262,26 +405,57 @@ class AliExpressAdapter extends BaseAdapter {
   _normalizeProductFallback(d) {
     const p = emptyProduct();
     p.source = 'aliexpress';
-    p.sourceId = String(d.itemId || d.productId || '');
+    const item = d.item || d;
+    p.sourceId = String(item.itemId || item.productId || d.itemId || d.productId || '');
     p.sourceName = 'AliExpress';
-    p.title = d.title || d.subject || '';
+    p.title = item.title || item.subject || d.title || d.subject || '';
     p.brand = d.storeName || d.store?.name || null;
-    p.description = d.description || '';
+    p.description = d.description || item.description || '';
     p.bullets = Array.isArray(d.features) ? d.features : [];
-    const imgs = d.images || d.imagePathList || [];
+    const imgs = item.images || d.images || d.imagePathList || [];
     p.images = imgs.map(img => typeof img === 'string' ? img : (img.imgUrl || '')).filter(Boolean);
     p.images = p.images.map(url => url.startsWith('//') ? 'https:' + url : url);
     p.primaryImage = p.images[0] || '';
-    p.price = parsePrice(d.price?.minPrice || d.salePrice || d.currentPrice);
+    const skuDef = d.sku?.def || {};
+    const defPrice = typeof skuDef.price === 'string' && skuDef.price.includes('-') ? skuDef.price.split('-')[0].trim() : skuDef.price;
+    p.price = parsePrice(defPrice || d.price?.minPrice || d.salePrice || d.currentPrice);
     p.originalPrice = parsePrice(d.price?.maxPrice || d.originalPrice);
-    p.rating = d.evaluation?.starRating ? parseFloat(d.evaluation.starRating) : null;
+    p.rating = item.averageStarRate ? parseFloat(item.averageStarRate) :
+               d.evaluation?.starRating ? parseFloat(d.evaluation.starRating) : null;
     p.reviews = d.evaluation?.totalCount || 0;
+    p.availability = item.available === false ? 'Out of Stock' : 'In Stock';
+    p.stockSignal = item.available === false ? 'out_of_stock' : 'in_stock';
+    p.deliveryEstimate = { minDays: 10, maxDays: 25, label: '10-25 business days' };
+    p.shippingData.note = 'International Shipping';
+    p.returnPolicy = { window: 15, summary: 'Returns accepted within 15 days' };
+    const itemUrl = item.itemUrl || '';
+    p.sourceUrl = itemUrl ? (itemUrl.startsWith('//') ? 'https:' + itemUrl : itemUrl) :
+                  `https://www.aliexpress.com/item/${p.sourceId}.html`;
+    p.normalizedHandle = this._makeHandle(p.title);
+    return p;
+  }
+
+  // Convert a search result card into a full product object (for fallback when detail fails)
+  _searchResultToProduct(sr) {
+    const p = emptyProduct();
+    p.source = 'aliexpress';
+    p.sourceId = sr.id || '';
+    p.sourceName = 'AliExpress';
+    p.title = sr.title || '';
+    p.brand = sr.brand || null;
+    p.price = parsePrice(sr.price);
+    p.originalPrice = parsePrice(sr.originalPrice);
+    p.images = sr.image ? [sr.image] : [];
+    p.primaryImage = p.images[0] || '';
+    p.rating = sr.rating || null;
+    p.reviews = sr.reviews || 0;
+    p.badge = sr.badge || null;
     p.availability = 'In Stock';
     p.stockSignal = 'in_stock';
     p.deliveryEstimate = { minDays: 10, maxDays: 25, label: '10-25 business days' };
     p.shippingData.note = 'International Shipping';
     p.returnPolicy = { window: 15, summary: 'Returns accepted within 15 days' };
-    p.sourceUrl = `https://www.aliexpress.com/item/${p.sourceId}.html`;
+    p.sourceUrl = sr.url || `https://www.aliexpress.com/item/${p.sourceId}.html`;
     p.normalizedHandle = this._makeHandle(p.title);
     return p;
   }

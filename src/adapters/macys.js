@@ -370,18 +370,20 @@ class MacysAdapter extends BaseAdapter {
   }
 
   _extractPrice(pricing) {
-    // tieredPrice shape: [{ values: [{ value, formattedValue, type }] }]
-    if (pricing?.tieredPrice?.[0]?.values?.[0]) {
-      const v = pricing.tieredPrice[0].values[0];
+    // tieredPrice can be at pricing.tieredPrice OR pricing.price.tieredPrice
+    const tiered = pricing?.tieredPrice || pricing?.price?.tieredPrice;
+    if (tiered?.[0]?.values?.[0]) {
+      const v = tiered[0].values[0];
       return parsePrice(v.value || v.formattedValue);
     }
-    return parsePrice(pricing?.price?.regularPrice);
+    return parsePrice(pricing?.price?.regularPrice || pricing?.regularPrice);
   }
 
   _extractOrigPrice(pricing) {
     // Second value in tieredPrice is often the original/compare price
-    if (pricing?.tieredPrice?.[0]?.values?.length > 1) {
-      return parsePrice(pricing.tieredPrice[0].values[1]?.value);
+    const tiered = pricing?.tieredPrice || pricing?.price?.tieredPrice;
+    if (tiered?.[0]?.values?.length > 1) {
+      return parsePrice(tiered[0].values[1]?.value || tiered[0].values[1]?.formattedValue);
     }
     return parsePrice(pricing?.price?.originalPrice || pricing?.price?.msrp);
   }

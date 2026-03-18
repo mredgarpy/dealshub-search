@@ -181,7 +181,7 @@ class AliExpressAdapter extends BaseAdapter {
     const searchResults = await this.search(productId, 3);
     if (searchResults.length > 0) {
       // Return first result as a product (limited data)
-      const best = searchResults.find(r => String(r.id) === String(productId)) || searchResults[0];
+      const best = searchResults.find(r => String(r.id) === String(productId)) || null;
       return this._searchResultToProduct(best);
     }
 

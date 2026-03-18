@@ -31,7 +31,7 @@ class SephoraAdapter extends BaseAdapter {
         // FIX: If detail returned 204/null, try getting skuId from search first
         if (!data && isProductId) {
                 try {
-                          const skuSearchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(id)}&pageSize=5&currentPage=1`;
+                          const skuSearchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(options.title || id)}&pageSize=5&currentPage=1`;
                           const skuSearchData = await this.fetchJSON(skuSearchUrl, { headers: this.rapidHeaders(API_HOST) });
                           const skuMatch = skuSearchData?.products?.find(p => p.productId === id);
                           if (skuMatch?.currentSku?.skuId) {

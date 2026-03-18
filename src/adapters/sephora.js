@@ -28,6 +28,20 @@ class SephoraAdapter extends BaseAdapter {
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
     if (data?.currentSku) return this.normalizeProduct(data);
 
+        // FIX: If detail returned 204/null, try getting skuId from search first
+        if (!data && isProductId) {
+                try {
+                          const skuSearchUrl = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(id)}&pageSize=5&currentPage=1`;
+                          const skuSearchData = await this.fetchJSON(skuSearchUrl, { headers: this.rapidHeaders(API_HOST) });
+                          const skuMatch = skuSearchData?.products?.find(p => p.productId === id);
+                          if (skuMatch?.currentSku?.skuId) {
+                                      const retryUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(id)}&preferedSku=${encodeURIComponent(skuMatch.currentSku.skuId)}`;
+                                      const retryData = await this.fetchJSON(retryUrl, { headers: this.rapidHeaders(API_HOST) });
+                                      if (retryData?.currentSku) return this.normalizeProduct(retryData);
+                          }
+                } catch (e) { logger.debug('sephora', 'SKU pre-search retry failed: ' + e.message); }
+        }
+
     // If detail returned partial data with enough info, try to normalize it directly
     if (data && data.displayName && data.productId) {
       logger.warn('sephora', `Truncated JSON from detail API, extracting partial data`, { textLen: JSON.stringify(data).length });

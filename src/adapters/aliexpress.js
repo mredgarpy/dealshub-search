@@ -250,9 +250,9 @@ class AliExpressAdapter extends BaseAdapter {
     // item_detail_2 shape: data has { item, sku, seller, shipping, ... }
     // Legacy shape: data IS the product directly
     const item = d.item || d;
-    const skuData = d.sku || d.skuModule || {};
+    const skuData = d.sku || item.sku || d.skuModule || {};
     const sellerData = d.seller || d.store || d.storeModule || {};
-    const shippingData = d.shipping || d.shippingModule || d.deliveryModule || {};
+    const shippingData = d.shipping || d.delivery || item.shipping || d.shippingModule || d.deliveryModule || {};
 
     p.sourceId = String(item.itemId || item.productId || d.itemId || d.productId || '');
     p.title = item.title || item.subject || d.title || d.subject || '';

@@ -1,6 +1,6 @@
 // ============================================================
 // StyleHub — Shopify Sync Service (On-Demand Product Creation)
-// =============================================================
+// ============================================================
 // Creates/updates products in Shopify ONLY when user wants to buy
 // Handles: deduplication, inventory, variants, metafields
 // FIX v1.1: Added storefront propagation wait after new product creation
@@ -145,7 +145,20 @@ async function findExistingProduct(source, sourceId) {
         logger.info('sync', 'Found existing product via DB mapping', { source, sourceId, shopifyId: check.product.id });
         return mapping;
       } else {
-        logger.warn('sync', 'DB mapping points to archived/deleted product', { source, sourceId, shopifyId: dbMapping.shopify_product,
+        logger.warn('sync', 'DB mapping points to archived/deleted product', { source, sourceId, shopifyId: dbMapping.shopify_product_id });
+      }
+    }
+  } catch (e) {
+    logger.debug('sync', 'DB-based product lookup failed', { error: e.message });
+  }
+
+  return null;
+}
+
+// ---- CREATE PRODUCT IN SHOPIFY ----
+async function createShopifyProduct(productData, pricingResult) {
+  const {
+    source, sourceId, title, images, primaryImage,
     brand, description, bullets, options,
     variants: sourceVariants
   } = productData;

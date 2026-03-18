@@ -1,4 +1,4 @@
-h// ============================================================
+// ============================================================
 // DealsHub â AliExpress Adapter (AliExpress DataHub via RapidAPI)
 // Corrected: underscore URL paths, new response shapes
 // Working endpoints: item_search_3, item_detail_2
@@ -251,7 +251,7 @@ class AliExpressAdapter extends BaseAdapter {
     // Legacy shape: data IS the product directly
     const item = d.item || d;
     const skuData = d.sku || item.sku || d.skuModule || {}
-      d.skuModule || {};
+  
     const sellerData = d.seller || item.seller || d.store || d.storeModule || {};
     const shippingData = d.shipping || d.delivery || item.shipping || d.shippingModule || d.deliveryModule || {};
 

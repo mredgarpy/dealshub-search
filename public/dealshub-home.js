@@ -1,5 +1,5 @@
 /* ============================================================
-   StyleHub Miami — Home Engine v2.0
+   StyleHub Miami â Home Engine v2.0
    18-section home based on approved design doc v6
    Design system: Red #E53E3E | Navy #1A1A2E | Gray #F7F7F8
    ============================================================ */
@@ -13,7 +13,7 @@
   function parsePrice(v){if(!v)return 0;var n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));return isNaN(n)?0:n}
   function fmtPrice(n){return n?'$'+n.toFixed(2):''}
   function fmtNum(n){if(!n)return '0';n=parseInt(n);if(n>=1000000)return (n/1000000).toFixed(1)+'M';if(n>=1000)return (n/1000).toFixed(1)+'K';return String(n)}
-  function stars(r){r=parseFloat(r)||0;var h='';for(var i=1;i<=5;i++)h+=i<=Math.round(r)?'★':'☆';return h}
+  function stars(r){r=parseFloat(r)||0;var h='';for(var i=1;i<=5;i++)h+=i<=Math.round(r)?'â':'â';return h}
   function shuffleSeed(arr,seed){var a=arr.slice();for(var i=a.length-1;i>0;i--){seed=(seed*9301+49297)%233280;var j=Math.floor((seed/233280)*i);var t=a[i];a[i]=a[j];a[j]=t}return a}
   function decodeEntities(s){var el=document.createElement('textarea');el.innerHTML=s;return el.value}
 
@@ -76,7 +76,7 @@
     var ctaStyle='';
     if(opts.ctaType==='red'){
       ctaStyle='background:'+RED+';color:#fff;border:none';
-      ctaText=opts.cta||'⚡ Grab Deal';
+      ctaText=opts.cta||'â¡ Grab Deal';
     } else if(opts.ctaType==='outline'){
       ctaStyle='background:#fff;color:'+NAVY+';border:1.5px solid '+NAVY;
       ctaText=opts.cta||'Add to Cart';
@@ -160,8 +160,8 @@
 
     var slides=sorted.map(function(cat,i){
       var items=cats[cat]||products.slice(i*3,(i+1)*3);
-      var topImg=items[0]?items[0].image||items[0].primaryImage||'':'';
-      var top3=items.slice(0,3).map(function(p){return decodeEntities(p.title||'').substring(0,40)}).join(' · ');
+      var topImg=items[0]?items[0].images||items[0].primaryImage||items[0].primaryImage||'':'';
+      var top3=items.slice(0,3).map(function(p){return decodeEntities(p.title||'').substring(0,40)}).join(' Â· ');
       return {cat:cat,img:topImg,top3:top3};
     });
 
@@ -171,7 +171,7 @@
     h+='<div id="dh-hero-carousel" style="position:relative;border-radius:12px;overflow:hidden;aspect-ratio:2.2;background:'+NAVY+'">';
     slides.forEach(function(s,i){
       h+='<div class="dh-hero-slide" data-slide="'+i+'" style="position:absolute;inset:0;opacity:'+(i===0?'1':'0')+';transition:opacity 0.6s ease;z-index:'+(i===0?'2':'1')+'">';
-      if(s.img)h+='<img src="'+esc(s.img)+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" loading="'+(i===0?'eager':'lazy')+'">';
+      if(s.img)h+='<img src="'+es`¨s.img)+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" loading="'+(i===0?'eager':'lazy')+'">';
       h+='<div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(26,26,46,0.95) 0%,rgba(26,26,46,0.85) 45%,rgba(26,26,46,0.35) 100%)"></div>';
       h+='<div style="position:relative;z-index:3;padding:32px;display:flex;flex-direction:column;justify-content:center;height:100%">';
       h+='<span style="display:inline-block;background:'+RED+';color:#fff;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;margin-bottom:12px;width:fit-content">Trending now</span>';
@@ -187,8 +187,8 @@
     });
     h+='</div>';
     // Arrows
-    h+='<button class="dh-hero-arr" data-dir="-1" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:5;background:rgba(255,255,255,0.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer">‹</button>';
-    h+='<button class="dh-hero-arr" data-dir="1" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:5;background:rgba(255,255,255,0.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer">›</button>';
+    h+='<button class="dh-hero-arr" data-dir="-1" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:5;background:rgba(255,255,255,0.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer">â¹</button>';
+    h+='<button class="dh-hero-arr" data-dir="1" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:5;background:rgba(255,255,255,0.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer">âº</button>';
     h+='</div>';
 
     // Side cards
@@ -250,7 +250,7 @@
     if(!query){
       // Fallback to trending
       apiFetch('/api/trending').then(function(data){
-        var items=(data.products||data||[]).slice(0,5);
+        var items=(data.results||data.products||data||[]).slice(0,5);
         if(!items.length){container.style.display='none';return}
         container.innerHTML=section('because-searched',
           sectionHeader('Trending now','View all >','/pages/search-results?q=trending')+
@@ -260,7 +260,7 @@
     }
 
     apiFetch('/api/search?q='+encodeURIComponent(query)+'&limit=5').then(function(data){
-      var items=(data.products||data||[]).slice(0,5);
+      var items=(data.results||data.products||data||[]).slice(0,5);
       if(!items.length){container.style.display='none';return}
       container.innerHTML=section('because-searched',
         sectionHeader('Because you searched \''+query+'\'','View all >','/pages/search-results?q='+encodeURIComponent(query))+
@@ -273,7 +273,7 @@
   // ============================================================
   function buildTrending(container){
     apiFetch('/api/trending').then(function(data){
-      var items=data.products||data||[];
+      var items=data.results||data.products||data||[];
       if(!items.length){container.style.display='none';return}
 
       var stores=['All','Amazon','AliExpress','Sephora'];
@@ -340,12 +340,12 @@
       'Home & garden':{t:'Home essentials',s:'Decor, kitchen, garden'},
       'Kids':{t:'Kids\' favorites',s:'Toys, clothing, accessories'},
       'Shoes':{t:'Step up your style',s:'Sneakers, boots, sandals'},
-      'Accessories':{t:'Complete the look',s:'Watches, sunglasses, bags'},
+      'Accessories':{t:'Complete the look",s:'Watches, sunglasses, bags'},
       'Phones':{t:'Latest mobile deals',s:'Cases, chargers, smartphones'},
       'Jewelry':{t:'Shine bright',s:'Rings, necklaces, bracelets'}
     };
-    var c1=meta[today[0]]||{t:today[0],s:'Shop now'};
-    var c2=meta[today[1]]||{t:today[1],s:'Shop now'};
+    var c1=meta[today[0]]||{t:today[0],s:'Shop now'},
+    var c2=meta[today[1]]||{t:today[1],s:'Shop now'},
 
     container.innerHTML=section('cat-banners',
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="dh-cat-banners">'+
@@ -353,7 +353,7 @@
       '<span style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px">'+esc(today[0])+'</span>'+
       '<h3 style="color:#fff;font-size:16px;font-weight:700;margin:8px 0 4px">'+esc(c1.t)+'</h3>'+
       '<p style="color:rgba(255,255,255,0.5);font-size:11px;margin:0 0 16px">'+esc(c1.s)+'</p>'+
-      '<a href="/pages/search-results?q='+encodeURIComponent(today[0])+'" style="color:'+RED+';font-size:12px;font-weight:600;text-decoration:none">Shop '+esc(today[0])+' ></a>'+
+      '<a href="/pages/search-results?q='+encodeURIComponent(today[0])+'" style="color:'+RED+';font-size:12px;font-weight:600;text-decoration:none">Shop '+esc(today[0])+'+ ~</a>'+
       '</div>'+
       '<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:28px">'+
       '<span style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.5px">'+esc(today[1])+'</span>'+
@@ -368,13 +368,12 @@
   // ============================================================
   function buildFlashDeals(container){
     apiFetch('/api/flash-deals').then(function(data){
-      var items=data.products||data||[];
+      var items=data.results||data.products||data||[];
       if(!items.length){container.style.display='none';return}
 
-      // Countdown — check for ends_at
+      // Countdown â check for ends_at
       var endsAt=data.ends_at?new Date(data.ends_at).getTime():0;
       var hasTimer=endsAt>Date.now();
-
       var header='<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">';
       header+='<h2 style="font-size:15px;font-weight:700;color:'+NAVY+';margin:0">Flash deals</h2>';
       if(hasTimer){
@@ -389,7 +388,7 @@
       var grid='<div class="dh-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px">';
       items.slice(0,5).forEach(function(p){
         var claimed=Math.floor(Math.random()*65)+30; // 30-95%
-        var card=productCard(p,{ctaType:'red',cta:'⚡ Grab Deal'});
+        var card=productCard(p,{ctaType:'red',cta:'â¡ Grab Deal'});
         // Inject claimed bar before closing </div></div>
         var barHtml='<div style="margin:0 12px 8px"><div style="background:#eee;border-radius:4px;height:4px;overflow:hidden"><div style="background:'+RED+';height:100%;width:'+claimed+'%;border-radius:4px"></div></div><div style="font-size:9px;color:#888;margin-top:2px">'+claimed+'% claimed</div></div>';
         // Insert before last </div>
@@ -407,8 +406,7 @@
         function updateTimer(){
           var diff=endsAt-Date.now();
           if(diff<=0){timerEl.innerHTML='<span style="color:#888;font-size:11px">Ended</span>';return}
-          var h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
-          timerEl.innerHTML=[h,m,s].map(function(v){return '<span style="background:'+NAVY+';color:'+RED+';padding:2px 6px;border-radius:4px;font-weight:700;font-size:14px;min-width:28px;text-align:center;display:inline-block">'+(v<10?'0':'')+v+'</span>'}).join('<span style="color:#999;font-weight:700"> : </span>');
+          var h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((&fØ+ov{}000000)+%Co5 ",uTimer.innerHTML=[h,m,s].map(function(v){return '<span style="background:'+NAVY+';color:'+RED+';padding:2px 6px;border-radius:4px;font-weight:700;font-size:14px;min-width:28px;text-align:center;display:inline-block">'+(v<10?'0':'')+v+'</span>'}).join('<span style="color:#999;font-weight:700"> : </span>');
           setTimeout(updateTimer,1000);
         }
         updateTimer();
@@ -421,13 +419,13 @@
   // ============================================================
   function buildNewThisWeek(container){
     apiFetch('/api/new-arrivals').then(function(data){
-      var items=data.products||data||[];
+      var items=data.results||data.products||data||[];
       var count=items.length||0;
       container.innerHTML=section('new-week',
         '<div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px">'+
         '<div style="width:48px;height:48px;background:'+NAVY+';border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:#fff;font-size:18px;font-weight:700">S</span></div>'+
         '<div style="flex:1"><div style="font-size:14px;font-weight:700;color:'+NAVY+'">New on StyleHub this week</div>'+
-        '<div style="font-size:12px;color:#888">'+count+' new products added from Amazon, AliExpress & Sephora — updated every 6 hours</div></div>'+
+        '<div style="font-size:12px;color:#888">'+count+' new products added from Amazon, AliExpress & Sephora â updated every 6 hours</div></div>'+
         '<a href="/pages/search-results?q=new" style="color:'+RED+';font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">See what\'s new ></a>'+
         '</div>');
     }).catch(function(){container.style.display='none'});
@@ -438,7 +436,7 @@
   // ============================================================
   function buildBestSellers(container){
     apiFetch('/api/bestsellers').then(function(data){
-      var items=(data.products||data||[]).slice(0,5);
+      var items=(data.results||data.products||data||[]).slice(0,5);
       if(!items.length){container.style.display='none';return}
 
       var grid='<div class="dh-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px">';
@@ -512,8 +510,8 @@
   // ============================================================
   function buildDiscoverMore(container){
     Promise.all([apiFetch('/api/featured?category=moda'),apiFetch('/api/trending')]).then(function(results){
-      var feat=results[0].products||results[0]||[];
-      var trend=results[1].products||results[1]||[];
+      var feat=results[0].results||results[0].products||results[0]||[];
+      var trend=results[1].results||results[1].products||results[1]||[];
       var all=feat.concat(trend);
       // Dedupe by id
       var seen={};
@@ -551,10 +549,10 @@
   // ============================================================
   function buildUSP(container){
     var items=[
-      {icon:'🔒',t:'Secure checkout',s:'SSL encrypted'},
-      {icon:'📦',t:'Tracked shipping',s:'Real-time tracking'},
-      {icon:'💰',t:'Best prices',s:'Up to 70% off'},
-      {icon:'💬',t:'24/7 support',s:'Always here to help'}
+      {icon:'ð',t:'Secure checkout',s:'SSL encrypted'},
+      {icon:'ð¦',t:'Tracked shipping',s:'Real-time tracking'},
+      {icon:'ð°',t:'Best prices',s:'Up to 70% off'},
+      {icon:'ð¬',t:'24/7 support',s:'Always here to help'}
     ];
     var grid='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center" class="dh-usp-grid">';
     items.forEach(function(i){
@@ -576,9 +574,8 @@
       '<p style="font-size:12px;color:rgba(255,255,255,0.6);margin:0 0 20px">Join 10,000+ shoppers. No spam, unsubscribe anytime.</p>'+
       '<form id="dh-newsletter-form" style="display:flex;max-width:420px;margin:0 auto">'+
       '<input type="email" placeholder="Enter your email" required style="flex:1;padding:12px 16px;border:none;border-radius:8px 0 0 8px;font-size:13px;outline:none">'+
-      '<button type="submit" style="background:'+RED+';color:#fff;border:none;padding:12px 24px;border-radius:0 8px 8px 0;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Subscribe</button>'+
+      '<button type="submit" style="background:'+RED+';color:#fff;border:none;padding:12px 24px;border-radius:8px 8px 8px 0;font-size:13px;font-weight:700;cursor:pointer;space:nowrap">Subscribe</button>'+
       '</form><div id="dh-newsletter-msg" style="margin-top:8px;font-size:12px;color:rgba(255,255,255,0.7)"></div></div>');
-
     document.getElementById('dh-newsletter-form').addEventListener('submit',function(e){
       e.preventDefault();
       var email=this.querySelector('input').value;
@@ -586,15 +583,14 @@
       msg.textContent='Subscribing...';
       // Try Shopify customer API
       fetch('/contact',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:'form_type=customer&email='+encodeURIComponent(email)+'&utf8=✓'})
+        body:'form_type=customer&email='+encodeURIComponent(email)+'&utf8=â'})
         .then(function(){msg.textContent='Thanks for subscribing!';msg.style.color='#22c55e'})
         .catch(function(){msg.textContent='Thanks! We\'ll keep you posted.';msg.style.color='#22c55e'});
     });
   }
 
   // ============================================================
-  // RESPONSIVE CSS
-  // ============================================================
+  // RESPONSIVE CSSJ // ============================================================
   function injectStyles(){
     var css=document.createElement('style');
     css.textContent=`
@@ -607,7 +603,7 @@
   }
 
   // ============================================================
-  // INIT — Build all sections in order
+  // INIT â Build all sections in order
   // ============================================================
   function init(){
     var root=document.getElementById('dealshub-home');
@@ -627,20 +623,20 @@
       root.appendChild(div);
     });
 
-    // Build in order — hero first, then parallel API calls
+    // Build in order â hero first, then parallel API calls
     var heroContainer=document.getElementById('dh-sec-hero');
     apiFetch('/api/trending').then(function(data){
-      buildHero(heroContainer,data.products||data||[]);
+      buildHero(heroContainer,data.results||data.products||data||[]);
       // Load hero side card thumbnails
       apiFetch('/api/flash-deals').then(function(fd){
-        var items=fd.products||fd||[];
+        var items=fd.results||fd.products||fd||[];
         if(items[0]&&items[0].image){
           var el=document.getElementById('dh-hero-flash-thumb');
           if(el)el.innerHTML='<img src="'+esc(items[0].image)+'" style="width:100%;height:100%;object-fit:contain">';
         }
       }).catch(function(){});
       apiFetch('/api/bestsellers').then(function(bs){
-        var items=bs.products||bs||[];
+        var items=bs.results||bs.products||bs||[];
         if(items[0]&&items[0].image){
           var el=document.getElementById('dh-hero-bs-thumb');
           if(el)el.innerHTML='<img src="'+esc(items[0].image)+'" style="width:100%;height:100%;object-fit:contain">';

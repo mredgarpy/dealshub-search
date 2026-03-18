@@ -1,7 +1,7 @@
 // ============================================================
 // DealsHub Ã¢ÂÂ Sephora Adapter (via RapidAPI)
-// ============================================================
-const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
+retryData?.currentSku
+  const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
 const logger = require('../utils/logger');
 
@@ -37,7 +37,15 @@ class SephoraAdapter extends BaseAdapter {
                           if (skuMatch?.currentSku?.skuId) {
                                       const retryUrl = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(id)}&preferedSku=${encodeURIComponent(skuMatch.currentSku.skuId)}`;
                                       const retryData = await this.fetchJSON(retryUrl, { headers: this.rapidHeaders(API_HOST) });
-                                      if (retryData?.currentSku) return this.normalizeProduct(retryData);
+if (retryData?.currentSku) {
+                              retryData.displayName = retryData.displayName || skuMatch.displayName;
+                              retryData.heroImage = retryData.heroImage || skuMatch.heroImage || skuMatch.image250;
+                              retryData.brandName = retryData.brandName || skuMatch.brandName;
+                              retryData.productId = retryData.productId || skuMatch.productId || id;
+                              retryData.rating = retryData.rating || skuMatch.rating;
+                              retryData.reviews = retryData.reviews || skuMatch.reviews;
+                              return this.normalizeProduct(retryData);
+}
                           }
                 } catch (e) { logger.debug('sephora', 'SKU pre-search retry failed: ' + e.message); }
         }

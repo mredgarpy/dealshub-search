@@ -334,6 +334,39 @@ app.get('/api/source-health', async (req, res) => {
   res.json({ sources: health, timestamp: new Date().toISOString() });
 });
 
+
+
+// ---- PRODUCT REVIEWS ----
+app.get('/api/reviews/:id', async (req, res) => {
+  const { id } = req.params;
+  const { store, source: sourceParam, limit = 10 } = req.query;
+  const source = (sourceParam || store || 'amazon').toLowerCase();
+
+  if (!VALID_SOURCES.includes(source)) {
+    return res.status(400).json({ error: 'Invalid source' });
+  }
+
+  const cacheKey = `reviews:${source}:${id}:${limit}`;
+  const cached = productCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const adapter = getAdapter(source);
+    if (!adapter || typeof adapter.getReviews !== 'function') {
+      return res.status(404).json({ error: 'Reviews not available for this source', source });
+    }
+
+    const reviews = await adapter.getReviews(id, parseInt(limit) || 10);
+    if (reviews) {
+      productCache.set(cacheKey, reviews);
+    }
+    res.json(reviews || { reviews: [], summary: null });
+  } catch (e) {
+    logger.error('reviews', 'Reviews fetch failed', { error: e.message, source, id });
+    res.status(500).json({ error: 'Failed to load reviews' });
+  }
+});
+
 // ============================================================
 // CAPA B â ON-DEMAND SYNC LAYER
 // ============================================================

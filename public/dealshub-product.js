@@ -265,11 +265,17 @@
     }
 
     function updatePriceDisplay(variant){
-      if(!variant || !variant.price) return;
-      var priceEl = container.querySelector('.dhpdp-info [style*="font-size:32px"]');
-      if(priceEl){
-        var vPrice = typeof variant.price === 'number' ? variant.price : parseFloat(String(variant.price).replace(/[^0-9.]/g,''));
-        if(vPrice > 0) priceEl.textContent = '$' + vPrice.toFixed(2);
+      if(!variant) return;
+      var vPrice = variant.price ? (typeof variant.price === 'number' ? variant.price : parseFloat(String(variant.price).replace(/[^0-9.]/g,''))) : 0;
+      if(vPrice <= 0) return;
+      // Find price element - look for the red price span
+      var priceEls = container.querySelectorAll('span');
+      for(var i=0;i<priceEls.length;i++){
+        var s = priceEls[i].style;
+        if(s.fontSize === '32px' && s.fontWeight === '700' && s.color){
+          priceEls[i].textContent = '$' + vPrice.toFixed(2);
+          break;
+        }
       }
     }
 
@@ -304,6 +310,14 @@
         if(variant){
           updatePriceDisplay(variant);
           updateMainImage(variant);
+        }
+        // Fallback: if variant has no image, use option value image from the clicked button
+        if(!variant || !variant.image){
+          var btnImg = this.querySelector('img');
+          if(btnImg && btnImg.src){
+            var mainImg = document.getElementById('dhpdp-main-img');
+            if(mainImg) mainImg.src = btnImg.src;
+          }
         }
       });
     });

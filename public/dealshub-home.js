@@ -69,7 +69,7 @@
     var badge=p.badge||'';
     var id=p.id||p.sourceId||'';
     var store=(p.source||'amazon').toLowerCase();
-    var url='/pages/product?id='+encodeURIComponent(id)+'&store='+encodeURIComponent(store)+'&title='+encodeURIComponent(title.substring(0,80));
+    var url='/pages/product?id='+encodeURIComponent(id)+'&store='+encodeURIComponent(store)+'&title='+encodeURIComponent(title.substring(0,80))+'&image='+encodeURIComponent(img);
 
     // CTA button style
     var ctaText=opts.cta||'View Deal';

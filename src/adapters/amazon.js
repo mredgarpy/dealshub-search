@@ -132,7 +132,7 @@ class AmazonAdapter extends BaseAdapter {
         const name = v.name || 'Option';
         if (!groups[name]) groups[name] = { name, values: [] };
         groups[name].values.push({
-          value: v.value || '',
+          value: v.value || '', image: v.photo || v.image || null,
           asin: v.asin || null,
           image: v.image || null,
           selected: v.is_selected || false

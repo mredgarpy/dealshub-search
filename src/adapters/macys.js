@@ -83,7 +83,7 @@ class MacysAdapter extends BaseAdapter {
     const url = `https://${API_HOST}/api/products/${encodeURIComponent(productId)}`;
     logger.info('macys', 'getProduct attempt', { productId });
     try {
-      const data = await this.fetchJSON(url, { headers: { ...this.rapidHeaders(API_HOST), 'Content-Type': 'application/json' } });
+      const data = await this.fetchWithRetry(url, { headers: { ...this.rapidHeaders(API_HOST), 'Content-Type': 'application/json' } });
 
       // Rate limit check
       if (data?.message && data.message.includes('rate limit')) {

@@ -1,6 +1,5 @@
 // ============================================================
 // DealsHub Ã¢ÂÂ Sephora Adapter (via RapidAPI)
-retryData?.currentSku
   const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
 const logger = require('../utils/logger');

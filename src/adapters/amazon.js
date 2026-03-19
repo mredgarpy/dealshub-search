@@ -21,7 +21,7 @@ class AmazonAdapter extends BaseAdapter {
 
   async getProduct(asin) {
     const url = `https://${API_HOST}/product-details?asin=${encodeURIComponent(asin)}&country=US`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+    const data = await this.fetchWithRetry(url, { headers: this.rapidHeaders(API_HOST) });
     if (!data || !data.data) {
       logger.warn('amazon', `Product not found: ${asin}`);
       const searchUrl = `https://${API_HOST}/search?query=${encodeURIComponent(asin)}&page=1&country=US`;

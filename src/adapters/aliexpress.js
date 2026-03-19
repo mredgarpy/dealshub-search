@@ -180,9 +180,13 @@ class AliExpressAdapter extends BaseAdapter {
     logger.warn('aliexpress', `All detail endpoints failed for ${productId}, trying search fallback`);
     const searchResults = await this.search(productId, 3);
     if (searchResults.length > 0) {
-      // Return first result as a product (limited data)
-      const best = searchResults.find(r => String(r.id) === String(productId)) || searchResults[0];
-      return this._searchResultToProduct(best);
+      // ONLY return if we find an exact ID match — never return a random product
+      const exact = searchResults.find(r => String(r.id) === String(productId));
+      if (exact) {
+        logger.info('aliexpress', `Search fallback found exact match for ${productId}`);
+        return this._searchResultToProduct(exact);
+      }
+      logger.warn('aliexpress', `Search fallback found no exact match for ${productId}, returning null`);
     }
 
     return null;

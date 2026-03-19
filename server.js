@@ -162,7 +162,16 @@ app.get('/api/product/:id', async (req, res) => {
       };
     }
 
-    productCache.set(cacheKey, product);
+    // Only cache if returned product matches requested ID (prevent stale fallback pollution)
+    const returnedId = String(product.sourceId || '');
+    const requestedId = String(id);
+    if (returnedId && returnedId !== requestedId) {
+      logger.warn('product', `Source returned mismatched product`, { requested: requestedId, returned: returnedId, source });
+      product._mismatch = true; // Flag but still return it for transparency
+    }
+    if (!product._mismatch) {
+      productCache.set(cacheKey, product);
+    }
     res.json(product);
   } catch (e) {
     logger.error('product', 'Product detail failed', { error: e.message, source, id });

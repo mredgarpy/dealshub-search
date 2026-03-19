@@ -148,9 +148,9 @@ class MacysAdapter extends BaseAdapter {
     // Badge from pricing.badges array or pricing.badge
     let badge = null;
     if (Array.isArray(pricing.badges) && pricing.badges.length) {
-      badge = pricing.badges[0]?.text || pricing.badges[0] || null;
+      badge = this._extractBadge(pricing.badges[0]);
     }
-    if (!badge && pricing.badge?.text) badge = pricing.badge.text;
+    if (!badge && pricing.badge) badge = this._extractBadge(pricing.badge);
 
     // Brand â new API returns string directly in detail.brand, old returns object
     const brand = typeof detail.brand === 'string' ? detail.brand :
@@ -261,9 +261,9 @@ class MacysAdapter extends BaseAdapter {
 
     // Badge
     if (Array.isArray(pricing.badges) && pricing.badges.length) {
-      p.badge = pricing.badges[0]?.text || pricing.badges[0] || null;
+      p.badge = this._extractBadge(pricing.badges[0]);
     }
-    if (!p.badge && pricing.badge?.text) p.badge = pricing.badge.text;
+    if (!p.badge && pricing.badge) p.badge = this._extractBadge(pricing.badge);
 
     // Rating â handle both aggregate and flat shapes
     const reviewStats = detail.reviewStatistics?.aggregate || detail.reviewStatistics || {};
@@ -381,9 +381,9 @@ class MacysAdapter extends BaseAdapter {
     product.reviews = reviewStats.count || reviewStats.reviewCount || 0;
 
     if (Array.isArray(pricing.badges) && pricing.badges.length) {
-      product.badge = pricing.badges[0]?.text || pricing.badges[0] || null;
+      product.badge = this._extractBadge(pricing.badges[0]);
     }
-    if (!product.badge && pricing.badge?.text) product.badge = pricing.badge.text;
+    if (!product.badge && pricing.badge) product.badge = this._extractBadge(pricing.badge);
 
     product.availability = 'In Stock';
     product.stockSignal = 'in_stock';
@@ -393,6 +393,14 @@ class MacysAdapter extends BaseAdapter {
     product.sourceUrl = p.url || `https://www.macys.com/shop/product/${product.sourceId}`;
     product.normalizedHandle = this._makeHandle(product.title);
     return product;
+  }
+
+
+  _extractBadge(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'string') return raw;
+    if (typeof raw === 'object') return raw.text || raw.description || raw.badgeText || null;
+    return String(raw);
   }
 
   _extractPrice(pricing) {

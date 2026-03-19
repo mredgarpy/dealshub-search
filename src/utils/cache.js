@@ -2,7 +2,7 @@
 // DealsHub — In-Memory Cache with TTL
 // ============================================================
 class MemoryCache {
-  constructor(defaultTTL = 300000) { // 5 min default
+  constructor(defaultTTL = 2114400000) { // 5 min default
     this.store = new Map();
     this.defaultTTL = defaultTTL;
     // Cleanup expired entries every 60s
@@ -46,8 +46,8 @@ class MemoryCache {
 }
 
 // Shared cache instances
-const searchCache = new MemoryCache(300000);  // 5 min for search
-const productCache = new MemoryCache(600000); // 10 min for product detail
-const syncCache = new MemoryCache(3600000);   // 1hr for sync mappings
+const searchCache = new MemoryCache(2114400000);  // 5 min for search
+const productCache = new MemoryCache(14400000); // 10 min for product detail
+const syncCache = new MemoryCache(314400000);   // 1hr for sync mappings
 
 module.exports = { MemoryCache, searchCache, productCache, syncCache };

@@ -138,13 +138,25 @@ class AliExpressAdapter extends BaseAdapter {
       try {
         const url = `https://${SEARCH_HOST}${endpoint}?itemId=${encodeURIComponent(productId)}`;
         const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
-        if (!data?.result) continue;
-
-        // Check for API-level error
-        if (data.result.status?.data === 'error' || data.result.status?.code >= 5000) {
-          logger.warn('aliexpress', `${endpoint} returned error`, { productId });
+        if (!data) {
+          logger.warn('aliexpress', `${endpoint} returned null/empty`, { productId });
           continue;
         }
+        if (!data.result) {
+          logger.warn('aliexpress', `${endpoint} no result key`, { productId, keys: Object.keys(data).join(','), statusCode: data.status_code || data.code || 'none' });
+          continue;
+        }
+
+        // Check for API-level error
+        const statusData = data.result.status?.data;
+        const statusCode = data.result.status?.code;
+        if (statusData === 'error' || (statusCode && statusCode >= 5000)) {
+          logger.warn('aliexpress', `${endpoint} returned error`, { productId, statusData, statusCode, msg: data.result.status?.msg || '' });
+          continue;
+        }
+
+        // Log what keys we got for diagnostics
+        logger.info('aliexpress', `${endpoint} response keys`, { productId, keys: Object.keys(data.result).join(','), hasItem: !!data.result.item });
 
         // item_detail_2 shape: { result: { status, settings, item: {...}, sku: {...}, ... } }
         if (data.result.item) {

@@ -279,7 +279,7 @@ app.get('/api/featured', async (req, res) => {
 
   try {
     const results = await Promise.allSettled(
-      ['amazon', 'aliexpress', 'shein'].map(source => {
+      ['amazon', 'aliexpress', 'sephora', 'macys', 'shein'].map(source => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(query, 4) : Promise.resolve([]);
       })
@@ -301,14 +301,26 @@ app.get('/api/flash-deals', async (req, res) => {
 
   try {
     const results = await Promise.allSettled(
-      ['amazon', 'aliexpress', 'shein'].map(source => {
+      ['amazon', 'aliexpress', 'sephora', 'macys', 'shein'].map(source => {
         const adapter = getAdapter(source);
-        const q = source === 'amazon' ? 'deals under 20' : source === 'aliexpress' ? 'flash deals' : 'flash sale';
-        return adapter ? adapter.search(q, 6) : Promise.resolve([]);
+        const q = source === 'amazon' ? 'deals best price'
+          : source === 'aliexpress' ? 'sale hot products discount'
+          : source === 'sephora' ? 'sale value set'
+          : source === 'macys' ? 'clearance sale'
+          : 'sale clearance';
+        return adapter ? adapter.search(q, 5) : Promise.resolve([]);
       })
     );
-    const all = interleaveFromSettled(results, 12);
-    const response = { results: all, section: 'flash-deals' };
+    const raw = interleaveFromSettled(results, 30);
+    // Filter: only products with real discounts, cap at 80%
+    const all = raw.filter(p => {
+      if (!p.originalPrice || !p.price) return true;
+      const orig = parseFloat(String(p.originalPrice).replace(/[^0-9.]/g, ''));
+      const curr = parseFloat(String(p.price).replace(/[^0-9.]/g, ''));
+      if (!orig || !curr || orig <= curr) return false;
+      return true;
+    }).slice(0, 15);
+    const response = { results: all.length > 0 ? all : raw.slice(0, 12), section: 'flash-deals' };
     searchCache.set(cacheKey, response, 300000); // 5 min
     res.json(response);
   } catch (e) {

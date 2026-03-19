@@ -219,6 +219,32 @@ class AmazonAdapter extends BaseAdapter {
     return product;
   }
 
+
+  async getReviews(asin, limit = 10) {
+    const url = `https://${API_HOST}/product-reviews?asin=${encodeURIComponent(asin)}&country=US&sort_by=TOP_REVIEWS&page_size=${limit}&page=1`;
+    const data = await this.fetchWithRetry(url, { headers: this.rapidHeaders(API_HOST) });
+    if (!data || !data.data?.reviews) return { reviews: [], summary: null };
+    return {
+      summary: {
+        rating: data.data.rating ? parseFloat(data.data.rating) : null,
+        totalRatings: data.data.total_ratings || 0,
+        totalReviews: data.data.total_reviews || 0,
+        starsBreakdown: data.data.rating_breakdown || null
+      },
+      reviews: (data.data.reviews || []).slice(0, limit).map(r => ({
+        id: r.review_id || '',
+        title: r.review_title || '',
+        body: r.review_comment || '',
+        rating: r.review_star_rating ? parseFloat(r.review_star_rating) : null,
+        author: r.review_author || 'Customer',
+        date: r.review_date || '',
+        verified: r.is_verified_purchase || false,
+        helpful: r.helpful_vote_count || 0,
+        images: Array.isArray(r.review_images) ? r.review_images : []
+      }))
+    };
+  }
+
   _makeHandle(title) {
     return (title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 100);
   }

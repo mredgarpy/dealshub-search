@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub â AliExpress Adapter (AliExpress DataHub via RapidAPI)
+// DealsHub — AliExpress Adapter (AliExpress DataHub via RapidAPI)
 // Corrected: underscore URL paths, new response shapes
 // Working endpoints: item_search_3, item_detail_2
 // ============================================================
@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 
 const SEARCH_HOST = 'aliexpress-datahub.p.rapidapi.com';
 
-// Endpoint fallback chains â ordered by reliability
+// Endpoint fallback chains — ordered by reliability
 const SEARCH_ENDPOINTS = [
   '/item_search_3',  // Confirmed working 2026-03-17
   '/item_search_2',  // Returns 5003 intermittently
@@ -84,7 +84,7 @@ class AliExpressAdapter extends BaseAdapter {
   _extractSearchItems(result) {
     let items = [];
 
-    // SHAPE 1 (PRIMARY): result.resultList â array of { item: {...} }
+    // SHAPE 1 (PRIMARY): result.resultList — array of { item: {...} }
     // This is the confirmed shape for item_search_3 as of 2026-03-17
     if (result.resultList) {
       const rl = result.resultList;
@@ -151,7 +151,7 @@ class AliExpressAdapter extends BaseAdapter {
           logger.info('aliexpress', `Detail success via ${endpoint}`, { productId });
           const product = this.normalizeProduct(data.result);
           if (product && product.price) return product;
-          // Detail returned data but no price â try to fill price from search
+          // Detail returned data but no price — try to fill price from search
           if (product) {
             logger.warn('aliexpress', `Detail returned no price via ${endpoint}, trying search for price`, { productId });
             const priceProduct = await this._fillPriceFromSearch(product, productId);
@@ -181,15 +181,14 @@ class AliExpressAdapter extends BaseAdapter {
     const searchResults = await this.search(productId, 3);
     if (searchResults.length > 0) {
       // Return first result as a product (limited data)
-      const best = searchResults.find(r => String(r.id) === String(productId)) || searchResults[0] || null;
-      if (!best) return null;
+      const best = searchResults.find(r => String(r.id) === String(productId)) || searchResults[0];
       return this._searchResultToProduct(best);
     }
 
     return null;
   }
 
-  // Normalize search result item â handles both new (item_search_3) and legacy shapes
+  // Normalize search result item — handles both new (item_search_3) and legacy shapes
   normalizeSearchResult(p) {
     if (!p) return null;
 
@@ -251,17 +250,16 @@ class AliExpressAdapter extends BaseAdapter {
     // item_detail_2 shape: data has { item, sku, seller, shipping, ... }
     // Legacy shape: data IS the product directly
     const item = d.item || d;
-    const skuData = d.sku || item.sku || d.skuModule || {}
-  
-    const sellerData = d.seller || item.seller || d.store || d.storeModule || {};
-    const shippingData = d.shipping || d.delivery || item.shipping || d.shippingModule || d.deliveryModule || {};
+    const skuData = d.sku || d.skuModule || {};
+    const sellerData = d.seller || d.store || d.storeModule || {};
+    const shippingData = d.shipping || d.shippingModule || d.deliveryModule || {};
 
     p.sourceId = String(item.itemId || item.productId || d.itemId || d.productId || '');
     p.title = item.title || item.subject || d.title || d.subject || '';
     p.brand = sellerData.storeName || sellerData.name || d.storeName || d.store?.name || null;
     p.category = item.catId ? `Category ${item.catId}` : d.categoryName || null;
 
-    // Breadcrumbs â item_detail_2 has item.breadcrumbs[]
+    // Breadcrumbs — item_detail_2 has item.breadcrumbs[]
     if (item.breadcrumbs?.length) {
       p.breadcrumbs = item.breadcrumbs.map(b => b.title || b.name || b).filter(Boolean);
     } else if (d.breadcrumbs?.length) {
@@ -286,7 +284,23 @@ class AliExpressAdapter extends BaseAdapter {
       if (specLines.length) descParts.push(specLines.join('\n'));
     }
     if (d.pageModule?.description) descParts.push(d.pageModule.description);
+    // Also try item.specs or item.itemProperties for specs-based description
+    if (item.itemProperties?.length) {
+      const specLines = item.itemProperties.filter(sp => sp.name && sp.value).map(sp => `${sp.name}: ${sp.value}`);
+      if (specLines.length) descParts.push(specLines.join('\n'));
+    }
+    if (item.specs?.length) {
+      const specLines = item.specs.filter(sp => sp.attrName && sp.attrValue).map(sp => `${sp.attrName}: ${sp.attrValue}`);
+      if (specLines.length) descParts.push(specLines.join('\n'));
+    }
     p.description = descParts.join('\n\n') || '';
+    // Fallback: if no description, build one from available data (title, category, options)
+    if (!p.description && p.title) {
+      const descFallback = [];
+      descFallback.push(p.title);
+      if (p.breadcrumbs?.length) descFallback.push('Category: ' + p.breadcrumbs.join(' > '));
+      p.description = descFallback.join('. ');
+    }
 
     // Bullets
     p.bullets = [];
@@ -307,7 +321,7 @@ class AliExpressAdapter extends BaseAdapter {
       p.bullets.unshift(d.titleModule.subject);
     }
 
-    // Images â item_detail_2 has item.images[]
+    // Images — item_detail_2 has item.images[]
     const imgSources = item.images || d.images || d.imagePathList || d.imageModule?.imagePathList || [];
     p.images = imgSources.map(img => {
       if (typeof img === 'string') return img;
@@ -316,7 +330,7 @@ class AliExpressAdapter extends BaseAdapter {
     p.images = p.images.map(url => url.startsWith('//') ? 'https:' + url : url);
     p.primaryImage = p.images[0] || '';
 
-    // Price â item_detail_2: sku.def.price (can be range "20.91 - 34.71"), sku.def.promotionPrice
+    // Price — item_detail_2: sku.def.price (can be range "20.91 - 34.71"), sku.def.promotionPrice
     const skuDef = skuData.def || {};
     const defPrice = typeof skuDef.price === 'string' && skuDef.price.includes('-')
       ? skuDef.price.split('-')[0].trim() // Take low end of range
@@ -354,7 +368,7 @@ class AliExpressAdapter extends BaseAdapter {
               salesNum > 1000 ? 'Popular' :
               (p.rating && p.rating >= 4.8 ? 'Top Rated' : null);
 
-    // Availability â item_detail_2 has item.available
+    // Availability — item_detail_2 has item.available
     p.availability = item.available === false ? 'Out of Stock' : 'In Stock';
     p.stockSignal = item.available === false ? 'out_of_stock' : 'in_stock';
     if (skuDef.quantity === 0 || d.quantityModule?.totalAvailQuantity === 0 || d.inventory === 0) {
@@ -362,19 +376,30 @@ class AliExpressAdapter extends BaseAdapter {
       p.stockSignal = 'out_of_stock';
     }
 
-    // Variants â item_detail_2: sku.base[] with { skuId, propMap, price, promotionPrice, quantity }
+    // Variants — item_detail_2: sku.base[] with { skuId, propMap, price, promotionPrice, quantity }
     // Also sku.props[] for option definitions
+    // Build propId:valueId → readable name mapping for resolving coded variant titles
+    const propIdMap = {};    // e.g. "14:200003699" → "black"
+    const propImageMap = {}; // e.g. "14:200003699" → "https://..."
+
     if (skuData.props?.length) {
       skuData.props.forEach(prop => {
+        const pid = String(prop.pid || prop.skuPropertyId || '');
+        const values = prop.values || prop.skuPropertyValues || [];
         const option = {
           name: prop.name || prop.skuPropertyName || 'Option',
-          values: (prop.values || prop.skuPropertyValues || []).map(v => ({
-            value: v.name || v.propertyValueDefinitionName || v.propertyValueName || '',
-            image: v.image ? (v.image.startsWith('//') ? 'https:' + v.image : v.image) :
-                   v.skuPropertyImagePath ? (v.skuPropertyImagePath.startsWith('//') ? 'https:' + v.skuPropertyImagePath : v.skuPropertyImagePath) : null,
-            id: v.id || v.propertyValueId || null,
-            selected: false
-          }))
+          values: values.map(v => {
+            const vid = String(v.vid || v.id || v.propertyValueId || '');
+            const valName = v.name || v.propertyValueDefinitionName || v.propertyValueName || '';
+            const img = v.image ? (v.image.startsWith('//') ? 'https:' + v.image : v.image) :
+                        v.skuPropertyImagePath ? (v.skuPropertyImagePath.startsWith('//') ? 'https:' + v.skuPropertyImagePath : v.skuPropertyImagePath) : null;
+            // Build mapping: "pid:vid" → readable name and image
+            if (pid && vid && valName) {
+              propIdMap[`${pid}:${vid}`] = valName;
+              if (img) propImageMap[`${pid}:${vid}`] = img;
+            }
+            return { value: valName, image: img, id: vid || null, selected: false };
+          })
         };
         if (option.values.length) p.options.push(option);
       });
@@ -382,34 +407,60 @@ class AliExpressAdapter extends BaseAdapter {
     // Legacy: productSKUPropertyList
     if (!p.options.length && d.skuModule?.productSKUPropertyList) {
       d.skuModule.productSKUPropertyList.forEach(prop => {
+        const pid = String(prop.skuPropertyId || '');
+        const values = prop.skuPropertyValues || [];
         const option = {
           name: prop.skuPropertyName || 'Option',
-          values: (prop.skuPropertyValues || []).map(v => ({
-            value: v.propertyValueDefinitionName || v.propertyValueName || '',
-            image: v.skuPropertyImagePath ? (v.skuPropertyImagePath.startsWith('//') ? 'https:' + v.skuPropertyImagePath : v.skuPropertyImagePath) : null,
-            id: v.propertyValueId || null,
-            selected: false
-          }))
+          values: values.map(v => {
+            const vid = String(v.propertyValueId || '');
+            const valName = v.propertyValueDefinitionName || v.propertyValueName || '';
+            const img = v.skuPropertyImagePath ? (v.skuPropertyImagePath.startsWith('//') ? 'https:' + v.skuPropertyImagePath : v.skuPropertyImagePath) : null;
+            if (pid && vid && valName) {
+              propIdMap[`${pid}:${vid}`] = valName;
+              if (img) propImageMap[`${pid}:${vid}`] = img;
+            }
+            return { value: valName, image: img, id: vid || null, selected: false };
+          })
         };
         p.options.push(option);
       });
     }
 
-    // SKU variants
+    // Helper: resolve coded propMap like "14:200003699;5:100014065" to "black / S"
+    function resolvePropMap(propMap) {
+      if (!propMap || !Object.keys(propIdMap).length) return propMap || '';
+      const parts = propMap.split(';').map(part => {
+        const key = part.trim();
+        return propIdMap[key] || key; // fallback to raw key if not found
+      });
+      return parts.join(' / ');
+    }
+
+    // Helper: find first image from propMap segments
+    function resolveVariantImage(propMap) {
+      if (!propMap || !Object.keys(propImageMap).length) return null;
+      for (const part of propMap.split(';')) {
+        const img = propImageMap[part.trim()];
+        if (img) return img;
+      }
+      return null;
+    }
+
+    // SKU variants — resolve coded titles to human-readable names
     if (skuData.base?.length) {
       p.variants = skuData.base.map(sku => ({
         id: String(sku.skuId || ''),
-        title: sku.propMap || '',
+        title: resolvePropMap(sku.propMap),
         price: parsePrice(sku.promotionPrice || sku.price) || p.price,
-        image: null,
+        image: resolveVariantImage(sku.propMap),
         available: (sku.quantity || 0) > 0
       }));
     } else if (d.skuModule?.skuPriceList) {
       p.variants = d.skuModule.skuPriceList.map(sku => ({
         id: String(sku.skuId || ''),
-        title: sku.skuAttr || sku.skuPropIds || '',
+        title: resolvePropMap(sku.skuAttr || sku.skuPropIds || ''),
         price: parsePrice(sku.skuVal?.actSkuCalPrice || sku.skuVal?.skuCalPrice) || p.price,
-        image: null,
+        image: resolveVariantImage(sku.skuAttr || sku.skuPropIds || ''),
         available: (sku.skuVal?.availQuantity || 0) > 0
       }));
     }

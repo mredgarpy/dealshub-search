@@ -24,7 +24,7 @@ class SephoraAdapter extends BaseAdapter {
     const productIdParam = isProductId ? id : id;
     const skuParam = isProductId ? '' : id;
     const url = `https://${API_HOST}/us/products/v2/detail?productId=${encodeURIComponent(productIdParam)}${skuParam ? '&preferedSku=' + encodeURIComponent(skuParam) : ''}`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+    const data = await this.fetchWithRetry(url, { headers: this.rapidHeaders(API_HOST) });
     if (data?.currentSku) return this.normalizeProduct(data);
 
         // FIX: If detail returned 204/null, try getting skuId from search first

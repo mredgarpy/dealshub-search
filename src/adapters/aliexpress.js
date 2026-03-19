@@ -266,7 +266,7 @@ class AliExpressAdapter extends BaseAdapter {
     // item_detail_2 shape: data has { item, sku, seller, shipping, ... }
     // Legacy shape: data IS the product directly
     const item = d.item || d;
-    const skuData = d.sku || d.skuModule || {};
+    const skuData = d.sku || item.sku || d.skuModule || {};
     const sellerData = d.seller || d.store || d.storeModule || {};
     const shippingData = d.shipping || d.shippingModule || d.deliveryModule || {};
 
@@ -347,7 +347,21 @@ class AliExpressAdapter extends BaseAdapter {
     p.primaryImage = p.images[0] || '';
 
     // Price — item_detail_2: sku.def.price (can be range "20.91 - 34.71"), sku.def.promotionPrice
-    const skuDef = skuData.def || {};
+    // Also check item.sku (some API responses nest sku inside item)
+    const skuDef = skuData.def || item.sku?.def || {};
+
+    // Log price diagnostic info
+    logger.info('aliexpress', 'Price extraction debug', {
+      productId: p.sourceId,
+      hasSkuData: !!d.sku,
+      hasItemSku: !!item.sku,
+      skuDefKeys: Object.keys(skuDef).join(',') || 'empty',
+      itemKeys: Object.keys(item).slice(0, 15).join(','),
+      itemPrice: item.price || item.salePrice || item.promotionPrice || 'none',
+      dPrice: d.price || 'none',
+      settingsPrice: d.settings?.price || 'none'
+    });
+
     const defPrice = typeof skuDef.price === 'string' && skuDef.price.includes('-')
       ? skuDef.price.split('-')[0].trim() // Take low end of range
       : skuDef.price;
@@ -357,6 +371,8 @@ class AliExpressAdapter extends BaseAdapter {
 
     p.price = parsePrice(
       defPromoPrice || defPrice ||
+      item.sku?.def?.promotionPrice || item.sku?.def?.price ||
+      item.price || item.salePrice || item.promotionPrice ||
       d.price?.minPrice || d.price?.minAmount?.value || d.currentPrice ||
       d.salePrice || d.priceModule?.minPrice || d.priceModule?.actMinPrice
     );
@@ -364,7 +380,9 @@ class AliExpressAdapter extends BaseAdapter {
       ? skuDef.price.split('-')[1].trim() // Take high end as "original"
       : skuDef.price;
     p.originalPrice = parsePrice(
-      origPriceRaw || d.price?.maxPrice || d.price?.maxAmount?.value || d.originalPrice ||
+      origPriceRaw || item.sku?.def?.price ||
+      item.originalPrice || item.retailPrice ||
+      d.price?.maxPrice || d.price?.maxAmount?.value || d.originalPrice ||
       d.retailPrice || d.priceModule?.maxPrice
     );
     if (p.originalPrice && p.price && p.originalPrice <= p.price) p.originalPrice = null;

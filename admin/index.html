@@ -416,18 +416,24 @@ async function loadDashboard() {
         document.getElementById('stat-mappings').textContent = stats.totalMappings || 0;
         document.getElementById('stat-syncs').textContent = stats.recentSyncs || 0;
 
-        // Source health
-        const online = Object.values(health).filter(h => h.status === 'up').length;
+        // Source health — normalize response format
+        const src = health.sources || health;
+        const normalize = (h) => {
+            if (!h) return { status: 'unknown', latency: null };
+            const st = (h.status === 'ok' || h.status === 'up') ? 'up' : h.status === 'degraded' ? 'degraded' : h.status || 'unknown';
+            return { status: st, latency: h.latencyMs || h.latency || null, lastChecked: h.lastChecked };
+        };
+        const online = SOURCES.filter(s => normalize(src[s]).status === 'up').length;
         document.getElementById('stat-sources').textContent = `${online}/5`;
 
         // Source cards
         const grid = document.getElementById('dashboard-sources');
         grid.innerHTML = SOURCES.map(s => {
-            const h = health[s] || { status: 'unknown', latency: null };
+            const h = normalize(src[s]);
             const dotClass = h.status === 'up' ? 'up' : h.status === 'degraded' ? 'degraded' : 'down';
             return `<div class="source-card">
                 <div class="source-name">${s}</div>
-                <div class="source-status"><span class="source-dot ${dotClass}"></span>${h.status || 'unknown'}</div>
+                <div class="source-status"><span class="source-dot ${dotClass}"></span>${h.status}</div>
                 <div class="source-latency">${h.latency ? h.latency + 'ms' : '—'}</div>
             </div>`;
         }).join('');
@@ -642,15 +648,18 @@ async function loadSourceHealth() {
     const grid = document.getElementById('health-grid');
     try {
         const health = await api('/api/source-health');
+        const src = health.sources || health;
         grid.innerHTML = SOURCES.map(s => {
-            const h = health[s] || { status: 'unknown' };
-            const dotClass = h.status === 'up' ? 'up' : h.status === 'degraded' ? 'degraded' : 'down';
-            const bg = h.status === 'up' ? '#F0FFF4' : h.status === 'degraded' ? '#FFFFF0' : '#FFF5F5';
+            const raw = src[s] || { status: 'unknown' };
+            const st = (raw.status === 'ok' || raw.status === 'up') ? 'up' : raw.status === 'degraded' ? 'degraded' : raw.status || 'unknown';
+            const lat = raw.latencyMs || raw.latency || null;
+            const dotClass = st === 'up' ? 'up' : st === 'degraded' ? 'degraded' : 'down';
+            const bg = st === 'up' ? '#F0FFF4' : st === 'degraded' ? '#FFFFF0' : '#FFF5F5';
             return `<div class="source-card" style="background:${bg}">
                 <div class="source-name">${s}</div>
-                <div class="source-status"><span class="source-dot ${dotClass}"></span>${h.status || 'unknown'}</div>
-                <div class="source-latency">${h.latency ? 'Latency: ' + h.latency + 'ms' : ''}</div>
-                <div style="font-size:.72rem;color:var(--gray-400);margin-top:6px;">${h.lastChecked ? 'Checked: ' + new Date(h.lastChecked).toLocaleTimeString() : ''}</div>
+                <div class="source-status"><span class="source-dot ${dotClass}"></span>${st}</div>
+                <div class="source-latency">${lat ? 'Latency: ' + lat + 'ms' : ''}</div>
+                <div style="font-size:.72rem;color:var(--gray-400);margin-top:6px;">${raw.resultCount !== undefined ? 'Results: ' + raw.resultCount : ''}</div>
             </div>`;
         }).join('');
     } catch(e) {

@@ -1,7 +1,33 @@
 // ============================================================
-// StyleHub — Shipping Estimation Service
+// StyleHub — Shipping Estimation Service v2.0
 // Calculates shipping costs and delivery estimates by source
+// Now reads from DB rules with fallback to hardcoded profiles
 // ============================================================
+
+const logger = require('../utils/logger');
+
+// Cache DB shipping rules in memory (refreshed every 5 minutes)
+let _dbShippingCache = null;
+let _dbShippingCacheTime = 0;
+const DB_SHIPPING_TTL = 300000;
+
+function _loadDbShippingRules() {
+  if (_dbShippingCache && Date.now() - _dbShippingCacheTime < DB_SHIPPING_TTL) {
+    return _dbShippingCache;
+  }
+  try {
+    const { getShippingRules } = require('../utils/db');
+    const rules = getShippingRules();
+    if (rules && rules.length > 0) {
+      _dbShippingCache = rules.filter(r => r.is_active);
+      _dbShippingCacheTime = Date.now();
+      return _dbShippingCache;
+    }
+  } catch (e) {
+    // DB not available
+  }
+  return null;
+}
 
 const SHIPPING_PROFILES = {
   amazon: {
@@ -63,6 +89,28 @@ const RETURN_POLICIES = {
 };
 
 function getShippingOptions(source, region = 'domestic') {
+  // Try DB rules first
+  const dbRules = _loadDbShippingRules();
+  if (dbRules && dbRules.length > 0) {
+    const sourceRules = dbRules.filter(r =>
+      r.source_store === source && (r.region || 'domestic') === region
+    );
+    if (sourceRules.length > 0) {
+      const result = {};
+      sourceRules.forEach(r => {
+        result[r.method || 'standard'] = {
+          cost: r.cost,
+          minDays: r.min_days,
+          maxDays: r.max_days,
+          label: r.label || `${r.method} (${r.min_days}-${r.max_days} days)`,
+          ruleId: r.id
+        };
+      });
+      return result;
+    }
+  }
+
+  // Fallback to hardcoded profiles
   const profile = SHIPPING_PROFILES[source];
   if (!profile) return getDefaultShipping();
   return profile[region] || profile.domestic || getDefaultShipping();
@@ -79,6 +127,55 @@ function getShippingEstimate(source, price = 0) {
     maxDays: standard.maxDays,
     label: standard.label,
     note: standard.cost === 0 ? 'FREE Shipping' : `Shipping: $${standard.cost.toFixed(2)}`
+  };
+}
+
+/**
+ * Get full shipping quote for a product (used by PDP and cart)
+ * Merges source-specific API data with our shipping rules
+ */
+function getShippingQuote(source, productData = {}) {
+  const estimate = getShippingEstimate(source);
+  const returnPolicy = getReturnPolicy(source);
+
+  // Override with product-level shipping data if available from source API
+  const sourceShipping = productData.shippingData || {};
+  const sourceDelivery = productData.deliveryEstimate || {};
+
+  return {
+    source,
+    shipping: {
+      cost: sourceShipping.cost != null ? sourceShipping.cost : estimate.cost,
+      freeShipping: sourceShipping.cost === 0 || estimate.freeShipping,
+      minDays: sourceDelivery.minDays || estimate.minDays,
+      maxDays: sourceDelivery.maxDays || estimate.maxDays,
+      label: sourceDelivery.label || estimate.label,
+      note: sourceShipping.note || estimate.note,
+      method: sourceShipping.method || 'Standard'
+    },
+    returnPolicy,
+    allOptions: getShippingOptions(source),
+    deliveryPromise: _buildDeliveryPromise(
+      sourceDelivery.minDays || estimate.minDays,
+      sourceDelivery.maxDays || estimate.maxDays
+    )
+  };
+}
+
+function _buildDeliveryPromise(minDays, maxDays) {
+  const now = new Date();
+  const minDate = new Date(now);
+  minDate.setDate(minDate.getDate() + minDays);
+  const maxDate = new Date(now);
+  maxDate.setDate(maxDate.getDate() + maxDays);
+
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return {
+    earliest: fmt(minDate),
+    latest: fmt(maxDate),
+    label: `${fmt(minDate)} – ${fmt(maxDate)}`,
+    minDays,
+    maxDays
   };
 }
 
@@ -104,11 +201,19 @@ function getDefaultShipping() {
   };
 }
 
+// Invalidate cache after admin updates
+function invalidateShippingCache() {
+  _dbShippingCache = null;
+  _dbShippingCacheTime = 0;
+}
+
 module.exports = {
   getShippingOptions,
   getShippingEstimate,
+  getShippingQuote,
   getReturnPolicy,
   calculateShippingMarkup,
+  invalidateShippingCache,
   SHIPPING_PROFILES,
   RETURN_POLICIES
 };

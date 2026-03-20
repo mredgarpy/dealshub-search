@@ -32,6 +32,8 @@ const {
 } = require('../utils/db');
 const { getAdapter } = require('../adapters');
 const { prepareCart } = require('../services/shopify-sync');
+const { invalidatePricingCache } = require('../utils/pricing');
+const { invalidateShippingCache } = require('../services/shipping');
 
 // ============================================================
 // PRICING RULES
@@ -93,6 +95,7 @@ router.post('/pricing-rules', (req, res) => {
     }
 
     logger.info('admin', id ? 'Updated pricing rule' : 'Created pricing rule', { source_store });
+    invalidatePricingCache();
 
     res.json({
       success: true,
@@ -134,6 +137,7 @@ router.delete('/pricing-rules/:id', (req, res) => {
     }
 
     logger.info('admin', 'Deleted pricing rule', { id });
+    invalidatePricingCache();
 
     res.json({
       success: true,
@@ -208,6 +212,7 @@ router.post('/shipping-rules', (req, res) => {
     }
 
     logger.info('admin', id ? 'Updated shipping rule' : 'Created shipping rule', { source_store });
+    invalidateShippingCache();
 
     res.json({
       success: true,
@@ -249,6 +254,7 @@ router.delete('/shipping-rules/:id', (req, res) => {
     }
 
     logger.info('admin', 'Deleted shipping rule', { id });
+    invalidateShippingCache();
 
     res.json({
       success: true,

@@ -45,7 +45,8 @@ const { searchCache, productCache } = require('./src/utils/cache');
 const { initAdapters, getAdapter, getAllAdapters, VALID_SOURCES } = require('./src/adapters');
 const { prepareCart } = require('./src/services/shopify-sync');
 const { calculateFinalPrice, parsePrice } = require('./src/utils/pricing');
-const { getShippingEstimate, getReturnPolicy, getShippingOptions } = require('./src/services/shipping');
+const { getShippingEstimate, getReturnPolicy, getShippingOptions, getShippingQuote, invalidateShippingCache } = require('./src/services/shipping');
+const { invalidatePricingCache } = require('./src/utils/pricing');
 const adminRouter = require('./src/routes/admin');
 
 // Initialize adapters
@@ -734,6 +735,37 @@ app.get('/api/shipping/:source', (req, res) => {
   const returnPolicy = getReturnPolicy(source);
   const options = getShippingOptions(source);
   res.json({ source, shipping: estimate, returnPolicy, allOptions: options });
+});
+
+// ---- SHIPPING QUOTE (for PDP — merges source data with rules) ----
+app.get('/api/shipping-quote', async (req, res) => {
+  const { source, id } = req.query;
+  if (!source || !id) return res.status(400).json({ error: 'Missing source and id' });
+  if (!VALID_SOURCES.includes(source.toLowerCase())) {
+    return res.status(400).json({ error: 'Invalid source' });
+  }
+
+  const cacheKey = `shipquote:${source}:${id}`;
+  const cached = productCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    // Try to get product data for source-specific shipping info
+    let productData = productCache.get(`product:${source}:${id}`);
+    if (!productData) {
+      const adapter = getAdapter(source.toLowerCase());
+      if (adapter) {
+        productData = await adapter.getProduct(id);
+      }
+    }
+    const quote = getShippingQuote(source.toLowerCase(), productData || {});
+    productCache.set(cacheKey, quote, 3600000); // 1hr
+    res.json(quote);
+  } catch (e) {
+    // Fallback to basic estimate
+    const quote = getShippingQuote(source.toLowerCase(), {});
+    res.json(quote);
+  }
 });
 
 // ---- ORDER STATUS (proxy to Shopify) ----

@@ -53,7 +53,7 @@ class SheinAdapter extends BaseAdapter {
     return [];
   }
 
-  async getProduct(productId) {
+  async getProduct(productId, opts = {}) {
     // Try multiple detail endpoint variations
     const detailEndpoints = [
       `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD`,
@@ -112,6 +112,28 @@ class SheinAdapter extends BaseAdapter {
       }
       logger.warn('shein', `Search fallback found no exact ID match for ${productId}`);
     }
+
+    // Last resort: search by title if provided (SHEIN detail API often returns 204)
+    if (opts.title) {
+      logger.info('shein', `Trying title-based search fallback for ${productId}`, { title: opts.title });
+      const titleUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(opts.title)}&language=en&country=US&currency=USD&page=1&limit=5`;
+      const tData = await this.fetchJSON(titleUrl, { headers: this.rapidHeaders(API_HOST) });
+      const titleProducts = tData?.info?.products || tData?.products || [];
+      if (titleProducts.length) {
+        // Try exact ID match first
+        const exactById = titleProducts.find(p => String(p.goods_id) === String(productId));
+        if (exactById) {
+          logger.info('shein', `Title search found exact ID match for ${productId}`);
+          return this.normalizeProductFromSearch(exactById);
+        }
+        // If no exact ID match, return first result but override the sourceId
+        logger.info('shein', `Title search returning best match for ${productId}`, { matchId: titleProducts[0].goods_id });
+        const result = this.normalizeProductFromSearch(titleProducts[0]);
+        result.sourceId = String(productId); // Keep original ID for consistency
+        return result;
+      }
+    }
+
     return null;
   }
 

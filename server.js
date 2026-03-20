@@ -124,8 +124,18 @@ app.get('/api/search', async (req, res) => {
 });
 
 // ---- UNIFIED PRODUCT DETAIL ----
-app.get('/api/product/:id', async (req, res) => {
-  const { id } = req.params;
+// Supports both: GET /api/product/:id?source=amazon  AND  GET /api/product?source=amazon&id=XXX
+app.get('/api/product', (req, res) => {
+  if (req.query.id) {
+    req.params = { id: req.query.id };
+    return productDetailHandler(req, res);
+  }
+  return res.status(400).json({ error: 'Missing id parameter' });
+});
+app.get('/api/product/:id', (req, res) => productDetailHandler(req, res));
+
+async function productDetailHandler(req, res) {
+  const id = req.params.id;
   const { store, source: sourceParam } = req.query;
   const source = (sourceParam || store || 'amazon').toLowerCase();
 
@@ -191,7 +201,7 @@ app.get('/api/product/:id', async (req, res) => {
     logger.error('product', 'Product detail failed', { error: e.message, source, id });
     res.status(500).json({ error: 'Failed to load product' });
   }
-});
+}
 
 // ---- SEARCH BY INDIVIDUAL SOURCE (backward compatible) ----
 VALID_SOURCES.forEach(source => {
@@ -213,6 +223,48 @@ VALID_SOURCES.forEach(source => {
       res.json([]);
     }
   });
+});
+
+// ---- SEARCH SUGGESTIONS (lightweight, fast) ----
+app.get('/api/search-suggest', async (req, res) => {
+  const { q } = req.query;
+  if (!q || q.length < 2) return res.json({ suggestions: [] });
+
+  const cacheKey = `suggest:${q}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    // Quick search across Amazon and one fast source for suggestions
+    const results = await Promise.allSettled([
+      getAdapter('amazon')?.search(q, 4) || Promise.resolve([]),
+      getAdapter('aliexpress')?.search(q, 3) || Promise.resolve([])
+    ]);
+
+    const suggestions = [];
+    results.forEach(r => {
+      if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+        r.value.forEach(p => {
+          if (p && p.title && suggestions.length < 6) {
+            suggestions.push({
+              title: p.title.substring(0, 80),
+              price: p.price,
+              image: p.image,
+              source: p.source,
+              id: p.id
+            });
+          }
+        });
+      }
+    });
+
+    const response = { query: q, suggestions };
+    searchCache.set(cacheKey, response, 600000); // 10 min cache
+    res.json(response);
+  } catch (e) {
+    logger.error('suggest', 'Search suggest failed', { error: e.message, query: q });
+    res.json({ suggestions: [] });
+  }
 });
 
 // ---- TRENDING ----
@@ -348,6 +400,33 @@ app.get('/api/flash-deals', async (req, res) => {
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- RELATED PRODUCTS ----
+app.get('/api/related', async (req, res) => {
+  const { source, id, title, limit = 6 } = req.query;
+  if (!source || !id) return res.status(400).json({ error: 'Missing source and id' });
+
+  const cacheKey = `related:${source}:${id}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    // Use product title as search query to find similar items
+    const searchQuery = title ? title.split(' ').slice(0, 3).join(' ') : id;
+    const adapter = getAdapter(source);
+    if (!adapter) return res.json({ results: [] });
+
+    const results = await adapter.search(searchQuery, parseInt(limit) + 2);
+    // Filter out the current product
+    const filtered = (results || []).filter(r => String(r.id) !== String(id)).slice(0, parseInt(limit));
+    const response = { results: filtered, source, relatedTo: id };
+    searchCache.set(cacheKey, response, 1800000); // 30 min
+    res.json(response);
+  } catch (e) {
+    logger.error('related', 'Related products failed', { error: e.message, source, id });
+    res.json({ results: [] });
   }
 });
 

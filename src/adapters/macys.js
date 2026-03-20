@@ -102,19 +102,24 @@ class MacysAdapter extends BaseAdapter {
       logger.warn('macys', 'Product detail endpoint failed', { productId, error: e.message });
     }
 
-    // Fallback: search by ID (use trailing-slash path + Content-Type header)
-    try {
-      const searchUrl = `https://${API_HOST}/api/search/product/?q=${encodeURIComponent(productId)}&currencyCode=USD&regionCode=US&perPage=3&pageIndex=1`;
-      const sData = await this.fetchJSON(searchUrl, { headers: { ...this.rapidHeaders(API_HOST), 'Content-Type': 'application/json' } });
-      const items = sData?.result?.products;
-      if (items?.length) {
-        const exact = items.find(p => String(p.identifier?.productId || p.id) === String(productId));
-        const best = exact || items[0];
-        logger.info('macys', 'getProduct success via search fallback', { productId });
-        return this.normalizeProductFromSearch(best);
+    // Fallback: search by product ID using the same search paths that work for main search
+    for (const path of SEARCH_PATHS) {
+      try {
+        const searchUrl = `https://${API_HOST}${path}?q=${encodeURIComponent(productId)}&currencyCode=USD&regionCode=US&perPage=5&pageIndex=1`;
+        logger.info('macys', `getProduct search fallback via ${path}`, { productId });
+        const sData = await this.fetchJSON(searchUrl, { headers: { ...this.rapidHeaders(API_HOST), 'Content-Type': 'application/json' } });
+        if (!sData) continue;
+        const items = sData?.result?.products;
+        if (items?.length) {
+          const exact = items.find(p => String(p.identifier?.productId || p.id) === String(productId));
+          const best = exact || items[0];
+          logger.info('macys', 'getProduct success via search fallback', { productId, matchedExact: !!exact });
+          return this.normalizeProductFromSearch(best);
+        }
+      } catch (e) {
+        logger.warn('macys', `Search fallback ${path} failed`, { productId, error: e.message });
+        continue;
       }
-    } catch (e) {
-      logger.warn('macys', 'Search fallback also failed', { productId, error: e.message });
     }
     return null;
   }

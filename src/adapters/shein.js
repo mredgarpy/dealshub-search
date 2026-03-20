@@ -1,5 +1,5 @@
 // ============================================================
-// DealsHub â SHEIN Adapter (via RapidAPI)
+// DealsHub - SHEIN Adapter (via RapidAPI)
 // ============================================================
 const { BaseAdapter, emptySearchResult, emptyProduct } = require('./base');
 const { parsePrice } = require('../utils/pricing');
@@ -17,6 +17,12 @@ class SheinAdapter extends BaseAdapter {
         const url = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(query)}&language=en&country=US&currency=USD&page=1&limit=${limit}`;
         const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
 
+        // Log raw response keys for diagnostics
+        if (data) {
+          const topKeys = Object.keys(data).join(',');
+          logger.info('shein', `Search response`, { query, attempt, topKeys, code: data.code, msg: data.msg });
+        }
+
         // Try multiple response shapes
         if (data?.info?.products?.length) {
           return data.info.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
@@ -24,7 +30,10 @@ class SheinAdapter extends BaseAdapter {
         if (data?.products?.length) {
           return data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
         }
-        // Response came back but empty â could be transient
+        if (data?.data?.products?.length) {
+          return data.data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
+        }
+        // Response came back but empty - could be transient
         if (data && attempt < 2) {
           logger.warn('shein', `Search returned empty on attempt ${attempt}, retrying...`, { query });
           await new Promise(r => setTimeout(r, 1000)); // Brief delay before retry
@@ -45,30 +54,64 @@ class SheinAdapter extends BaseAdapter {
   }
 
   async getProduct(productId) {
-    // Retry up to 2 times for detail endpoint
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const url = `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD`;
-        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
-        if (data?.info) return this.normalizeProduct(data.info);
-        if (data && attempt < 2) {
-          logger.warn('shein', `Detail returned empty on attempt ${attempt}, retrying...`, { productId });
-          await new Promise(r => setTimeout(r, 1000));
-          continue;
-        }
-      } catch (e) {
-        if (attempt < 2) {
-          logger.warn('shein', `Detail attempt ${attempt} failed, retrying...`, { error: e.message, productId });
-          await new Promise(r => setTimeout(r, 1000));
-          continue;
+    // Try multiple detail endpoint variations
+    const detailEndpoints = [
+      `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD`,
+      `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&with_price=true`,
+    ];
+
+    for (const url of detailEndpoints) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+
+          // Log raw response structure for diagnostics
+          if (data) {
+            const topKeys = Object.keys(data).join(',');
+            const infoKeys = data.info ? Object.keys(data.info).slice(0, 20).join(',') : 'no-info';
+            logger.info('shein', `Detail response`, { productId, attempt, topKeys, infoKeys, hasInfo: !!data.info, code: data.code, msg: data.msg });
+          } else {
+            logger.warn('shein', `Detail returned null`, { productId, attempt, endpoint: url.split('?')[0] });
+          }
+
+          if (data?.info) return this.normalizeProduct(data.info);
+          // Some SHEIN API responses nest data differently
+          if (data?.data) {
+            logger.info('shein', `Detail has data key instead of info`, { productId, dataKeys: Object.keys(data.data).slice(0, 15).join(',') });
+            return this.normalizeProduct(data.data);
+          }
+          if (data && attempt < 2) {
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+        } catch (e) {
+          logger.warn('shein', `Detail attempt ${attempt} failed`, { error: e.message, productId });
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
         }
       }
     }
-    // Fallback to search
-    logger.warn('shein', `Detail failed for ${productId}, trying search fallback`);
-    const searchUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&page=1&limit=1`;
+
+    // Fallback to search by ID
+    logger.warn('shein', `All detail endpoints failed for ${productId}, trying search fallback`);
+    const searchUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&page=1&limit=5`;
     const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
-    if (sData?.info?.products?.[0]) return this.normalizeProductFromSearch(sData.info.products[0]);
+
+    // Log search fallback response
+    const products = sData?.info?.products || sData?.products || [];
+    logger.info('shein', `Search fallback response`, { productId, resultCount: products.length, topKeys: sData ? Object.keys(sData).join(',') : 'null' });
+
+    if (products.length) {
+      // Only return exact ID match
+      const exact = products.find(p => String(p.goods_id) === String(productId));
+      if (exact) {
+        logger.info('shein', `Search fallback found exact match for ${productId}`);
+        return this.normalizeProductFromSearch(exact);
+      }
+      logger.warn('shein', `Search fallback found no exact ID match for ${productId}`);
+    }
     return null;
   }
 
@@ -114,7 +157,7 @@ class SheinAdapter extends BaseAdapter {
       p.breadcrumbs = [d.cat_name];
     }
 
-    // Description â combine all available text sources
+    // Description - combine all available text sources
     const descParts = [];
     if (d.detail?.description) descParts.push(d.detail.description);
     if (d.goods_desc && d.goods_desc !== d.detail?.description) descParts.push(d.goods_desc);
@@ -131,7 +174,7 @@ class SheinAdapter extends BaseAdapter {
     if (d.detail?.sizeTemplate) descParts.push(`Size Guide: ${d.detail.sizeTemplate}`);
     p.description = descParts.join('\n\n') || '';
 
-    // Bullets â structured product attributes + description bullets
+    // Bullets - structured product attributes + description bullets
     p.bullets = [];
     if (Array.isArray(d.detail?.goods_desc_bullet) && d.detail.goods_desc_bullet.length) {
       p.bullets = d.detail.goods_desc_bullet.filter(b => b && typeof b === 'string');
@@ -162,7 +205,7 @@ class SheinAdapter extends BaseAdapter {
     if (d.detail?.neckline) p.bullets.push(`Neckline: ${d.detail.neckline}`);
     if (d.detail?.sleeveLength) p.bullets.push(`Sleeve: ${d.detail.sleeveLength}`);
 
-    // Images â multiple sources
+    // Images - multiple sources
     p.images = [];
     if (d.goods_imgs?.detail_image?.length) {
       p.images = d.goods_imgs.detail_image
@@ -201,7 +244,7 @@ class SheinAdapter extends BaseAdapter {
     p.availability = d.is_on_sale === 0 ? 'Out of Stock' : 'In Stock';
     p.stockSignal = d.is_on_sale === 0 ? 'out_of_stock' : 'in_stock';
 
-    // Variants (size, color) â saleAttr shape
+    // Variants (size, color) - saleAttr shape
     if (d.productDetails?.saleAttr) {
       const saleAttr = d.productDetails.saleAttr;
       const attrEntries = typeof saleAttr === 'object' ? Object.values(saleAttr) : [];

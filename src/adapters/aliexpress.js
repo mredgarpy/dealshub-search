@@ -273,16 +273,23 @@ class AliExpressAdapter extends BaseAdapter {
     p.sourceId = String(item.itemId || item.productId || d.itemId || d.productId || '');
     p.title = item.title || item.subject || d.title || d.subject || '';
     p.brand = sellerData.storeName || sellerData.name || d.storeName || d.store?.name || null;
-    p.category = item.catId ? `Category ${item.catId}` : d.categoryName || null;
-
     // Breadcrumbs — item_detail_2 has item.breadcrumbs[]
     if (item.breadcrumbs?.length) {
-      p.breadcrumbs = item.breadcrumbs.map(b => b.title || b.name || b).filter(Boolean);
+      p.breadcrumbs = item.breadcrumbs.map(b => {
+        if (typeof b === 'string') return b;
+        return b.title || b.name || null;
+      }).filter(Boolean);
     } else if (d.breadcrumbs?.length) {
-      p.breadcrumbs = d.breadcrumbs.map(b => b.name || b.title || b).filter(Boolean);
+      p.breadcrumbs = d.breadcrumbs.map(b => {
+        if (typeof b === 'string') return b;
+        return b.name || b.title || null;
+      }).filter(Boolean);
     } else if (d.crossLinkGroupList?.length) {
       p.breadcrumbs = d.crossLinkGroupList.map(g => g.name).filter(Boolean);
     }
+
+    // Category — prefer readable name from breadcrumbs, fall back to API fields
+    p.category = d.categoryName || (p.breadcrumbs.length ? p.breadcrumbs[p.breadcrumbs.length - 1] : null);
 
     // Description
     const descParts = [];
@@ -314,7 +321,9 @@ class AliExpressAdapter extends BaseAdapter {
     if (!p.description && p.title) {
       const descFallback = [];
       descFallback.push(p.title);
-      if (p.breadcrumbs?.length) descFallback.push('Category: ' + p.breadcrumbs.join(' > '));
+      // Only join string breadcrumbs to avoid [object Object]
+      const readableCrumbs = (p.breadcrumbs || []).filter(b => typeof b === 'string' && b.length > 0);
+      if (readableCrumbs.length) descFallback.push('Category: ' + readableCrumbs.join(' > '));
       p.description = descFallback.join('. ');
     }
 

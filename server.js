@@ -146,7 +146,7 @@ app.get('/api/product/:id', async (req, res) => {
       return res.status(404).json({ error: 'Product not found', source, id });
     }
 
-    // Apply pricing
+    // Apply pricing engine markup
     if (product.price) {
       const pricing = calculateFinalPrice(product.price, source, {
         originalPrice: product.originalPrice,
@@ -160,6 +160,20 @@ app.get('/api/product/:id', async (req, res) => {
         sourcePrice: product.price,
         margin: pricing.marginPct
       };
+
+      // Also apply markup to variant prices so PDP shows consistent marked-up prices
+      if (product.variants && product.variants.length) {
+        product.variants = product.variants.map(v => {
+          if (v.price && typeof v.price === 'number' && v.price > 0) {
+            const vPricing = calculateFinalPrice(v.price, source, {
+              shippingCost: product.shippingData?.cost || 0
+            });
+            v.sourcePrice = v.price;
+            v.price = vPricing.price;
+          }
+          return v;
+        });
+      }
     }
 
     // Only cache if returned product matches requested ID (prevent stale fallback pollution)

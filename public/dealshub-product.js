@@ -1,16 +1,7 @@
-/* DealsHub PDP v1.2 — Self-contained Product Detail Page
+/* DealsHub PDP v1.3 — Self-contained Product Detail Page
    FIX v1.1: Improved Add to Cart retry logic for newly created products
-   - 3 retry attempts (was 1)
-   - Exponential backoff delays (3s, 5s, 8s)
-   - isNewlyCreated flag from backend triggers preemptive delay
-   - Better error messages for users
-   FIX v1.2: PDP Variant improvements (P0 #190-199)
-   - Pre-select first variant option by default
-   - Show selected option name next to label
-   - Update main image when variant has an image
-   - Update price display on variant change
-   - Fix getSelectedVariant to return correct title for backend matching
-   - data-valtitle attribute on option buttons for label display
+   FIX v1.2: PDP Variant improvements (pre-select, image/price update)
+   FIX v1.3: Cart count selector fix (#dh-cart-count), prepare-cart timeout 60s
 */
 (function(){
   'use strict';
@@ -400,7 +391,7 @@
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(45000) // Longer timeout for new products (backend now waits for propagation)
+        signal: AbortSignal.timeout(60000) // v1.3: 60s timeout (backend now waits up to 15s for propagation + inventory)
       })
       .then(function(r){
         if(!r.ok) throw new Error('Sync error (' + r.status + ')');
@@ -475,9 +466,9 @@
           if(buyNow){
             window.location.href = '/checkout';
           } else {
-            // Update cart count in header
+            // Update cart count in header (includes #dh-cart-count from dealshub header)
             fetch('/cart.js').then(function(r){return r.json()}).then(function(cart){
-              var countEls = document.querySelectorAll('.cart-count,.cart-count-bubble,[data-cart-count],.header-cart-count');
+              var countEls = document.querySelectorAll('#dh-cart-count,.cart-count,.cart-count-bubble,[data-cart-count],.header-cart-count');
               countEls.forEach(function(el){el.textContent = cart.item_count});
             }).catch(function(){});
           }

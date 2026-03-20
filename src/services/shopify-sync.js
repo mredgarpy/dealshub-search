@@ -4,6 +4,7 @@
 // Creates/updates products in Shopify ONLY when user wants to buy
 // Handles: deduplication, inventory, variants, metafields
 // FIX v1.1: Added storefront propagation wait after new product creation
+// FIX v1.3: Blocking inventory set, 15s propagation wait, Admin API fallback
 
 const fetch = require('node-fetch');
 const logger = require('../utils/logger');
@@ -67,12 +68,13 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ---- WAIT FOR STOREFRONT PROPAGATION (v1.2 — faster, no fallback sleep) ----
-async function waitForStorefrontPropagation(handle, variantId, maxWaitMs = 5000) {
+// ---- WAIT FOR STOREFRONT PROPAGATION (v1.3 — longer wait + admin API fallback) ----
+async function waitForStorefrontPropagation(handle, variantId, maxWaitMs = 15000) {
   const startTime = Date.now();
-  const interval = 800;
+  const interval = 1000;
   let attempts = 0;
 
+  // Phase 1: Check storefront JSON API (faster, but not always immediately available)
   while (Date.now() - startTime < maxWaitMs) {
     attempts++;
     try {
@@ -95,8 +97,24 @@ async function waitForStorefrontPropagation(handle, variantId, maxWaitMs = 5000)
     await sleep(interval);
   }
 
-  // v1.2: No fallback sleep — frontend has retry logic for 422s
-  logger.warn('sync', `Storefront propagation not confirmed after ${maxWaitMs}ms (${attempts} attempts) — returning immediately`, { handle, variantId });
+  // Phase 2: Verify via Admin API as fallback — product exists even if storefront hasn't propagated
+  try {
+    const adminCheck = await shopifyAPI(`/products.json?handle=${handle}&fields=id,variants,status`);
+    if (adminCheck?.products?.[0]) {
+      const adminProduct = adminCheck.products[0];
+      const adminVariantFound = adminProduct.variants?.some(v => v.id === variantId);
+      if (adminVariantFound && adminProduct.status === 'active') {
+        logger.info('sync', `Admin API confirms product exists (storefront not yet propagated) — ${Date.now() - startTime}ms`, { handle, variantId });
+        // Give storefront a bit more time since Admin confirms it exists
+        await sleep(3000);
+        return true;
+      }
+    }
+  } catch (e) {
+    logger.warn('sync', `Admin API propagation check failed: ${e.message}`);
+  }
+
+  logger.warn('sync', `Storefront propagation not confirmed after ${maxWaitMs}ms (${attempts} attempts)`, { handle, variantId });
   return false;
 }
 
@@ -279,25 +297,42 @@ async function createShopifyProduct(productData, pricingResult) {
     throw new Error('Product creation returned no product');
   }
 
-  // v1.2: Skip per-variant PUT loop — create payload already sets inventory_management:null + inventory_policy:'continue'
-  // Only do a single background inventory set for the first variant as safety net (non-blocking)
-  logger.info('sync', 'Product created (untracked inventory via create payload)', {
+  // v1.3: Ensure inventory is properly set BEFORE returning (blocking, not fire-and-forget)
+  logger.info('sync', 'Product created — setting inventory for all variants', {
     productId: product.id,
     variantCount: product.variants.length
   });
-  if (product.variants[0]?.inventory_item_id) {
-    setInventoryAvailable(product.variants[0].inventory_item_id, 999).catch(() => {});
+
+  // Set inventory for ALL variants (not just first), and AWAIT the result
+  for (const variant of product.variants) {
+    if (variant.inventory_item_id) {
+      try {
+        await setInventoryAvailable(variant.inventory_item_id, 999);
+        logger.info('sync', `Inventory set for variant ${variant.id}`, { inventoryItemId: variant.inventory_item_id });
+      } catch (invErr) {
+        // If inventory set fails, force the variant to untracked mode as final fallback
+        logger.warn('sync', `Inventory set failed for variant ${variant.id}, forcing untracked mode`, { error: invErr.message });
+        try {
+          await shopifyAPI(`/variants/${variant.id}.json`, 'PUT', {
+            variant: { id: variant.id, inventory_management: null, inventory_policy: 'continue' }
+          });
+          logger.info('sync', `Forced variant ${variant.id} to untracked/continue`);
+        } catch (varErr) {
+          logger.error('sync', `Failed to force untracked mode for variant ${variant.id}`, { error: varErr.message });
+        }
+      }
+    }
   }
 
   // ============================================================
-  // FIX v1.1: Wait for storefront propagation before returning
+  // FIX v1.3: Wait for storefront propagation (increased to 15s + admin API fallback)
   // This prevents the 422 race condition where cart/add.js
   // is called before Shopify's storefront knows about the variant
   // ============================================================
   const propagated = await waitForStorefrontPropagation(
     product.handle,
     product.variants[0].id,
-    5000 // v1.2: reduced from 10s — frontend retries handle stragglers
+    15000 // v1.3: increased from 5s, plus admin API fallback
   );
 
   if (!propagated) {

@@ -419,8 +419,43 @@ app.post('/api/prepare-cart', async (req, res) => {
   }
 
   try {
-    // 1. Get full product data from source
-    const adapter = getAdapter(source.toLowerCase());
+    const srcLower = source.toLowerCase();
+    const srcId = String(sourceId);
+
+    // v1.2 FAST PATH: Check if mapping already exists before fetching from source API
+    const { syncCache } = require('./src/utils/cache');
+    const { findMapping } = require('./src/utils/db');
+    const cacheKey = `mapping:${srcLower}:${srcId}`;
+    const cachedMapping = !forceResync && syncCache.get(cacheKey);
+    const dbMapping = !cachedMapping && !forceResync && findMapping(srcLower, srcId);
+
+    if (cachedMapping && cachedMapping.shopifyVariantId) {
+      // FAST PATH: Already synced, skip source API entirely
+      let variantId = cachedMapping.shopifyVariantId;
+      if (selectedVariant && cachedMapping.variants?.length > 1) {
+        const norm = s => (s || '').trim().toLowerCase().replace(/^option:\s*/i, '');
+        const match = cachedMapping.variants.find(v => {
+          const vt = norm(v.title), sv = norm(selectedVariant);
+          return vt === sv || vt.includes(sv) || sv.includes(vt);
+        });
+        if (match) variantId = match.id;
+      }
+      logger.info('cart', 'FAST PATH: cache hit, skipping source fetch', { source: srcLower, sourceId: srcId, variantId });
+      return res.json({
+        success: true,
+        shopifyProductId: cachedMapping.shopifyProductId,
+        shopifyVariantId: variantId,
+        handle: cachedMapping.handle,
+        quantity: parseInt(quantity) || 1,
+        availability: true,
+        isNewlyCreated: false,
+        priceSnapshot: { price: cachedMapping.variants?.[0]?.price || 0, compareAt: null, currency: 'USD' },
+        shippingSummary: { note: 'Standard shipping', deliveryLabel: null }
+      });
+    }
+
+    // 1. Get full product data from source (needed for new product creation)
+    const adapter = getAdapter(srcLower);
     const productData = await adapter.getProduct(sourceId);
 
     if (!productData) {
@@ -429,8 +464,8 @@ app.post('/api/prepare-cart', async (req, res) => {
 
     // 2. Sync to Shopify and get cart-ready data
     const result = await prepareCart({
-      source: source.toLowerCase(),
-      sourceId: String(sourceId),
+      source: srcLower,
+      sourceId: srcId,
       productData,
       selectedVariantId: selectedVariant,
       quantity: parseInt(quantity) || 1,
@@ -438,7 +473,7 @@ app.post('/api/prepare-cart', async (req, res) => {
     });
 
     logger.info('cart', 'Cart prepared', {
-      source, sourceId,
+      source: srcLower, sourceId: srcId,
       variantId: result.shopifyVariantId,
       price: result.priceSnapshot.price
     });

@@ -42,10 +42,10 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ---- WAIT FOR STOREFRONT PROPAGATION (NEW — fixes 422 race condition) ----
-async function waitForStorefrontPropagation(handle, variantId, maxWaitMs = 10000) {
+// ---- WAIT FOR STOREFRONT PROPAGATION (v1.2 — faster, no fallback sleep) ----
+async function waitForStorefrontPropagation(handle, variantId, maxWaitMs = 5000) {
   const startTime = Date.now();
-  const interval = 1500;
+  const interval = 800;
   let attempts = 0;
 
   while (Date.now() - startTime < maxWaitMs) {
@@ -53,7 +53,7 @@ async function waitForStorefrontPropagation(handle, variantId, maxWaitMs = 10000
     try {
       const resp = await fetch(`https://${CUSTOM_DOMAIN()}/products/${handle}.json`, {
         headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(3000)
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -65,15 +65,13 @@ async function waitForStorefrontPropagation(handle, variantId, maxWaitMs = 10000
         }
       }
     } catch (e) {
-      // keep trying — storefront may not be ready yet
       logger.debug('sync', `Propagation check attempt ${attempts} failed: ${e.message}`);
     }
     await sleep(interval);
   }
 
-  // Final fallback: even if storefront check fails, add a minimum safety delay
-  logger.warn('sync', `Storefront propagation not confirmed after ${maxWaitMs}ms (${attempts} attempts) — proceeding with safety delay`, { handle, variantId });
-  await sleep(3000);
+  // v1.2: No fallback sleep — frontend has retry logic for 422s
+  logger.warn('sync', `Storefront propagation not confirmed after ${maxWaitMs}ms (${attempts} attempts) — returning immediately`, { handle, variantId });
   return false;
 }
 
@@ -253,22 +251,15 @@ async function createShopifyProduct(productData, pricingResult) {
     throw new Error('Product creation returned no product');
   }
 
-  // Force-verify inventory settings on each variant after creation
-  for (const v of product.variants) {
-    try {
-      await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
-        variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
-      });
-      await setInventoryAvailable(v.inventory_item_id, 999);
-    } catch (invErr) {
-      logger.warn('sync', `Post-create inventory fix for variant ${v.id} failed`, { error: invErr.message });
-    }
-  }
-
-  logger.info('sync', 'Product created with forced untracked inventory (dropship model)', {
+  // v1.2: Skip per-variant PUT loop — create payload already sets inventory_management:null + inventory_policy:'continue'
+  // Only do a single background inventory set for the first variant as safety net (non-blocking)
+  logger.info('sync', 'Product created (untracked inventory via create payload)', {
     productId: product.id,
     variantCount: product.variants.length
   });
+  if (product.variants[0]?.inventory_item_id) {
+    setInventoryAvailable(product.variants[0].inventory_item_id, 999).catch(() => {});
+  }
 
   // ============================================================
   // FIX v1.1: Wait for storefront propagation before returning
@@ -278,7 +269,7 @@ async function createShopifyProduct(productData, pricingResult) {
   const propagated = await waitForStorefrontPropagation(
     product.handle,
     product.variants[0].id,
-    10000 // max 10 seconds
+    5000 // v1.2: reduced from 10s — frontend retries handle stragglers
   );
 
   if (!propagated) {
@@ -302,6 +293,8 @@ async function createShopifyProduct(productData, pricingResult) {
 
 // ---- PREPARE CART (Main entry point for buy flow) ----
 async function prepareCart({ source, sourceId, productData, selectedVariantId, quantity = 1, forceResync = false }) {
+  const _startTime = Date.now();
+  const _timing = {};
   if (!SHOPIFY_TOKEN() || !SHOPIFY_DOMAIN()) {
     throw new Error('Shopify not configured');
   }
@@ -326,6 +319,7 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     shippingCost: productData.shippingData?.cost || 0
   });
 
+  _timing.pricing = Date.now() - _startTime;
   const cacheKey = `mapping:${source}:${sourceId}`;
 
   if (forceResync) {
@@ -365,8 +359,10 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     }
   }
 
+  _timing.lookup = Date.now() - _startTime;
+
   if (!mapping) {
-    // Create new product — includes propagation wait (FIX v1.1)
+    // Create new product — includes propagation wait
     mapping = await createShopifyProduct(productData, pricingResult);
     upsertMapping({
       source, sourceId,
@@ -435,6 +431,9 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     }
   }
 
+  _timing.total = Date.now() - _startTime;
+  logger.info('sync', `prepareCart completed in ${_timing.total}ms`, { source, sourceId, timing: _timing, isNew: !!mapping.isNewlyCreated });
+
   return {
     success: true,
     shopifyProductId: mapping.shopifyProductId,
@@ -442,7 +441,7 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     handle: mapping.handle,
     quantity,
     availability: true,
-    isNewlyCreated: !!mapping.isNewlyCreated, // FIX v1.1: signal to frontend
+    isNewlyCreated: !!mapping.isNewlyCreated,
     priceSnapshot: {
       price: pricingResult.price,
       compareAt: pricingResult.compareAt,

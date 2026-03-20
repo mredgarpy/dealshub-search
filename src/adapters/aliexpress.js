@@ -132,7 +132,7 @@ class AliExpressAdapter extends BaseAdapter {
 
   _delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-  async getProduct(productId) {
+  async getProduct(productId, opts = {}) {
     // Try each detail endpoint in fallback chain
     for (const endpoint of DETAIL_ENDPOINTS) {
       try {
@@ -190,15 +190,42 @@ class AliExpressAdapter extends BaseAdapter {
 
     // Final fallback: search by productId
     logger.warn('aliexpress', `All detail endpoints failed for ${productId}, trying search fallback`);
-    const searchResults = await this.search(productId, 3);
+    const searchResults = await this.search(productId, 5);
     if (searchResults.length > 0) {
-      // ONLY return if we find an exact ID match — never return a random product
+      // Best case: exact ID match
       const exact = searchResults.find(r => String(r.id) === String(productId));
       if (exact) {
         logger.info('aliexpress', `Search fallback found exact match for ${productId}`);
         return this._searchResultToProduct(exact);
       }
-      logger.warn('aliexpress', `Search fallback found no exact match for ${productId}, returning null`);
+      logger.info('aliexpress', `Search fallback found ${searchResults.length} results but no exact ID match for ${productId}`);
+    }
+
+    // Title-based search fallback (like SHEIN adapter)
+    if (opts.title) {
+      logger.info('aliexpress', `Trying title-based search fallback for ${productId}`, { title: opts.title });
+      const titleResults = await this.search(opts.title, 5);
+      if (titleResults.length > 0) {
+        // Check for exact ID match within title results
+        const exactById = titleResults.find(r => String(r.id) === String(productId));
+        if (exactById) {
+          logger.info('aliexpress', `Title search found exact ID match for ${productId}`);
+          return this._searchResultToProduct(exactById);
+        }
+        // Use the first result — user came from a search result page so title matches well
+        logger.info('aliexpress', `Title search returning first result for ${productId} (no exact ID match)`);
+        const result = this._searchResultToProduct(titleResults[0]);
+        if (result) result.sourceId = String(productId); // Preserve original ID
+        return result;
+      }
+    }
+
+    // Last resort: if ID-search had results, use the first one (better than showing error)
+    if (searchResults && searchResults.length > 0) {
+      logger.info('aliexpress', `Using first search result as last resort for ${productId}`);
+      const result = this._searchResultToProduct(searchResults[0]);
+      if (result) result.sourceId = String(productId);
+      return result;
     }
 
     return null;

@@ -17,6 +17,31 @@ const LOCATION_ID    = () => parseInt(process.env.SHOPIFY_LOCATION_ID || '840421
 const CUSTOM_DOMAIN  = () => process.env.SHOPIFY_CUSTOM_DOMAIN || 'stylehubmiami.com';
 const API_VERSION    = '2024-01';
 
+// ---- CONCURRENCY LOCK (prevents duplicate product creation) ----
+const syncLocks = new Map();
+function acquireLock(key) {
+  if (syncLocks.has(key)) {
+    return syncLocks.get(key); // Return existing promise
+  }
+  let resolve;
+  const promise = new Promise(r => { resolve = r; });
+  promise._resolve = resolve;
+  syncLocks.set(key, promise);
+  return null; // Lock acquired
+}
+function releaseLock(key) {
+  const lock = syncLocks.get(key);
+  syncLocks.delete(key);
+  if (lock && lock._resolve) lock._resolve();
+}
+// Clean stale locks every 5 minutes
+setInterval(() => {
+  if (syncLocks.size > 100) {
+    logger.warn('sync', `Clearing ${syncLocks.size} stale sync locks`);
+    syncLocks.clear();
+  }
+}, 300000);
+
 // ---- SHOPIFY API HELPER ----
 async function shopifyAPI(endpoint, method = 'GET', body = null) {
   const url = `https://${SHOPIFY_DOMAIN()}/admin/api/${API_VERSION}${endpoint}`;
@@ -302,6 +327,35 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     throw new Error('Shopify not configured');
   }
 
+  // Concurrency lock: if another request is already syncing the same product, wait for it
+  const lockKey = `${source}:${sourceId}`;
+  const existingLock = acquireLock(lockKey);
+  if (existingLock) {
+    logger.info('sync', 'Waiting for concurrent sync to complete', { source, sourceId });
+    await existingLock;
+    // After waiting, the product should be in cache — retry lookup
+    const cached = syncCache.get(`mapping:${source}:${sourceId}`);
+    if (cached) {
+      logger.info('sync', 'Using result from concurrent sync', { source, sourceId });
+      let variantId = cached.shopifyVariantId;
+      if (selectedVariantId && cached.variants?.length > 1) {
+        const match = cached.variants.find(v => (v.title || '').toLowerCase().includes(String(selectedVariantId).toLowerCase()));
+        if (match) variantId = match.id;
+      }
+      return {
+        shopifyProductId: cached.shopifyProductId,
+        shopifyVariantId: variantId,
+        handle: cached.handle,
+        available: true,
+        price: cached.variants?.[0]?.price,
+        timing: { total: Date.now() - _startTime, waitedForLock: true }
+      };
+    }
+  }
+
+  // Everything below is protected by concurrency lock — release in finally
+  try {
+
   // Calculate final pricing
   let sourcePrice = productData.price;
   if (typeof sourcePrice === 'string') {
@@ -473,6 +527,11 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
       sourceId
     }
   };
+
+  } finally {
+    // Always release concurrency lock, even on errors
+    releaseLock(lockKey);
+  }
 }
 
 // ---- FORMAT DESCRIPTION ----

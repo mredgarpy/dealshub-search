@@ -131,7 +131,7 @@ class AmazonAdapter extends BaseAdapter {
       // Object keyed by group name (e.g., { "Size": [...], "Color": [...], "Carrier": [...] })
       for (const [groupName, items] of Object.entries(d.product_variations)) {
         if (!Array.isArray(items)) continue;
-        const cleanName = groupName.trim() || 'Option';
+        const cleanName = this._formatGroupName(groupName.trim()) || 'Option';
         if (!groups[cleanName]) groups[cleanName] = { name: cleanName, values: [] };
         items.forEach(v => {
           if (!v || typeof v !== 'object') return;
@@ -252,6 +252,35 @@ class AmazonAdapter extends BaseAdapter {
     return product;
   }
 
+
+  // Format API group names like "service_provider" -> "Carrier", "product_grade" -> "Condition"
+  _formatGroupName(name) {
+    if (!name) return null;
+    const mappings = {
+      'size': 'Storage',
+      'color': 'Color',
+      'colour': 'Color',
+      'service_provider': 'Carrier',
+      'carrier': 'Carrier',
+      'product_grade': 'Condition',
+      'condition': 'Condition',
+      'style': 'Style',
+      'pattern': 'Pattern',
+      'material': 'Material',
+      'configuration': 'Configuration',
+      'flavor': 'Flavor',
+      'scent': 'Scent',
+      'count': 'Count',
+      'wattage': 'Wattage',
+      'voltage': 'Voltage',
+      'length': 'Length',
+      'width': 'Width'
+    };
+    const lower = name.toLowerCase();
+    if (mappings[lower]) return mappings[lower];
+    // Title-case fallback: "some_name" -> "Some Name"
+    return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
 
   // Infer option type from value string when API doesn't provide group names
   _inferOptionType(value) {

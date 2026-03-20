@@ -209,9 +209,12 @@ async function createShopifyProduct(productData, pricingResult) {
     });
   }
 
+  // Shopify title max 255 characters
+  const safeTitle = title && title.length > 255 ? title.substring(0, 252) + '...' : title;
+
   const payload = {
     product: {
-      title,
+      title: safeTitle,
       body_html: formatDescription(description, bullets),
       vendor: brand || 'StyleHub',
       product_type: productData.category || 'General',

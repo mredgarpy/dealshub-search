@@ -23,7 +23,26 @@ class BaseAdapter {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeout);
     try {
-      const resp = await fetch(url, { ...options, signal: controller.signal });
+      let resp = await fetch(url, { ...options, signal: controller.signal, redirect: 'follow' });
+
+      // If we still see a 3xx after redirect: 'follow', manually follow Location header
+      if (resp.status >= 300 && resp.status < 400) {
+        const location = resp.headers.get('location');
+        if (location) {
+          logger.info('adapter', `${this.name} manually following ${resp.status} redirect`, { from: url.split('?')[0], to: location.split('?')[0] });
+          const redirectUrl = location.startsWith('http') ? location : new URL(location, url).href;
+          resp = await fetch(redirectUrl, { ...options, signal: controller.signal, redirect: 'follow' });
+        } else {
+          // 3xx with no Location — try to read body anyway (some APIs return data with 302)
+          logger.warn('adapter', `${this.name} HTTP ${resp.status} with no Location header`, { url: url.split('?')[0] });
+          const text = await resp.text();
+          if (text && text.trim().startsWith('{')) {
+            try { return JSON.parse(text); } catch (e) { /* fall through */ }
+          }
+          return null;
+        }
+      }
+
       clearTimeout(timer);
       if (!resp.ok) {
         logger.warn('adapter', `${this.name} HTTP ${resp.status}`, { url: url.split('?')[0] });

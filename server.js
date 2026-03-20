@@ -596,7 +596,7 @@ app.get('/api/debug/raw-search', async (req, res) => {
   };
 
   const urls = {
-    aliexpress: `https://${hosts.aliexpress}/item/search?q=${encodeURIComponent(q)}&page=1&sort=default`,
+    aliexpress: `https://${hosts.aliexpress}/item_search_3?q=${encodeURIComponent(q)}&page=1&sort=default`,
     macys: `https://${hosts.macys}/search?keyword=${encodeURIComponent(q)}&pageSize=3&requestType=search`,
     amazon: `https://${hosts.amazon}/search?query=${encodeURIComponent(q)}&page=1&country=US&sort_by=RELEVANCE`,
     sephora: `https://${hosts.sephora}/us/products/v2/search?q=${encodeURIComponent(q)}&pageIndex=0&pageSize=3`,

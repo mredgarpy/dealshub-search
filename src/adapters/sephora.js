@@ -12,8 +12,17 @@ class SephoraAdapter extends BaseAdapter {
   async search(query, limit = 12) {
     const url = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(query)}&pageIndex=0&pageSize=${limit}`;
     const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
-    if (!data || !data.products) return [];
-    return data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
+    if (!data) {
+      logger.warn('sephora', 'Search returned null/undefined', { query });
+      return [];
+    }
+    // API may return products at data.products or data.data or other shapes
+    const products = data.products || data.data || data.items || data.results || [];
+    if (!Array.isArray(products) || products.length === 0) {
+      logger.warn('sephora', 'Search returned no products array', { query, keys: Object.keys(data).join(','), totalProducts: data.totalProducts || data.total });
+      return [];
+    }
+    return products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }
 
   async getProduct(id, options = {}) {

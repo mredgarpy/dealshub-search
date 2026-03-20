@@ -80,6 +80,9 @@ const searchCache = new MemoryCache(21600000);
 // Product cache: 4 hours (individual PDP)
 const productCache = new MemoryCache(14400000);
 
+// Sync cache: 1 hour (Shopify product mappings for on-demand sync)
+const syncCache = new MemoryCache(3600000);
+
 // Load disk cache into memory on startup
 try {
   const files = fs.readdirSync(CACHE_DIR);
@@ -90,7 +93,9 @@ try {
       if (raw && raw.expiresAt > Date.now()) {
         const key = f.replace('.json', '').replace(/_/g, ':');
         // Guess which cache based on prefix
-        if (key.startsWith('product') || key.startsWith('reviews')) {
+        if (key.startsWith('mapping') || key.startsWith('sync')) {
+          syncCache.store.set(key, raw);
+        } else if (key.startsWith('product') || key.startsWith('reviews')) {
           productCache.store.set(key, raw);
         } else {
           searchCache.store.set(key, raw);
@@ -104,4 +109,4 @@ try {
   }
 } catch(e) {}
 
-module.exports = { searchCache, productCache };
+module.exports = { searchCache, productCache, syncCache };

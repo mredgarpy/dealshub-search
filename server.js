@@ -839,10 +839,17 @@ function interleaveFromSettled(results, maxTotal = 18) {
     ? r.value.filter(p => p && p.title && p.price && p.price !== '$0.00' && p.price !== '$NaN')
     : []);
   const interleaved = [];
+  const seen = new Set(); // Deduplicate by id+source
   const maxLen = Math.max(...arrays.map(a => a.length), 0);
   for (let i = 0; i < maxLen && interleaved.length < maxTotal; i++) {
     for (const arr of arrays) {
-      if (arr[i] && interleaved.length < maxTotal) interleaved.push(arr[i]);
+      if (arr[i] && interleaved.length < maxTotal) {
+        const key = `${arr[i].source || arr[i].sourceName || ''}:${arr[i].id || arr[i].title || ''}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          interleaved.push(arr[i]);
+        }
+      }
     }
   }
   return interleaved;

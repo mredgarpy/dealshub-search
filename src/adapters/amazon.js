@@ -121,29 +121,62 @@ class AmazonAdapter extends BaseAdapter {
     p.stockSignal = d.product_availability?.toLowerCase().includes('in stock') ? 'in_stock' :
                     d.product_availability?.toLowerCase().includes('out') ? 'out_of_stock' : 'unknown';
 
-    // Variants from Amazon (can be array, object, or undefined)
-    const variations = Array.isArray(d.product_variations) ? d.product_variations :
-                       (d.product_variations && typeof d.product_variations === 'object') ?
-                         Object.values(d.product_variations).flat().filter(v => v && typeof v === 'object') : [];
-    if (variations.length > 0) {
-      const groups = {};
-      variations.forEach(v => {
+    // Variants from Amazon (can be array, object keyed by group name, or undefined)
+    // When object: { "Size": [{asin, value, ...}], "Color": [{asin, value, ...}] }
+    // When array: [{name, value, asin, ...}]
+    const groups = {};
+    const allVariants = [];
+
+    if (d.product_variations && typeof d.product_variations === 'object' && !Array.isArray(d.product_variations)) {
+      // Object keyed by group name (e.g., { "Size": [...], "Color": [...], "Carrier": [...] })
+      for (const [groupName, items] of Object.entries(d.product_variations)) {
+        if (!Array.isArray(items)) continue;
+        const cleanName = groupName.trim() || 'Option';
+        if (!groups[cleanName]) groups[cleanName] = { name: cleanName, values: [] };
+        items.forEach(v => {
+          if (!v || typeof v !== 'object') return;
+          groups[cleanName].values.push({
+            value: v.value || '',
+            image: v.photo || v.image || null,
+            asin: v.asin || null,
+            selected: v.is_selected || false
+          });
+          allVariants.push({ ...v, _groupName: cleanName });
+        });
+      }
+    } else if (Array.isArray(d.product_variations)) {
+      // Flat array with name/value pairs
+      d.product_variations.forEach(v => {
         if (!v || typeof v !== 'object') return;
-        const name = v.name || 'Option';
+        const name = v.name || this._inferOptionType(v.value) || 'Option';
         if (!groups[name]) groups[name] = { name, values: [] };
         groups[name].values.push({
-          value: v.value || '', image: v.photo || v.image || null,
+          value: v.value || '',
+          image: v.photo || v.image || null,
           asin: v.asin || null,
-          image: v.image || null,
           selected: v.is_selected || false
         });
+        allVariants.push({ ...v, _groupName: name });
       });
+    }
+
+    if (allVariants.length > 0) {
+      // Deduplicate values within each group
+      for (const g of Object.values(groups)) {
+        const seen = new Set();
+        g.values = g.values.filter(v => {
+          const key = `${v.value}:${v.asin || ''}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
       p.options = Object.values(groups);
-      p.variants = variations.filter(v => v && typeof v === 'object').map(v => ({
+      p.variants = allVariants.filter(v => v && typeof v === 'object').map(v => ({
         id: v.asin || '',
-        title: `${v.name || 'Option'}: ${v.value || ''}`,
+        title: `${v._groupName}: ${v.value || ''}`,
         price: parsePrice(v.price) || p.price,
-        image: v.image || null,
+        image: v.photo || v.image || null,
         available: true
       }));
     }
@@ -219,6 +252,29 @@ class AmazonAdapter extends BaseAdapter {
     return product;
   }
 
+
+  // Infer option type from value string when API doesn't provide group names
+  _inferOptionType(value) {
+    if (!value) return null;
+    const v = value.trim();
+    // Storage sizes
+    if (/^\d+\s*(GB|TB|MB)$/i.test(v)) return 'Storage';
+    // Colors
+    const colors = ['black','white','red','blue','green','gold','silver','pink','purple','gray','grey',
+      'midnight','starlight','space gray','space grey','graphite','sierra blue','alpine green',
+      'deep purple','yellow','orange','coral','lavender','cream','titanium','natural titanium',
+      'blue titanium','white titanium','black titanium','desert titanium','teal','ultramarine'];
+    if (colors.some(c => v.toLowerCase() === c || v.toLowerCase().startsWith(c + ' '))) return 'Color';
+    // Carriers
+    const carriers = ['at&t','t-mobile','verizon','sprint','boost mobile','cricket','tracfone',
+      'unlocked','metro','us cellular','visible','straight talk','xfinity','spectrum','mint mobile'];
+    if (carriers.some(c => v.toLowerCase() === c)) return 'Carrier';
+    // Condition
+    if (/^(renewed|refurbished|new|used|renewed premium|certified refurbished|pre-owned|open box)$/i.test(v)) return 'Condition';
+    // RAM
+    if (/^\d+\s*GB\s*RAM$/i.test(v)) return 'RAM';
+    return null;
+  }
 
   async getReviews(asin, limit = 10) {
     const url = `https://${API_HOST}/product-reviews?asin=${encodeURIComponent(asin)}&country=US&sort_by=TOP_REVIEWS&page_size=${limit}&page=1`;

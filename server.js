@@ -456,7 +456,16 @@ app.post('/api/prepare-cart', async (req, res) => {
 
     // 1. Get full product data from source (needed for new product creation)
     const adapter = getAdapter(srcLower);
-    const productData = await adapter.getProduct(sourceId);
+    let productData = await adapter.getProduct(sourceId);
+
+    // Fallback: try productCache if source adapter failed (e.g. SHEIN detail API down)
+    if (!productData) {
+      const cachedProduct = productCache.get(`product:${srcLower}:${srcId}`);
+      if (cachedProduct) {
+        logger.info('cart', 'Source adapter failed, using productCache fallback', { source: srcLower, sourceId: srcId });
+        productData = cachedProduct;
+      }
+    }
 
     if (!productData) {
       return res.status(404).json({ error: 'Product not found on source' });

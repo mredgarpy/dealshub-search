@@ -394,14 +394,23 @@ function toast(msg, duration = 3000) {
 }
 
 // ── API HELPERS ──
-async function api(path, opts = {}) {
-    try {
-        const res = await fetch(API + path, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        return await res.json();
-    } catch(e) {
-        console.error('API error:', path, e);
-        throw e;
+async function api(path, opts = {}, retries = 1) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            const res = await fetch(API + path, { ...opts, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...opts.headers } });
+            clearTimeout(timeout);
+            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+            return await res.json();
+        } catch(e) {
+            console.error('API error:', path, e);
+            if (attempt < retries) {
+                await new Promise(r => setTimeout(r, 2000));
+                continue;
+            }
+            throw e;
+        }
     }
 }
 

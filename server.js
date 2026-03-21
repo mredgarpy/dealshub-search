@@ -854,9 +854,18 @@ app.get('/api/admin/sync-logs', (req, res) => {
 });
 
 app.get('/api/admin/stats', (req, res) => {
-  const mappingCount = db.getMappingCount();
+  const advanced = db.getAdvancedStats();
+  const recentSyncCount = Array.isArray(advanced.recentSyncs)
+    ? advanced.recentSyncs.reduce((sum, r) => sum + (r.count || 0), 0)
+    : 0;
   res.json({
-    mappings: mappingCount,
+    totalProducts: advanced.mappingCount || 0,
+    totalMappings: advanced.mappingCount || 0,
+    totalOrders: advanced.orderCount || 0,
+    recentSyncs: recentSyncCount,
+    unresolvedFailures: advanced.failureCount || 0,
+    mappingsBySource: advanced.mappingsBySource || [],
+    ordersBySource: advanced.ordersBySource || [],
     cache: { search: searchCache.size, product: productCache.size },
     sources: VALID_SOURCES,
     uptime: process.uptime(),

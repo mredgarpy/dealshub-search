@@ -531,31 +531,62 @@ let pricingRules = [];
 async function loadPricingRules() {
     try {
         const data = await api('/api/admin/pricing-rules');
-        pricingRules = data.rules || data || [];
+        const raw = data.data || data.rules || data || [];
+        pricingRules = (Array.isArray(raw) ? raw : []).map(r => ({
+            id: r.id || null,
+            source_store: r.source_store || r.source || '',
+            category: r.category || '',
+            brand: r.brand || '',
+            markup_pct: r.markup_pct ?? 15,
+            min_margin_pct: r.min_margin_pct ?? 8,
+            round_to: r.round_to ?? 0.99,
+            price_floor: r.price_floor || null,
+            is_active: r.is_active !== undefined ? r.is_active : 1
+        }));
     } catch(e) {
         pricingRules = [];
     }
     if (!pricingRules.length) {
-        pricingRules = SOURCES.map(s => ({ source: s, marginPercent: 30, flatFee: 2, roundTo: 0.99 }));
+        pricingRules = SOURCES.map(s => ({ id:null, source_store:s, category:'', brand:'', markup_pct:15, min_margin_pct:8, round_to:0.99, price_floor:null, is_active:1 }));
     }
     renderPricingRules();
 }
 
 function renderPricingRules() {
     document.getElementById('pricing-rules-list').innerHTML = pricingRules.map((r, i) => `
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:10px;padding:12px;background:var(--gray-50);border-radius:8px;">
-            <div class="form-group" style="margin:0"><label>Source</label><select onchange="pricingRules[${i}].source=this.value">${SOURCES.map(s=>`<option ${s===r.source?'selected':''}>${s}</option>`).join('')}</select></div>
-            <div class="form-group" style="margin:0"><label>Margin %</label><input type="number" value="${r.marginPercent||30}" onchange="pricingRules[${i}].marginPercent=+this.value"></div>
-            <div class="form-group" style="margin:0"><label>Flat Fee $</label><input type="number" value="${r.flatFee||0}" step="0.5" onchange="pricingRules[${i}].flatFee=+this.value"></div>
-            <div class="form-group" style="margin:0"><label>Round To</label><input type="number" value="${r.roundTo||0.99}" step="0.01" onchange="pricingRules[${i}].roundTo=+this.value"></div>
+        <div style="display:grid;grid-template-columns:1fr .7fr .7fr .6fr .6fr .5fr auto;gap:8px;align-items:end;margin-bottom:10px;padding:12px;background:var(--gray-50);border-radius:8px;">
+            <div class="form-group" style="margin:0"><label>Source</label><select onchange="pricingRules[${i}].source_store=this.value">${SOURCES.map(s=>`<option ${s===r.source_store?'selected':''}>${s}</option>`).join('')}</select></div>
+            <div class="form-group" style="margin:0"><label>Markup %</label><input type="number" value="${r.markup_pct}" onchange="pricingRules[${i}].markup_pct=+this.value"></div>
+            <div class="form-group" style="margin:0"><label>Min Margin %</label><input type="number" value="${r.min_margin_pct}" onchange="pricingRules[${i}].min_margin_pct=+this.value"></div>
+            <div class="form-group" style="margin:0"><label>Round To</label><input type="number" value="${r.round_to}" step="0.01" onchange="pricingRules[${i}].round_to=+this.value"></div>
+            <div class="form-group" style="margin:0"><label>Category</label><input value="${r.category||''}" placeholder="all" onchange="pricingRules[${i}].category=this.value"></div>
+            <div class="form-group" style="margin:0"><label>Brand</label><input value="${r.brand||''}" placeholder="all" onchange="pricingRules[${i}].brand=this.value"></div>
             <button class="btn btn-sm btn-secondary" onclick="pricingRules.splice(${i},1);renderPricingRules()" style="margin-bottom:0">✕</button>
         </div>`).join('');
 }
-function addPricingRule() { pricingRules.push({ source:'amazon', marginPercent:30, flatFee:2, roundTo:0.99 }); renderPricingRules(); }
+function addPricingRule() { pricingRules.push({ id:null, source_store:'amazon', category:'', brand:'', markup_pct:15, min_margin_pct:8, round_to:0.99, price_floor:null, is_active:1 }); renderPricingRules(); }
 async function savePricingRules() {
     try {
-        await api('/api/admin/pricing-rules', { method:'POST', body:JSON.stringify({ rules: pricingRules }) });
-        toast('Pricing rules saved');
+        let saved = 0;
+        for (const rule of pricingRules) {
+            await api('/api/admin/pricing-rules', {
+                method: 'POST',
+                body: JSON.stringify({
+                    id: rule.id || undefined,
+                    source_store: rule.source_store,
+                    category: rule.category || null,
+                    brand: rule.brand || null,
+                    markup_pct: rule.markup_pct,
+                    min_margin_pct: rule.min_margin_pct,
+                    round_to: rule.round_to,
+                    price_floor: rule.price_floor,
+                    is_active: rule.is_active !== undefined ? rule.is_active : 1
+                })
+            });
+            saved++;
+        }
+        toast(`${saved} pricing rules saved`);
+        loadPricingRules();
     } catch(e) { toast('Failed to save: ' + e.message); }
 }
 
@@ -578,29 +609,59 @@ let shippingRules = [];
 async function loadShippingRules() {
     try {
         const data = await api('/api/admin/shipping-rules');
-        shippingRules = data.rules || data || [];
+        const raw = data.data || data.rules || data || [];
+        shippingRules = (Array.isArray(raw) ? raw : []).map(r => ({
+            id: r.id || null,
+            source_store: r.source_store || r.source || '',
+            region: r.region || 'domestic',
+            method: r.method || 'standard',
+            cost: r.cost ?? 0,
+            min_days: r.min_days ?? 7,
+            max_days: r.max_days ?? 15,
+            label: r.label || '',
+            is_active: r.is_active !== undefined ? r.is_active : 1
+        }));
     } catch(e) { shippingRules = []; }
     if (!shippingRules.length) {
-        shippingRules = SOURCES.map(s => ({ source: s, freeAbove: 50, flatRate: 5.99, minDays: 7, maxDays: 15 }));
+        shippingRules = SOURCES.map(s => ({ id:null, source_store:s, region:'domestic', method:'standard', cost:0, min_days:7, max_days:15, label:'', is_active:1 }));
     }
     renderShippingRules();
 }
 function renderShippingRules() {
     document.getElementById('shipping-rules-list').innerHTML = shippingRules.map((r, i) => `
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:10px;padding:12px;background:var(--gray-50);border-radius:8px;">
-            <div class="form-group" style="margin:0"><label>Source</label><select onchange="shippingRules[${i}].source=this.value">${SOURCES.map(s=>`<option ${s===r.source?'selected':''}>${s}</option>`).join('')}</select></div>
-            <div class="form-group" style="margin:0"><label>Free Above $</label><input type="number" value="${r.freeAbove||50}" onchange="shippingRules[${i}].freeAbove=+this.value"></div>
-            <div class="form-group" style="margin:0"><label>Flat Rate $</label><input type="number" value="${r.flatRate||5.99}" step="0.01" onchange="shippingRules[${i}].flatRate=+this.value"></div>
-            <div class="form-group" style="margin:0"><label>Min Days</label><input type="number" value="${r.minDays||7}" onchange="shippingRules[${i}].minDays=+this.value"></div>
-            <div class="form-group" style="margin:0"><label>Max Days</label><input type="number" value="${r.maxDays||15}" onchange="shippingRules[${i}].maxDays=+this.value"></div>
+        <div style="display:grid;grid-template-columns:1fr .7fr .7fr .6fr .6fr .6fr auto;gap:8px;align-items:end;margin-bottom:10px;padding:12px;background:var(--gray-50);border-radius:8px;">
+            <div class="form-group" style="margin:0"><label>Source</label><select onchange="shippingRules[${i}].source_store=this.value">${SOURCES.map(s=>`<option ${s===r.source_store?'selected':''}>${s}</option>`).join('')}</select></div>
+            <div class="form-group" style="margin:0"><label>Method</label><select onchange="shippingRules[${i}].method=this.value"><option ${r.method==='standard'?'selected':''}>standard</option><option ${r.method==='express'?'selected':''}>express</option><option ${r.method==='premium'?'selected':''}>premium</option></select></div>
+            <div class="form-group" style="margin:0"><label>Cost $</label><input type="number" value="${r.cost}" step="0.01" onchange="shippingRules[${i}].cost=+this.value"></div>
+            <div class="form-group" style="margin:0"><label>Min Days</label><input type="number" value="${r.min_days}" onchange="shippingRules[${i}].min_days=+this.value"></div>
+            <div class="form-group" style="margin:0"><label>Max Days</label><input type="number" value="${r.max_days}" onchange="shippingRules[${i}].max_days=+this.value"></div>
+            <div class="form-group" style="margin:0"><label>Region</label><select onchange="shippingRules[${i}].region=this.value"><option ${r.region==='domestic'?'selected':''}>domestic</option><option ${r.region==='international'?'selected':''}>international</option></select></div>
             <button class="btn btn-sm btn-secondary" onclick="shippingRules.splice(${i},1);renderShippingRules()" style="margin-bottom:0">✕</button>
         </div>`).join('');
 }
-function addShippingRule() { shippingRules.push({ source:'amazon', freeAbove:50, flatRate:5.99, minDays:7, maxDays:15 }); renderShippingRules(); }
+function addShippingRule() { shippingRules.push({ id:null, source_store:'amazon', region:'domestic', method:'standard', cost:0, min_days:7, max_days:15, label:'', is_active:1 }); renderShippingRules(); }
 async function saveShippingRules() {
     try {
-        await api('/api/admin/shipping-rules', { method:'POST', body:JSON.stringify({ rules: shippingRules }) });
-        toast('Shipping rules saved');
+        let saved = 0;
+        for (const rule of shippingRules) {
+            await api('/api/admin/shipping-rules', {
+                method: 'POST',
+                body: JSON.stringify({
+                    id: rule.id || undefined,
+                    source_store: rule.source_store,
+                    region: rule.region || 'domestic',
+                    method: rule.method || 'standard',
+                    cost: rule.cost,
+                    min_days: rule.min_days,
+                    max_days: rule.max_days,
+                    label: rule.label || `${rule.method || 'Standard'} (${rule.min_days}-${rule.max_days} days)`,
+                    is_active: rule.is_active !== undefined ? rule.is_active : 1
+                })
+            });
+            saved++;
+        }
+        toast(`${saved} shipping rules saved`);
+        loadShippingRules();
     } catch(e) { toast('Failed to save: ' + e.message); }
 }
 

@@ -1,404 +1,1078 @@
 {% comment %}
-  StyleHub Miami — Account Dashboard Section
-  Works with New Customer Accounts (page template, not customers/account)
-  Uses JS to detect login state and fetch customer data via Storefront API
-  Design: DM Sans, Navy #1A1A2E, Red #E53E3E
+  StyleHub Miami — Account Dashboard (Liquid-powered)
+  Uses Shopify customer object for real data.
+  If customer is nil, redirects to login.
+  Design reference: stylehub_account_pro_v2 mockup
 {% endcomment %}
 
-{{ 'account.css' | asset_url | stylesheet_tag }}
+{%- unless customer -%}
+  <script>
+    window.location.href = "{{ routes.account_login_url | default: '/account/login' }}";
+  </script>
+  <meta http-equiv="refresh" content="0;url={{ routes.account_login_url | default: '/account/login' }}">
+  <div style="text-align:center;padding:80px 20px;font-family:'DM Sans',sans-serif">
+    <p>Redirecting to login...</p>
+    <a href="{{ routes.account_login_url | default: '/account/login' }}">Click here if not redirected</a>
+  </div>
+  {%- break -%}
+{%- endunless -%}
 
-<div class="page" data-account-section id="sh-account-dashboard">
+{%- comment -%} Compute customer data from Liquid {%- endcomment -%}
+{%- assign cust_first = customer.first_name | default: "Member" -%}
+{%- assign cust_last = customer.last_name | default: "" -%}
+{%- assign cust_name = customer.name | default: "StyleHub Member" -%}
+{%- assign cust_email = customer.email | default: "" -%}
+{%- assign cust_orders = customer.orders -%}
+{%- assign cust_order_count = customer.orders_count | default: 0 -%}
+{%- assign cust_addresses = customer.addresses -%}
+{%- assign cust_default_address = customer.default_address -%}
 
-  {%- comment -%} ========== SIDEBAR ========== {%- endcomment -%}
-  <div class="side" data-account-sidebar>
+{%- comment -%} Build initials {%- endcomment -%}
+{%- assign initial1 = cust_first | slice: 0 | upcase -%}
+{%- assign initial2 = cust_last | slice: 0 | upcase -%}
+{%- if initial2 == blank -%}
+  {%- assign initials = initial1 -%}
+{%- else -%}
+  {%- assign initials = initial1 | append: initial2 -%}
+{%- endif -%}
 
-    <button class="sh-mobile-toggle" data-account-mobile-toggle aria-label="Toggle menu">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-    </button>
+{%- comment -%} Count active orders (unfulfilled/partial) {%- endcomment -%}
+{%- assign active_orders = 0 -%}
+{%- assign total_savings = 0 -%}
+{%- for order in cust_orders -%}
+  {%- if order.fulfillment_status == null or order.fulfillment_status == "partial" -%}
+    {%- assign active_orders = active_orders | plus: 1 -%}
+  {%- endif -%}
+  {%- comment -%} Calculate savings from compare_at vs price {%- endcomment -%}
+  {%- for item in order.line_items -%}
+    {%- if item.variant.compare_at_price > item.variant.price -%}
+      {%- assign item_saving = item.variant.compare_at_price | minus: item.variant.price | times: item.quantity -%}
+      {%- assign total_savings = total_savings | plus: item_saving -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endfor -%}
 
-    <div class="side-profile">
-      <div class="side-av" id="sh-avatar">SH</div>
-      <div class="side-name" id="sh-customer-name">StyleHub Member</div>
-      <div class="side-email" id="sh-customer-email">Welcome to your account</div>
-      <div class="side-tier">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-        <span id="sh-tier-label">Member</span>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+
+<style>
+/* ========== ACCOUNT DASHBOARD CSS ========== */
+.sh-acct *{margin:0;padding:0;box-sizing:border-box}
+.sh-acct{--red:#E53E3E;--navy:#1A1A2E;--gray:#F7F7F8;--border:#f0f0f0;--text2:#888;--text3:#bbb;--green:#1D9E75;--amber:#D97706;--radius:10px;font-family:'DM Sans',sans-serif;background:var(--gray);color:var(--navy);font-size:13px;-webkit-font-smoothing:antialiased}
+.sh-acct a{text-decoration:none;color:inherit}
+
+/* Layout */
+.sh-page{max-width:1140px;margin:0 auto;padding:24px 20px;display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px}
+
+/* Sidebar */
+.sh-side{display:flex;flex-direction:column;gap:0;position:sticky;top:20px;align-self:start}
+.sh-side-profile{background:#fff;border-radius:14px;padding:20px;margin-bottom:12px;text-align:center;border:0.5px solid var(--border)}
+.sh-side-av{width:56px;height:56px;border-radius:50%;background:var(--navy);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;letter-spacing:-0.5px}
+.sh-side-name{font-size:15px;font-weight:600}
+.sh-side-email{font-size:11px;color:var(--text2);margin-top:2px}
+.sh-side-tier{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:10px;font-weight:600;color:var(--amber);background:#FEF3C7;padding:3px 10px;border-radius:20px}
+.sh-side-tier svg{width:12px;height:12px}
+
+.sh-side-nav{background:#fff;border-radius:14px;padding:8px;border:0.5px solid var(--border)}
+.sh-nav-group{padding:4px 0}
+.sh-nav-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;padding:10px 12px 4px}
+.sh-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:#666;font-size:13px;cursor:pointer;transition:all 0.15s;position:relative;border:none;background:none;width:100%;text-align:left;font-family:inherit}
+.sh-nav-item:hover{background:var(--gray);color:var(--navy)}
+.sh-nav-item.active{background:var(--navy);color:#fff;font-weight:500}
+.sh-nav-item svg{width:18px;height:18px;opacity:0.5;flex-shrink:0}
+.sh-nav-item.active svg{opacity:1}
+.sh-nav-badge{position:absolute;right:10px;font-size:10px;font-weight:600;background:var(--red);color:#fff;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.sh-nav-sep{height:0.5px;background:var(--border);margin:4px 8px}
+
+/* Mobile toggle */
+.sh-mobile-toggle{display:none;position:fixed;bottom:20px;right:20px;z-index:100;width:48px;height:48px;border-radius:50%;background:var(--navy);color:#fff;border:none;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.2);align-items:center;justify-content:center}
+
+/* Main content */
+.sh-main{display:flex;flex-direction:column;gap:16px}
+.sh-welcome{display:flex;justify-content:space-between;align-items:flex-end}
+.sh-welcome h1{font-size:22px;font-weight:700;letter-spacing:-0.5px}
+.sh-welcome-sub{font-size:13px;color:var(--text2);margin-top:2px}
+.sh-welcome-date{font-size:12px;color:var(--text2)}
+
+/* Alert bar */
+.sh-alert{background:#FEF3C7;border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;font-size:12px;color:#92400E}
+.sh-alert svg{width:18px;height:18px;flex-shrink:0;color:var(--amber)}
+.sh-alert b{font-weight:600}
+.sh-alert-close{margin-left:auto;opacity:0.5;cursor:pointer;font-size:16px;background:none;border:none;color:#92400E}
+
+/* Metrics */
+.sh-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sh-metric{background:#fff;border-radius:var(--radius);padding:16px;border:0.5px solid var(--border);position:relative;overflow:hidden}
+.sh-metric::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sh-metric.m-orders::after{background:var(--navy)}
+.sh-metric.m-wish::after{background:var(--red)}
+.sh-metric.m-save::after{background:var(--green)}
+.sh-metric.m-points::after{background:var(--amber)}
+.sh-metric-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sh-metric-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff}
+.sh-metric-change{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500}
+.sh-metric-num{font-size:26px;font-weight:700;letter-spacing:-1px;line-height:1}
+.sh-metric-label{font-size:11px;color:var(--text2);margin-top:4px}
+
+/* Sections / Cards */
+.sh-section{background:#fff;border-radius:14px;padding:0;border:0.5px solid var(--border);overflow:hidden}
+.sh-section-head{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 0}
+.sh-section-title{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.sh-section-title .sh-count{font-size:11px;background:var(--gray);padding:2px 8px;border-radius:10px;color:var(--text2);font-weight:500}
+.sh-section-action{font-size:12px;color:var(--red);font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px;text-decoration:none}
+.sh-section-body{padding:16px 20px 20px}
+
+/* Order cards */
+.sh-order-card{border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:box-shadow 0.2s}
+.sh-order-card:hover{box-shadow:0 2px 12px rgba(0,0,0,0.04)}
+.sh-order-card:last-child{margin-bottom:0}
+.sh-oc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:11px;color:var(--text2)}
+.sh-oc-id{font-weight:600;color:var(--navy);font-size:12px}
+.sh-oc-items{display:flex;gap:12px;align-items:center}
+.sh-oc-img{width:64px;height:64px;border-radius:8px;background:var(--gray);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#ccc;overflow:hidden}
+.sh-oc-img img{width:100%;height:100%;object-fit:cover}
+.sh-oc-info{flex:1;min-width:0}
+.sh-oc-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-oc-variant{font-size:11px;color:var(--text2);margin-top:2px}
+.sh-oc-price-row{display:flex;align-items:baseline;gap:6px;margin-top:4px}
+.sh-oc-price{font-size:15px;font-weight:700;color:var(--red)}
+.sh-oc-qty{font-size:11px;color:var(--text2)}
+
+/* Tracking timeline */
+.sh-oc-track{margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)}
+.sh-track{display:flex;align-items:center;gap:0}
+.sh-track-node{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
+.sh-track-dot{width:12px;height:12px;border-radius:50%;background:#eee;border:2px solid #eee;z-index:1;transition:all 0.3s}
+.sh-track-dot.done{background:var(--green);border-color:var(--green)}
+.sh-track-dot.now{background:#fff;border-color:var(--green);box-shadow:0 0 0 3px rgba(29,158,117,0.2)}
+.sh-track-line{position:absolute;top:5px;left:50%;width:100%;height:2px;background:#eee}
+.sh-track-node:last-child .sh-track-line{display:none}
+.sh-track-line.done{background:var(--green)}
+.sh-track-label{font-size:10px;color:var(--text2);margin-top:6px;text-align:center;line-height:1.2}
+.sh-track-label.active{color:var(--green);font-weight:500}
+.sh-track-date{font-size:9px;color:var(--text3)}
+
+.sh-oc-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.sh-oc-status{font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px}
+.sh-st-shipped{background:#E8F5E9;color:#1B5E20}
+.sh-st-processing{background:#FEF3C7;color:#92400E}
+.sh-st-delivered{background:#E6F1FB;color:#0C447C}
+.sh-st-cancelled{background:#FEE2E2;color:#991B1B}
+.sh-oc-actions{display:flex;gap:6px}
+.sh-oc-btn{font-size:11px;padding:6px 14px;border-radius:6px;font-weight:500;cursor:pointer;border:none;font-family:inherit}
+.sh-oc-btn-primary{background:var(--navy);color:#fff}
+.sh-oc-btn-outline{background:#fff;color:var(--navy);border:1px solid #ddd}
+
+/* Two-column grid */
+.sh-g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* Wishlist */
+.sh-wish-list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sh-wish-item{display:flex;gap:10px;background:var(--gray);border-radius:8px;padding:10px;position:relative}
+.sh-wish-img{width:60px;height:60px;border-radius:6px;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#ddd;overflow:hidden;position:relative}
+.sh-wish-img img{width:100%;height:100%;object-fit:cover}
+.sh-wish-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.sh-wish-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-wish-pr{font-size:14px;font-weight:700;color:var(--red);margin-top:2px}
+.sh-wish-pr .orig{font-size:10px;color:var(--text3);text-decoration:line-through;font-weight:400;margin-left:4px}
+.sh-wish-cart{font-size:10px;color:var(--navy);font-weight:500;margin-top:3px;cursor:pointer}
+.sh-wish-cart:hover{color:var(--red)}
+.sh-wish-x{position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:10px;color:#999;cursor:pointer;border:none}
+
+/* Coupons */
+.sh-coupon-card{display:flex;align-items:center;gap:12px;border:1px dashed #e5c77e;background:#FFFDF5;border-radius:8px;padding:12px;margin-bottom:8px}
+.sh-coupon-card:last-child{margin-bottom:0}
+.sh-coupon-left{text-align:center;min-width:60px}
+.sh-coupon-val{font-size:20px;font-weight:700;color:var(--amber);line-height:1}
+.sh-coupon-type{font-size:9px;color:var(--amber);font-weight:500}
+.sh-coupon-mid{flex:1}
+.sh-coupon-name{font-size:12px;font-weight:600;color:var(--navy)}
+.sh-coupon-desc{font-size:11px;color:var(--text2);margin-top:1px}
+.sh-coupon-exp{font-size:10px;color:var(--text3);margin-top:3px}
+.sh-coupon-use{font-size:11px;background:var(--navy);color:#fff;padding:6px 14px;border-radius:6px;font-weight:500;cursor:pointer;white-space:nowrap;border:none;font-family:inherit}
+
+/* Points */
+.sh-points-wrap{display:flex;align-items:center;gap:16px}
+.sh-points-circle{width:72px;height:72px;border-radius:50%;background:conic-gradient(var(--red) 0% 60%, #eee 60% 100%);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.sh-points-inner{width:58px;height:58px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.sh-points-num{font-size:18px;font-weight:700;color:var(--red);line-height:1}
+.sh-points-lbl{font-size:8px;color:var(--text2);font-weight:500}
+.sh-points-info{flex:1}
+.sh-points-tier{font-size:14px;font-weight:600}
+.sh-points-next{font-size:11px;color:var(--text2);margin-top:2px}
+.sh-points-earn{display:flex;gap:6px;margin-top:8px}
+.sh-points-tag{font-size:10px;background:var(--gray);padding:3px 8px;border-radius:4px;color:#666}
+
+/* Addresses */
+.sh-addr-row{display:flex;gap:10px}
+.sh-addr-item{flex:1;border:0.5px solid var(--border);border-radius:8px;padding:14px;position:relative}
+.sh-addr-item.default{border-color:var(--green)}
+.sh-addr-default-badge{position:absolute;top:10px;right:10px;font-size:9px;background:#E8F5E9;color:#1B5E20;padding:2px 8px;border-radius:4px;font-weight:500}
+.sh-addr-type{font-size:12px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.sh-addr-type svg{width:14px;height:14px;color:var(--text2)}
+.sh-addr-text{font-size:11px;color:var(--text2);line-height:1.6}
+.sh-addr-actions{display:flex;gap:8px;margin-top:8px}
+.sh-addr-btn{font-size:10px;color:var(--red);font-weight:500;cursor:pointer}
+
+/* Messages */
+.sh-msg-row{display:flex;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--border);align-items:start}
+.sh-msg-row:last-child{border-bottom:none}
+.sh-msg-dot{width:6px;height:6px;border-radius:50%;background:var(--red);margin-top:6px;flex-shrink:0}
+.sh-msg-dot.read{background:#ddd}
+.sh-msg-body{flex:1}
+.sh-msg-title{font-size:12px;font-weight:600}
+.sh-msg-text{font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4}
+.sh-msg-time{font-size:10px;color:var(--text3);flex-shrink:0;margin-top:2px}
+
+/* Settings grid */
+.sh-set-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.sh-set-item{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:0.5px solid var(--border)}
+.sh-set-item:nth-child(odd){padding-right:20px;border-right:0.5px solid var(--border)}
+.sh-set-item:nth-child(even){padding-left:20px}
+.sh-set-left{display:flex;flex-direction:column;gap:1px}
+.sh-set-key{font-size:12px;font-weight:500}
+.sh-set-val{font-size:11px;color:var(--text2)}
+.sh-set-edit{font-size:11px;color:var(--red);font-weight:500;cursor:pointer}
+
+/* Buy again / Reorder */
+.sh-reorder{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.sh-reorder-item{min-width:80px;text-align:center;flex-shrink:0}
+.sh-reorder-img{width:80px;height:80px;border-radius:8px;background:var(--gray);margin-bottom:6px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#ddd;overflow:hidden}
+.sh-reorder-img img{width:100%;height:100%;object-fit:cover}
+.sh-reorder-name{font-size:10px;color:#666;height:26px;overflow:hidden}
+.sh-reorder-btn{font-size:10px;color:var(--red);font-weight:500;margin-top:2px;cursor:pointer;text-decoration:none;display:block}
+
+/* Quick actions */
+.sh-quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.sh-quick-item{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s;cursor:pointer;border:none;font-family:inherit}
+.sh-quick-item:hover{box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+
+/* Tab bar for orders */
+.sh-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sh-tab{padding:10px 16px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.sh-tab.active{color:var(--navy);border-bottom-color:var(--red);font-weight:600}
+.sh-tab:hover{color:var(--navy)}
+
+/* Empty state */
+.sh-empty{text-align:center;padding:40px 20px}
+.sh-empty svg{margin:0 auto 16px;display:block;opacity:0.4}
+.sh-empty h3{font-size:1.1rem;color:var(--navy);margin:0 0 8px}
+.sh-empty p{color:var(--text2);font-size:0.9rem;margin:0 0 20px;max-width:400px;margin-left:auto;margin-right:auto}
+.sh-empty-btn{display:inline-block;background:var(--navy);color:#fff;padding:12px 28px;border-radius:8px;font-size:0.9rem;font-weight:600;text-decoration:none;transition:opacity 0.2s}
+.sh-empty-btn:hover{opacity:0.9}
+
+/* Content sections toggling */
+.sh-content-section{display:none}
+.sh-content-section.active{display:block}
+
+/* ========== RESPONSIVE ========== */
+@media(max-width:900px){
+  .sh-page{grid-template-columns:1fr;padding:16px 12px}
+  .sh-side{position:fixed;top:0;left:-280px;width:270px;height:100vh;z-index:200;background:var(--gray);padding:16px;overflow-y:auto;transition:left 0.3s ease;box-shadow:4px 0 24px rgba(0,0,0,0.1)}
+  .sh-side.open{left:0}
+  .sh-mobile-toggle{display:flex}
+  .sh-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:199}
+  .sh-overlay.open{display:block}
+  .sh-metrics{grid-template-columns:repeat(2,1fr)}
+  .sh-g2{grid-template-columns:1fr}
+  .sh-wish-list{grid-template-columns:1fr}
+  .sh-set-grid{grid-template-columns:1fr}
+  .sh-set-item:nth-child(odd){padding-right:0;border-right:none}
+  .sh-set-item:nth-child(even){padding-left:0}
+  .sh-addr-row{flex-direction:column}
+  .sh-welcome{flex-direction:column;gap:4px;align-items:flex-start}
+}
+@media(max-width:480px){
+  .sh-metrics{grid-template-columns:1fr 1fr}
+  .sh-oc-items{flex-direction:column;align-items:flex-start}
+  .sh-oc-bottom{flex-direction:column;gap:8px;align-items:flex-start}
+}
+</style>
+
+<div class="sh-acct">
+<div class="sh-overlay" data-sh-overlay></div>
+
+<div class="sh-page">
+
+{%- comment -%} ========== SIDEBAR ========== {%- endcomment -%}
+<div class="sh-side" data-sh-sidebar>
+
+  <button class="sh-mobile-toggle" data-sh-mobile-toggle aria-label="Toggle menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+
+  <div class="sh-side-profile">
+    <div class="sh-side-av">{{ initials }}</div>
+    <div class="sh-side-name">{{ cust_name }}</div>
+    <div class="sh-side-email">{{ cust_email }}</div>
+    <div class="sh-side-tier">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      <span>Member</span>
+    </div>
+  </div>
+
+  <div class="sh-side-nav">
+    <div class="sh-nav-group">
+      <button class="sh-nav-item active" data-sh-nav="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </button>
+      <button class="sh-nav-item" data-sh-nav="orders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        My orders
+        {%- if cust_order_count > 0 -%}<span class="sh-nav-badge">{{ cust_order_count }}</span>{%- endif -%}
+      </button>
+      <a class="sh-nav-item" href="/pages/tracking">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Track order
+      </a>
+      <a class="sh-nav-item" href="/pages/wishlist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Wishlist
+      </a>
+      <button class="sh-nav-item" data-sh-nav="recently-viewed">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Recently viewed
+      </button>
+    </div>
+
+    <div class="sh-nav-sep"></div>
+    <div class="sh-nav-group">
+      <div class="sh-nav-label">Shopping</div>
+      <button class="sh-nav-item" data-sh-nav="coupons">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 5H3l2 14h14l2-14z"/><path d="M7 5V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/></svg>
+        My coupons
+      </button>
+      <a class="sh-nav-item" href="/pages/rewards">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Reward points
+      </a>
+      <button class="sh-nav-item" data-sh-nav="orders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Buy again
+      </button>
+    </div>
+
+    <div class="sh-nav-sep"></div>
+    <div class="sh-nav-group">
+      <div class="sh-nav-label">Support</div>
+      <a class="sh-nav-item" href="/pages/help-center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Returns & refunds
+      </a>
+      <button class="sh-nav-item" data-sh-nav="messages">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Messages
+      </button>
+      <a class="sh-nav-item" href="/pages/help-center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Help center
+      </a>
+    </div>
+
+    <div class="sh-nav-sep"></div>
+    <div class="sh-nav-group">
+      <div class="sh-nav-label">Account</div>
+      <button class="sh-nav-item" data-sh-nav="addresses">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Addresses
+      </button>
+      <button class="sh-nav-item" data-sh-nav="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+      <a class="sh-nav-item" href="/account/logout" style="color:var(--red)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Log out
+      </a>
+    </div>
+  </div>
+</div>
+
+{%- comment -%} ========== MAIN CONTENT ========== {%- endcomment -%}
+<div class="sh-main">
+
+  {%- comment -%} === DASHBOARD === {%- endcomment -%}
+  <div class="sh-content-section active" data-sh-section="dashboard">
+
+    <div class="sh-welcome">
+      <div>
+        <h1>Welcome back, {{ cust_first }}</h1>
+        <div class="sh-welcome-sub">Here's what's happening with your account today</div>
+      </div>
+      <div class="sh-welcome-date">{{ 'now' | date: '%B %d, %Y' }}</div>
+    </div>
+
+    {%- comment -%} Alert for latest order in transit {%- endcomment -%}
+    {%- for order in cust_orders limit: 1 -%}
+      {%- if order.fulfillment_status == "fulfilled" and order.financial_status == "paid" -%}
+        <div class="sh-alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          <div>Your order <b>{{ order.name }}</b> has been fulfilled and is on its way!</div>
+          <button class="sh-alert-close" data-sh-dismiss>&times;</button>
+        </div>
+      {%- endif -%}
+    {%- endfor -%}
+
+    {%- comment -%} Metrics cards {%- endcomment -%}
+    <div class="sh-metrics">
+      <div class="sh-metric m-orders">
+        <div class="sh-metric-top">
+          <div class="sh-metric-icon" style="background:var(--navy)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="16" height="16"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/></svg>
+          </div>
+          {%- if active_orders > 0 -%}
+            <span class="sh-metric-change" style="background:#E8F5E9;color:#1B5E20">{{ active_orders }} active</span>
+          {%- endif -%}
+        </div>
+        <div class="sh-metric-num">{{ cust_order_count }}</div>
+        <div class="sh-metric-label">Total orders</div>
+      </div>
+
+      <div class="sh-metric m-wish">
+        <div class="sh-metric-top">
+          <div class="sh-metric-icon" style="background:var(--red)">
+            <svg viewBox="0 0 24 24" fill="#fff" width="14" height="14"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </div>
+        </div>
+        <div class="sh-metric-num" data-sh-wishlist-count>0</div>
+        <div class="sh-metric-label">Wishlist items</div>
+      </div>
+
+      <div class="sh-metric m-save">
+        <div class="sh-metric-top">
+          <div class="sh-metric-icon" style="background:var(--green)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="14" height="14"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+        </div>
+        <div class="sh-metric-num" style="color:var(--green)">{{ total_savings | money }}</div>
+        <div class="sh-metric-label">Total savings</div>
+      </div>
+
+      <div class="sh-metric m-points">
+        <div class="sh-metric-top">
+          <div class="sh-metric-icon" style="background:var(--amber)">
+            <svg viewBox="0 0 24 24" fill="#fff" width="14" height="14"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </div>
+          <span class="sh-metric-change" style="background:#FEF3C7;color:#92400E">Member</span>
+        </div>
+        <div class="sh-metric-num" style="color:var(--amber)">0</div>
+        <div class="sh-metric-label">Reward points</div>
       </div>
     </div>
 
-    <div class="side-nav" data-account-sidebar-nav>
-      <div class="nav-group">
-        <a href="#dashboard" class="nav-item active" data-account-nav-item="dashboard">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          Dashboard
-        </a>
-        <a href="#orders" class="nav-item" data-account-nav-item="orders">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-          My orders
-        </a>
-        <a href="/pages/tracking" class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Track order
-        </a>
-        <a href="/pages/wishlist" class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          Wishlist
-        </a>
-        <a href="#recently-viewed" class="nav-item" data-account-nav-item="recently-viewed">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          Recently viewed
-        </a>
+    {%- comment -%} Active orders section {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Active orders <span class="sh-count">{{ cust_order_count }}</span></div>
+        <button class="sh-section-action" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View all orders &rarr;</button>
+      </div>
+      <div class="sh-section-body">
+        {%- if cust_order_count == 0 -%}
+          <div class="sh-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            <h3>No orders yet</h3>
+            <p>Start shopping to see your orders here.</p>
+            <a href="/" class="sh-empty-btn">Start shopping &rarr;</a>
+          </div>
+        {%- else -%}
+          {%- for order in cust_orders limit: 3 -%}
+            <div class="sh-order-card">
+              <div class="sh-oc-top">
+                <div>
+                  <span class="sh-oc-id">{{ order.name }}</span> &middot; {{ order.created_at | date: '%b %d, %Y' }}
+                </div>
+              </div>
+              <div class="sh-oc-items">
+                {%- assign first_item = order.line_items | first -%}
+                <div class="sh-oc-img">
+                  {%- if first_item.image -%}
+                    <img src="{{ first_item.image | image_url: width: 128 }}" alt="{{ first_item.title | escape }}" loading="lazy">
+                  {%- else -%}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  {%- endif -%}
+                </div>
+                <div class="sh-oc-info">
+                  <div class="sh-oc-name">{{ first_item.title }}</div>
+                  {%- if first_item.variant_title != blank -%}
+                    <div class="sh-oc-variant">{{ first_item.variant_title }}</div>
+                  {%- endif -%}
+                  <div class="sh-oc-price-row">
+                    <span class="sh-oc-price">{{ order.total_price | money }}</span>
+                    <span class="sh-oc-qty">{{ order.line_items.size }} item{%- if order.line_items.size > 1 -%}s{%- endif -%}</span>
+                  </div>
+                </div>
+              </div>
+
+              {%- comment -%} Tracking timeline {%- endcomment -%}
+              {%- assign ff_status = order.fulfillment_status -%}
+              {%- assign fn_status = order.financial_status -%}
+              {%- if ff_status == "fulfilled" or ff_status == "partial" -%}
+                <div class="sh-oc-track">
+                  <div class="sh-track">
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot done"></div>
+                      <div class="sh-track-line done"></div>
+                      <div class="sh-track-label active">Confirmed<br><span class="sh-track-date">{{ order.created_at | date: '%b %d' }}</span></div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot done"></div>
+                      <div class="sh-track-line {% if ff_status == 'fulfilled' %}done{% endif %}"></div>
+                      <div class="sh-track-label active">Shipped</div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot {% if ff_status == 'fulfilled' %}done{% else %}now{% endif %}"></div>
+                      <div class="sh-track-line"></div>
+                      <div class="sh-track-label {% if ff_status == 'fulfilled' %}active{% endif %}">In transit</div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot"></div>
+                      <div class="sh-track-label">Delivered</div>
+                    </div>
+                  </div>
+                </div>
+              {%- endif -%}
+
+              <div class="sh-oc-bottom">
+                {%- if ff_status == "fulfilled" -%}
+                  <span class="sh-oc-status sh-st-shipped">Shipped</span>
+                {%- elsif ff_status == "partial" -%}
+                  <span class="sh-oc-status sh-st-processing">Partially fulfilled</span>
+                {%- elsif order.cancelled_at != blank -%}
+                  <span class="sh-oc-status sh-st-cancelled">Cancelled</span>
+                {%- else -%}
+                  <span class="sh-oc-status sh-st-processing">Processing</span>
+                {%- endif -%}
+                <div class="sh-oc-actions">
+                  <a href="{{ order.customer_url }}" class="sh-oc-btn sh-oc-btn-outline" target="_blank" rel="noopener">View details</a>
+                  {%- if ff_status == "fulfilled" -%}
+                    <a href="/pages/tracking" class="sh-oc-btn sh-oc-btn-primary">Track package</a>
+                  {%- endif -%}
+                </div>
+              </div>
+            </div>
+          {%- endfor -%}
+        {%- endif -%}
+      </div>
+    </div>
+
+    {%- comment -%} Quick actions {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Quick actions</div>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-quick-grid">
+          <button class="sh-quick-item" data-sh-nav="orders">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            My orders
+          </button>
+          <a class="sh-quick-item" href="/pages/tracking">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            Track package
+          </a>
+          <a class="sh-quick-item" href="/pages/wishlist">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            Wishlist
+          </a>
+          <a class="sh-quick-item" href="/pages/rewards">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Rewards
+          </a>
+          <a class="sh-quick-item" href="/pages/help-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            Returns
+          </a>
+          <a class="sh-quick-item" href="/pages/help-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Help center
+          </a>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Two columns: Coupons + Reward points {%- endcomment -%}
+    <div class="sh-g2">
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">My coupons</div>
+        </div>
+        <div class="sh-section-body">
+          <div class="sh-coupon-card">
+            <div class="sh-coupon-left"><div class="sh-coupon-val">10%</div><div class="sh-coupon-type">OFF</div></div>
+            <div class="sh-coupon-mid"><div class="sh-coupon-name">WELCOME10</div><div class="sh-coupon-desc">First order discount</div><div class="sh-coupon-exp">New customers only</div></div>
+            <button class="sh-coupon-use" data-sh-copy="WELCOME10">Copy code</button>
+          </div>
+          <div class="sh-coupon-card" style="border-color:#a7d5c0;background:#F0FFF8">
+            <div class="sh-coupon-left"><div class="sh-coupon-val" style="color:var(--green)">FREE</div><div class="sh-coupon-type" style="color:var(--green)">SHIP</div></div>
+            <div class="sh-coupon-mid"><div class="sh-coupon-name">FREESHIP</div><div class="sh-coupon-desc">Free shipping on orders $30+</div><div class="sh-coupon-exp">No expiration</div></div>
+            <button class="sh-coupon-use" data-sh-copy="FREESHIP">Copy code</button>
+          </div>
+        </div>
       </div>
 
-      <div class="nav-sep"></div>
-      <div class="nav-group">
-        <div class="nav-label">Shopping</div>
-        <a href="#coupons" class="nav-item" data-account-nav-item="coupons">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 5H3l2 14h14l2-14z"/><path d="M7 5V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/></svg>
-          My coupons
-        </a>
-        <a href="/pages/rewards" class="nav-item">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-          Reward points
-        </a>
-        <a href="#orders" class="nav-item" data-account-nav-item="orders">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-          Buy again
-        </a>
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">Reward points</div>
+          <a href="/pages/rewards" class="sh-section-action">How it works &rarr;</a>
+        </div>
+        <div class="sh-section-body">
+          <div class="sh-points-wrap">
+            <div class="sh-points-circle">
+              <div class="sh-points-inner">
+                <div class="sh-points-num">0</div>
+                <div class="sh-points-lbl">POINTS</div>
+              </div>
+            </div>
+            <div class="sh-points-info">
+              <div class="sh-points-tier">Member</div>
+              <div class="sh-points-next">Start earning points today!</div>
+              <div class="sh-points-earn">
+                <span class="sh-points-tag">1pt / $1 spent</span>
+                <span class="sh-points-tag">200pts = $10 off</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Buy again — from past orders {%- endcomment -%}
+    {%- if cust_order_count > 0 -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Buy again</div>
+        <button class="sh-section-action" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View order history &rarr;</button>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-reorder">
+          {%- for order in cust_orders limit: 6 -%}
+            {%- for item in order.line_items limit: 1 -%}
+              <div class="sh-reorder-item">
+                <div class="sh-reorder-img">
+                  {%- if item.image -%}
+                    <img src="{{ item.image | image_url: width: 160 }}" alt="{{ item.title | escape }}" loading="lazy">
+                  {%- else -%}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                  {%- endif -%}
+                </div>
+                <div class="sh-reorder-name">{{ item.title | truncate: 30 }}</div>
+                <a href="{{ item.url }}" class="sh-reorder-btn">Reorder &rarr;</a>
+              </div>
+            {%- endfor -%}
+          {%- endfor -%}
+        </div>
+      </div>
+    </div>
+    {%- endif -%}
+
+    {%- comment -%} Two columns: Addresses + Messages {%- endcomment -%}
+    <div class="sh-g2">
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">Addresses</div>
+          <a href="https://account.stylehubmiami.com/" class="sh-section-action" target="_blank" rel="noopener">Manage &rarr;</a>
+        </div>
+        <div class="sh-section-body">
+          {%- if cust_addresses.size == 0 -%}
+            <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">
+              No addresses saved yet. <a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" style="color:var(--red)">Add one &rarr;</a>
+            </div>
+          {%- else -%}
+            <div class="sh-addr-row">
+              {%- for address in cust_addresses limit: 2 -%}
+                <div class="sh-addr-item{% if address == cust_default_address %} default{% endif %}">
+                  {%- if address == cust_default_address -%}
+                    <span class="sh-addr-default-badge">Default</span>
+                  {%- endif -%}
+                  <div class="sh-addr-type">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {%- if address.company != blank -%}{{ address.company }}{%- else -%}Address{%- endif -%}
+                  </div>
+                  <div class="sh-addr-text">
+                    {{ address.first_name }} {{ address.last_name }}<br>
+                    {{ address.address1 }}{%- if address.address2 != blank -%}, {{ address.address2 }}{%- endif -%}<br>
+                    {{ address.city }}, {{ address.province_code }} {{ address.zip }}<br>
+                    {%- if address.phone != blank -%}{{ address.phone }}{%- endif -%}
+                  </div>
+                </div>
+              {%- endfor -%}
+            </div>
+          {%- endif -%}
+        </div>
       </div>
 
-      <div class="nav-sep"></div>
-      <div class="nav-group">
-        <div class="nav-label">Support</div>
-        <a href="/pages/help-center" class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-          Returns & refunds
-        </a>
-        <a href="#messages" class="nav-item" data-account-nav-item="messages">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          Messages
-        </a>
-        <a href="/pages/help-center" class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Help center
-        </a>
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">Messages</div>
+        </div>
+        <div class="sh-section-body">
+          <div class="sh-msg-row">
+            <div class="sh-msg-dot"></div>
+            <div class="sh-msg-body">
+              <div class="sh-msg-title">Welcome to StyleHub Miami!</div>
+              <div class="sh-msg-text">Thank you for being a member. Browse our latest deals and start saving today. Need help? Contact our support team.</div>
+            </div>
+            <div class="sh-msg-time">Welcome</div>
+          </div>
+        </div>
       </div>
+    </div>
 
-      <div class="nav-sep"></div>
-      <div class="nav-group">
-        <div class="nav-label">Account</div>
-        <a href="#addresses" class="nav-item" data-account-nav-item="addresses">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          Addresses
-        </a>
-        <a href="#settings" class="nav-item" data-account-nav-item="settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          Settings
-        </a>
-        <a href="/account/logout" class="nav-item" style="color:var(--red)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Log out
-        </a>
+    {%- comment -%} Account settings preview {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Account settings</div>
+        <a href="https://account.stylehubmiami.com/" class="sh-section-action" target="_blank" rel="noopener">Edit profile &rarr;</a>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-set-grid">
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">Managed by Shopify</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Change</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Orders</div><div class="sh-set-val">{{ cust_order_count }} total orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Language</div><div class="sh-set-val">English (US)</div></div><span class="sh-set-edit" style="opacity:0.5">Default</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end dashboard -->
+
+  {%- comment -%} === ORDERS SECTION === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="orders">
+    <div class="sh-welcome">
+      <div>
+        <h1>My orders</h1>
+        <div class="sh-welcome-sub">View and manage your order history</div>
+      </div>
+    </div>
+
+    {%- if cust_order_count == 0 -%}
+      <div class="sh-section">
+        <div class="sh-section-body">
+          <div class="sh-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            <h3>No orders yet</h3>
+            <p>Start shopping to see your orders here.</p>
+            <a href="/" class="sh-empty-btn">Start shopping &rarr;</a>
+          </div>
+        </div>
+      </div>
+    {%- else -%}
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">All orders <span class="sh-count">{{ cust_order_count }}</span></div>
+        </div>
+        <div class="sh-section-body">
+          {%- for order in cust_orders -%}
+            <div class="sh-order-card">
+              <div class="sh-oc-top">
+                <div>
+                  <span class="sh-oc-id">{{ order.name }}</span> &middot; {{ order.created_at | date: '%b %d, %Y' }}
+                </div>
+              </div>
+              <div class="sh-oc-items">
+                {%- for item in order.line_items -%}
+                  <div style="display:flex;gap:12px;align-items:center;{%- unless forloop.first -%}margin-top:8px{%- endunless -%}">
+                    <div class="sh-oc-img">
+                      {%- if item.image -%}
+                        <img src="{{ item.image | image_url: width: 128 }}" alt="{{ item.title | escape }}" loading="lazy">
+                      {%- else -%}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                      {%- endif -%}
+                    </div>
+                    <div class="sh-oc-info">
+                      <div class="sh-oc-name">{{ item.title }}</div>
+                      {%- if item.variant_title != blank -%}
+                        <div class="sh-oc-variant">{{ item.variant_title }}</div>
+                      {%- endif -%}
+                      <div class="sh-oc-price-row">
+                        <span class="sh-oc-price">{{ item.final_price | money }}</span>
+                        <span class="sh-oc-qty">&times; {{ item.quantity }}</span>
+                      </div>
+                    </div>
+                  </div>
+                {%- endfor -%}
+              </div>
+
+              {%- assign ff_status = order.fulfillment_status -%}
+              {%- if ff_status == "fulfilled" or ff_status == "partial" -%}
+                <div class="sh-oc-track">
+                  <div class="sh-track">
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot done"></div>
+                      <div class="sh-track-line done"></div>
+                      <div class="sh-track-label active">Confirmed<br><span class="sh-track-date">{{ order.created_at | date: '%b %d' }}</span></div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot done"></div>
+                      <div class="sh-track-line {% if ff_status == 'fulfilled' %}done{% endif %}"></div>
+                      <div class="sh-track-label active">Shipped</div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot {% if ff_status == 'fulfilled' %}done{% else %}now{% endif %}"></div>
+                      <div class="sh-track-line"></div>
+                      <div class="sh-track-label {% if ff_status == 'fulfilled' %}active{% endif %}">In transit</div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot"></div>
+                      <div class="sh-track-label">Delivered</div>
+                    </div>
+                  </div>
+                </div>
+              {%- endif -%}
+
+              <div class="sh-oc-bottom">
+                {%- if order.cancelled_at != blank -%}
+                  <span class="sh-oc-status sh-st-cancelled">Cancelled</span>
+                {%- elsif ff_status == "fulfilled" -%}
+                  <span class="sh-oc-status sh-st-shipped">Shipped</span>
+                {%- elsif ff_status == "partial" -%}
+                  <span class="sh-oc-status sh-st-processing">Partially fulfilled</span>
+                {%- else -%}
+                  <span class="sh-oc-status sh-st-processing">Processing</span>
+                {%- endif -%}
+                <div class="sh-oc-actions">
+                  <a href="{{ order.customer_url }}" class="sh-oc-btn sh-oc-btn-outline" target="_blank" rel="noopener">View details</a>
+                  {%- if ff_status == "fulfilled" -%}
+                    <a href="/pages/tracking" class="sh-oc-btn sh-oc-btn-primary">Track package</a>
+                  {%- endif -%}
+                </div>
+              </div>
+            </div>
+          {%- endfor -%}
+        </div>
+      </div>
+    {%- endif -%}
+  </div>
+
+  {%- comment -%} === ADDRESSES === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="addresses">
+    <div class="sh-welcome">
+      <div>
+        <h1>My addresses</h1>
+        <div class="sh-welcome-sub">Manage your shipping and billing addresses</div>
+      </div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Saved addresses <span class="sh-count">{{ cust_addresses.size }}</span></div>
+        <a href="https://account.stylehubmiami.com/" class="sh-section-action" target="_blank" rel="noopener">Add new &rarr;</a>
+      </div>
+      <div class="sh-section-body">
+        {%- if cust_addresses.size == 0 -%}
+          <div class="sh-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <h3>No addresses saved</h3>
+            <p>Add your shipping address to speed up checkout.</p>
+            <a href="https://account.stylehubmiami.com/" class="sh-empty-btn" target="_blank" rel="noopener">Add address &rarr;</a>
+          </div>
+        {%- else -%}
+          <div class="sh-addr-row" style="flex-wrap:wrap">
+            {%- for address in cust_addresses -%}
+              <div class="sh-addr-item{% if address == cust_default_address %} default{% endif %}" style="min-width:220px">
+                {%- if address == cust_default_address -%}
+                  <span class="sh-addr-default-badge">Default</span>
+                {%- endif -%}
+                <div class="sh-addr-type">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  {%- if address.company != blank -%}{{ address.company }}{%- else -%}Address {{ forloop.index }}{%- endif -%}
+                </div>
+                <div class="sh-addr-text">
+                  {{ address.first_name }} {{ address.last_name }}<br>
+                  {{ address.address1 }}{%- if address.address2 != blank -%}, {{ address.address2 }}{%- endif -%}<br>
+                  {{ address.city }}, {{ address.province_code }} {{ address.zip }}<br>
+                  {{ address.country }}<br>
+                  {%- if address.phone != blank -%}{{ address.phone }}{%- endif -%}
+                </div>
+              </div>
+            {%- endfor -%}
+          </div>
+        {%- endif -%}
       </div>
     </div>
   </div>
 
-  {%- comment -%} ========== MAIN CONTENT ========== {%- endcomment -%}
-  <div class="main">
-
-    {%- comment -%} === DASHBOARD === {%- endcomment -%}
-    <div data-account-content-section="dashboard" style="display:block">
-
-      <div class="welcome">
-        <div>
-          <h1 id="sh-welcome-title">Welcome back!</h1>
-          <div class="welcome-sub">Here's what's happening with your account today</div>
-        </div>
-        <div class="welcome-date">{{ 'now' | date: '%B %d, %Y' }}</div>
+  {%- comment -%} === COUPONS === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="coupons">
+    <div class="sh-welcome">
+      <div>
+        <h1>My coupons</h1>
+        <div class="sh-welcome-sub">Available discount codes for your next order</div>
       </div>
-
-      {%- comment -%} Stats cards {%- endcomment -%}
-      <div class="metrics">
-        <div class="metric m-orders">
-          <div class="metric-top">
-            <div class="metric-icon" style="background:var(--navy)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="16" height="16"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/></svg>
-            </div>
-          </div>
-          <div class="metric-num"><a href="#orders" data-account-nav-item="orders" style="color:inherit;text-decoration:none;cursor:pointer">View orders</a></div>
-          <div class="metric-label">My orders</div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-body">
+        <div class="sh-coupon-card">
+          <div class="sh-coupon-left"><div class="sh-coupon-val">10%</div><div class="sh-coupon-type">OFF</div></div>
+          <div class="sh-coupon-mid"><div class="sh-coupon-name">WELCOME10</div><div class="sh-coupon-desc">First order discount &middot; New customers only</div><div class="sh-coupon-exp">Min. order $15</div></div>
+          <button class="sh-coupon-use" data-sh-copy="WELCOME10">Copy code</button>
         </div>
-
-        <div class="metric m-wish">
-          <div class="metric-top">
-            <div class="metric-icon" style="background:var(--red)">
-              <svg viewBox="0 0 24 24" fill="#fff" width="14" height="14"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            </div>
-          </div>
-          <div class="metric-num" id="sh-wishlist-count">0</div>
-          <div class="metric-label">Wishlist items</div>
-        </div>
-
-        <div class="metric m-save">
-          <div class="metric-top">
-            <div class="metric-icon" style="background:var(--green)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="14" height="14"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </div>
-          </div>
-          <div class="metric-num" style="color:var(--green)">$0.00</div>
-          <div class="metric-label">Total savings</div>
-        </div>
-
-        <div class="metric m-points">
-          <div class="metric-top">
-            <div class="metric-icon" style="background:var(--amber)">
-              <svg viewBox="0 0 24 24" fill="#fff" width="14" height="14"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            </div>
-            <span class="metric-change" style="background:#FEF3C7;color:#92400E" id="sh-loyalty-tier-badge">Member</span>
-          </div>
-          <div class="metric-num" style="color:var(--amber)" id="sh-points-count">0</div>
-          <div class="metric-label">Reward points</div>
-        </div>
-      </div>
-
-      {%- comment -%} Quick actions grid {%- endcomment -%}
-      <div class="section">
-        <div class="section-head">
-          <div class="section-title">Quick actions</div>
-        </div>
-        <div class="section-body">
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">
-            <a href="#orders" data-account-nav-item="orders" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s;cursor:pointer">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-              My orders
-            </a>
-            <a href="/pages/tracking" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-              Track package
-            </a>
-            <a href="/pages/wishlist" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-              Wishlist
-            </a>
-            <a href="/pages/rewards" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              Rewards
-            </a>
-            <a href="/pages/help-center" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-              Returns
-            </a>
-            <a href="/pages/help-center" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              Help center
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {%- comment -%} Two-column: Coupons + Reward points {%- endcomment -%}
-      <div class="g2">
-        <div class="section">
-          <div class="section-head">
-            <div class="section-title">My coupons</div>
-          </div>
-          <div class="section-body">
-            <div class="coupon-card">
-              <div class="coupon-left"><div class="coupon-val">10%</div><div class="coupon-type">OFF</div></div>
-              <div class="coupon-mid"><div class="coupon-name">WELCOME10</div><div class="coupon-desc">First order discount</div><div class="coupon-exp">New customers only</div></div>
-              <button class="coupon-use" data-copy-coupon="WELCOME10">Copy code</button>
-            </div>
-            <div class="coupon-card" style="border-color:#a7d5c0;background:#F0FFF8">
-              <div class="coupon-left"><div class="coupon-val" style="color:var(--green)">FREE</div><div class="coupon-type" style="color:var(--green)">SHIP</div></div>
-              <div class="coupon-mid"><div class="coupon-name">FREESHIP</div><div class="coupon-desc">Free shipping on orders $30+</div><div class="coupon-exp">No expiration</div></div>
-              <button class="coupon-use" data-copy-coupon="FREESHIP">Copy code</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-head">
-            <div class="section-title">Reward points</div>
-            <a href="/pages/rewards" class="section-action" style="text-decoration:none">How it works &rarr;</a>
-          </div>
-          <div class="section-body">
-            <div class="points-wrap" id="growave-points-widget">
-              <div class="points-circle">
-                <div class="points-inner">
-                  <div class="points-num" id="sh-points-num">0</div>
-                  <div class="points-lbl">POINTS</div>
-                </div>
-              </div>
-              <div class="points-info">
-                <div class="points-tier" id="sh-points-tier">Member</div>
-                <div class="points-next" id="sh-points-next">Start earning points today!</div>
-                <div class="points-earn">
-                  <span class="points-tag">1pt / $1 spent</span>
-                  <span class="points-tag">200pts = $10 off</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {%- comment -%} Recently viewed {%- endcomment -%}
-      <div class="section">
-        <div class="section-head">
-          <div class="section-title">Recently viewed</div>
-          <a href="/" class="section-action" style="text-decoration:none">Continue shopping &rarr;</a>
-        </div>
-        <div class="section-body" data-recently-viewed-products>
-          <p style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">Your recently viewed products will appear here as you browse.</p>
-        </div>
-      </div>
-
-      {%- comment -%} Messages {%- endcomment -%}
-      <div class="section">
-        <div class="section-head">
-          <div class="section-title">Messages</div>
-        </div>
-        <div class="section-body">
-          <div class="msg-row">
-            <div class="msg-dot"></div>
-            <div class="msg-body">
-              <div class="msg-title">Welcome to StyleHub Miami!</div>
-              <div class="msg-text">Thank you for being a member. Browse our latest deals and start saving today. Need help? Use the chat widget below.</div>
-            </div>
-            <div class="msg-time">Welcome</div>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- end dashboard -->
-
-    {%- comment -%} === RECENTLY VIEWED section === {%- endcomment -%}
-    <div data-account-content-section="recently-viewed" style="display:none">
-      <div class="welcome">
-        <div>
-          <h1>Recently viewed</h1>
-          <div class="welcome-sub">Products you've browsed recently</div>
-        </div>
-      </div>
-      <div class="section">
-        <div class="section-body" data-recently-viewed-products>
-          <p style="text-align:center;padding:24px 0;color:var(--text2);font-size:13px">Loading recently viewed products...</p>
+        <div class="sh-coupon-card" style="border-color:#a7d5c0;background:#F0FFF8">
+          <div class="sh-coupon-left"><div class="sh-coupon-val" style="color:var(--green)">FREE</div><div class="sh-coupon-type" style="color:var(--green)">SHIP</div></div>
+          <div class="sh-coupon-mid"><div class="sh-coupon-name">FREESHIP</div><div class="sh-coupon-desc">Free shipping on orders $30+</div><div class="sh-coupon-exp">No expiration</div></div>
+          <button class="sh-coupon-use" data-sh-copy="FREESHIP">Copy code</button>
         </div>
       </div>
     </div>
+  </div>
 
-    {%- comment -%} === COUPONS section === {%- endcomment -%}
-    <div data-account-content-section="coupons" style="display:none">
-      <div class="welcome">
-        <div>
-          <h1>My coupons</h1>
-          <div class="welcome-sub">Available discount codes for your next order</div>
-        </div>
+  {%- comment -%} === MESSAGES === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="messages">
+    <div class="sh-welcome">
+      <div>
+        <h1>Messages</h1>
+        <div class="sh-welcome-sub">Your conversations with StyleHub support</div>
       </div>
-      <div class="section">
-        <div class="section-body">
-          <div class="coupon-card">
-            <div class="coupon-left"><div class="coupon-val">10%</div><div class="coupon-type">OFF</div></div>
-            <div class="coupon-mid"><div class="coupon-name">WELCOME10</div><div class="coupon-desc">First order discount &middot; New customers only</div><div class="coupon-exp">Min. order $15</div></div>
-            <button class="coupon-use" data-copy-coupon="WELCOME10">Copy code</button>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-body">
+        <div class="sh-msg-row">
+          <div class="sh-msg-dot"></div>
+          <div class="sh-msg-body">
+            <div class="sh-msg-title">Welcome to StyleHub Miami!</div>
+            <div class="sh-msg-text">Thank you for creating your account. If you need help with anything, our support team is here for you.</div>
           </div>
-          <div class="coupon-card" style="border-color:#a7d5c0;background:#F0FFF8">
-            <div class="coupon-left"><div class="coupon-val" style="color:var(--green)">FREE</div><div class="coupon-type" style="color:var(--green)">SHIP</div></div>
-            <div class="coupon-mid"><div class="coupon-name">FREESHIP</div><div class="coupon-desc">Free shipping on orders $30+</div><div class="coupon-exp">No expiration</div></div>
-            <button class="coupon-use" data-copy-coupon="FREESHIP">Copy code</button>
-          </div>
+          <div class="sh-msg-time">Welcome</div>
+        </div>
+        <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">
+          Need help? <a href="/pages/help-center" style="color:var(--red)">Visit our Help Center</a> or use the chat widget below.
         </div>
       </div>
     </div>
+  </div>
 
-    {%- comment -%} === MESSAGES section === {%- endcomment -%}
-    <div data-account-content-section="messages" style="display:none">
-      <div class="welcome">
-        <div>
-          <h1>Messages</h1>
-          <div class="welcome-sub">Your conversations with StyleHub support</div>
-        </div>
+  {%- comment -%} === RECENTLY VIEWED === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="recently-viewed">
+    <div class="sh-welcome">
+      <div>
+        <h1>Recently viewed</h1>
+        <div class="sh-welcome-sub">Products you've browsed recently</div>
       </div>
-      <div class="section">
-        <div class="section-body">
-          <div class="msg-row">
-            <div class="msg-dot"></div>
-            <div class="msg-body">
-              <div class="msg-title">Welcome to StyleHub Miami!</div>
-              <div class="msg-text">Thank you for creating your account. If you need help with anything, our support team is here for you.</div>
-            </div>
-            <div class="msg-time">Welcome</div>
-          </div>
-          <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">
-            Need help? Use the chat widget in the bottom right corner to start a conversation.
-          </div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-body" data-sh-recently-viewed>
+        <div class="sh-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <h3>No recently viewed products</h3>
+          <p>Products you browse will appear here.</p>
+          <a href="/" class="sh-empty-btn">Start browsing &rarr;</a>
         </div>
       </div>
     </div>
+  </div>
 
-    {%- comment -%} === ORDERS section === {%- endcomment -%}
-    <div data-account-content-section="orders" style="display:none">
-      <div class="welcome">
-        <div>
-          <h1>My orders</h1>
-          <div class="welcome-sub">View and manage your order history</div>
-        </div>
+  {%- comment -%} === SETTINGS === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="settings">
+    <div class="sh-welcome">
+      <div>
+        <h1>Account settings</h1>
+        <div class="sh-welcome-sub">Manage your profile and preferences</div>
       </div>
-      <div class="section">
-        <div class="section-body" style="text-align:center;padding:40px 20px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48" style="margin:0 auto 16px;display:block;opacity:0.4"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-          <h3 style="font-size:1.1rem;color:var(--navy);margin:0 0 8px">Your orders are managed by Shopify</h3>
-          <p style="color:var(--text2);font-size:0.9rem;margin:0 0 20px;max-width:400px;margin-left:auto;margin-right:auto">View your complete order history, track shipments, and manage returns through your secure Shopify account.</p>
-          <a href="https://account.stylehubmiami.com/orders" target="_blank" rel="noopener" style="display:inline-block;background:var(--navy);color:#fff;padding:12px 28px;border-radius:8px;font-size:0.9rem;font-weight:600;text-decoration:none;transition:opacity 0.2s">View order history &rarr;</a>
-          <div style="margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-            <a href="/pages/tracking" style="color:var(--red);font-size:0.85rem;font-weight:500;text-decoration:none">Track a package</a>
-            <span style="color:#ddd">|</span>
-            <a href="/pages/help-center" style="color:var(--red);font-size:0.85rem;font-weight:500;text-decoration:none">Need help with an order?</a>
-          </div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Profile information</div>
+        <a href="https://account.stylehubmiami.com/" class="sh-section-action" target="_blank" rel="noopener">Edit in Shopify &rarr;</a>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-set-grid">
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">Managed by Shopify accounts</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Change</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total orders</div><div class="sh-set-val">{{ cust_order_count }} orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total spent</div><div class="sh-set-val">{{ customer.total_spent | money }}</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
         </div>
       </div>
     </div>
+  </div>
 
-    {%- comment -%} === ADDRESSES section === {%- endcomment -%}
-    <div data-account-content-section="addresses" style="display:none">
-      <div class="welcome">
-        <div>
-          <h1>My addresses</h1>
-          <div class="welcome-sub">Manage your shipping and billing addresses</div>
-        </div>
-      </div>
-      <div class="section">
-        <div class="section-body" style="text-align:center;padding:40px 20px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48" style="margin:0 auto 16px;display:block;opacity:0.4"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          <h3 style="font-size:1.1rem;color:var(--navy);margin:0 0 8px">Manage your addresses</h3>
-          <p style="color:var(--text2);font-size:0.9rem;margin:0 0 20px;max-width:400px;margin-left:auto;margin-right:auto">Add, edit, or remove shipping addresses through your secure Shopify account profile.</p>
-          <a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" style="display:inline-block;background:var(--navy);color:#fff;padding:12px 28px;border-radius:8px;font-size:0.9rem;font-weight:600;text-decoration:none;transition:opacity 0.2s">Manage addresses &rarr;</a>
-        </div>
-      </div>
-    </div>
+</div><!-- end main -->
+</div><!-- end page -->
+</div><!-- end sh-acct -->
 
-    {%- comment -%} === SETTINGS section === {%- endcomment -%}
-    <div data-account-content-section="settings" style="display:none">
-      <div class="welcome">
-        <div>
-          <h1>Account settings</h1>
-          <div class="welcome-sub">Manage your profile and preferences</div>
-        </div>
-      </div>
-      <div class="section">
-        <div class="section-body" style="text-align:center;padding:40px 20px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48" style="margin:0 auto 16px;display:block;opacity:0.4"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          <h3 style="font-size:1.1rem;color:var(--navy);margin:0 0 8px">Profile settings</h3>
-          <p style="color:var(--text2);font-size:0.9rem;margin:0 0 20px;max-width:400px;margin-left:auto;margin-right:auto">Update your name, email, password, and notification preferences.</p>
-          <a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" style="display:inline-block;background:var(--navy);color:#fff;padding:12px 28px;border-radius:8px;font-size:0.9rem;font-weight:600;text-decoration:none;transition:opacity 0.2s">Edit profile &rarr;</a>
-        </div>
-      </div>
-    </div>
+<script>
+(function() {
+  'use strict';
 
-  </div><!-- end main -->
-</div>
+  /* Navigation */
+  var navItems = document.querySelectorAll('[data-sh-nav]');
+  var sections = document.querySelectorAll('[data-sh-section]');
+  var sidebar = document.querySelector('[data-sh-sidebar]');
+  var overlay = document.querySelector('[data-sh-overlay]');
+  var mobileToggle = document.querySelector('[data-sh-mobile-toggle]');
 
-<script src="{{ 'account.js' | asset_url }}" defer></script>
+  function showSection(name) {
+    sections.forEach(function(s) { s.classList.remove('active'); });
+    navItems.forEach(function(n) { n.classList.remove('active'); });
+    var target = document.querySelector('[data-sh-section="' + name + '"]');
+    if (target) target.classList.add('active');
+    navItems.forEach(function(n) {
+      if (n.getAttribute('data-sh-nav') === name) n.classList.add('active');
+    });
+    closeSidebar();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  navItems.forEach(function(item) {
+    item.addEventListener('click', function(e) {
+      e.preventDefault();
+      showSection(this.getAttribute('data-sh-nav'));
+    });
+  });
+
+  /* Mobile sidebar */
+  function closeSidebar() {
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
+  }
+
+  if (mobileToggle) {
+    mobileToggle.addEventListener('click', function() {
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('open');
+    });
+  }
+  if (overlay) overlay.addEventListener('click', closeSidebar);
+
+  /* Copy coupon code */
+  document.querySelectorAll('[data-sh-copy]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var code = this.getAttribute('data-sh-copy');
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(code);
+        this.textContent = 'Copied!';
+        var self = this;
+        setTimeout(function() { self.textContent = 'Copy code'; }, 2000);
+      }
+    });
+  });
+
+  /* Dismiss alert */
+  document.querySelectorAll('[data-sh-dismiss]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      this.closest('.sh-alert').style.display = 'none';
+    });
+  });
+
+  /* Wishlist count from localStorage */
+  try {
+    var wl = JSON.parse(localStorage.getItem('sh_wishlist') || '[]');
+    var countEls = document.querySelectorAll('[data-sh-wishlist-count]');
+    countEls.forEach(function(el) { el.textContent = wl.length; });
+  } catch(e) {}
+
+  /* Hash navigation on load */
+  if (window.location.hash) {
+    var hashSection = window.location.hash.replace('#', '');
+    var validSections = ['dashboard','orders','addresses','coupons','messages','recently-viewed','settings'];
+    if (validSections.indexOf(hashSection) !== -1) {
+      showSection(hashSection);
+    }
+  }
+})();
+</script>
 
 {% schema %}
 {
@@ -412,4 +1086,3 @@
   ]
 }
 {% endschema %}
-

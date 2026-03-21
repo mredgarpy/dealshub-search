@@ -1,0 +1,270 @@
+{% comment %}
+  StyleHub Miami — Order Detail Page
+  Redesigned to match the custom account dashboard design
+  Design: DM Sans, Navy #1A1A2E, Red #E53E3E
+{% endcomment %}
+
+{{ 'account.css' | asset_url | stylesheet_tag }}
+
+<div class="page" data-account-section>
+
+  {% render 'account-sidebar', current_page: 'orders' %}
+
+  <div class="main">
+
+    {%- comment -%} Header {%- endcomment -%}
+    <div class="welcome">
+      <div>
+        <h1>Order {{ order.name }}</h1>
+        <div class="welcome-sub">Placed on {{ order.created_at | date: '%B %d, %Y at %I:%M %p' }}</div>
+      </div>
+      <a href="/account#orders" style="font-size:12px;color:var(--red);font-weight:500;text-decoration:none">&larr; Back to orders</a>
+    </div>
+
+    {%- comment -%} Order status banner {%- endcomment -%}
+    {%- if order.cancelled_at != blank -%}
+      <div class="alert" style="background:#FEE2E2;color:#991B1B">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <div>This order was <b>cancelled</b> on {{ order.cancelled_at | date: '%B %d, %Y' }}. Reason: {{ order.cancel_reason | default: 'Not specified' }}</div>
+      </div>
+    {%- elsif order.fulfillment_status == 'fulfilled' -%}
+      <div class="alert" style="background:#E8F5E9;color:#1B5E20">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <div>This order has been <b>shipped</b>!
+          {%- if order.fulfillments.first.tracking_number -%}
+            Tracking: {{ order.fulfillments.first.tracking_number }}
+          {%- endif -%}
+        </div>
+      </div>
+    {%- elsif order.financial_status == 'refunded' -%}
+      <div class="alert" style="background:#FEF3C7;color:#92400E">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        <div>This order has been <b>refunded</b>.</div>
+      </div>
+    {%- endif -%}
+
+    {%- comment -%} Tracking timeline for shipped orders {%- endcomment -%}
+    {%- if order.fulfillment_status == 'fulfilled' and order.cancelled_at == blank -%}
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">Shipping progress</div>
+          {%- if order.fulfillments.first.tracking_url -%}
+            <a href="{{ order.fulfillments.first.tracking_url }}" target="_blank" rel="noopener" class="section-action" style="text-decoration:none">Track on carrier site &rarr;</a>
+          {%- endif -%}
+        </div>
+        <div class="section-body">
+          <div class="track">
+            <div class="track-node">
+              <div class="track-dot done"></div>
+              <div class="track-line done"></div>
+              <div class="track-label active">Confirmed<br><span class="track-date">{{ order.created_at | date: '%b %d' }}</span></div>
+            </div>
+            <div class="track-node">
+              <div class="track-dot done"></div>
+              <div class="track-line done"></div>
+              <div class="track-label active">Shipped<br><span class="track-date">{{ order.fulfillments.first.created_at | date: '%b %d' | default: '—' }}</span></div>
+            </div>
+            <div class="track-node">
+              <div class="track-dot now"></div>
+              <div class="track-line"></div>
+              <div class="track-label active">In transit</div>
+            </div>
+            <div class="track-node">
+              <div class="track-dot"></div>
+              <div class="track-label">Delivered</div>
+            </div>
+          </div>
+          {%- if order.fulfillments.first.tracking_company -%}
+            <div style="margin-top:12px;font-size:11px;color:var(--text2)">
+              Carrier: <b>{{ order.fulfillments.first.tracking_company }}</b>
+              {%- if order.fulfillments.first.tracking_number -%}
+                &middot; Tracking #: <b>{{ order.fulfillments.first.tracking_number }}</b>
+              {%- endif -%}
+            </div>
+          {%- endif -%}
+        </div>
+      </div>
+    {%- endif -%}
+
+    {%- comment -%} Order items {%- endcomment -%}
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Items <span class="count">{{ order.line_items.size }}</span></div>
+      </div>
+      <div class="section-body">
+        {%- for item in order.line_items -%}
+          <div class="order-card" style="border:0;padding:0;margin-bottom:16px{% if forloop.last %};margin-bottom:0{% endif %}">
+            <div class="oc-items">
+              <div class="oc-img">
+                {%- if item.image -%}
+                  <img src="{{ item.image | image_url: width: 128 }}" alt="{{ item.title | escape }}" width="64" height="64" loading="lazy" style="width:100%;height:100%;object-fit:cover">
+                {%- else -%}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                {%- endif -%}
+              </div>
+              <div class="oc-info">
+                <div class="oc-name">{{ item.title }}</div>
+                {%- if item.variant.title != 'Default Title' -%}
+                  <div class="oc-variant">{{ item.variant.title }}</div>
+                {%- endif -%}
+                <div class="oc-variant">Vendor: {{ item.vendor | default: 'StyleHub' }}</div>
+                <div class="oc-price-row">
+                  <span class="oc-price">{{ item.final_price | money }}</span>
+                  {%- if item.variant.compare_at_price > item.final_price -%}
+                    <span style="font-size:11px;color:#aaa;text-decoration:line-through">{{ item.variant.compare_at_price | money }}</span>
+                  {%- endif -%}
+                  <span class="oc-qty">&times; {{ item.quantity }}</span>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div style="font-size:15px;font-weight:700">{{ item.final_line_price | money }}</div>
+                {%- if item.variant_id -%}
+                  <button class="oc-btn oc-btn-outline" data-buy-again="{{ item.variant_id }}" data-quantity="1" style="margin-top:6px;font-size:10px;padding:4px 10px">Buy again</button>
+                {%- endif -%}
+              </div>
+            </div>
+          </div>
+          {%- unless forloop.last -%}<div style="border-top:0.5px solid var(--border);margin:0"></div>{%- endunless -%}
+        {%- endfor -%}
+      </div>
+    </div>
+
+    {%- comment -%} 4 info blocks in 2x2 grid {%- endcomment -%}
+    <div class="g2">
+
+      {%- comment -%} Shipping address {%- endcomment -%}
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Shipping address
+          </div>
+        </div>
+        <div class="section-body">
+          {%- if order.shipping_address -%}
+            <div style="font-size:12px;line-height:1.7;color:var(--navy)">
+              <div style="font-weight:600">{{ order.shipping_address.name }}</div>
+              {{ order.shipping_address.address1 }}<br>
+              {%- if order.shipping_address.address2 != blank -%}{{ order.shipping_address.address2 }}<br>{%- endif -%}
+              {{ order.shipping_address.city }}, {{ order.shipping_address.province_code }} {{ order.shipping_address.zip }}<br>
+              {{ order.shipping_address.country }}<br>
+              {%- if order.shipping_address.phone != blank -%}{{ order.shipping_address.phone }}{%- endif -%}
+            </div>
+          {%- else -%}
+            <div style="font-size:12px;color:var(--text2)">No shipping address</div>
+          {%- endif -%}
+        </div>
+      </div>
+
+      {%- comment -%} Order summary {%- endcomment -%}
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            Order summary
+          </div>
+        </div>
+        <div class="section-body">
+          <div style="font-size:12px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between">
+              <span style="color:var(--text2)">Subtotal</span>
+              <span>{{ order.subtotal_price | money }}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <span style="color:var(--text2)">Shipping</span>
+              <span>{%- if order.shipping_price == 0 -%}<span style="color:var(--green);font-weight:500">FREE</span>{%- else -%}{{ order.shipping_price | money }}{%- endif -%}</span>
+            </div>
+            {%- if order.total_discounts > 0 -%}
+              <div style="display:flex;justify-content:space-between">
+                <span style="color:var(--text2)">Discount</span>
+                <span style="color:var(--green)">-{{ order.total_discounts | money }}</span>
+              </div>
+            {%- endif -%}
+            {%- if order.tax_price > 0 -%}
+              <div style="display:flex;justify-content:space-between">
+                <span style="color:var(--text2)">Tax</span>
+                <span>{{ order.tax_price | money }}</span>
+              </div>
+            {%- endif -%}
+            <div style="border-top:0.5px solid var(--border);padding-top:8px;display:flex;justify-content:space-between;font-weight:700;font-size:14px">
+              <span>Total</span>
+              <span>{{ order.total_price | money }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {%- comment -%} Payment info {%- endcomment -%}
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            Payment
+          </div>
+        </div>
+        <div class="section-body">
+          <div style="font-size:12px;line-height:1.7">
+            {%- for transaction in order.transactions -%}
+              {%- if transaction.status == 'success' -%}
+                <div style="font-weight:500">{{ transaction.gateway | capitalize }}</div>
+              {%- endif -%}
+            {%- endfor -%}
+            <div style="color:var(--text2)">Financial status: <span style="font-weight:500;color:var(--navy)">{{ order.financial_status | capitalize }}</span></div>
+            <div style="color:var(--text2)">Paid on {{ order.created_at | date: '%b %d, %Y' }}</div>
+          </div>
+        </div>
+      </div>
+
+      {%- comment -%} Carrier info {%- endcomment -%}
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            Shipping info
+          </div>
+        </div>
+        <div class="section-body">
+          <div style="font-size:12px;line-height:1.7">
+            {%- if order.fulfillments.size > 0 -%}
+              {%- for fulfillment in order.fulfillments -%}
+                {%- if fulfillment.tracking_company -%}
+                  <div><span style="color:var(--text2)">Carrier:</span> <b>{{ fulfillment.tracking_company }}</b></div>
+                {%- endif -%}
+                {%- if fulfillment.tracking_number -%}
+                  <div><span style="color:var(--text2)">Tracking #:</span> <b>{{ fulfillment.tracking_number }}</b></div>
+                {%- endif -%}
+                {%- if fulfillment.tracking_url -%}
+                  <div style="margin-top:4px"><a href="{{ fulfillment.tracking_url }}" target="_blank" rel="noopener" style="color:var(--red);font-weight:500;text-decoration:none">Track on carrier site &rarr;</a></div>
+                {%- endif -%}
+              {%- endfor -%}
+            {%- else -%}
+              <div style="color:var(--text2)">
+                {%- if order.cancelled_at != blank -%}
+                  Order was cancelled before shipping.
+                {%- else -%}
+                  Not yet shipped. We'll update tracking info once your order is on its way.
+                {%- endif -%}
+              </div>
+            {%- endif -%}
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    {%- comment -%} Action buttons {%- endcomment -%}
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      {%- if order.order_status_url -%}
+        <a href="{{ order.order_status_url }}" class="oc-btn oc-btn-primary" style="text-decoration:none;padding:10px 20px">View order status</a>
+      {%- endif -%}
+      <a href="/apps/parcelpanel" class="oc-btn oc-btn-outline" style="text-decoration:none;padding:10px 20px">Track with ParcelPanel</a>
+      {%- if order.fulfillment_status == 'fulfilled' -%}
+        <a href="/apps/return-prime" class="oc-btn oc-btn-outline" style="text-decoration:none;padding:10px 20px">Return an item</a>
+      {%- endif -%}
+      <a href="/pages/help-center" class="oc-btn oc-btn-outline" style="text-decoration:none;padding:10px 20px">Need help?</a>
+    </div>
+
+  </div>
+</div>
+
+<script src="{{ 'account.js' | asset_url }}" defer></script>

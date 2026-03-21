@@ -1,0 +1,355 @@
+{% comment %}
+  StyleHub Miami — Account Dashboard Section
+  Works with New Customer Accounts (page template, not customers/account)
+  Uses JS to detect login state and fetch customer data via Storefront API
+  Design: DM Sans, Navy #1A1A2E, Red #E53E3E
+{% endcomment %}
+
+{{ 'account.css' | asset_url | stylesheet_tag }}
+
+<div class="page" data-account-section id="sh-account-dashboard">
+
+  {%- comment -%} ========== SIDEBAR ========== {%- endcomment -%}
+  <div class="side" data-account-sidebar>
+
+    <button class="sh-mobile-toggle" data-account-mobile-toggle aria-label="Toggle menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+
+    <div class="side-profile">
+      <div class="side-av" id="sh-avatar">SH</div>
+      <div class="side-name" id="sh-customer-name">StyleHub Member</div>
+      <div class="side-email" id="sh-customer-email">Welcome to your account</div>
+      <div class="side-tier">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <span id="sh-tier-label">Member</span>
+      </div>
+    </div>
+
+    <div class="side-nav" data-account-sidebar-nav>
+      <div class="nav-group">
+        <a href="#dashboard" class="nav-item active" data-account-nav-item="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </a>
+        <a href="/account" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+          My orders
+        </a>
+        <a href="/apps/parcelpanel" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Track order
+        </a>
+        <a href="/pages/wishlist" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          Wishlist
+        </a>
+        <a href="#recently-viewed" class="nav-item" data-account-nav-item="recently-viewed">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Recently viewed
+        </a>
+      </div>
+
+      <div class="nav-sep"></div>
+      <div class="nav-group">
+        <div class="nav-label">Shopping</div>
+        <a href="#coupons" class="nav-item" data-account-nav-item="coupons">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 5H3l2 14h14l2-14z"/><path d="M7 5V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/></svg>
+          My coupons
+        </a>
+        <a href="/pages/rewards" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Reward points
+        </a>
+        <a href="/account" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Buy again
+        </a>
+      </div>
+
+      <div class="nav-sep"></div>
+      <div class="nav-group">
+        <div class="nav-label">Support</div>
+        <a href="/apps/return-prime" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          Returns & refunds
+        </a>
+        <a href="#messages" class="nav-item" data-account-nav-item="messages">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Messages
+        </a>
+        <a href="/pages/help-center" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Help center
+        </a>
+      </div>
+
+      <div class="nav-sep"></div>
+      <div class="nav-group">
+        <div class="nav-label">Account</div>
+        <a href="/account" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          Addresses
+        </a>
+        <a href="/account" class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
+        </a>
+        <a href="/account/logout" class="nav-item" style="color:var(--red)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Log out
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} ========== MAIN CONTENT ========== {%- endcomment -%}
+  <div class="main">
+
+    {%- comment -%} === DASHBOARD === {%- endcomment -%}
+    <div data-account-content-section="dashboard" style="display:block">
+
+      <div class="welcome">
+        <div>
+          <h1 id="sh-welcome-title">Welcome back!</h1>
+          <div class="welcome-sub">Here's what's happening with your account today</div>
+        </div>
+        <div class="welcome-date">{{ 'now' | date: '%B %d, %Y' }}</div>
+      </div>
+
+      {%- comment -%} Stats cards {%- endcomment -%}
+      <div class="metrics">
+        <div class="metric m-orders">
+          <div class="metric-top">
+            <div class="metric-icon" style="background:var(--navy)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="16" height="16"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/></svg>
+            </div>
+          </div>
+          <div class="metric-num"><a href="/account" style="color:inherit;text-decoration:none">View orders</a></div>
+          <div class="metric-label">My orders</div>
+        </div>
+
+        <div class="metric m-wish">
+          <div class="metric-top">
+            <div class="metric-icon" style="background:var(--red)">
+              <svg viewBox="0 0 24 24" fill="#fff" width="14" height="14"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            </div>
+          </div>
+          <div class="metric-num" id="sh-wishlist-count">0</div>
+          <div class="metric-label">Wishlist items</div>
+        </div>
+
+        <div class="metric m-save">
+          <div class="metric-top">
+            <div class="metric-icon" style="background:var(--green)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="14" height="14"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+          </div>
+          <div class="metric-num" style="color:var(--green)">$0.00</div>
+          <div class="metric-label">Total savings</div>
+        </div>
+
+        <div class="metric m-points">
+          <div class="metric-top">
+            <div class="metric-icon" style="background:var(--amber)">
+              <svg viewBox="0 0 24 24" fill="#fff" width="14" height="14"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </div>
+            <span class="metric-change" style="background:#FEF3C7;color:#92400E" id="sh-loyalty-tier-badge">Member</span>
+          </div>
+          <div class="metric-num" style="color:var(--amber)" id="sh-points-count">0</div>
+          <div class="metric-label">Reward points</div>
+        </div>
+      </div>
+
+      {%- comment -%} Quick actions grid {%- endcomment -%}
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">Quick actions</div>
+        </div>
+        <div class="section-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">
+            <a href="/account" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+              My orders
+            </a>
+            <a href="/apps/parcelpanel" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+              Track package
+            </a>
+            <a href="/pages/wishlist" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              Wishlist
+            </a>
+            <a href="/pages/rewards" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              Rewards
+            </a>
+            <a href="/apps/return-prime" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              Returns
+            </a>
+            <a href="/pages/help-center" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              Help center
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {%- comment -%} Two-column: Coupons + Reward points {%- endcomment -%}
+      <div class="g2">
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">My coupons</div>
+          </div>
+          <div class="section-body">
+            <div class="coupon-card">
+              <div class="coupon-left"><div class="coupon-val">10%</div><div class="coupon-type">OFF</div></div>
+              <div class="coupon-mid"><div class="coupon-name">WELCOME10</div><div class="coupon-desc">First order discount</div><div class="coupon-exp">New customers only</div></div>
+              <button class="coupon-use" data-copy-coupon="WELCOME10">Copy code</button>
+            </div>
+            <div class="coupon-card" style="border-color:#a7d5c0;background:#F0FFF8">
+              <div class="coupon-left"><div class="coupon-val" style="color:var(--green)">FREE</div><div class="coupon-type" style="color:var(--green)">SHIP</div></div>
+              <div class="coupon-mid"><div class="coupon-name">FREESHIP</div><div class="coupon-desc">Free shipping on orders $30+</div><div class="coupon-exp">No expiration</div></div>
+              <button class="coupon-use" data-copy-coupon="FREESHIP">Copy code</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <div class="section-title">Reward points</div>
+            <a href="/pages/rewards" class="section-action" style="text-decoration:none">How it works &rarr;</a>
+          </div>
+          <div class="section-body">
+            <div class="points-wrap" id="growave-points-widget">
+              <div class="points-circle">
+                <div class="points-inner">
+                  <div class="points-num" id="sh-points-num">0</div>
+                  <div class="points-lbl">POINTS</div>
+                </div>
+              </div>
+              <div class="points-info">
+                <div class="points-tier" id="sh-points-tier">Member</div>
+                <div class="points-next" id="sh-points-next">Start earning points today!</div>
+                <div class="points-earn">
+                  <span class="points-tag">1pt / $1 spent</span>
+                  <span class="points-tag">200pts = $10 off</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {%- comment -%} Recently viewed {%- endcomment -%}
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">Recently viewed</div>
+          <a href="/" class="section-action" style="text-decoration:none">Continue shopping &rarr;</a>
+        </div>
+        <div class="section-body" data-recently-viewed-products>
+          <p style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">Your recently viewed products will appear here as you browse.</p>
+        </div>
+      </div>
+
+      {%- comment -%} Messages {%- endcomment -%}
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">Messages</div>
+        </div>
+        <div class="section-body">
+          <div class="msg-row">
+            <div class="msg-dot"></div>
+            <div class="msg-body">
+              <div class="msg-title">Welcome to StyleHub Miami!</div>
+              <div class="msg-text">Thank you for being a member. Browse our latest deals and start saving today. Need help? Use the chat widget below.</div>
+            </div>
+            <div class="msg-time">Welcome</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end dashboard -->
+
+    {%- comment -%} === RECENTLY VIEWED section === {%- endcomment -%}
+    <div data-account-content-section="recently-viewed" style="display:none">
+      <div class="welcome">
+        <div>
+          <h1>Recently viewed</h1>
+          <div class="welcome-sub">Products you've browsed recently</div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-body" data-recently-viewed-products>
+          <p style="text-align:center;padding:24px 0;color:var(--text2);font-size:13px">Loading recently viewed products...</p>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} === COUPONS section === {%- endcomment -%}
+    <div data-account-content-section="coupons" style="display:none">
+      <div class="welcome">
+        <div>
+          <h1>My coupons</h1>
+          <div class="welcome-sub">Available discount codes for your next order</div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-body">
+          <div class="coupon-card">
+            <div class="coupon-left"><div class="coupon-val">10%</div><div class="coupon-type">OFF</div></div>
+            <div class="coupon-mid"><div class="coupon-name">WELCOME10</div><div class="coupon-desc">First order discount &middot; New customers only</div><div class="coupon-exp">Min. order $15</div></div>
+            <button class="coupon-use" data-copy-coupon="WELCOME10">Copy code</button>
+          </div>
+          <div class="coupon-card" style="border-color:#a7d5c0;background:#F0FFF8">
+            <div class="coupon-left"><div class="coupon-val" style="color:var(--green)">FREE</div><div class="coupon-type" style="color:var(--green)">SHIP</div></div>
+            <div class="coupon-mid"><div class="coupon-name">FREESHIP</div><div class="coupon-desc">Free shipping on orders $30+</div><div class="coupon-exp">No expiration</div></div>
+            <button class="coupon-use" data-copy-coupon="FREESHIP">Copy code</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} === MESSAGES section === {%- endcomment -%}
+    <div data-account-content-section="messages" style="display:none">
+      <div class="welcome">
+        <div>
+          <h1>Messages</h1>
+          <div class="welcome-sub">Your conversations with StyleHub support</div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-body">
+          <div class="msg-row">
+            <div class="msg-dot"></div>
+            <div class="msg-body">
+              <div class="msg-title">Welcome to StyleHub Miami!</div>
+              <div class="msg-text">Thank you for creating your account. If you need help with anything, our support team is here for you.</div>
+            </div>
+            <div class="msg-time">Welcome</div>
+          </div>
+          <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">
+            Need help? Use the chat widget in the bottom right corner to start a conversation.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end main -->
+</div>
+
+<script src="{{ 'account.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Account Dashboard",
+  "class": "sh-account-dashboard-section",
+  "settings": [],
+  "presets": [
+    {
+      "name": "Account Dashboard"
+    }
+  ]
+}
+{% endschema %}

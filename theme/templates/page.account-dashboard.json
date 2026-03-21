@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "main": {
+      "type": "account-dashboard",
+      "settings": {}
+    }
+  },
+  "order": ["main"]
+}

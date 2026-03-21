@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "main": {
+      "type": "dealshub-shipping-policy",
+      "settings": {}
+    }
+  },
+  "order": ["main"]
+}

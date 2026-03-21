@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "main": {
+      "type": "dealshub-returns-policy",
+      "settings": {}
+    }
+  },
+  "order": ["main"]
+}

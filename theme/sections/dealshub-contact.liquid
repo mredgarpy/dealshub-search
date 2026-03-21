@@ -1,0 +1,157 @@
+{% comment %}
+  StyleHub Miami — Contact Us Page
+  Design: DM Sans, Navy #1A1A2E, Red #E53E3E
+{% endcomment %}
+
+<div class="contact-page page-width">
+
+  <div class="contact-hero">
+    <h1>Contact Us</h1>
+    <p>We'd love to hear from you. Our team typically responds within 24 hours.</p>
+  </div>
+
+  <div class="contact-grid">
+
+    <div class="contact-form-wrap">
+      <form id="contact-form" action="/contact#contact-form" method="post" class="contact-form">
+        <input type="hidden" name="form_type" value="contact">
+        <input type="hidden" name="utf8" value="✓">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="contact-name">Full Name <span class="req">*</span></label>
+            <input type="text" id="contact-name" name="contact[name]" placeholder="John Doe" required>
+          </div>
+          <div class="form-group">
+            <label for="contact-email">Email Address <span class="req">*</span></label>
+            <input type="email" id="contact-email" name="contact[email]" placeholder="john@example.com" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="contact-subject">Subject</label>
+          <select id="contact-subject" name="contact[subject]">
+            <option value="general">General Inquiry</option>
+            <option value="order">Order Issue</option>
+            <option value="return">Return / Refund</option>
+            <option value="shipping">Shipping Question</option>
+            <option value="product">Product Question</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="contact-order">Order Number (if applicable)</label>
+          <input type="text" id="contact-order" name="contact[order_number]" placeholder="#1234">
+        </div>
+
+        <div class="form-group">
+          <label for="contact-message">Message <span class="req">*</span></label>
+          <textarea id="contact-message" name="contact[body]" rows="6" placeholder="Tell us how we can help..." required></textarea>
+        </div>
+
+        <button type="submit" class="contact-submit">Send Message</button>
+      </form>
+
+      {% if form.posted_successfully? %}
+        <div class="contact-success">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38A169" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <p><b>Message sent!</b> We'll get back to you within 24 hours.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="contact-info">
+      <div class="contact-info-card">
+        <div class="contact-info-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E53E3E" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <h3>Email</h3>
+        <p>support@stylehubmiami.com</p>
+        <span class="contact-info-note">Typically responds within 24 hours</span>
+      </div>
+
+      <div class="contact-info-card">
+        <div class="contact-info-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E53E3E" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <h3>Location</h3>
+        <p>Miami, FL — United States</p>
+        <span class="contact-info-note">Online store — no physical showroom</span>
+      </div>
+
+      <div class="contact-info-card">
+        <div class="contact-info-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E53E3E" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h3>Business Hours</h3>
+        <p>Mon – Fri: 9:00 AM – 6:00 PM EST</p>
+        <span class="contact-info-note">Closed weekends & major US holidays</span>
+      </div>
+
+      <div class="contact-quick-links">
+        <h3>Quick Links</h3>
+        <a href="/pages/tracking">Track My Order</a>
+        <a href="/pages/help-center">Help Center & FAQ</a>
+        <a href="/policies/refund-policy">Return Policy</a>
+        <a href="/policies/shipping-policy">Shipping Policy</a>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<style>
+.contact-page { padding:40px 0 60px; max-width:960px; margin:0 auto; font-family:'DM Sans',system-ui,sans-serif; }
+.contact-hero { text-align:center; margin-bottom:40px; }
+.contact-hero h1 { font-size:32px; font-weight:700; color:#1A1A2E; margin:0 0 8px; }
+.contact-hero p { color:#718096; font-size:15px; margin:0; }
+
+.contact-grid { display:grid; grid-template-columns:1.3fr 1fr; gap:40px; align-items:start; }
+.contact-form-wrap { background:#fff; border:1px solid #E2E8F0; border-radius:16px; padding:32px; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-group { margin-bottom:16px; }
+.form-group label { display:block; font-size:13px; font-weight:600; color:#4A5568; margin-bottom:5px; }
+.form-group .req { color:#E53E3E; }
+.form-group input, .form-group select, .form-group textarea {
+  width:100%; padding:11px 14px; border:2px solid #E2E8F0; border-radius:10px;
+  font-size:14px; font-family:inherit; outline:none; transition:border-color .2s; background:#fff;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:#1A1A2E; }
+.form-group textarea { resize:vertical; min-height:120px; }
+.contact-submit {
+  width:100%; padding:14px; background:#E53E3E; color:#fff; border:none; border-radius:10px;
+  font-size:15px; font-weight:700; cursor:pointer; transition:background .15s; font-family:inherit;
+}
+.contact-submit:hover { background:#C53030; }
+.contact-success { display:flex; align-items:center; gap:10px; padding:14px; background:#E8F5E9; border-radius:10px; margin-top:16px; }
+.contact-success p { margin:0; font-size:14px; color:#1B5E20; }
+
+.contact-info { display:flex; flex-direction:column; gap:16px; }
+.contact-info-card { background:#fff; border:1px solid #E2E8F0; border-radius:14px; padding:20px; }
+.contact-info-icon { width:42px; height:42px; background:#FFF5F5; border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom:10px; }
+.contact-info-card h3 { font-size:14px; font-weight:700; color:#1A1A2E; margin:0 0 4px; }
+.contact-info-card p { font-size:14px; color:#4A5568; margin:0; }
+.contact-info-note { font-size:11px; color:#A0AEC0; }
+.contact-quick-links { background:#F7FAFC; border-radius:14px; padding:20px; }
+.contact-quick-links h3 { font-size:14px; font-weight:700; color:#1A1A2E; margin:0 0 12px; }
+.contact-quick-links a { display:block; font-size:13px; color:#E53E3E; text-decoration:none; padding:6px 0; font-weight:500; }
+.contact-quick-links a:hover { text-decoration:underline; }
+
+@media(max-width:768px) {
+  .contact-grid { grid-template-columns:1fr; }
+  .form-row { grid-template-columns:1fr; }
+  .contact-page { padding:24px 16px 40px; }
+  .contact-hero h1 { font-size:24px; }
+}
+</style>
+
+{% schema %}
+{
+  "name": "Contact Us",
+  "tag": "section",
+  "settings": [],
+  "presets": [{ "name": "Contact Us" }]
+}
+{% endschema %}

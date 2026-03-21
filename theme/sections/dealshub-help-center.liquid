@@ -1,0 +1,308 @@
+{% comment %}
+  StyleHub Miami — Help Center Page
+  Design: DM Sans, Navy #1A1A2E, Red #E53E3E
+{% endcomment %}
+
+<div class="help-center page-width">
+
+  <div class="help-hero">
+    <h1>How Can We Help?</h1>
+    <p>Find answers to common questions or reach out to our support team</p>
+    <div class="help-search">
+      <input type="text" id="help-search-input" placeholder="Search for help..." autocomplete="off">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </div>
+  </div>
+
+  <div class="help-topics">
+    <a href="#orders" class="help-topic-card" data-help-topic>
+      <div class="help-topic-icon" style="background:#EBF5FB">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3182CE" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      </div>
+      <h3>Orders & Payment</h3>
+      <p>Track orders, payment issues, order changes</p>
+    </a>
+    <a href="#shipping" class="help-topic-card" data-help-topic>
+      <div class="help-topic-icon" style="background:#E8F8F5">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38A169" stroke-width="1.5"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      </div>
+      <h3>Shipping & Delivery</h3>
+      <p>Delivery times, shipping costs, tracking</p>
+    </a>
+    <a href="#returns" class="help-topic-card" data-help-topic>
+      <div class="help-topic-icon" style="background:#FEF5E7">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D69E2E" stroke-width="1.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      </div>
+      <h3>Returns & Refunds</h3>
+      <p>Return process, refund timeline, eligibility</p>
+    </a>
+    <a href="#account" class="help-topic-card" data-help-topic>
+      <div class="help-topic-icon" style="background:#F5EEF8">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8E44AD" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <h3>My Account</h3>
+      <p>Login, password, account settings</p>
+    </a>
+    <a href="#products" class="help-topic-card" data-help-topic>
+      <div class="help-topic-icon" style="background:#FDEDEC">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E53E3E" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+      </div>
+      <h3>Products & Pricing</h3>
+      <p>Product info, pricing, availability</p>
+    </a>
+    <a href="/pages/contact" class="help-topic-card" data-help-topic>
+      <div class="help-topic-icon" style="background:#E8F6F3">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1ABC9C" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      </div>
+      <h3>Contact Us</h3>
+      <p>Reach our support team directly</p>
+    </a>
+  </div>
+
+  {%- comment -%} FAQ Sections {%- endcomment -%}
+  <div class="help-faq-sections">
+
+    <div class="help-faq-group" id="orders" data-help-group>
+      <h2>Orders & Payment</h2>
+      <div class="faq-list">
+        <details class="faq-item" data-faq>
+          <summary>How do I track my order?</summary>
+          <div class="faq-answer">
+            <p>You can track your order in several ways:</p>
+            <p>Visit our <a href="/pages/tracking">Track My Order</a> page and enter your order number. You'll also receive tracking updates via email once your order ships. If you have an account, you can view all order statuses from your <a href="/pages/my-account">account dashboard</a>.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>How long does order processing take?</summary>
+          <div class="faq-answer">
+            <p>Most orders are processed within 1–3 business days. During high-demand periods like holidays or flash sales, processing may take up to 5 business days. You'll receive a confirmation email once your order is placed and another when it ships.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>Can I cancel or modify my order?</summary>
+          <div class="faq-answer">
+            <p>You can request a cancellation or modification within 2 hours of placing your order by contacting our support team at <b>support@stylehubmiami.com</b>. Once an order enters processing or has shipped, we're unable to make changes — but you can initiate a return once delivered.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>What payment methods do you accept?</summary>
+          <div class="faq-answer">
+            <p>We accept all major credit and debit cards (Visa, Mastercard, American Express, Discover), Shop Pay, Apple Pay, Google Pay, and PayPal. All transactions are processed securely through Shopify Payments with SSL encryption.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>Why was my payment declined?</summary>
+          <div class="faq-answer">
+            <p>Payment declines can happen for several reasons: insufficient funds, incorrect card details, your bank flagging an unfamiliar transaction, or an expired card. Try using a different payment method or contact your bank. If the issue persists, reach out to our support team.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="help-faq-group" id="shipping" data-help-group>
+      <h2>Shipping & Delivery</h2>
+      <div class="faq-list">
+        <details class="faq-item" data-faq>
+          <summary>How long does shipping take?</summary>
+          <div class="faq-answer">
+            <p>Shipping times vary depending on the product and your location. Most domestic orders within the US arrive within 5–15 business days after processing. Some items may ship from international partners and take 10–25 business days. Estimated delivery dates are shown on each product page.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>How much does shipping cost?</summary>
+          <div class="faq-answer">
+            <p>Shipping costs are calculated at checkout based on item weight, dimensions, and your shipping address. Many items qualify for free shipping — look for the "Free Shipping" badge on product pages. We frequently run free shipping promotions on orders over a certain amount.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>Do you ship internationally?</summary>
+          <div class="faq-answer">
+            <p>Currently, we primarily ship within the United States. International shipping may be available for select products. Check the product page for shipping availability to your country, or contact support for specific inquiries.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>My package shows delivered but I haven't received it</summary>
+          <div class="faq-answer">
+            <p>If tracking shows your package as delivered but you haven't received it, first check around your delivery area (porch, mailbox, with neighbors, or building reception). Wait 24 hours as carriers sometimes mark packages as delivered early. If still missing, contact us at <b>support@stylehubmiami.com</b> with your order number and we'll investigate.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="help-faq-group" id="returns" data-help-group>
+      <h2>Returns & Refunds</h2>
+      <div class="faq-list">
+        <details class="faq-item" data-faq>
+          <summary>What is your return policy?</summary>
+          <div class="faq-answer">
+            <p>We offer a 30-day return window from the date of delivery for most products. Items must be unused, in original packaging, and in resellable condition. Some categories like intimate apparel, swimwear, and personalized items may have different policies. See our full <a href="/policies/refund-policy">Returns & Refund Policy</a> for details.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>How do I start a return?</summary>
+          <div class="faq-answer">
+            <p>To start a return, log into your account and go to your order history, or email <b>support@stylehubmiami.com</b> with your order number and the reason for return. Our team will review your request and provide return instructions within 1–2 business days.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>When will I receive my refund?</summary>
+          <div class="faq-answer">
+            <p>Once we receive and inspect your returned item, refunds are processed within 5–7 business days. The refund will be credited to your original payment method. Please allow an additional 3–5 business days for the refund to appear on your statement, depending on your bank.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>My item arrived damaged or defective</summary>
+          <div class="faq-answer">
+            <p>We're sorry to hear that! Please contact us within 48 hours of delivery with photos of the damaged/defective item and your order number. We'll arrange a replacement or full refund at no additional cost to you, including return shipping.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="help-faq-group" id="account" data-help-group>
+      <h2>My Account</h2>
+      <div class="faq-list">
+        <details class="faq-item" data-faq>
+          <summary>How do I create an account?</summary>
+          <div class="faq-answer">
+            <p>Click the person icon in the header or visit our login page. You can create an account using your email address. Having an account lets you track orders, save addresses, maintain a wishlist, and check out faster.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>I forgot my password</summary>
+          <div class="faq-answer">
+            <p>On the login page, click "Forgot password?" and enter your email address. You'll receive a password reset link within a few minutes. Check your spam folder if you don't see it. The link expires after 24 hours.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>How do I update my shipping address?</summary>
+          <div class="faq-answer">
+            <p>Log into your account and navigate to the Addresses section. You can add, edit, or remove saved addresses. Note that changing your default address won't affect orders already in processing — those will ship to the address used at checkout.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="help-faq-group" id="products" data-help-group>
+      <h2>Products & Pricing</h2>
+      <div class="faq-list">
+        <details class="faq-item" data-faq>
+          <summary>Are your products authentic?</summary>
+          <div class="faq-answer">
+            <p>Yes. All products sold through StyleHub Miami are sourced from authorized retailers and verified suppliers. We work with trusted partners to ensure authenticity and quality. If you ever have concerns about a product you've received, contact our support team immediately.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>Why do prices change?</summary>
+          <div class="faq-answer">
+            <p>Our prices reflect real-time market conditions and supplier pricing. Prices may fluctuate based on demand, availability, and supplier costs. The price shown at checkout is the price you'll pay. We recommend completing your purchase promptly if you find a great deal.</p>
+          </div>
+        </details>
+        <details class="faq-item" data-faq>
+          <summary>Do you price match?</summary>
+          <div class="faq-answer">
+            <p>We strive to offer competitive prices, and many of our products already reflect significant savings compared to retail. While we don't have a formal price-match guarantee, if you find a significantly lower price from a verified retailer, let us know and we'll do our best to help.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+  </div>
+
+  {%- comment -%} Contact CTA {%- endcomment -%}
+  <div class="help-contact-cta">
+    <h2>Still Need Help?</h2>
+    <p>Our support team is here to help you Monday through Friday, 9 AM – 6 PM EST.</p>
+    <div class="help-contact-methods">
+      <a href="mailto:support@stylehubmiami.com" class="help-contact-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        Email Support
+      </a>
+      <a href="/pages/contact" class="help-contact-btn help-contact-btn--outline">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Contact Form
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const search = document.getElementById('help-search-input');
+  if (!search) return;
+  search.addEventListener('input', function() {
+    const q = this.value.toLowerCase().trim();
+    document.querySelectorAll('[data-faq]').forEach(faq => {
+      const text = faq.textContent.toLowerCase();
+      faq.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
+    document.querySelectorAll('[data-help-group]').forEach(group => {
+      const visibleFaqs = group.querySelectorAll('[data-faq]:not([style*="display: none"])');
+      group.style.display = (!q || visibleFaqs.length > 0) ? '' : 'none';
+    });
+  });
+})();
+</script>
+
+<style>
+.help-center { padding:40px 0 60px; max-width:900px; margin:0 auto; font-family:'DM Sans',system-ui,sans-serif; }
+.help-hero { text-align:center; margin-bottom:40px; }
+.help-hero h1 { font-size:32px; font-weight:700; color:#1A1A2E; margin:0 0 8px; }
+.help-hero p { color:#718096; font-size:15px; margin:0 0 24px; }
+.help-search { position:relative; max-width:480px; margin:0 auto; }
+.help-search input { width:100%; padding:14px 16px 14px 44px; border:2px solid #E2E8F0; border-radius:12px; font-size:15px; outline:none; transition:border-color .2s; font-family:inherit; }
+.help-search input:focus { border-color:#1A1A2E; }
+.help-search svg { position:absolute; left:14px; top:50%; transform:translateY(-50%); pointer-events:none; }
+
+.help-topics { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:48px; }
+.help-topic-card { text-decoration:none; background:#fff; border:1px solid #E2E8F0; border-radius:14px; padding:24px 20px; text-align:center; transition:all .2s; }
+.help-topic-card:hover { border-color:#E53E3E; box-shadow:0 4px 12px rgba(0,0,0,.06); transform:translateY(-2px); }
+.help-topic-icon { width:56px; height:56px; border-radius:14px; display:flex; align-items:center; justify-content:center; margin:0 auto 14px; }
+.help-topic-card h3 { font-size:15px; font-weight:700; color:#1A1A2E; margin:0 0 4px; }
+.help-topic-card p { font-size:12px; color:#718096; margin:0; line-height:1.5; }
+
+.help-faq-sections { margin-bottom:48px; }
+.help-faq-group { margin-bottom:36px; }
+.help-faq-group h2 { font-size:20px; font-weight:700; color:#1A1A2E; margin:0 0 16px; padding-bottom:10px; border-bottom:2px solid #E2E8F0; }
+.faq-item { border:1px solid #E2E8F0; border-radius:10px; margin-bottom:8px; overflow:hidden; }
+.faq-item summary { padding:16px 20px; font-size:14px; font-weight:600; color:#1A1A2E; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; transition:background .15s; }
+.faq-item summary:hover { background:#F7FAFC; }
+.faq-item summary::-webkit-details-marker { display:none; }
+.faq-item summary::after { content:'+'; font-size:20px; color:#A0AEC0; transition:transform .2s; flex-shrink:0; margin-left:12px; }
+.faq-item[open] summary::after { content:'−'; color:#E53E3E; }
+.faq-item[open] summary { background:#F7FAFC; border-bottom:1px solid #E2E8F0; }
+.faq-answer { padding:16px 20px; font-size:14px; color:#4A5568; line-height:1.7; }
+.faq-answer p { margin:0 0 10px; }
+.faq-answer p:last-child { margin-bottom:0; }
+.faq-answer a { color:#E53E3E; text-decoration:none; font-weight:500; }
+.faq-answer a:hover { text-decoration:underline; }
+
+.help-contact-cta { text-align:center; background:#F7FAFC; border-radius:16px; padding:40px; border:1px solid #E2E8F0; }
+.help-contact-cta h2 { font-size:22px; font-weight:700; color:#1A1A2E; margin:0 0 8px; }
+.help-contact-cta p { color:#718096; font-size:14px; margin:0 0 20px; }
+.help-contact-methods { display:flex; gap:12px; justify-content:center; }
+.help-contact-btn { display:inline-flex; align-items:center; gap:8px; padding:12px 24px; border-radius:10px; font-size:14px; font-weight:600; text-decoration:none; transition:all .15s; background:#E53E3E; color:#fff; }
+.help-contact-btn:hover { background:#C53030; }
+.help-contact-btn--outline { background:#fff; color:#1A1A2E; border:2px solid #E2E8F0; }
+.help-contact-btn--outline:hover { border-color:#1A1A2E; }
+
+@media(max-width:768px) {
+  .help-topics { grid-template-columns:repeat(2,1fr); }
+}
+@media(max-width:480px) {
+  .help-center { padding:24px 16px 40px; }
+  .help-hero h1 { font-size:24px; }
+  .help-topics { grid-template-columns:1fr; }
+  .help-contact-methods { flex-direction:column; align-items:center; }
+}
+</style>
+
+{% schema %}
+{
+  "name": "Help Center",
+  "tag": "section",
+  "settings": [],
+  "presets": [{ "name": "Help Center" }]
+}
+{% endschema %}

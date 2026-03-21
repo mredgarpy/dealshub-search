@@ -57,7 +57,7 @@ initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    version: '2.3.0',
+    version: '2.4.0',
     sources: VALID_SOURCES,
     cacheSize: { search: searchCache.size, product: productCache.size },
     uptime: process.uptime()

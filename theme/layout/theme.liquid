@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ page_title }} – {{ shop.name }}</title>
+  {{ content_for_header }}
+  <style>
+    :root{--dh-red:#e53e3e;--dh-dark:#1a1a2e;--dh-bg:#f8f8f8;--dh-card:#fff}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--dh-bg);color:#333;line-height:1.6}
+    a{text-decoration:none;color:inherit}
+    img{max-width:100%;height:auto}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    .dh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+    @media(max-width:768px){.dh-grid{grid-template-columns:repeat(2,1fr);gap:10px}}
+    @media(max-width:480px){.dh-grid{grid-template-columns:repeat(2,1fr);gap:8px}.dh-api-card h3{font-size:11px!important}}
+  </style>
+  {{ 'stylehub-api.js' | asset_url | script_tag }}
+</head>
+<body>
+  {% section 'header' %}
+  <main>{{ content_for_layout }}</main>
+  {% section 'footer' %}
+  <script src="{{ 'dealshub-analytics.js' | asset_url }}" defer></script>
+  {% render 'cookie-consent' %}
+</body>
+</html>

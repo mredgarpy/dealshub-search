@@ -1089,9 +1089,10 @@ app.post('/api/admin/theme-update', express.json(), async (req, res) => {
 // Verify Shopify webhook HMAC signature
 function verifyShopifyWebhook(req) {
   const hmac = req.headers['x-shopify-hmac-sha256'];
-  if (!hmac || !process.env.SHOPIFY_WEBHOOK_SECRET) return false;
+  const secret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
+  if (!hmac || !secret) return false;
   const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-  const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+  const hash = crypto.createHmac('sha256', secret)
     .update(body, 'utf8').digest('base64');
   return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash));
 }
@@ -1106,8 +1107,9 @@ app.post('/webhooks/order-created', express.raw({ type: 'application/json' }), (
     const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
     const hmac = req.headers['x-shopify-hmac-sha256'];
 
-    if (hmac && process.env.SHOPIFY_WEBHOOK_SECRET) {
-      const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+    const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
+    if (hmac && webhookSecret) {
+      const hash = crypto.createHmac('sha256', webhookSecret)
         .update(body, 'utf8').digest('base64');
       if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
         logger.warn('webhook', 'HMAC verification failed for order-created');
@@ -1155,8 +1157,9 @@ app.post('/webhooks/order-fulfilled', express.raw({ type: 'application/json' }),
     const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
     const hmac = req.headers['x-shopify-hmac-sha256'];
 
-    if (hmac && process.env.SHOPIFY_WEBHOOK_SECRET) {
-      const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+    const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
+    if (hmac && webhookSecret) {
+      const hash = crypto.createHmac('sha256', webhookSecret)
         .update(body, 'utf8').digest('base64');
       if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
         return res.status(401).send('Unauthorized');
@@ -1195,8 +1198,9 @@ app.post('/webhooks/order-cancelled', express.raw({ type: 'application/json' }),
     const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
     const hmac = req.headers['x-shopify-hmac-sha256'];
 
-    if (hmac && process.env.SHOPIFY_WEBHOOK_SECRET) {
-      const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+    const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
+    if (hmac && webhookSecret) {
+      const hash = crypto.createHmac('sha256', webhookSecret)
         .update(body, 'utf8').digest('base64');
       if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
         return res.status(401).send('Unauthorized');
@@ -1224,8 +1228,9 @@ app.post('/webhooks/refund-created', express.raw({ type: 'application/json' }), 
     const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
     const hmac = req.headers['x-shopify-hmac-sha256'];
 
-    if (hmac && process.env.SHOPIFY_WEBHOOK_SECRET) {
-      const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+    const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
+    if (hmac && webhookSecret) {
+      const hash = crypto.createHmac('sha256', webhookSecret)
         .update(body, 'utf8').digest('base64');
       if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
         return res.status(401).send('Unauthorized');

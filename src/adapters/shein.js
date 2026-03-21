@@ -10,23 +10,33 @@ const API_HOST = 'unofficial-shein.p.rapidapi.com';
 class SheinAdapter extends BaseAdapter {
   constructor(config) { super('shein', { ...config, timeout: 20000 }); }
 
-  // SHEIN API sometimes returns 302 with data in body instead of 200
-  // Use redirect: 'manual' to capture those responses
+  // SHEIN RapidAPI proxy intermittently returns 302 with empty body.
+  // Strategy: cache-bust with timestamp, retry up to 3 times with delay.
   _sheinFetchOpts() {
-    return { headers: this.rapidHeaders(API_HOST), redirect: 'manual' };
+    return { headers: this.rapidHeaders(API_HOST) };
+  }
+
+  _cacheBust(url) {
+    // Add timestamp to bust RapidAPI proxy caching of 302 responses
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}_t=${Date.now()}`;
   }
 
   async search(query, limit = 12) {
-    // Retry up to 2 times for intermittent SHEIN API failures
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    // Retry up to 3 times — SHEIN API is intermittent (302 empty body issue)
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const url = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(query)}&language=en&country=US&currency=USD&page=1&limit=${limit}`;
+        const baseUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(query)}&language=en&country=US&currency=USD&page=1&limit=${limit}`;
+        const url = this._cacheBust(baseUrl);
         const data = await this.fetchJSON(url, this._sheinFetchOpts());
 
         // Log raw response keys for diagnostics
         if (data) {
           const topKeys = Object.keys(data).join(',');
           logger.info('shein', `Search response`, { query, attempt, topKeys, code: data.code, msg: data.msg });
+        } else {
+          logger.warn('shein', `Search returned null on attempt ${attempt}/${maxAttempts}`, { query });
         }
 
         // Try multiple response shapes
@@ -39,17 +49,19 @@ class SheinAdapter extends BaseAdapter {
         if (data?.data?.products?.length) {
           return data.data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
         }
-        // Response came back but empty - could be transient
-        if (data && attempt < 2) {
-          logger.warn('shein', `Search returned empty on attempt ${attempt}, retrying...`, { query });
-          await new Promise(r => setTimeout(r, 1000)); // Brief delay before retry
+        // Response came back but empty/null - could be transient 302
+        if (attempt < maxAttempts) {
+          const delay = 1500 * attempt; // Increasing delay: 1.5s, 3s
+          logger.warn('shein', `Search returned empty on attempt ${attempt}, retrying in ${delay}ms...`, { query });
+          await new Promise(r => setTimeout(r, delay));
           continue;
         }
         return [];
       } catch (e) {
-        if (attempt < 2) {
-          logger.warn('shein', `Search attempt ${attempt} failed, retrying...`, { error: e.message, query });
-          await new Promise(r => setTimeout(r, 1000));
+        if (attempt < maxAttempts) {
+          const delay = 1500 * attempt;
+          logger.warn('shein', `Search attempt ${attempt} failed, retrying in ${delay}ms...`, { error: e.message, query });
+          await new Promise(r => setTimeout(r, delay));
           continue;
         }
         logger.error('shein', 'Search failed after retries', { error: e.message, query });
@@ -66,9 +78,10 @@ class SheinAdapter extends BaseAdapter {
       `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&with_price=true`,
     ];
 
-    for (const url of detailEndpoints) {
-      for (let attempt = 1; attempt <= 2; attempt++) {
+    for (const baseUrl of detailEndpoints) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
+          const url = this._cacheBust(baseUrl);
           const data = await this.fetchJSON(url, this._sheinFetchOpts());
 
           // Log raw response structure for diagnostics
@@ -86,14 +99,14 @@ class SheinAdapter extends BaseAdapter {
             logger.info('shein', `Detail has data key instead of info`, { productId, dataKeys: Object.keys(data.data).slice(0, 15).join(',') });
             return this.normalizeProduct(data.data);
           }
-          if (data && attempt < 2) {
-            await new Promise(r => setTimeout(r, 1000));
+          if (data && attempt < 3) {
+            await new Promise(r => setTimeout(r, 1500 * attempt));
             continue;
           }
         } catch (e) {
           logger.warn('shein', `Detail attempt ${attempt} failed`, { error: e.message, productId });
-          if (attempt < 2) {
-            await new Promise(r => setTimeout(r, 1000));
+          if (attempt < 3) {
+            await new Promise(r => setTimeout(r, 1500 * attempt));
             continue;
           }
         }
@@ -102,7 +115,7 @@ class SheinAdapter extends BaseAdapter {
 
     // Fallback to search by ID
     logger.warn('shein', `All detail endpoints failed for ${productId}, trying search fallback`);
-    const searchUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&page=1&limit=5`;
+    const searchUrl = this._cacheBust(`https://${API_HOST}/products/search?keywords=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&page=1&limit=5`);
     const sData = await this.fetchJSON(searchUrl, this._sheinFetchOpts());
 
     // Log search fallback response
@@ -122,7 +135,7 @@ class SheinAdapter extends BaseAdapter {
     // Last resort: search by title if provided (SHEIN detail API often returns 204)
     if (opts.title) {
       logger.info('shein', `Trying title-based search fallback for ${productId}`, { title: opts.title });
-      const titleUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(opts.title)}&language=en&country=US&currency=USD&page=1&limit=5`;
+      const titleUrl = this._cacheBust(`https://${API_HOST}/products/search?keywords=${encodeURIComponent(opts.title)}&language=en&country=US&currency=USD&page=1&limit=5`);
       const tData = await this.fetchJSON(titleUrl, this._sheinFetchOpts());
       const titleProducts = tData?.info?.products || tData?.products || [];
       if (titleProducts.length) {

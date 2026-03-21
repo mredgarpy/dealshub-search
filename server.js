@@ -680,7 +680,7 @@ app.get('/api/debug/raw-search', async (req, res) => {
     macys: `https://${hosts.macys}/search?keyword=${encodeURIComponent(q)}&pageSize=3&requestType=search`,
     amazon: `https://${hosts.amazon}/search?query=${encodeURIComponent(q)}&page=1&country=US&sort_by=RELEVANCE`,
     sephora: `https://${hosts.sephora}/us/products/v2/search?q=${encodeURIComponent(q)}&pageIndex=0&pageSize=3`,
-    shein: `https://${hosts.shein}/products/search?keywords=${encodeURIComponent(q)}&language=en&country=US&currency=USD&page=1&limit=3`
+    shein: `https://${hosts.shein}/products/search?keywords=${encodeURIComponent(q)}&language=en&country=US&currency=USD&page=1&limit=3&_t=${Date.now()}`
   };
 
   const url = urls[source];

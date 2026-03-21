@@ -7,6 +7,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
 const app = express();
 
 // ---- MIDDLEWARE ----
@@ -1079,6 +1080,190 @@ app.post('/api/admin/theme-update', express.json(), async (req, res) => {
     if (!putResp.ok) { const e = await putResp.text(); return res.status(putResp.status).json({ error: 'PUT failed', detail: e.substring(0, 300) }); }
     res.json({ success: true, key, applied });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================================
+// SHOPIFY WEBHOOKS (CRM)
+// ============================================================
+
+// Verify Shopify webhook HMAC signature
+function verifyShopifyWebhook(req) {
+  const hmac = req.headers['x-shopify-hmac-sha256'];
+  if (!hmac || !process.env.SHOPIFY_WEBHOOK_SECRET) return false;
+  const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+  const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+    .update(body, 'utf8').digest('base64');
+  return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash));
+}
+
+// In-memory CRM store (replace with DB in production)
+const crmOrders = new Map();
+
+// Webhook: New order created
+app.post('/webhooks/order-created', express.raw({ type: 'application/json' }), (req, res) => {
+  try {
+    // Parse body (may be Buffer from express.raw or object from express.json)
+    const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
+    const hmac = req.headers['x-shopify-hmac-sha256'];
+
+    if (hmac && process.env.SHOPIFY_WEBHOOK_SECRET) {
+      const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+        .update(body, 'utf8').digest('base64');
+      if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
+        logger.warn('webhook', 'HMAC verification failed for order-created');
+        return res.status(401).send('Unauthorized');
+      }
+    }
+
+    const order = JSON.parse(body);
+    const orderData = {
+      id: order.id,
+      name: order.name || `#${order.order_number}`,
+      email: order.customer?.email || order.email,
+      totalPrice: order.total_price,
+      currency: order.currency,
+      lineItems: (order.line_items || []).map(li => ({
+        title: li.title,
+        quantity: li.quantity,
+        price: li.price,
+        vendor: li.vendor,
+        sku: li.sku,
+        properties: li.properties
+      })),
+      status: 'created',
+      createdAt: order.created_at,
+      fulfillmentStatus: order.fulfillment_status || 'unfulfilled',
+      financialStatus: order.financial_status,
+      shippingAddress: order.shipping_address,
+      trackingNumbers: [],
+      events: [{ type: 'created', at: new Date().toISOString() }]
+    };
+
+    crmOrders.set(order.id, orderData);
+    logger.info('webhook', `[CRM] New order: ${orderData.name} - $${order.total_price} ${order.currency} - ${orderData.lineItems.length} items`);
+
+    res.status(200).send('OK');
+  } catch (err) {
+    logger.error('webhook', 'Error processing order-created webhook', { error: err.message });
+    res.status(200).send('OK'); // Always return 200 to prevent Shopify retries
+  }
+});
+
+// Webhook: Order fulfilled (AutoDS synced tracking)
+app.post('/webhooks/order-fulfilled', express.raw({ type: 'application/json' }), (req, res) => {
+  try {
+    const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
+    const hmac = req.headers['x-shopify-hmac-sha256'];
+
+    if (hmac && process.env.SHOPIFY_WEBHOOK_SECRET) {
+      const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+        .update(body, 'utf8').digest('base64');
+      if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
+        return res.status(401).send('Unauthorized');
+      }
+    }
+
+    const order = JSON.parse(body);
+    const tracking = order.fulfillments?.[0]?.tracking_number || 'N/A';
+    const carrier = order.fulfillments?.[0]?.tracking_company || 'N/A';
+    const trackingUrl = order.fulfillments?.[0]?.tracking_url || null;
+
+    // Update CRM record
+    const existing = crmOrders.get(order.id);
+    if (existing) {
+      existing.status = 'fulfilled';
+      existing.fulfillmentStatus = 'fulfilled';
+      existing.trackingNumbers = order.fulfillments?.map(f => ({
+        number: f.tracking_number,
+        company: f.tracking_company,
+        url: f.tracking_url
+      })) || [];
+      existing.events.push({ type: 'fulfilled', at: new Date().toISOString(), tracking, carrier });
+    }
+
+    logger.info('webhook', `[CRM] Order fulfilled: ${order.name || order.id} - ${carrier}: ${tracking}`);
+    res.status(200).send('OK');
+  } catch (err) {
+    logger.error('webhook', 'Error processing order-fulfilled webhook', { error: err.message });
+    res.status(200).send('OK');
+  }
+});
+
+// Webhook: Order cancelled
+app.post('/webhooks/order-cancelled', express.raw({ type: 'application/json' }), (req, res) => {
+  try {
+    const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
+    const hmac = req.headers['x-shopify-hmac-sha256'];
+
+    if (hmac && process.env.SHOPIFY_WEBHOOK_SECRET) {
+      const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+        .update(body, 'utf8').digest('base64');
+      if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
+        return res.status(401).send('Unauthorized');
+      }
+    }
+
+    const order = JSON.parse(body);
+    const existing = crmOrders.get(order.id);
+    if (existing) {
+      existing.status = 'cancelled';
+      existing.events.push({ type: 'cancelled', at: new Date().toISOString(), reason: order.cancel_reason });
+    }
+
+    logger.info('webhook', `[CRM] Order cancelled: ${order.name || order.id} - Reason: ${order.cancel_reason || 'N/A'}`);
+    res.status(200).send('OK');
+  } catch (err) {
+    logger.error('webhook', 'Error processing order-cancelled webhook', { error: err.message });
+    res.status(200).send('OK');
+  }
+});
+
+// Webhook: Refund created
+app.post('/webhooks/refund-created', express.raw({ type: 'application/json' }), (req, res) => {
+  try {
+    const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
+    const hmac = req.headers['x-shopify-hmac-sha256'];
+
+    if (hmac && process.env.SHOPIFY_WEBHOOK_SECRET) {
+      const hash = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET)
+        .update(body, 'utf8').digest('base64');
+      if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
+        return res.status(401).send('Unauthorized');
+      }
+    }
+
+    const refund = JSON.parse(body);
+    const orderId = refund.order_id;
+    const existing = crmOrders.get(orderId);
+    if (existing) {
+      existing.events.push({
+        type: 'refund',
+        at: new Date().toISOString(),
+        refundId: refund.id,
+        amount: refund.transactions?.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0) || 0
+      });
+    }
+
+    logger.info('webhook', `[CRM] Refund created for order: ${orderId} - Refund ID: ${refund.id}`);
+    res.status(200).send('OK');
+  } catch (err) {
+    logger.error('webhook', 'Error processing refund-created webhook', { error: err.message });
+    res.status(200).send('OK');
+  }
+});
+
+// CRM API: Get order data (for admin panel)
+app.get('/api/crm/orders', (req, res) => {
+  const orders = Array.from(crmOrders.values()).sort((a, b) =>
+    new Date(b.createdAt) - new Date(a.createdAt)
+  );
+  res.json({ orders, total: orders.length });
+});
+
+app.get('/api/crm/orders/:id', (req, res) => {
+  const order = crmOrders.get(parseInt(req.params.id));
+  if (!order) return res.status(404).json({ error: 'Order not found in CRM' });
+  res.json(order);
 });
 
 // ============================================================

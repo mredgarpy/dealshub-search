@@ -10,12 +10,18 @@ const API_HOST = 'unofficial-shein.p.rapidapi.com';
 class SheinAdapter extends BaseAdapter {
   constructor(config) { super('shein', { ...config, timeout: 20000 }); }
 
+  // SHEIN API sometimes returns 302 with data in body instead of 200
+  // Use redirect: 'manual' to capture those responses
+  _sheinFetchOpts() {
+    return { headers: this.rapidHeaders(API_HOST), redirect: 'manual' };
+  }
+
   async search(query, limit = 12) {
     // Retry up to 2 times for intermittent SHEIN API failures
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const url = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(query)}&language=en&country=US&currency=USD&page=1&limit=${limit}`;
-        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+        const data = await this.fetchJSON(url, this._sheinFetchOpts());
 
         // Log raw response keys for diagnostics
         if (data) {
@@ -63,7 +69,7 @@ class SheinAdapter extends BaseAdapter {
     for (const url of detailEndpoints) {
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+          const data = await this.fetchJSON(url, this._sheinFetchOpts());
 
           // Log raw response structure for diagnostics
           if (data) {
@@ -97,7 +103,7 @@ class SheinAdapter extends BaseAdapter {
     // Fallback to search by ID
     logger.warn('shein', `All detail endpoints failed for ${productId}, trying search fallback`);
     const searchUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&page=1&limit=5`;
-    const sData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
+    const sData = await this.fetchJSON(searchUrl, this._sheinFetchOpts());
 
     // Log search fallback response
     const products = sData?.info?.products || sData?.products || [];
@@ -117,7 +123,7 @@ class SheinAdapter extends BaseAdapter {
     if (opts.title) {
       logger.info('shein', `Trying title-based search fallback for ${productId}`, { title: opts.title });
       const titleUrl = `https://${API_HOST}/products/search?keywords=${encodeURIComponent(opts.title)}&language=en&country=US&currency=USD&page=1&limit=5`;
-      const tData = await this.fetchJSON(titleUrl, { headers: this.rapidHeaders(API_HOST) });
+      const tData = await this.fetchJSON(titleUrl, this._sheinFetchOpts());
       const titleProducts = tData?.info?.products || tData?.products || [];
       if (titleProducts.length) {
         // Try exact ID match first
@@ -139,17 +145,31 @@ class SheinAdapter extends BaseAdapter {
 
   normalizeSearchResult(p) {
     if (!p) return null;
-    const price = parsePrice(p.salePrice?.amount || p.sale_price?.amount || p.retailPrice?.amount);
-    const origPrice = parsePrice(p.retailPrice?.amount || p.retail_price?.amount);
-    const reviews = p.comment?.comment_num || p.comment_num || 0;
+    // Handle both camelCase and snake_case field names from SHEIN API
+    const price = parsePrice(
+      p.salePrice?.amount || p.sale_price?.amount ||
+      p.salePrice?.usdAmount || p.sale_price?.usdAmount ||
+      p.retailPrice?.amount || p.retail_price?.amount ||
+      p.price || p.salePrice || p.sale_price
+    );
+    const origPrice = parsePrice(
+      p.retailPrice?.amount || p.retail_price?.amount ||
+      p.retailPrice?.usdAmount || p.retail_price?.usdAmount ||
+      p.retailPrice || p.retail_price
+    );
+    const reviews = p.comment?.comment_num || p.comment_num || p.commentCount || 0;
+    const goodsId = p.goods_id || p.goodsId || p.goods_sn || p.productRelationID || '';
+    const title = p.goods_name || p.goodsName || p.goods_title || p.goodsTitle || '';
+    const image = p.goods_img || p.goodsImg || p.goods_thumb || p.goodsThumb || '';
     return {
-      id: String(p.goods_id || p.goods_sn || ''),
-      title: p.goods_name || p.goods_title || '',
+      id: String(goodsId),
+      title: title,
       price: price ? `$${price.toFixed(2)}` : null,
       originalPrice: origPrice && origPrice > (price || 0) ? `$${origPrice.toFixed(2)}` : null,
-      image: p.goods_img || p.goods_thumb || '',
-      url: `https://us.shein.com/${(p.goods_url_name || 'product')}-p-${p.goods_id}.html`,
-      rating: p.comment?.comment_rank ? parseFloat(p.comment.comment_rank) : null,
+      image: image,
+      url: `https://us.shein.com/${(p.goods_url_name || p.goodsUrlName || 'product')}-p-${goodsId}.html`,
+      rating: p.comment?.comment_rank ? parseFloat(p.comment.comment_rank) :
+              p.commentRank ? parseFloat(p.commentRank) : null,
       reviews: reviews,
       badge: p.promotionInfo?.length ? 'Deal' : (reviews > 500 ? 'Popular' : null),
       source: 'shein',

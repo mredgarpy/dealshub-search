@@ -23,7 +23,7 @@ class BaseAdapter {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeout);
     try {
-      let resp = await fetch(url, { ...options, signal: controller.signal, redirect: 'follow' });
+      let resp = await fetch(url, { redirect: 'follow', ...options, signal: controller.signal });
 
       // If we still see a 3xx after redirect: 'follow', manually follow Location header
       if (resp.status >= 300 && resp.status < 400) {
@@ -36,8 +36,21 @@ class BaseAdapter {
           // 3xx with no Location — try to read body anyway (some APIs return data with 302)
           logger.warn('adapter', `${this.name} HTTP ${resp.status} with no Location header`, { url: url.split('?')[0] });
           const text = await resp.text();
-          if (text && text.trim().startsWith('{')) {
-            try { return JSON.parse(text); } catch (e) { /* fall through */ }
+          if (text && (text.trim().startsWith('{') || text.trim().startsWith('['))) {
+            try {
+              const parsed = JSON.parse(text);
+              logger.info('adapter', `${this.name} extracted JSON from ${resp.status} body (${text.length} chars)`);
+              return parsed;
+            } catch (e) {
+              // Try truncated JSON recovery on 302 bodies too
+              if (text.length > 100) {
+                const recovered = this._recoverTruncatedJSON(text);
+                if (recovered) {
+                  logger.info('adapter', `${this.name} recovered truncated JSON from ${resp.status} body`);
+                  return recovered;
+                }
+              }
+            }
           }
           return null;
         }

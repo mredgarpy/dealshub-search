@@ -294,16 +294,16 @@ app.get('/api/trending', async (req, res) => {
   if (cached) return res.json(cached);
 
   try {
-    const queries = { amazon: 'trending deals', aliexpress: 'hot products', shein: 'trending' };
+    const queries = { amazon: 'trending deals', aliexpress: 'hot products', sephora: 'trending beauty', macys: 'trending now', shein: 'trending' };
     const results = await Promise.allSettled(
       Object.entries(queries).map(([source, q]) => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(q, 6) : Promise.resolve([]);
       })
     );
-    const all = interleaveFromSettled(results, 18);
+    const all = interleaveFromSettled(results, 20);
     const response = { results: all, section: 'trending' };
-    searchCache.set(cacheKey, response, 600000); // 10 min
+    searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -317,16 +317,22 @@ app.get('/api/bestsellers', async (req, res) => {
   if (cached) return res.json(cached);
 
   try {
-    const queries = { amazon: 'best sellers', sephora: 'best sellers beauty', macys: 'top rated' };
+    const queries = { amazon: 'best sellers', aliexpress: 'best selling products', sephora: 'best sellers beauty', macys: 'top rated', shein: 'best sellers' };
     const results = await Promise.allSettled(
       Object.entries(queries).map(([source, q]) => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(q, 6) : Promise.resolve([]);
       })
     );
-    const all = interleaveFromSettled(results, 18);
+    const raw = interleaveFromSettled(results, 30);
+    // Filter: bestsellers should have meaningful reviews (>= 50)
+    const filtered = raw.filter(p => {
+      const revCount = parseInt(p.reviews) || 0;
+      return revCount >= 50;
+    });
+    const all = filtered.length >= 5 ? filtered.slice(0, 20) : raw.slice(0, 20);
     const response = { results: all, section: 'bestsellers' };
-    searchCache.set(cacheKey, response, 600000);
+    searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -340,16 +346,16 @@ app.get('/api/new-arrivals', async (req, res) => {
   if (cached) return res.json(cached);
 
   try {
-    const queries = { amazon: 'new arrivals', shein: 'new in', sephora: 'new arrivals', macys: 'new arrivals' };
+    const queries = { amazon: 'new arrivals', aliexpress: 'new arrivals 2024', shein: 'new in', sephora: 'new arrivals', macys: 'new arrivals' };
     const results = await Promise.allSettled(
       Object.entries(queries).map(([source, q]) => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(q, 5) : Promise.resolve([]);
       })
     );
-    const all = interleaveFromSettled(results, 18);
+    const all = interleaveFromSettled(results, 20);
     const response = { results: all, section: 'new-arrivals' };
-    searchCache.set(cacheKey, response, 600000);
+    searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -381,7 +387,7 @@ app.get('/api/featured', async (req, res) => {
     );
     const all = interleaveFromSettled(results, 12);
     const response = { results: all, section: 'featured', category };
-    searchCache.set(cacheKey, response, 600000);
+    searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -416,7 +422,7 @@ app.get('/api/flash-deals', async (req, res) => {
       return true;
     }).slice(0, 15);
     const response = { results: all.length > 0 ? all : raw.slice(0, 12), section: 'flash-deals' };
-    searchCache.set(cacheKey, response, 300000); // 5 min
+    searchCache.set(cacheKey, response, 3600000); // 1 hour
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });

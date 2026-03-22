@@ -17,13 +17,28 @@
   function shuffleSeed(arr,seed){var a=arr.slice();for(var i=a.length-1;i>0;i--){seed=(seed*9301+49297)%233280;var j=Math.floor((seed/233280)*i);var t=a[i];a[i]=a[j];a[j]=t}return a}
   function decodeEntities(s){var el=document.createElement('textarea');el.innerHTML=s;return el.value}
 
-  // ---- API FETCH WITH CACHE ----
+  // ---- API FETCH WITH CACHE (memory + sessionStorage) ----
   var _cache={};
   function apiFetch(path,ttl){
+    // 1. Memory cache
     if(_cache[path]&&_cache[path].t>Date.now())return Promise.resolve(_cache[path].d);
+    // 2. sessionStorage cache (survives page reload)
+    try{
+      var sk='dh:'+path;
+      var ss=sessionStorage.getItem(sk);
+      if(ss){var p=JSON.parse(ss);if(p&&p.t>Date.now()){_cache[path]=p;return Promise.resolve(p.d)}}
+    }catch(e){}
+    // 3. Network fetch
     return fetch(API+path,{signal:AbortSignal.timeout(15000)})
       .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
-      .then(function(d){_cache[path]={d:d,t:Date.now()+(ttl||600000)};return d});
+      .then(function(d){
+        // Normalize: ensure .products always exists
+        if(d&&d.results&&!d.products)d.products=d.results;
+        var entry={d:d,t:Date.now()+(ttl||600000)};
+        _cache[path]=entry;
+        try{sessionStorage.setItem('dh:'+path,JSON.stringify(entry))}catch(e){}
+        return d;
+      });
   }
 
   // ---- SOURCE BADGE ----

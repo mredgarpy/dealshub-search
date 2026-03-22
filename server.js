@@ -1049,7 +1049,7 @@ app.get('/', (req, res) => {
   const { shop, hmac, host } = req.query;
   if (shop) {
     const clientId = process.env.SHOPIFY_CLIENT_ID;
-    const scopes = 'read_all_orders,read_customers,read_fulfillments,write_fulfillments,read_orders,write_orders,read_products,write_products,read_content,write_content,read_themes,write_themes';
+    const scopes = 'read_all_orders,read_customers,write_customers,read_fulfillments,write_fulfillments,read_orders,write_orders,read_products,write_products,read_content,write_content,read_themes,write_themes';
     const redirectUri = 'https://dealshub-search.onrender.com/oauth/callback';
     const authUrl = 'https://' + shop + '/admin/oauth/authorize?client_id=' + clientId + '&scope=' + scopes + '&redirect_uri=' + encodeURIComponent(redirectUri);
     return res.redirect(authUrl);

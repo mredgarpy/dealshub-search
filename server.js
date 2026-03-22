@@ -1287,6 +1287,51 @@ app.get('/api/crm/orders/:id', (req, res) => {
 });
 
 // ============================================================
+// CUSTOMER UPDATE (Settings inline edit)
+// ============================================================
+app.post('/api/customer/update', express.json(), async (req, res) => {
+  try {
+    const { customerId, firstName, lastName, email, phone } = req.body;
+    if (!customerId) return res.status(400).json({ error: 'Missing customerId' });
+
+    const shopDomain = process.env.SHOPIFY_STORE_DOMAIN || '1rnmax-5z.myshopify.com';
+    const adminToken = process.env.SHOPIFY_ADMIN_TOKEN || process.env.SHOPIFY_TOKEN;
+    if (!adminToken) return res.status(500).json({ error: 'Admin token not configured' });
+
+    const customer = {};
+    if (firstName !== undefined) customer.first_name = firstName;
+    if (lastName !== undefined) customer.last_name = lastName;
+    if (email !== undefined) customer.email = email;
+    if (phone !== undefined) customer.phone = phone || null;
+
+    const response = await fetch(
+      `https://${shopDomain}/admin/api/2024-01/customers/${customerId}.json`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': adminToken
+        },
+        body: JSON.stringify({ customer })
+      }
+    );
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      logger.error('customer-update', `Shopify API error: ${response.status}`);
+      return res.status(response.status).json({ error: err.errors || 'Update failed' });
+    }
+
+    const data = await response.json();
+    logger.info('customer-update', `Updated customer ${customerId}`);
+    res.json({ success: true, customer: data.customer });
+  } catch (err) {
+    logger.error('customer-update', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================================
 // START
 // ============================================================
 // ---- WARM-UP: Pre-populate cache on startup to reduce perceived cold start ----

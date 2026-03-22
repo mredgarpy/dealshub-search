@@ -14,7 +14,7 @@ class AmazonAdapter extends BaseAdapter {
 
   async search(query, limit = 12) {
     const url = `https://${API_HOST}/search?query=${encodeURIComponent(query)}&page=1&country=US&sort_by=RELEVANCE`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+    const data = await this.fetchWithRetry(url, { headers: this.rapidHeaders(API_HOST) }, 1, 2000);
     if (!data || !data.data?.products) return [];
     return data.data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }

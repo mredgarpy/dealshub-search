@@ -26,10 +26,10 @@ class MacysAdapter extends BaseAdapter {
       logger.info('macys', `Search attempt via ${path}`, { query, url: url.substring(0, 120) });
 
       try {
-        const data = await this.fetchJSON(url, { headers: { ...this.rapidHeaders(API_HOST), 'Content-Type': 'application/json' } });
+        const data = await this.fetchWithRetry(url, { headers: { ...this.rapidHeaders(API_HOST), 'Content-Type': 'application/json' } }, 1, 2000);
 
         if (!data) {
-          logger.warn('macys', `${path} returned null (HTTP error or timeout)`, { query });
+          logger.warn('macys', `${path} returned null after retry (HTTP error or timeout)`, { query });
           continue;
         }
 

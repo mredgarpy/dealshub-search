@@ -11,7 +11,7 @@ class SephoraAdapter extends BaseAdapter {
 
   async search(query, limit = 12) {
     const url = `https://${API_HOST}/us/products/v2/search?q=${encodeURIComponent(query)}&pageIndex=0&pageSize=${limit}`;
-    const data = await this.fetchJSON(url, { headers: this.rapidHeaders(API_HOST) });
+    const data = await this.fetchWithRetry(url, { headers: this.rapidHeaders(API_HOST) }, 1, 2000);
     if (!data) {
       logger.warn('sephora', 'Search returned null/undefined', { query });
       return [];

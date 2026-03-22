@@ -424,7 +424,7 @@
             <span class="sh-metric-change" style="background:#E8F5E9;color:#1B5E20">{{ active_orders }} active</span>
           {%- endif -%}
         </div>
-        <div class="sh-metric-num">{{ cust_order_count }}</div>
+        <div class="sh-metric-num" id="sh-metric-orders-num">{{ cust_order_count }}</div>
         <div class="sh-metric-label">Total orders</div>
       </div>
 
@@ -463,16 +463,15 @@
     {%- comment -%} Active orders section {%- endcomment -%}
     <div class="sh-section">
       <div class="sh-section-head">
-        <div class="sh-section-title">Active orders <span class="sh-count">{{ cust_order_count }}</span></div>
+        <div class="sh-section-title">Recent orders <span class="sh-count" id="sh-dash-orders-count">{{ cust_order_count }}</span></div>
         <button class="sh-section-action" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View all orders &rarr;</button>
       </div>
-      <div class="sh-section-body">
+      <div class="sh-section-body" id="sh-dash-orders-container">
         {%- if cust_order_count == 0 -%}
-          <div class="sh-empty">
+          <div class="sh-empty" id="sh-dash-orders-empty">
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-            <h3>No orders yet</h3>
-            <p>Start shopping to see your orders here.</p>
-            <a href="/" class="sh-empty-btn">Start shopping &rarr;</a>
+            <h3>Loading orders&hellip;</h3>
+            <p style="font-size:12px;color:#999">Checking your order history</p>
           </div>
         {%- else -%}
           {%- for order in cust_orders limit: 3 -%}
@@ -748,13 +747,15 @@
     </div>
 
     {%- if cust_order_count == 0 -%}
-      <div class="sh-section">
-        <div class="sh-section-body">
-          <div class="sh-empty">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-            <h3>No orders yet</h3>
-            <p>Start shopping to see your orders here.</p>
-            <a href="/" class="sh-empty-btn">Start shopping &rarr;</a>
+      <div class="sh-section" id="sh-orders-api-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">All orders <span class="sh-count" id="sh-orders-api-count">...</span></div>
+        </div>
+        <div class="sh-section-body" id="sh-orders-api-container">
+          <div style="text-align:center;padding:24px 0;color:var(--text2)">
+            <div class="sh-skeleton" style="height:60px;border-radius:8px;margin-bottom:12px;background:#f0f0f0;animation:pulse 1.5s infinite"></div>
+            <div class="sh-skeleton" style="height:60px;border-radius:8px;background:#f0f0f0;animation:pulse 1.5s infinite"></div>
+            <p style="margin-top:12px;font-size:12px;color:#999">Loading order history&hellip;</p>
           </div>
         </div>
       </div>
@@ -1215,6 +1216,116 @@
   if (addrAddBtn2) addrAddBtn2.addEventListener('click', showAddrForm);
   if (addrCancelBtn) addrCancelBtn.addEventListener('click', hideAddrForm);
   if (addrCancelBtn2) addrCancelBtn2.addEventListener('click', hideAddrForm);
+
+  /* ---- Fetch orders via API (includes cancelled/refunded) ---- */
+  var customerEmail = '{{ customer.email | escape }}';
+  var liquidOrderCount = {{ cust_order_count | default: 0 }};
+
+  function formatOrderDate(d) {
+    var dt = new Date(d);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+  }
+
+  function orderStatusBadge(o) {
+    if (o.cancelled_at) return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#FEE2E2;color:#991B1B">Cancelled</span>';
+    if (o.financial_status === 'refunded') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#FEF3C7;color:#92400E">Refunded</span>';
+    if (o.financial_status === 'partially_refunded') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#FEF3C7;color:#92400E">Partially refunded</span>';
+    if (o.fulfillment_status === 'fulfilled') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#D1FAE5;color:#065F46">Delivered</span>';
+    if (o.fulfillment_status === 'partial') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#DBEAFE;color:#1E40AF">Partially shipped</span>';
+    if (o.financial_status === 'paid') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#DBEAFE;color:#1E40AF">Processing</span>';
+    if (o.financial_status === 'pending') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#F3F4F6;color:#374151">Pending</span>';
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#F3F4F6;color:#374151">' + (o.financial_status || 'Unknown') + '</span>';
+  }
+
+  function renderOrderCard(o) {
+    var itemsHtml = '';
+    var items = o.line_items || [];
+    items.forEach(function(item, idx) {
+      var imgHtml = item.image
+        ? '<img src="' + item.image + '" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px" loading="lazy">'
+        : '<div style="width:48px;height:48px;background:#f5f5f5;border-radius:6px;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
+      itemsHtml += '<div style="display:flex;gap:10px;align-items:center;' + (idx > 0 ? 'margin-top:8px;' : '') + '">'
+        + imgHtml
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + item.title + '</div>'
+        + (item.variant_title ? '<div style="font-size:11px;color:#888">' + item.variant_title + '</div>' : '')
+        + '<div style="font-size:12px;color:#555">$' + parseFloat(item.price).toFixed(2) + ' &times; ' + item.quantity + '</div>'
+        + '</div></div>';
+    });
+
+    return '<div class="sh-order-card" style="border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:12px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      + '<div><span style="font-weight:700;font-size:14px">' + o.name + '</span> <span style="color:#888;font-size:12px">&middot; ' + formatOrderDate(o.created_at) + '</span></div>'
+      + '<div style="display:flex;align-items:center;gap:8px">' + orderStatusBadge(o) + '<span style="font-weight:700;font-size:14px">$' + parseFloat(o.total_price).toFixed(2) + '</span></div>'
+      + '</div>'
+      + '<div>' + itemsHtml + '</div>'
+      + (o.tracking_url ? '<div style="margin-top:10px"><a href="' + o.tracking_url + '" target="_blank" rel="noopener" style="font-size:12px;color:var(--red,#e53e3e);font-weight:600;text-decoration:none">Track shipment &rarr;</a></div>' : '')
+      + '</div>';
+  }
+
+  if (customerEmail && liquidOrderCount === 0) {
+    fetch('https://dealshub-search.onrender.com/api/customer-orders?email=' + encodeURIComponent(customerEmail))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var orders = data.orders || [];
+        /* Update metric card */
+        var metricEl = document.getElementById('sh-metric-orders-num');
+        if (metricEl) metricEl.textContent = orders.length;
+
+        /* Update orders count in settings */
+        var settingsCountEls = document.querySelectorAll('.sh-set-val');
+        settingsCountEls.forEach(function(el) {
+          if (el.textContent.trim() === '0 orders') el.textContent = orders.length + ' orders';
+        });
+
+        /* Update dashboard preview */
+        var dashCount = document.getElementById('sh-dash-orders-count');
+        if (dashCount) dashCount.textContent = orders.length;
+        var dashContainer = document.getElementById('sh-dash-orders-container');
+        var dashEmpty = document.getElementById('sh-dash-orders-empty');
+        if (orders.length > 0 && dashEmpty) {
+          dashEmpty.remove();
+          orders.slice(0, 3).forEach(function(o) {
+            dashContainer.insertAdjacentHTML('beforeend', renderOrderCard(o));
+          });
+        } else if (orders.length === 0 && dashEmpty) {
+          dashEmpty.querySelector('h3').textContent = 'No orders yet';
+          dashEmpty.querySelector('p').innerHTML = 'Start shopping to see your orders here.';
+          dashEmpty.insertAdjacentHTML('beforeend', '<a href="/" class="sh-empty-btn" style="margin-top:12px;display:inline-block">Start shopping &rarr;</a>');
+        }
+
+        /* Update full orders section */
+        var apiCount = document.getElementById('sh-orders-api-count');
+        var apiContainer = document.getElementById('sh-orders-api-container');
+        if (apiCount) apiCount.textContent = orders.length;
+        if (apiContainer) {
+          if (orders.length > 0) {
+            apiContainer.innerHTML = '';
+            orders.forEach(function(o) {
+              apiContainer.insertAdjacentHTML('beforeend', renderOrderCard(o));
+            });
+          } else {
+            apiContainer.innerHTML = '<div class="sh-empty">'
+              + '<svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>'
+              + '<h3>No orders yet</h3><p>Start shopping to see your orders here.</p>'
+              + '<a href="/" class="sh-empty-btn">Start shopping &rarr;</a></div>';
+          }
+        }
+      })
+      .catch(function(err) {
+        console.error('Failed to load orders:', err);
+        var apiContainer = document.getElementById('sh-orders-api-container');
+        if (apiContainer) {
+          apiContainer.innerHTML = '<div class="sh-empty"><h3>No orders yet</h3><p>Start shopping to see your orders here.</p><a href="/" class="sh-empty-btn">Start shopping &rarr;</a></div>';
+        }
+        var dashEmpty = document.getElementById('sh-dash-orders-empty');
+        if (dashEmpty) {
+          dashEmpty.querySelector('h3').textContent = 'No orders yet';
+          dashEmpty.querySelector('p').innerHTML = 'Start shopping to see your orders here.';
+        }
+      });
+  }
 
   /* Hash navigation on load */
   if (window.location.hash) {

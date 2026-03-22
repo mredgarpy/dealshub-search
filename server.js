@@ -862,6 +862,61 @@ app.post('/api/admin/cache/clear', (req, res) => {
   res.json({ success: true, message: 'All caches cleared' });
 });
 
+// ---- CUSTOMER ORDERS (via Admin API — includes cancelled/refunded) ----
+app.get('/api/customer-orders', async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ error: 'Missing email' });
+
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+  if (!shopifyDomain || !shopifyToken) {
+    return res.status(503).json({ error: 'Shopify not configured' });
+  }
+
+  try {
+    const fetch = require('node-fetch');
+    // Fetch ALL orders for this customer email (any status)
+    const url = `https://${shopifyDomain}/admin/api/2024-01/orders.json?email=${encodeURIComponent(email)}&status=any&limit=50`;
+    const response = await fetch(url, {
+      headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' }
+    });
+    const data = await response.json();
+
+    if (!data.orders) {
+      return res.json({ orders: [], total: 0 });
+    }
+
+    const orders = data.orders.map(o => ({
+      id: o.id,
+      name: o.name,
+      order_number: o.order_number,
+      created_at: o.created_at,
+      financial_status: o.financial_status,
+      fulfillment_status: o.fulfillment_status || 'unfulfilled',
+      cancelled_at: o.cancelled_at || null,
+      total_price: o.total_price,
+      subtotal_price: o.subtotal_price,
+      total_tax: o.total_tax,
+      currency: o.currency,
+      line_items: (o.line_items || []).map(item => ({
+        title: item.title,
+        variant_title: item.variant_title || null,
+        quantity: item.quantity,
+        price: item.price,
+        image: item.image ? item.image.src : null
+      })),
+      tracking_number: o.fulfillments?.[0]?.tracking_number || null,
+      tracking_url: o.fulfillments?.[0]?.tracking_url || null,
+      order_status_url: o.order_status_url || null
+    }));
+
+    res.json({ orders, total: orders.length });
+  } catch (err) {
+    logger.error('customer-orders', 'Failed to fetch customer orders', { error: err.message });
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
 // ---- ADMIN: Product Mappings ----
 const db = require('./src/utils/db');
 

@@ -1064,12 +1064,13 @@ app.get('/oauth/callback', async (req, res) => {
     const clientId = process.env.SHOPIFY_CLIENT_ID;
     const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
     const tokenUrl = 'https://' + shop + '/admin/oauth/access_tokens.json';
-    const tokenBody = JSON.stringify({ client_id: clientId, client_secret: clientSecret, code: code });
-    logger.info('oauth', 'Exchanging code for token', { shop, clientId: clientId ? clientId.substring(0, 8) + '...' : 'MISSING', secretSet: !!clientSecret });
+    // Try form-urlencoded format (some Shopify setups require this)
+    const tokenBody = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, code: code }).toString();
+    logger.info('oauth', 'Exchanging code for token', { shop, clientId: clientId ? clientId.substring(0, 8) + '...' : 'MISSING', secretSet: !!clientSecret, secretPrefix: clientSecret ? clientSecret.substring(0, 10) : 'NONE' });
     const tokenResp = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
         'User-Agent': 'DealsHub-Backend/2.3'
       },

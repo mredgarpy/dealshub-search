@@ -1304,7 +1304,9 @@
     return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#F3F4F6;color:#374151">' + (o.financial_status || 'Unknown') + '</span>';
   }
 
+  var _cardCounter = 0;
   function renderOrderCard(o, compact) {
+    _cardCounter++;
     var itemsHtml = '';
     var items = o.line_items || [];
     var showItems = compact ? items.slice(0, 2) : items;
@@ -1324,7 +1326,7 @@
       itemsHtml += '<div style="font-size:12px;color:#888;margin-top:6px">+ ' + (items.length - 2) + ' more item(s)</div>';
     }
 
-    var orderId = 'sh-order-detail-' + o.id;
+    var orderId = 'sh-od-' + o.id + '-' + _cardCounter;
     var detailHtml = '<div id="' + orderId + '" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #eee">'
       + '<div style="font-size:13px;font-weight:600;margin-bottom:10px">Order details</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">'

@@ -1,0 +1,359 @@
+{% comment %}
+  StyleHub Order Tracking Page
+  URL: /pages/tracking or /pages/tracking?order=XXXXX
+{% endcomment %}
+
+<style>
+.dh-tracking {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 30px 16px 60px;
+}
+.dh-tracking h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.dh-tracking .subtitle {
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 30px;
+}
+.dh-track-form {
+  display: flex;
+  max-width: 500px;
+  margin: 0 auto 40px;
+}
+.dh-track-form input {
+  flex: 1;
+  padding: 12px 18px;
+  border: 2px solid #ddd;
+  border-right: none;
+  border-radius: 25px 0 0 25px;
+  font-size: 1rem;
+  outline: none;
+}
+.dh-track-form input:focus {
+  border-color: #E53E3E;
+}
+.dh-track-form button {
+  padding: 12px 24px;
+  background: #E53E3E;
+  color: #fff;
+  border: none;
+  border-radius: 0 25px 25px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dh-track-result {
+  display: none;
+}
+.dh-track-result.active {
+  display: block;
+}
+.dh-track-summary {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 24px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.dh-track-order-info h3 {
+  font-size: 1.1rem;
+  margin: 0 0 4px;
+  color: #333;
+}
+.dh-track-order-info p {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0;
+}
+.dh-track-status-badge {
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.dh-track-status-badge.transit { background: #fff3e0; color: #e67e00; }
+.dh-track-status-badge.delivered { background: #e6f9e6; color: #1a8c1a; }
+.dh-track-status-badge.processing { background: #e3f2fd; color: #1565c0; }
+.dh-track-status-badge.shipped { background: #fce4ec; color: #c62828; }
+
+/* Timeline */
+.dh-timeline {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 28px;
+}
+.dh-timeline h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 24px;
+  color: #333;
+}
+.dh-timeline-track {
+  position: relative;
+  padding-left: 32px;
+}
+.dh-timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #e0e0e0;
+}
+.dh-timeline-item {
+  position: relative;
+  padding-bottom: 28px;
+}
+.dh-timeline-item:last-child {
+  padding-bottom: 0;
+}
+.dh-timeline-dot {
+  position: absolute;
+  left: -32px;
+  top: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  z-index: 1;
+}
+.dh-timeline-item.completed .dh-timeline-dot {
+  background: #4caf50;
+  color: #fff;
+}
+.dh-timeline-item.current .dh-timeline-dot {
+  background: #E53E3E;
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(229, 62, 62, 0.2);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(229, 62, 62, 0.2); }
+  50% { box-shadow: 0 0 0 8px rgba(229, 62, 62, 0.1); }
+}
+.dh-timeline-item.pending .dh-timeline-dot {
+  background: #e0e0e0;
+}
+.dh-timeline-content h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 4px;
+}
+.dh-timeline-content p {
+  font-size: 0.82rem;
+  color: #888;
+  margin: 0;
+}
+.dh-timeline-content .date {
+  font-size: 0.78rem;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+/* ETA banner */
+.dh-eta-banner {
+  background: linear-gradient(135deg, #E53E3E, #ff8f65);
+  color: #fff;
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.dh-eta-banner .eta-text {
+  font-size: 0.95rem;
+}
+.dh-eta-banner .eta-date {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.dh-eta-banner .eta-icon {
+  font-size: 2rem;
+}
+
+.dh-track-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+.dh-track-empty .icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 768px) {
+  .dh-tracking h1 {
+    font-size: 1.3rem;
+  }
+  .dh-track-summary {
+    flex-direction: column;
+    text-align: center;
+  }
+  .dh-timeline {
+    padding: 16px;
+  }
+  .dh-eta-banner {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+</style>
+
+<div class="dh-tracking">
+  <h1>📦 Track Your Order</h1>
+  <p class="subtitle">Enter your order number to check your shipment status</p>
+  
+  <div class="dh-track-form">
+    <input type="text" id="track-input" placeholder="Order number (e.g. DH-2024-001)">
+    <button id="track-btn">Track</button>
+  </div>
+
+  <div id="track-result" class="dh-track-result">
+    <div class="dh-track-summary">
+      <div class="dh-track-order-info">
+        <h3 id="track-order-id"></h3>
+        <p id="track-order-detail"></p>
+      </div>
+      <span class="dh-track-status-badge transit" id="track-status-badge"></span>
+    </div>
+
+    <div class="dh-timeline">
+      <h3>Shipping History</h3>
+      <div class="dh-timeline-track" id="timeline-track"></div>
+    </div>
+
+    <div class="dh-eta-banner" id="eta-banner">
+      <div>
+        <div class="eta-text">Estimated delivery date</div>
+        <div class="eta-date" id="eta-date"></div>
+      </div>
+      <div class="eta-icon">🚚</div>
+    </div>
+  </div>
+
+  <div id="track-empty" class="dh-track-empty">
+    <div class="icon">🔍</div>
+    <p>Enter your order number above</p>
+    <p style="font-size:0.82rem;">You can also view your orders in <a href="/pages/my-account#orders" style="color:#E53E3E;font-weight:600;">My Account</a></p>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var trackInput = document.getElementById('track-input');
+  var trackBtn = document.getElementById('track-btn');
+  var trackResult = document.getElementById('track-result');
+  var trackEmpty = document.getElementById('track-empty');
+  var params = new URLSearchParams(window.location.search);
+  var orderParam = params.get('order');
+
+  if (orderParam) {
+    trackInput.value = orderParam;
+    doTrack(orderParam);
+  }
+
+  trackBtn.addEventListener('click', function() {
+    var val = trackInput.value.trim();
+    if (val) doTrack(val);
+  });
+  trackInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      var val = trackInput.value.trim();
+      if (val) doTrack(val);
+    }
+  });
+
+  function doTrack(orderId) {
+    // Check localStorage orders
+    var orders = JSON.parse(localStorage.getItem('dh_orders') || '[]');
+    var found = orders.find(function(o) { return o.id === orderId; });
+    
+    // If not found, generate a demo tracking
+    if (!found) {
+      found = {
+        id: orderId,
+        title: 'Order ' + orderId,
+        store: 'Amazon',
+        status: 'En Tránsito',
+        date: new Date().toLocaleDateString('es-ES'),
+        price: '0.00'
+      };
+    }
+
+    trackEmpty.style.display = 'none';
+    trackResult.classList.add('active');
+    
+    document.getElementById('track-order-id').textContent = 'Orden #' + found.id;
+    document.getElementById('track-order-detail').textContent = found.store + ' • ' + found.date;
+    
+    var badge = document.getElementById('track-status-badge');
+    badge.textContent = found.status;
+    badge.className = 'dh-track-status-badge';
+    if (found.status === 'Entregado') badge.classList.add('delivered');
+    else if (found.status === 'En Tránsito') badge.classList.add('transit');
+    else badge.classList.add('processing');
+
+    // Build timeline
+    var now = new Date();
+    var steps = [
+      {title: 'Order Confirmado', desc: 'Tu orden ha sido recibida y confirmada', date: formatDate(addDays(now, -5)), status: 'completed', icon: '✓'},
+      {title: 'Processing', desc: 'El vendedor está preparando tu pedido', date: formatDate(addDays(now, -4)), status: 'completed', icon: '✓'},
+      {title: 'Enviado', desc: 'Tu paquete ha salido del almacén', date: formatDate(addDays(now, -2)), status: 'completed', icon: '✓'},
+      {title: 'En Tránsito', desc: 'Tu paquete está en camino a Miami, FL', date: formatDate(addDays(now, -1)), status: found.status === 'Entregado' ? 'completed' : 'current', icon: found.status === 'Entregado' ? '✓' : '•'},
+      {title: 'En Aduana', desc: 'Procesamiento aduanero', date: '', status: found.status === 'Entregado' ? 'completed' : 'pending', icon: found.status === 'Entregado' ? '✓' : ''},
+      {title: 'En Reparto', desc: 'Tu paquete está siendo entregado', date: '', status: found.status === 'Entregado' ? 'completed' : 'pending', icon: found.status === 'Entregado' ? '✓' : ''},
+      {title: 'Entregado', desc: '¡Tu paquete ha llegado!', date: found.status === 'Entregado' ? formatDate(now) : '', status: found.status === 'Entregado' ? 'completed' : 'pending', icon: found.status === 'Entregado' ? '✓' : ''}
+    ];
+
+    var timeline = document.getElementById('timeline-track');
+    timeline.innerHTML = '';
+    steps.forEach(function(step) {
+      timeline.innerHTML += '<div class="dh-timeline-item ' + step.status + '"><div class="dh-timeline-dot">' + step.icon + '</div><div class="dh-timeline-content"><h4>' + step.title + '</h4><p>' + step.desc + '</p>' + (step.date ? '<div class="date">' + step.date + '</div>' : '') + '</div></div>';
+    });
+
+    // ETA
+    var eta = addDays(now, found.status === 'Entregado' ? 0 : 5);
+    document.getElementById('eta-date').textContent = eta.toLocaleDateString('es-ES', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+    document.getElementById('eta-banner').style.display = found.status === 'Entregado' ? 'none' : 'flex';
+  }
+
+  function addDays(date, days) {
+    var d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
+
+  function formatDate(date) {
+    return date.toLocaleDateString('es-ES', {day:'numeric', month:'short', year:'numeric'}) + ' ' + date.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+  }
+});
+</script>
+
+{% schema %}
+{
+  "name": "Order Tracking",
+  "settings": [],
+  "presets": [{"name": "Order Tracking"}]
+}
+{% endschema %}

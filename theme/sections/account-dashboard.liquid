@@ -729,7 +729,7 @@
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div><button class="sh-set-edit" data-sh-nav="settings" style="background:none;border:none;font-family:inherit;cursor:pointer">Edit</button></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div><button class="sh-set-edit" data-sh-nav="settings" style="background:none;border:none;font-family:inherit;cursor:pointer">Edit</button></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">Managed by Shopify</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">••••••••</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Orders</div><div class="sh-set-val">{{ cust_order_count }} total orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Language</div><div class="sh-set-val">English (US)</div></div><span class="sh-set-edit" style="opacity:0.5">Default</span></div>
         </div>
@@ -900,6 +900,7 @@
       </div>
       <div class="sh-section-body">
         {% form 'customer_address', customer.new_address %}
+          <input type="hidden" name="return_to" value="/pages/my-account#addresses">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">First name</label>
@@ -1052,7 +1053,7 @@
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">Managed by Shopify accounts</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">••••••••</div></div></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total orders</div><div class="sh-set-val">{{ cust_order_count }} orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total spent</div><div class="sh-set-val">{{ customer.total_spent | money }}</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
         </div>
@@ -1067,6 +1068,7 @@
       </div>
       <div class="sh-section-body">
         {% form 'customer', customer %}
+          <input type="hidden" name="return_to" value="/pages/my-account#settings">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:500px">
             <div>
               <label for="sh-cust-first" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">First name</label>

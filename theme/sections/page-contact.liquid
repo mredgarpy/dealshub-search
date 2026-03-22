@@ -1,0 +1,71 @@
+<div style="max-width:800px;margin:0 auto;padding:40px 20px;font-family:system-ui,-apple-system,sans-serif">
+  <h1 style="font-size:28px;font-weight:700;color:#1a1a2e;margin-bottom:8px">Contact Us</h1>
+  <p style="font-size:15px;color:#555;margin-bottom:32px">We're here to help. Reach out and we'll respond as soon as possible.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:40px">
+    <div style="padding:24px;border:1px solid #eee;border-radius:12px;text-align:center">
+      <div style="font-size:24px;margin-bottom:8px">📧</div>
+      <h3 style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:4px">Email</h3>
+      <p style="font-size:13px;color:#666">support@stylehubmiami.com</p>
+      <p style="font-size:11px;color:#999;margin-top:4px">We reply within 24 hours</p>
+    </div>
+    <div style="padding:24px;border:1px solid #eee;border-radius:12px;text-align:center">
+      <div style="font-size:24px;margin-bottom:8px">💬</div>
+      <h3 style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:4px">Live Chat</h3>
+      <p style="font-size:13px;color:#666">Available 24/7</p>
+      <p style="font-size:11px;color:#999;margin-top:4px">Click the chat icon in the corner</p>
+    </div>
+  </div>
+
+  <h2 style="font-size:20px;font-weight:600;color:#1a1a2e;margin-bottom:16px">Send us a message</h2>
+
+  <form action="/contact" method="post" style="display:flex;flex-direction:column;gap:16px">
+    <input type="hidden" name="form_type" value="contact">
+    <input type="hidden" name="utf8" value="✓">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:4px">Name</label>
+        <input type="text" name="contact[name]" placeholder="Your name" required style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:4px">Email</label>
+        <input type="email" name="contact[email]" placeholder="your@email.com" required style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box">
+      </div>
+    </div>
+    <div>
+      <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:4px">Subject</label>
+      <select name="contact[subject]" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;background:#fff">
+        <option value="Order question">Order question</option>
+        <option value="Shipping inquiry">Shipping inquiry</option>
+        <option value="Return request">Return request</option>
+        <option value="Product question">Product question</option>
+        <option value="Damaged/lost item">Damaged or lost item</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:4px">Order Number (optional)</label>
+      <input type="text" name="contact[order_number]" placeholder="#1001" style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box">
+    </div>
+    <div>
+      <label style="font-size:13px;font-weight:600;color:#333;display:block;margin-bottom:4px">Message</label>
+      <textarea name="contact[body]" rows="5" placeholder="How can we help?" required style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <button type="submit" style="background:#e53e3e;color:#fff;border:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;align-self:flex-start">Send Message</button>
+  </form>
+
+  <div style="margin-top:40px;padding:24px;background:#f8f9fc;border-radius:12px">
+    <h3 style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:8px">Quick Links</h3>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <a href="/pages/faq" style="font-size:13px;color:#e53e3e;text-decoration:none">FAQ</a>
+      <a href="/pages/tracking" style="font-size:13px;color:#e53e3e;text-decoration:none">Track Order</a>
+      <a href="/policies/shipping-policy" style="font-size:13px;color:#e53e3e;text-decoration:none">Shipping Policy</a>
+      <a href="/policies/refund-policy" style="font-size:13px;color:#e53e3e;text-decoration:none">Returns & Refunds</a>
+      <a href="/pages/my-account" style="font-size:13px;color:#e53e3e;text-decoration:none">My Account</a>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{"name":"Contact Us","settings":[]}
+{% endschema %}

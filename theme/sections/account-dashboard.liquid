@@ -259,6 +259,7 @@
 .sh-empty p{color:var(--text2);font-size:0.9rem;margin:0 0 20px;max-width:400px;margin-left:auto;margin-right:auto}
 .sh-empty-btn{display:inline-block;background:var(--navy);color:#fff;padding:12px 28px;border-radius:8px;font-size:0.9rem;font-weight:600;text-decoration:none;transition:opacity 0.2s}
 .sh-empty-btn:hover{opacity:0.9}
+.sh-empty a,.sh-empty-btn{color:#fff !important}
 
 /* Content sections toggling */
 .sh-content-section{display:none}
@@ -355,10 +356,14 @@
     <div class="sh-nav-sep"></div>
     <div class="sh-nav-group">
       <div class="sh-nav-label">Support</div>
-      <a class="sh-nav-item" href="/pages/help-center">
+      <button class="sh-nav-item" data-sh-nav="returns">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
         Returns & refunds
-      </a>
+      </button>
+      <button class="sh-nav-item" data-sh-nav="reviews">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        My reviews
+      </button>
       <button class="sh-nav-item" data-sh-nav="messages">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         Messages
@@ -900,67 +905,65 @@
         <button id="sh-addr-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
       </div>
       <div class="sh-section-body">
-        {% form 'customer_address', customer.new_address %}
-          <input type="hidden" name="return_to" value="/pages/my-account#addresses">
+        <div id="sh-addr-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">First name</label>
-              <input type="text" name="address[first_name]" autocomplete="given-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+              <input type="text" id="sh-addr-first" autocomplete="given-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
             </div>
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Last name</label>
-              <input type="text" name="address[last_name]" autocomplete="family-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+              <input type="text" id="sh-addr-last" autocomplete="family-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
             </div>
           </div>
           <div style="margin-top:12px">
             <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Company (optional)</label>
-            <input type="text" name="address[company]" autocomplete="organization" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            <input type="text" id="sh-addr-company" autocomplete="organization" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
           </div>
           <div style="margin-top:12px">
             <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Address</label>
-            <input type="text" name="address[address1]" autocomplete="address-line1" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            <input type="text" id="sh-addr-address1" autocomplete="address-line1" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
           </div>
           <div style="margin-top:12px">
             <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Apartment, suite, etc. (optional)</label>
-            <input type="text" name="address[address2]" autocomplete="address-line2" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            <input type="text" id="sh-addr-address2" autocomplete="address-line2" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">City</label>
-              <input type="text" name="address[city]" autocomplete="address-level2" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+              <input type="text" id="sh-addr-city" autocomplete="address-level2" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
             </div>
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">State / Province</label>
-              <input type="text" name="address[province]" autocomplete="address-level1" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+              <input type="text" id="sh-addr-province" autocomplete="address-level1" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
             </div>
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">ZIP / Postal code</label>
-              <input type="text" name="address[zip]" autocomplete="postal-code" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+              <input type="text" id="sh-addr-zip" autocomplete="postal-code" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
             </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Country</label>
-              <select name="address[country]" autocomplete="country-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;background:#fff">
+              <select id="sh-addr-country" autocomplete="country-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;background:#fff">
                 <option value="United States" selected>United States</option>
                 <option value="Canada">Canada</option>
               </select>
             </div>
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Phone (optional)</label>
-              <input type="tel" name="address[phone]" autocomplete="tel" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+              <input type="tel" id="sh-addr-phone" autocomplete="tel" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
             </div>
           </div>
           <div style="margin-top:12px">
             <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;cursor:pointer">
-              <input type="checkbox" name="address[default]" value="1"> Set as default address
+              <input type="checkbox" id="sh-addr-default" value="1"> Set as default address
             </label>
           </div>
           <div style="display:flex;gap:10px;margin-top:20px">
-            <button type="submit" style="padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600">Save address</button>
+            <button type="button" id="sh-addr-save-btn" style="padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600">Save address</button>
             <button type="button" id="sh-addr-cancel-btn2" style="padding:10px 20px;background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
           </div>
-        {% endform %}
       </div>
     </div>
   </div>
@@ -1030,6 +1033,148 @@
           <p>Products you browse will appear here.</p>
           <a href="/" class="sh-empty-btn">Start browsing &rarr;</a>
         </div>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} === RETURNS === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="returns">
+    <div class="sh-welcome">
+      <div>
+        <h1>Returns & refunds</h1>
+        <div class="sh-welcome-sub">Request a return or check the status of an existing one</div>
+      </div>
+    </div>
+
+    {%- comment -%} New Return Request Form {%- endcomment -%}
+    <div class="sh-section" id="sh-return-form-section" style="display:none">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Request a return</div>
+        <button id="sh-return-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
+      </div>
+      <div class="sh-section-body">
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Order</label>
+          <select id="sh-return-order-select" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;background:#fff">
+            <option value="">Select an order...</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Reason for return</label>
+          <select id="sh-return-reason" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;background:#fff">
+            <option value="">Select a reason...</option>
+            <option value="wrong_item">Wrong item received</option>
+            <option value="damaged">Item arrived damaged</option>
+            <option value="not_as_described">Not as described</option>
+            <option value="doesnt_fit">Doesn't fit</option>
+            <option value="changed_mind">Changed my mind</option>
+            <option value="quality">Quality issue</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Additional details (optional)</label>
+          <textarea id="sh-return-comment" rows="3" placeholder="Describe the issue..." style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+        </div>
+        <div id="sh-return-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
+        <button id="sh-return-submit-btn" style="padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600">Submit return request</button>
+      </div>
+    </div>
+
+    {%- comment -%} Existing Returns List {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">My returns <span class="sh-count" id="sh-returns-count">0</span></div>
+        <button id="sh-return-new-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:12px">New return request &rarr;</button>
+      </div>
+      <div class="sh-section-body" id="sh-returns-container">
+        <div class="sh-empty" id="sh-returns-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          <h3>No returns</h3>
+          <p>You haven't submitted any return requests yet.</p>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Return policy summary {%- endcomment -%}
+    <div class="sh-section" style="background:linear-gradient(135deg,#fafafa,#f5f5f5);border:1px solid #eee;border-radius:12px">
+      <div class="sh-section-body" style="padding:20px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:10px">📦 Return policy</div>
+        <div style="font-size:13px;color:#555;line-height:1.7">
+          <div style="margin-bottom:6px"><strong>30-day window</strong> — Returns accepted within 30 days of delivery</div>
+          <div style="margin-bottom:6px"><strong>Condition</strong> — Items must be unused, in original packaging</div>
+          <div style="margin-bottom:6px"><strong>Process</strong> — Submit a request, we'll review within 24-48 hours</div>
+          <div><strong>Refunds</strong> — Processed to original payment method within 5-10 business days</div>
+        </div>
+        <a href="/policies/refund-policy" style="display:inline-block;margin-top:12px;font-size:12px;color:var(--red);font-weight:600;text-decoration:none">Read full policy &rarr;</a>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} === REVIEWS === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="reviews">
+    <div class="sh-welcome">
+      <div>
+        <h1>My reviews</h1>
+        <div class="sh-welcome-sub">Share your experience with products you've purchased</div>
+      </div>
+    </div>
+
+    {%- comment -%} Write Review Form (hidden by default) {%- endcomment -%}
+    <div class="sh-section" id="sh-review-form-section" style="display:none">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Write a review</div>
+        <button id="sh-review-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
+      </div>
+      <div class="sh-section-body">
+        <div id="sh-review-product-info" style="display:flex;gap:12px;align-items:center;padding:12px;background:#f9f9f9;border-radius:8px;margin-bottom:16px"></div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:8px">Rating</label>
+          <div id="sh-review-stars" style="display:flex;gap:4px">
+            <button class="sh-star-btn" data-star="1" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+            <button class="sh-star-btn" data-star="2" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+            <button class="sh-star-btn" data-star="3" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+            <button class="sh-star-btn" data-star="4" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+            <button class="sh-star-btn" data-star="5" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+          </div>
+          <input type="hidden" id="sh-review-rating" value="0">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Review title</label>
+          <input type="text" id="sh-review-title" placeholder="Summarize your experience" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Your review</label>
+          <textarea id="sh-review-text" rows="4" placeholder="Tell us what you liked or didn't like..." style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+        </div>
+        <div id="sh-review-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
+        <input type="hidden" id="sh-review-product-id" value="">
+        <input type="hidden" id="sh-review-product-title-val" value="">
+        <input type="hidden" id="sh-review-order-id" value="">
+        <button id="sh-review-submit-btn" style="padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600">Submit review</button>
+      </div>
+    </div>
+
+    {%- comment -%} Products available to review {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Products to review</div>
+      </div>
+      <div class="sh-section-body" id="sh-reviewable-container">
+        <div style="text-align:center;padding:24px 0;color:var(--text2);font-size:12px">
+          <div class="sh-skeleton" style="height:50px;border-radius:8px;background:#f0f0f0;animation:pulse 1.5s infinite"></div>
+          <p style="margin-top:10px">Loading your orders&hellip;</p>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Submitted reviews {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">My submitted reviews <span class="sh-count" id="sh-reviews-count">0</span></div>
+      </div>
+      <div class="sh-section-body" id="sh-reviews-list-container">
+        <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">No reviews submitted yet.</div>
       </div>
     </div>
   </div>
@@ -1283,6 +1428,72 @@
   if (addrCancelBtn) addrCancelBtn.addEventListener('click', hideAddrForm);
   if (addrCancelBtn2) addrCancelBtn2.addEventListener('click', hideAddrForm);
 
+  /* Save address via API (bypasses New Customer Accounts form issue) */
+  var addrSaveBtn = document.getElementById('sh-addr-save-btn');
+  var addrMsg = document.getElementById('sh-addr-msg');
+  if (addrSaveBtn) {
+    addrSaveBtn.addEventListener('click', function() {
+      var address = {
+        firstName: (document.getElementById('sh-addr-first') || {}).value || '',
+        lastName: (document.getElementById('sh-addr-last') || {}).value || '',
+        company: (document.getElementById('sh-addr-company') || {}).value || '',
+        address1: (document.getElementById('sh-addr-address1') || {}).value || '',
+        address2: (document.getElementById('sh-addr-address2') || {}).value || '',
+        city: (document.getElementById('sh-addr-city') || {}).value || '',
+        province: (document.getElementById('sh-addr-province') || {}).value || '',
+        zip: (document.getElementById('sh-addr-zip') || {}).value || '',
+        country: (document.getElementById('sh-addr-country') || {}).value || 'United States',
+        phone: (document.getElementById('sh-addr-phone') || {}).value || '',
+        isDefault: (document.getElementById('sh-addr-default') || {}).checked || false
+      };
+
+      if (!address.address1 || !address.city || !address.zip) {
+        if (addrMsg) {
+          addrMsg.style.display = 'block';
+          addrMsg.style.background = '#FEE2E2';
+          addrMsg.style.color = '#991B1B';
+          addrMsg.textContent = 'Please fill in address, city, and ZIP code.';
+        }
+        return;
+      }
+
+      addrSaveBtn.disabled = true;
+      addrSaveBtn.textContent = 'Saving...';
+
+      fetch('https://dealshub-search.onrender.com/api/customer/address/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: customerId, address: address })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        addrSaveBtn.disabled = false;
+        addrSaveBtn.textContent = 'Save address';
+        if (data.success) {
+          window.location.href = '/pages/my-account#addresses';
+          window.location.reload();
+        } else {
+          if (addrMsg) {
+            addrMsg.style.display = 'block';
+            addrMsg.style.background = '#FEE2E2';
+            addrMsg.style.color = '#991B1B';
+            addrMsg.textContent = data.error || 'Could not save address. Please try again.';
+          }
+        }
+      })
+      .catch(function() {
+        addrSaveBtn.disabled = false;
+        addrSaveBtn.textContent = 'Save address';
+        if (addrMsg) {
+          addrMsg.style.display = 'block';
+          addrMsg.style.background = '#FEE2E2';
+          addrMsg.style.color = '#991B1B';
+          addrMsg.textContent = 'Connection error. Please try again.';
+        }
+      });
+    });
+  }
+
   /* ---- Fetch orders via API (includes cancelled/refunded) ---- */
   var customerEmail = '{{ customer.email | escape }}';
   var liquidOrderCount = {{ cust_order_count | default: 0 }};
@@ -1432,10 +1643,321 @@
       });
   }
 
+  /* ---- RETURNS SECTION ---- */
+  var returnFormSection = document.getElementById('sh-return-form-section');
+  var returnNewBtn = document.getElementById('sh-return-new-btn');
+  var returnCancelBtn = document.getElementById('sh-return-cancel-btn');
+  var returnOrderSelect = document.getElementById('sh-return-order-select');
+  var returnSubmitBtn = document.getElementById('sh-return-submit-btn');
+  var returnMsg = document.getElementById('sh-return-msg');
+  var returnsContainer = document.getElementById('sh-returns-container');
+  var returnsEmpty = document.getElementById('sh-returns-empty');
+  var returnsCount = document.getElementById('sh-returns-count');
+
+  if (returnNewBtn) returnNewBtn.addEventListener('click', function() {
+    returnFormSection.style.display = 'block';
+    if (returnMsg) { returnMsg.style.display = 'none'; }
+  });
+  if (returnCancelBtn) returnCancelBtn.addEventListener('click', function() {
+    returnFormSection.style.display = 'none';
+  });
+
+  /* Populate return order select from API orders */
+  function populateReturnOrders(orders) {
+    if (!returnOrderSelect) return;
+    returnOrderSelect.innerHTML = '<option value="">Select an order...</option>';
+    orders.forEach(function(o) {
+      if (o.financial_status !== 'refunded' && !o.cancelled_at) {
+        var opt = document.createElement('option');
+        opt.value = o.id;
+        opt.textContent = o.name + ' — $' + parseFloat(o.total_price).toFixed(2) + ' (' + formatOrderDate(o.created_at) + ')';
+        returnOrderSelect.appendChild(opt);
+      }
+    });
+  }
+
+  /* Submit return */
+  if (returnSubmitBtn) {
+    returnSubmitBtn.addEventListener('click', function() {
+      var orderId = returnOrderSelect.value;
+      var reason = document.getElementById('sh-return-reason').value;
+      var comment = document.getElementById('sh-return-comment').value;
+
+      if (!orderId) { showReturnMsg('Please select an order.', true); return; }
+      if (!reason) { showReturnMsg('Please select a reason.', true); return; }
+
+      returnSubmitBtn.disabled = true;
+      returnSubmitBtn.textContent = 'Submitting...';
+
+      fetch('https://dealshub-search.onrender.com/api/crm/returns/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: orderId,
+          customerId: customerId,
+          reason: reason,
+          comment: comment
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        returnSubmitBtn.disabled = false;
+        returnSubmitBtn.textContent = 'Submit return request';
+        if (data.success) {
+          showReturnMsg('Return request submitted successfully! We will review it within 24-48 hours.', false);
+          document.getElementById('sh-return-reason').value = '';
+          document.getElementById('sh-return-comment').value = '';
+          returnOrderSelect.value = '';
+          loadCustomerReturns();
+        } else {
+          showReturnMsg(data.error || 'Something went wrong. Please try again.', true);
+        }
+      })
+      .catch(function() {
+        returnSubmitBtn.disabled = false;
+        returnSubmitBtn.textContent = 'Submit return request';
+        showReturnMsg('Connection error. Please try again.', true);
+      });
+    });
+  }
+
+  function showReturnMsg(msg, isError) {
+    if (!returnMsg) return;
+    returnMsg.style.display = 'block';
+    returnMsg.style.background = isError ? '#FEE2E2' : '#D1FAE5';
+    returnMsg.style.color = isError ? '#991B1B' : '#065F46';
+    returnMsg.textContent = msg;
+  }
+
+  function renderReturnCard(r) {
+    var statusColors = {
+      pending: { bg: '#FEF3C7', color: '#92400E', label: 'Pending review' },
+      approved: { bg: '#D1FAE5', color: '#065F46', label: 'Approved' },
+      rejected: { bg: '#FEE2E2', color: '#991B1B', label: 'Rejected' },
+      completed: { bg: '#DBEAFE', color: '#1E40AF', label: 'Completed' }
+    };
+    var st = statusColors[r.status] || statusColors.pending;
+    var reasonLabels = {
+      wrong_item: 'Wrong item received',
+      damaged: 'Item arrived damaged',
+      not_as_described: 'Not as described',
+      doesnt_fit: "Doesn't fit",
+      changed_mind: 'Changed my mind',
+      quality: 'Quality issue',
+      other: 'Other'
+    };
+
+    return '<div style="border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:12px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      + '<div><span style="font-weight:700;font-size:14px">Return ' + r.id + '</span> <span style="color:#888;font-size:12px">&middot; ' + r.orderNumber + '</span></div>'
+      + '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:' + st.bg + ';color:' + st.color + '">' + st.label + '</span>'
+      + '</div>'
+      + '<div style="font-size:13px;color:#555">'
+      + '<div style="margin-bottom:4px"><strong>Reason:</strong> ' + (reasonLabels[r.reason] || r.reason || 'Not specified') + '</div>'
+      + (r.comment ? '<div style="margin-bottom:4px"><strong>Details:</strong> ' + r.comment + '</div>' : '')
+      + '<div style="color:#999;font-size:11px;margin-top:6px">Submitted ' + formatOrderDate(r.createdAt) + '</div>'
+      + (r.adminNotes ? '<div style="margin-top:8px;padding:10px;background:#f9f9f9;border-radius:8px;font-size:12px"><strong>Staff note:</strong> ' + r.adminNotes + '</div>' : '')
+      + (r.refundAmount > 0 ? '<div style="margin-top:6px;font-weight:600;color:var(--green)">Refund: $' + parseFloat(r.refundAmount).toFixed(2) + '</div>' : '')
+      + '</div></div>';
+  }
+
+  function loadCustomerReturns() {
+    if (!customerId) return;
+    fetch('https://dealshub-search.onrender.com/api/crm/returns/customer/' + customerId)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var returns = data.returns || [];
+        if (returnsCount) returnsCount.textContent = returns.length;
+        if (returns.length > 0 && returnsContainer) {
+          returnsContainer.innerHTML = '';
+          returns.forEach(function(r) {
+            returnsContainer.insertAdjacentHTML('beforeend', renderReturnCard(r));
+          });
+        }
+      })
+      .catch(function() {});
+  }
+  loadCustomerReturns();
+
+  /* ---- REVIEWS SECTION ---- */
+  var reviewFormSection = document.getElementById('sh-review-form-section');
+  var reviewCancelBtn = document.getElementById('sh-review-cancel-btn');
+  var reviewSubmitBtn = document.getElementById('sh-review-submit-btn');
+  var reviewMsg = document.getElementById('sh-review-msg');
+  var reviewableContainer = document.getElementById('sh-reviewable-container');
+  var reviewsListContainer = document.getElementById('sh-reviews-list-container');
+  var reviewsCount = document.getElementById('sh-reviews-count');
+  var selectedRating = 0;
+
+  if (reviewCancelBtn) reviewCancelBtn.addEventListener('click', function() {
+    reviewFormSection.style.display = 'none';
+  });
+
+  /* Star rating */
+  document.querySelectorAll('.sh-star-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      selectedRating = parseInt(this.getAttribute('data-star'));
+      document.getElementById('sh-review-rating').value = selectedRating;
+      document.querySelectorAll('.sh-star-btn').forEach(function(s) {
+        var val = parseInt(s.getAttribute('data-star'));
+        s.style.color = val <= selectedRating ? '#F59E0B' : '#ddd';
+      });
+    });
+    btn.addEventListener('mouseenter', function() {
+      var hoverVal = parseInt(this.getAttribute('data-star'));
+      document.querySelectorAll('.sh-star-btn').forEach(function(s) {
+        var val = parseInt(s.getAttribute('data-star'));
+        s.style.color = val <= hoverVal ? '#F59E0B' : '#ddd';
+      });
+    });
+    btn.addEventListener('mouseleave', function() {
+      document.querySelectorAll('.sh-star-btn').forEach(function(s) {
+        var val = parseInt(s.getAttribute('data-star'));
+        s.style.color = val <= selectedRating ? '#F59E0B' : '#ddd';
+      });
+    });
+  });
+
+  function openReviewForm(productId, productTitle, productImage, orderId) {
+    reviewFormSection.style.display = 'block';
+    document.getElementById('sh-review-product-id').value = productId || '';
+    document.getElementById('sh-review-product-title-val').value = productTitle || '';
+    document.getElementById('sh-review-order-id').value = orderId || '';
+    var info = document.getElementById('sh-review-product-info');
+    if (info) {
+      var imgHtml = productImage
+        ? '<img src="' + productImage + '" style="width:48px;height:48px;object-fit:cover;border-radius:8px">'
+        : '<div style="width:48px;height:48px;background:#eee;border-radius:8px"></div>';
+      info.innerHTML = imgHtml + '<div><div style="font-weight:600;font-size:14px">' + (productTitle || 'Product') + '</div><div style="font-size:12px;color:#888">From order ' + (orderId || '') + '</div></div>';
+    }
+    /* Reset form */
+    selectedRating = 0;
+    document.getElementById('sh-review-rating').value = '0';
+    document.getElementById('sh-review-title').value = '';
+    document.getElementById('sh-review-text').value = '';
+    document.querySelectorAll('.sh-star-btn').forEach(function(s) { s.style.color = '#ddd'; });
+    if (reviewMsg) reviewMsg.style.display = 'none';
+    reviewFormSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  window.shOpenReviewForm = openReviewForm;
+
+  /* Submit review */
+  if (reviewSubmitBtn) {
+    reviewSubmitBtn.addEventListener('click', function() {
+      var rating = parseInt(document.getElementById('sh-review-rating').value);
+      var title = document.getElementById('sh-review-title').value.trim();
+      var text = document.getElementById('sh-review-text').value.trim();
+      var productId = document.getElementById('sh-review-product-id').value;
+      var productTitle = document.getElementById('sh-review-product-title-val').value;
+      var orderId = document.getElementById('sh-review-order-id').value;
+
+      if (!rating || rating < 1) { showReviewMsg('Please select a star rating.', true); return; }
+      if (!text) { showReviewMsg('Please write your review.', true); return; }
+
+      reviewSubmitBtn.disabled = true;
+      reviewSubmitBtn.textContent = 'Submitting...';
+
+      fetch('https://dealshub-search.onrender.com/api/crm/reviews/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: productId,
+          productTitle: productTitle,
+          customerId: customerId,
+          customerName: '{{ customer.name | escape }}',
+          rating: rating,
+          title: title,
+          text: text,
+          orderId: orderId
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        reviewSubmitBtn.disabled = false;
+        reviewSubmitBtn.textContent = 'Submit review';
+        if (data.success) {
+          showReviewMsg('Thank you! Your review has been submitted and is pending approval.', false);
+          reviewFormSection.style.display = 'none';
+        } else {
+          showReviewMsg(data.error || 'Something went wrong. Please try again.', true);
+        }
+      })
+      .catch(function() {
+        reviewSubmitBtn.disabled = false;
+        reviewSubmitBtn.textContent = 'Submit review';
+        showReviewMsg('Connection error. Please try again.', true);
+      });
+    });
+  }
+
+  function showReviewMsg(msg, isError) {
+    if (!reviewMsg) return;
+    reviewMsg.style.display = 'block';
+    reviewMsg.style.background = isError ? '#FEE2E2' : '#D1FAE5';
+    reviewMsg.style.color = isError ? '#991B1B' : '#065F46';
+    reviewMsg.textContent = msg;
+  }
+
+  function renderReviewableProducts(orders) {
+    if (!reviewableContainer) return;
+    var deliveredItems = [];
+    orders.forEach(function(o) {
+      if (o.fulfillment_status === 'fulfilled') {
+        (o.line_items || []).forEach(function(item) {
+          deliveredItems.push({
+            productId: item.product_id,
+            title: item.title,
+            image: item.image,
+            orderId: o.id,
+            orderName: o.name
+          });
+        });
+      }
+    });
+
+    if (deliveredItems.length === 0) {
+      reviewableContainer.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--text2);font-size:13px">'
+        + '<p>No delivered orders to review yet.</p>'
+        + '<p style="font-size:12px;color:#999;margin-top:4px">Once your orders are delivered, you can leave reviews here.</p></div>';
+      return;
+    }
+
+    reviewableContainer.innerHTML = '';
+    deliveredItems.forEach(function(item) {
+      var imgHtml = item.image
+        ? '<img src="' + item.image + '" style="width:48px;height:48px;object-fit:cover;border-radius:8px" loading="lazy">'
+        : '<div style="width:48px;height:48px;background:#f5f5f5;border-radius:8px"></div>';
+      reviewableContainer.insertAdjacentHTML('beforeend',
+        '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #eee;border-radius:10px;margin-bottom:8px">'
+        + imgHtml
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + item.title + '</div>'
+        + '<div style="font-size:11px;color:#888">From ' + item.orderName + '</div>'
+        + '</div>'
+        + '<button onclick="shOpenReviewForm(\'' + (item.productId || '') + '\',\'' + (item.title || '').replace(/'/g, "\\'") + '\',\'' + (item.image || '') + '\',\'' + item.orderId + '\')" style="padding:6px 14px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">Write review</button>'
+        + '</div>'
+      );
+    });
+  }
+
+  /* Load reviewable products from orders + populate return dropdown */
+  if (customerEmail) {
+    fetch('https://dealshub-search.onrender.com/api/customer-orders?email=' + encodeURIComponent(customerEmail))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var orders = data.orders || [];
+        populateReturnOrders(orders);
+        renderReviewableProducts(orders);
+      })
+      .catch(function() {
+        if (reviewableContainer) reviewableContainer.innerHTML = '<div style="text-align:center;padding:16px 0;color:#999;font-size:12px">Could not load orders.</div>';
+      });
+  }
+
   /* Hash navigation on load */
   if (window.location.hash) {
     var hashSection = window.location.hash.replace('#', '');
-    var validSections = ['dashboard','orders','addresses','coupons','messages','recently-viewed','settings'];
+    var validSections = ['dashboard','orders','addresses','coupons','messages','recently-viewed','settings','returns','reviews'];
     if (validSections.indexOf(hashSection) !== -1) {
       showSection(hashSection);
     }

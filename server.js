@@ -917,6 +917,50 @@ app.get('/api/customer-orders', async (req, res) => {
   }
 });
 
+// ---- UPDATE CUSTOMER PROFILE (via Admin API) ----
+app.post('/api/update-customer', async (req, res) => {
+  const { customer_id, first_name, last_name } = req.body;
+  if (!customer_id) return res.status(400).json({ error: 'Missing customer_id' });
+
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+  if (!shopifyDomain || !shopifyToken) {
+    return res.status(503).json({ error: 'Shopify not configured' });
+  }
+
+  try {
+    const fetch = require('node-fetch');
+    const url = `https://${shopifyDomain}/admin/api/2024-01/customers/${customer_id}.json`;
+    const payload = { customer: { id: parseInt(customer_id) } };
+    if (first_name !== undefined) payload.customer.first_name = first_name;
+    if (last_name !== undefined) payload.customer.last_name = last_name;
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+
+    if (data.customer) {
+      res.json({
+        success: true,
+        customer: {
+          id: data.customer.id,
+          first_name: data.customer.first_name,
+          last_name: data.customer.last_name,
+          email: data.customer.email
+        }
+      });
+    } else {
+      res.status(400).json({ error: data.errors || 'Failed to update customer' });
+    }
+  } catch (err) {
+    logger.error('update-customer', 'Failed to update customer', { error: err.message });
+    res.status(500).json({ error: 'Failed to update customer' });
+  }
+});
+
 // ---- ADMIN: Product Mappings ----
 const db = require('./src/utils/db');
 

@@ -729,7 +729,7 @@
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div><button class="sh-set-edit" data-sh-nav="settings" style="background:none;border:none;font-family:inherit;cursor:pointer">Edit</button></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">••••••••</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Orders</div><div class="sh-set-val">{{ cust_order_count }} total orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Orders</div><div class="sh-set-val" id="sh-dash-settings-orders">{{ cust_order_count }} total orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Language</div><div class="sh-set-val">English (US)</div></div><span class="sh-set-edit" style="opacity:0.5">Default</span></div>
         </div>
       </div>
@@ -1055,41 +1055,39 @@
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">••••••••</div></div></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total orders</div><div class="sh-set-val">{{ cust_order_count }} orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total orders</div><div class="sh-set-val" id="sh-settings-orders-count">{{ cust_order_count }} orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total spent</div><div class="sh-set-val">{{ customer.total_spent | money }}</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
         </div>
       </div>
     </div>
 
-    {%- comment -%} Profile edit form — uses Shopify native customer form (no API token needed) {%- endcomment -%}
+    {%- comment -%} Profile edit form — uses backend API to bypass New Customer Accounts redirect {%- endcomment -%}
     <div class="sh-section" id="sh-profile-form" style="display:none">
       <div class="sh-section-head">
         <div class="sh-section-title">Edit profile</div>
         <button class="sh-section-action" id="sh-profile-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
       </div>
       <div class="sh-section-body">
-        {% form 'customer', customer %}
-          <input type="hidden" name="return_to" value="/pages/my-account#settings">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:500px">
-            <div>
-              <label for="sh-cust-first" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">First name</label>
-              <input type="text" id="sh-cust-first" name="customer[first_name]" value="{{ customer.first_name }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit">
-            </div>
-            <div>
-              <label for="sh-cust-last" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Last name</label>
-              <input type="text" id="sh-cust-last" name="customer[last_name]" value="{{ customer.last_name }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit">
-            </div>
+        <div id="sh-profile-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:500px">
+          <div>
+            <label for="sh-cust-first" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">First name</label>
+            <input type="text" id="sh-cust-first" value="{{ customer.first_name }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit">
           </div>
-          <div style="margin-top:14px;max-width:500px">
-            <label for="sh-cust-email" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Email address</label>
-            <input type="email" id="sh-cust-email" name="customer[email]" value="{{ customer.email }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit" disabled>
-            <span style="font-size:11px;color:#999;margin-top:4px;display:block">Email cannot be changed here</span>
+          <div>
+            <label for="sh-cust-last" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Last name</label>
+            <input type="text" id="sh-cust-last" value="{{ customer.last_name }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit">
           </div>
-          <div style="margin-top:18px;display:flex;gap:10px">
-            <button type="submit" style="padding:10px 28px;background:var(--red,#e53e3e);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Save changes</button>
-            <button type="button" id="sh-profile-cancel-btn2" style="padding:10px 20px;background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
-          </div>
-        {% endform %}
+        </div>
+        <div style="margin-top:14px;max-width:500px">
+          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Email address</label>
+          <input type="email" value="{{ customer.email }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;background:#f9f9f9;color:#999" disabled>
+          <span style="font-size:11px;color:#999;margin-top:4px;display:block">Email cannot be changed here</span>
+        </div>
+        <div style="margin-top:18px;display:flex;gap:10px">
+          <button type="button" id="sh-profile-save-btn" style="padding:10px 28px;background:var(--red,#e53e3e);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Save changes</button>
+          <button type="button" id="sh-profile-cancel-btn2" style="padding:10px 20px;background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
+        </div>
       </div>
     </div>
 
@@ -1188,8 +1186,12 @@
   var profileEditBtn = document.getElementById('sh-profile-edit-btn');
   var profileCancelBtn = document.getElementById('sh-profile-cancel-btn');
   var profileCancelBtn2 = document.getElementById('sh-profile-cancel-btn2');
+  var profileSaveBtn = document.getElementById('sh-profile-save-btn');
+  var profileMsg = document.getElementById('sh-profile-msg');
+  var customerId = '{{ customer.id }}';
 
   function showProfileEdit() {
+    if (profileMsg) { profileMsg.style.display = 'none'; }
     if (profileView) profileView.style.display = 'none';
     if (profileForm) profileForm.style.display = 'block';
   }
@@ -1201,6 +1203,70 @@
   if (profileEditBtn) profileEditBtn.addEventListener('click', showProfileEdit);
   if (profileCancelBtn) profileCancelBtn.addEventListener('click', hideProfileEdit);
   if (profileCancelBtn2) profileCancelBtn2.addEventListener('click', hideProfileEdit);
+
+  /* Profile save via API (bypasses New Customer Accounts redirect) */
+  if (profileSaveBtn) {
+    profileSaveBtn.addEventListener('click', function() {
+      var firstName = document.getElementById('sh-cust-first').value.trim();
+      var lastName = document.getElementById('sh-cust-last').value.trim();
+      profileSaveBtn.disabled = true;
+      profileSaveBtn.textContent = 'Saving...';
+      if (profileMsg) profileMsg.style.display = 'none';
+
+      fetch('https://dealshub-search.onrender.com/api/update-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: customerId, first_name: firstName, last_name: lastName })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        profileSaveBtn.disabled = false;
+        profileSaveBtn.textContent = 'Save changes';
+        if (data.success) {
+          if (profileMsg) {
+            profileMsg.style.display = 'block';
+            profileMsg.style.background = '#D1FAE5';
+            profileMsg.style.color = '#065F46';
+            profileMsg.innerHTML = '<strong>Profile updated!</strong> Your changes have been saved.';
+          }
+          /* Update displayed name across the page */
+          var fullName = (data.customer.first_name || '') + ' ' + (data.customer.last_name || '');
+          document.querySelectorAll('.sh-side-name').forEach(function(el) { el.textContent = fullName.trim(); });
+          document.querySelectorAll('.sh-set-val').forEach(function(el) {
+            if (el.closest('.sh-set-item') && el.closest('.sh-set-item').querySelector('.sh-set-key') &&
+                el.closest('.sh-set-item').querySelector('.sh-set-key').textContent.trim() === 'Full name') {
+              el.textContent = fullName.trim();
+            }
+          });
+          /* Update initials */
+          var i1 = (data.customer.first_name || '').charAt(0).toUpperCase();
+          var i2 = (data.customer.last_name || '').charAt(0).toUpperCase();
+          document.querySelectorAll('.sh-side-av').forEach(function(el) { el.textContent = i1 + i2; });
+          /* Update welcome */
+          var welcomeH1 = document.querySelector('.sh-welcome h1');
+          if (welcomeH1) welcomeH1.textContent = 'Welcome back, ' + (data.customer.first_name || 'Member').toUpperCase();
+          setTimeout(function() { hideProfileEdit(); }, 1500);
+        } else {
+          if (profileMsg) {
+            profileMsg.style.display = 'block';
+            profileMsg.style.background = '#FEE2E2';
+            profileMsg.style.color = '#991B1B';
+            profileMsg.innerHTML = '<strong>Error:</strong> ' + (data.error || 'Could not save changes. Please try again.');
+          }
+        }
+      })
+      .catch(function(err) {
+        profileSaveBtn.disabled = false;
+        profileSaveBtn.textContent = 'Save changes';
+        if (profileMsg) {
+          profileMsg.style.display = 'block';
+          profileMsg.style.background = '#FEE2E2';
+          profileMsg.style.color = '#991B1B';
+          profileMsg.innerHTML = '<strong>Error:</strong> Connection failed. Please try again.';
+        }
+      });
+    });
+  }
 
   /* Address add form toggle */
   var addrFormWrap = document.getElementById('sh-addr-form-wrap');
@@ -1238,10 +1304,11 @@
     return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#F3F4F6;color:#374151">' + (o.financial_status || 'Unknown') + '</span>';
   }
 
-  function renderOrderCard(o) {
+  function renderOrderCard(o, compact) {
     var itemsHtml = '';
     var items = o.line_items || [];
-    items.forEach(function(item, idx) {
+    var showItems = compact ? items.slice(0, 2) : items;
+    showItems.forEach(function(item, idx) {
       var imgHtml = item.image
         ? '<img src="' + item.image + '" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px" loading="lazy">'
         : '<div style="width:48px;height:48px;background:#f5f5f5;border-radius:6px;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
@@ -1253,18 +1320,46 @@
         + '<div style="font-size:12px;color:#555">$' + parseFloat(item.price).toFixed(2) + ' &times; ' + item.quantity + '</div>'
         + '</div></div>';
     });
+    if (compact && items.length > 2) {
+      itemsHtml += '<div style="font-size:12px;color:#888;margin-top:6px">+ ' + (items.length - 2) + ' more item(s)</div>';
+    }
 
-    return '<div class="sh-order-card" style="border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:12px">'
+    var orderId = 'sh-order-detail-' + o.id;
+    var detailHtml = '<div id="' + orderId + '" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #eee">'
+      + '<div style="font-size:13px;font-weight:600;margin-bottom:10px">Order details</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">'
+      + '<div><span style="color:#888">Order number:</span> <strong>' + o.name + '</strong></div>'
+      + '<div><span style="color:#888">Date:</span> ' + formatOrderDate(o.created_at) + '</div>'
+      + '<div><span style="color:#888">Payment status:</span> <strong>' + (o.financial_status || 'N/A').replace('_', ' ') + '</strong></div>'
+      + '<div><span style="color:#888">Fulfillment:</span> <strong>' + (o.fulfillment_status || 'unfulfilled').replace('_', ' ') + '</strong></div>'
+      + (o.cancelled_at ? '<div><span style="color:#888">Cancelled:</span> ' + formatOrderDate(o.cancelled_at) + '</div>' : '')
+      + (o.tracking_number ? '<div><span style="color:#888">Tracking:</span> ' + o.tracking_number + '</div>' : '')
+      + '</div>'
+      + '<div style="margin-top:12px;padding:12px;background:#f9f9f9;border-radius:8px;font-size:12px">'
+      + '<div style="font-weight:600;margin-bottom:8px">Payment summary</div>'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Subtotal</span><span>$' + parseFloat(o.subtotal_price).toFixed(2) + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Tax</span><span>$' + parseFloat(o.total_tax).toFixed(2) + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between;font-weight:700;padding-top:6px;border-top:1px solid #ddd"><span>Total</span><span>$' + parseFloat(o.total_price).toFixed(2) + ' ' + (o.currency || 'USD') + '</span></div>'
+      + '</div>'
+      + (o.order_status_url ? '<div style="margin-top:10px"><a href="' + o.order_status_url + '" target="_blank" rel="noopener" style="font-size:12px;color:var(--red,#e53e3e);font-weight:600;text-decoration:none">View order status page &rarr;</a></div>' : '')
+      + (o.tracking_url ? '<div style="margin-top:6px"><a href="' + o.tracking_url + '" target="_blank" rel="noopener" style="font-size:12px;color:var(--red,#e53e3e);font-weight:600;text-decoration:none">Track shipment &rarr;</a></div>' : '')
+      + '</div>';
+
+    return '<div class="sh-order-card" style="border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer" onclick="(function(e){var d=document.getElementById(\'' + orderId + '\');if(d){d.style.display=d.style.display===\'none\'?\'block\':\'none\';}e.querySelector(\'.sh-order-toggle\').textContent=d&&d.style.display===\'block\'?\'Hide details\':\'View details\';})(this)">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
       + '<div><span style="font-weight:700;font-size:14px">' + o.name + '</span> <span style="color:#888;font-size:12px">&middot; ' + formatOrderDate(o.created_at) + '</span></div>'
       + '<div style="display:flex;align-items:center;gap:8px">' + orderStatusBadge(o) + '<span style="font-weight:700;font-size:14px">$' + parseFloat(o.total_price).toFixed(2) + '</span></div>'
       + '</div>'
       + '<div>' + itemsHtml + '</div>'
-      + (o.tracking_url ? '<div style="margin-top:10px"><a href="' + o.tracking_url + '" target="_blank" rel="noopener" style="font-size:12px;color:var(--red,#e53e3e);font-weight:600;text-decoration:none">Track shipment &rarr;</a></div>' : '')
+      + '<div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">'
+      + '<span class="sh-order-toggle" style="font-size:12px;color:var(--red,#e53e3e);font-weight:600">View details</span>'
+      + '</div>'
+      + detailHtml
       + '</div>';
   }
 
-  if (customerEmail && liquidOrderCount === 0) {
+  /* Always fetch from API to get complete order history (Liquid excludes cancelled) */
+  if (customerEmail) {
     fetch('https://dealshub-search.onrender.com/api/customer-orders?email=' + encodeURIComponent(customerEmail))
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -1273,11 +1368,19 @@
         var metricEl = document.getElementById('sh-metric-orders-num');
         if (metricEl) metricEl.textContent = orders.length;
 
-        /* Update orders count in settings */
-        var settingsCountEls = document.querySelectorAll('.sh-set-val');
-        settingsCountEls.forEach(function(el) {
-          if (el.textContent.trim() === '0 orders') el.textContent = orders.length + ' orders';
-        });
+        /* Update orders count in settings (by ID, reliable) */
+        var dashSettingsOrders = document.getElementById('sh-dash-settings-orders');
+        if (dashSettingsOrders) dashSettingsOrders.textContent = orders.length + ' total orders';
+        var settingsOrdersCount = document.getElementById('sh-settings-orders-count');
+        if (settingsOrdersCount) settingsOrdersCount.textContent = orders.length + ' orders';
+        /* Also update nav badge */
+        var navBadges = document.querySelectorAll('.sh-nav-badge');
+        if (orders.length > 0) {
+          var ordersNavItem = document.querySelector('[data-sh-nav="orders"]');
+          if (ordersNavItem && !ordersNavItem.querySelector('.sh-nav-badge')) {
+            ordersNavItem.insertAdjacentHTML('beforeend', '<span class="sh-nav-badge">' + orders.length + '</span>');
+          }
+        }
 
         /* Update dashboard preview */
         var dashCount = document.getElementById('sh-dash-orders-count');

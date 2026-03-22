@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>StyleHub CRM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    .mono { font-family: 'SF Mono', 'Fira Code', monospace; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #171717; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .pulse { animation: pulse 2s infinite; }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gray: { 950: '#0a0a0a', 900: '#171717', 850: '#1e1e1e', 800: '#262626', 700: '#374151', 600: '#4B5563', 500: '#6B7280', 400: '#9CA3AF', 300: '#D1D5DB', 200: '#E5E7EB', 100: '#F3F4F6' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef } = React;
+
+    const API = window.location.origin;
+    let TOKEN = localStorage.getItem('sh_admin_token') || '';
+
+    function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN, ...(opts.headers || {}) };
+      return fetch(API + path, { ...opts, headers }).then(r => {
+        if (r.status === 401) { localStorage.removeItem('sh_admin_token'); TOKEN = ''; window.location.reload(); }
+        return r.json();
+      });
+    }
+
+    // ── SOURCE BADGES ──
+    const SRC = {
+      amazon: { label: 'AMZ', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+      aliexpress: { label: 'ALI', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+      sephora: { label: 'SEPH', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
+      macys: { label: 'MACY', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+      shein: { label: 'SHEIN', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+      unknown: { label: '???', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' }
+    };
+
+    function SourceBadge({ source }) {
+      const s = SRC[source] || SRC.unknown;
+      return <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold border ${s.color}`}>{s.label}</span>;
+    }
+
+    function StatusDot({ order }) {
+      if (order.financialStatus === 'cancelled') return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-red-500"></span>Cancelled</span>;
+      if (order.financialStatus === 'refunded') return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-red-400"></span>Refunded</span>;
+      if (order.fulfillmentStatus === 'fulfilled') return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-green-500"></span>Shipped</span>;
+      if (order.requiresManual) return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-blue-500 pulse"></span>Manual</span>;
+      return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-amber-500 pulse"></span>Pending</span>;
+    }
+
+    // ── LOGIN ──
+    function Login({ onLogin }) {
+      const [token, setToken] = useState('');
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      async function handleLogin(e) {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+          const data = await fetch(API + '/api/crm/dashboard', { headers: { 'X-Admin-Token': token } }).then(r => r.json());
+          if (data.error) throw new Error(data.error);
+          TOKEN = token;
+          localStorage.setItem('sh_admin_token', token);
+          onLogin();
+        } catch (err) {
+          setError('Invalid token');
+        }
+        setLoading(false);
+      }
+
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <form onSubmit={handleLogin} className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-96 fade-in">
+            <h1 className="text-2xl font-bold mb-1">StyleHub CRM</h1>
+            <p className="text-gray-400 text-sm mb-6">Enter your admin token to continue</p>
+            <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="Admin Token"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 mb-3 text-sm focus:outline-none focus:border-red-500 transition" />
+            {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
+            <button type="submit" disabled={loading || !token}
+              className="w-full bg-red-600 hover:bg-red-500 disabled:bg-gray-700 text-white font-semibold py-2.5 rounded-lg transition text-sm">
+              {loading ? 'Verifying...' : 'Sign In'}
+            </button>
+          </form>
+        </div>
+      );
+    }
+
+    // ── METRIC CARD ──
+    function MetricCard({ icon, label, value, sub, color = 'text-gray-100' }) {
+      return (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex-1 min-w-[140px]">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">{icon}</span>
+            <span className="text-xs text-gray-400 uppercase tracking-wide">{label}</span>
+          </div>
+          <div className={`text-xl font-bold mono ${color}`}>{value}</div>
+          {sub && <div className="text-xs text-gray-500 mt-0.5">{sub}</div>}
+        </div>
+      );
+    }
+
+    // ── ORDER DETAIL PANEL ──
+    function OrderDetail({ order, onClose, onRefresh }) {
+      const [tracking, setTracking] = useState('');
+      const [carrier, setCarrier] = useState('USPS');
+      const [trackingUrl, setTrackingUrl] = useState('');
+      const [note, setNote] = useState(order.notes || '');
+      const [fulfilling, setFulfilling] = useState(false);
+      const [msg, setMsg] = useState('');
+
+      async function handleFulfill() {
+        if (!tracking.trim()) return setMsg('Enter tracking number');
+        setFulfilling(true);
+        setMsg('');
+        try {
+          const res = await api(`/api/crm/orders/${order.id}/fulfill`, {
+            method: 'POST',
+            body: JSON.stringify({ trackingNumber: tracking, trackingCompany: carrier, trackingUrl })
+          });
+          if (res.success) { setMsg('Fulfilled!'); onRefresh(); }
+          else setMsg(res.error || 'Failed');
+        } catch (e) { setMsg(e.message); }
+        setFulfilling(false);
+      }
+
+      async function handleNote() {
+        await api(`/api/crm/orders/${order.id}/note`, { method: 'POST', body: JSON.stringify({ note }) });
+        setMsg('Note saved');
+        onRefresh();
+      }
+
+      const addr = order.shippingAddress;
+      const canFulfill = !order.fulfillmentStatus && order.financialStatus !== 'cancelled';
+      const margin = order.total > 0 ? Math.round((order.estimatedProfit || 0) / order.total * 100) : 0;
+
+      return (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 fade-in">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-lg font-bold">Order {order.number}</h3>
+              <p className="text-sm text-gray-400">{order.customerName} ({order.email})</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <StatusDot order={order} />
+              <SourceBadge source={order.source} />
+              <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-xl">&times;</button>
+            </div>
+          </div>
+
+          {/* Items */}
+          <div className="mb-4">
+            <h4 className="text-xs text-gray-500 uppercase tracking-wide mb-2">Items</h4>
+            <div className="space-y-2">
+              {(order.items || []).map((item, i) => (
+                <div key={i} className="flex items-center gap-3 bg-gray-850 rounded-lg p-2">
+                  {item.image && <img src={item.image} className="w-10 h-10 rounded object-cover" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate">{item.title}</p>
+                    {item.variant && <p className="text-xs text-gray-500">{item.variant}</p>}
+                  </div>
+                  <span className="mono text-sm">${item.price} &times; {item.quantity}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Financials */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="bg-gray-850 rounded-lg p-3">
+              <h4 className="text-xs text-gray-500 uppercase mb-2">Financials</h4>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-gray-400">Subtotal</span><span className="mono">${(order.subtotal || 0).toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Tax</span><span className="mono">${(order.tax || 0).toFixed(2)}</span></div>
+                <div className="flex justify-between font-bold"><span>Total</span><span className="mono">${(order.total || 0).toFixed(2)} {order.currency}</span></div>
+                {order.refundAmount > 0 && <div className="flex justify-between text-red-400"><span>Refunded</span><span className="mono">-${order.refundAmount.toFixed(2)}</span></div>}
+              </div>
+            </div>
+            <div className="bg-gray-850 rounded-lg p-3">
+              <h4 className="text-xs text-gray-500 uppercase mb-2">Profit</h4>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-gray-400">Est. Cost</span><span className="mono">${(order.estimatedCost || 0).toFixed(2)}</span></div>
+                <div className="flex justify-between font-bold text-green-400"><span>Est. Profit</span><span className="mono">${(order.estimatedProfit || 0).toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Margin</span><span className="mono">{margin}%</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Shipping */}
+          {addr && (
+            <div className="mb-4 bg-gray-850 rounded-lg p-3">
+              <h4 className="text-xs text-gray-500 uppercase mb-1">Ship to</h4>
+              <p className="text-sm">{addr.first_name} {addr.last_name}, {addr.address1}{addr.address2 ? ', ' + addr.address2 : ''}, {addr.city} {addr.province} {addr.zip}, {addr.country}</p>
+            </div>
+          )}
+
+          {/* Tracking / Fulfill */}
+          {order.tracking ? (
+            <div className="mb-4 bg-gray-850 rounded-lg p-3">
+              <h4 className="text-xs text-gray-500 uppercase mb-1">Tracking</h4>
+              <p className="text-sm mono">{order.trackingCompany}: {order.tracking}</p>
+              {order.trackingUrl && <a href={order.trackingUrl} target="_blank" className="text-xs text-red-400 hover:underline">Track shipment &rarr;</a>}
+            </div>
+          ) : canFulfill ? (
+            <div className="mb-4 bg-gray-850 rounded-lg p-3">
+              <h4 className="text-xs text-gray-500 uppercase mb-2">Fulfill Order</h4>
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                <input placeholder="Tracking #" value={tracking} onChange={e => setTracking(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-red-500" />
+                <select value={carrier} onChange={e => setCarrier(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none">
+                  <option>USPS</option><option>UPS</option><option>FedEx</option><option>DHL</option><option>Other</option>
+                </select>
+                <input placeholder="Tracking URL" value={trackingUrl} onChange={e => setTrackingUrl(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-red-500" />
+              </div>
+              <button onClick={handleFulfill} disabled={fulfilling}
+                className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-sm font-semibold px-4 py-1.5 rounded transition">
+                {fulfilling ? 'Fulfilling...' : 'Fulfill & Notify Customer'}
+              </button>
+            </div>
+          ) : null}
+
+          {/* Notes */}
+          <div className="mb-4 bg-gray-850 rounded-lg p-3">
+            <h4 className="text-xs text-gray-500 uppercase mb-2">Internal Notes</h4>
+            <div className="flex gap-2">
+              <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm resize-none focus:outline-none focus:border-red-500" />
+              <button onClick={handleNote} className="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition">Save</button>
+            </div>
+          </div>
+
+          {/* Timeline */}
+          <div>
+            <h4 className="text-xs text-gray-500 uppercase mb-2">Timeline</h4>
+            <div className="space-y-2">
+              {(order.events || []).map((ev, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-500 mt-1.5 flex-shrink-0"></span>
+                  <span className="text-gray-400">{new Date(ev.at).toLocaleString()}</span>
+                  <span className="text-gray-300">{ev.type}{ev.tracking ? ` — ${ev.tracking}` : ''}{ev.text ? ` — ${ev.text}` : ''}{ev.amount ? ` — $${ev.amount}` : ''}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {msg && <p className="mt-3 text-xs text-amber-400">{msg}</p>}
+        </div>
+      );
+    }
+
+    // ── ORDERS TAB ──
+    function OrdersTab({ onRefresh, refreshKey }) {
+      const [orders, setOrders] = useState([]);
+      const [filter, setFilter] = useState('all');
+      const [search, setSearch] = useState('');
+      const [selected, setSelected] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      const load = useCallback(async () => {
+        setLoading(true);
+        const params = new URLSearchParams();
+        if (filter !== 'all') params.set('status', filter);
+        if (search) params.set('q', search);
+        const data = await api('/api/crm/orders?' + params.toString());
+        setOrders(data.orders || []);
+        setLoading(false);
+      }, [filter, search, refreshKey]);
+
+      useEffect(() => { load(); }, [load]);
+
+      if (selected) {
+        const fullOrder = orders.find(o => o.id === selected);
+        if (fullOrder) return <OrderDetail order={fullOrder} onClose={() => setSelected(null)} onRefresh={() => { load(); onRefresh(); }} />;
+      }
+
+      const filters = [
+        { key: 'all', label: 'All' },
+        { key: 'pending', label: 'Pending' },
+        { key: 'manual', label: 'Manual' },
+        { key: 'fulfilled', label: 'Shipped' },
+        { key: 'cancelled', label: 'Cancelled' }
+      ];
+
+      return (
+        <div className="fade-in">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {filters.map(f => (
+              <button key={f.key} onClick={() => setFilter(f.key)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition ${filter === f.key ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                {f.label}
+              </button>
+            ))}
+            <input placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)}
+              className="ml-auto bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:border-red-500" />
+          </div>
+
+          {loading ? (
+            <div className="text-center py-12 text-gray-500">Loading orders...</div>
+          ) : orders.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">No orders found</div>
+          ) : (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase">
+                    <th className="text-left px-4 py-3">Order</th>
+                    <th className="text-left px-4 py-3">Customer</th>
+                    <th className="text-center px-4 py-3">Items</th>
+                    <th className="text-right px-4 py-3">Total</th>
+                    <th className="text-center px-4 py-3">Source</th>
+                    <th className="text-center px-4 py-3">Status</th>
+                    <th className="text-right px-4 py-3">Profit</th>
+                    <th className="text-center px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map(o => (
+                    <tr key={o.id} className="border-b border-gray-800/50 hover:bg-gray-850 transition cursor-pointer" onClick={() => setSelected(o.id)}>
+                      <td className="px-4 py-3 mono font-medium">{o.number}</td>
+                      <td className="px-4 py-3">
+                        <div className="truncate max-w-[160px]">{o.customerName || 'Unknown'}</div>
+                        <div className="text-xs text-gray-500 truncate max-w-[160px]">{o.email}</div>
+                      </td>
+                      <td className="px-4 py-3 text-center">{(o.items || []).length}</td>
+                      <td className="px-4 py-3 text-right mono">${(o.total || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center"><SourceBadge source={o.source} /></td>
+                      <td className="px-4 py-3 text-center"><StatusDot order={o} /></td>
+                      <td className="px-4 py-3 text-right mono text-green-400">${(o.estimatedProfit || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button className="text-xs text-red-400 hover:text-red-300 font-medium">View</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── RETURNS TAB ──
+    function ReturnsTab({ refreshKey }) {
+      const [returns, setReturns] = useState([]);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        api('/api/crm/returns').then(d => { setReturns(d.returns || []); setLoading(false); });
+      }, [refreshKey]);
+
+      async function updateStatus(id, status) {
+        await api(`/api/crm/returns/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
+        setReturns(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+      }
+
+      const statuses = ['pending', 'approved', 'shipped_back', 'received', 'refunded', 'rejected'];
+
+      return (
+        <div className="fade-in">
+          {loading ? <div className="text-center py-12 text-gray-500">Loading...</div> :
+          returns.length === 0 ? <div className="text-center py-12 text-gray-500">No returns yet</div> : (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase">
+                    <th className="text-left px-4 py-3">Return ID</th>
+                    <th className="text-left px-4 py-3">Order</th>
+                    <th className="text-left px-4 py-3">Customer</th>
+                    <th className="text-left px-4 py-3">Reason</th>
+                    <th className="text-center px-4 py-3">Status</th>
+                    <th className="text-center px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {returns.map(r => (
+                    <tr key={r.id} className="border-b border-gray-800/50 hover:bg-gray-850">
+                      <td className="px-4 py-3 mono text-xs">{r.id}</td>
+                      <td className="px-4 py-3 mono">{r.orderNumber}</td>
+                      <td className="px-4 py-3">{r.customerName || r.customerEmail}</td>
+                      <td className="px-4 py-3 text-gray-400 max-w-[200px] truncate">{r.reason}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          r.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                          r.status === 'approved' ? 'bg-green-500/20 text-green-400' :
+                          r.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                          r.status === 'refunded' ? 'bg-blue-500/20 text-blue-400' :
+                          'bg-gray-500/20 text-gray-400'
+                        }`}>{r.status}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <select value={r.status} onChange={e => updateStatus(r.id, e.target.value)}
+                          className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs">
+                          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── REVIEWS TAB ──
+    function ReviewsTab({ refreshKey }) {
+      const [reviews, setReviews] = useState([]);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        api('/api/crm/reviews').then(d => { setReviews(d.reviews || []); setLoading(false); });
+      }, [refreshKey]);
+
+      async function updateReview(id, status) {
+        await api(`/api/crm/reviews/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
+        setReviews(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+      }
+
+      function stars(n) { return '★'.repeat(n) + '☆'.repeat(5 - n); }
+
+      return (
+        <div className="fade-in">
+          {loading ? <div className="text-center py-12 text-gray-500">Loading...</div> :
+          reviews.length === 0 ? <div className="text-center py-12 text-gray-500">No reviews yet</div> : (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase">
+                    <th className="text-left px-4 py-3">Product</th>
+                    <th className="text-left px-4 py-3">Review</th>
+                    <th className="text-left px-4 py-3">Customer</th>
+                    <th className="text-center px-4 py-3">Rating</th>
+                    <th className="text-center px-4 py-3">Status</th>
+                    <th className="text-center px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reviews.map(r => (
+                    <tr key={r.id} className="border-b border-gray-800/50 hover:bg-gray-850">
+                      <td className="px-4 py-3 max-w-[180px] truncate">{r.productTitle || r.productId}</td>
+                      <td className="px-4 py-3 text-gray-400 max-w-[250px]">
+                        {r.title && <span className="font-medium text-gray-300">{r.title} — </span>}
+                        <span className="truncate">{r.text}</span>
+                      </td>
+                      <td className="px-4 py-3">{r.customerName}</td>
+                      <td className="px-4 py-3 text-center text-amber-400 mono text-xs">{stars(r.rating)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          r.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                          r.status === 'published' ? 'bg-green-500/20 text-green-400' :
+                          'bg-red-500/20 text-red-400'
+                        }`}>{r.status}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center flex gap-1 justify-center">
+                        {r.status === 'pending' && (
+                          <>
+                            <button onClick={() => updateReview(r.id, 'published')} className="px-2 py-1 bg-green-600/30 hover:bg-green-600/50 rounded text-xs text-green-400 transition">✓</button>
+                            <button onClick={() => updateReview(r.id, 'rejected')} className="px-2 py-1 bg-red-600/30 hover:bg-red-600/50 rounded text-xs text-red-400 transition">✕</button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── MAIN APP ──
+    function App() {
+      const [authed, setAuthed] = useState(!!TOKEN);
+      const [tab, setTab] = useState('orders');
+      const [dash, setDash] = useState(null);
+      const [refreshKey, setRefreshKey] = useState(0);
+
+      const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
+
+      useEffect(() => {
+        if (!authed) return;
+        const load = () => api('/api/crm/dashboard').then(d => { if (!d.error) setDash(d); });
+        load();
+        const interval = setInterval(load, 30000);
+        return () => clearInterval(interval);
+      }, [authed, refreshKey]);
+
+      if (!authed) return <Login onLogin={() => setAuthed(true)} />;
+
+      const o = dash?.overview || {};
+      const c = dash?.counts || {};
+
+      return (
+        <div className="min-h-screen">
+          {/* Header */}
+          <header className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-bold text-red-500">StyleHub</span>
+              <span className="text-sm text-gray-500">CRM</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+              <button onClick={() => { localStorage.removeItem('sh_admin_token'); TOKEN = ''; setAuthed(false); }}
+                className="text-xs text-gray-500 hover:text-gray-300 transition">Logout</button>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-6 py-6">
+            {/* Metrics */}
+            <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
+              <MetricCard icon="💰" label="Revenue" value={'$' + (o.revenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})} sub={`+$${(o.todayRevenue || 0).toFixed(2)} today`} color="text-green-400" />
+              <MetricCard icon="📈" label="Profit" value={'$' + (o.profit || 0).toLocaleString(undefined, {minimumFractionDigits: 2})} sub={`${o.margin || 0}% margin`} color="text-green-400" />
+              <MetricCard icon="📦" label="Orders" value={o.totalOrders || 0} sub={`${o.todayOrders || 0} today`} />
+              <MetricCard icon="⏳" label="Pending" value={c.pending || 0} sub="need action" color={c.pending ? 'text-amber-400' : 'text-gray-100'} />
+              <MetricCard icon="⚠️" label="Manual" value={c.manual || 0} sub={c.manual ? 'ALERT' : 'none'} color={c.manual ? 'text-red-400' : 'text-gray-100'} />
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 mb-6 border-b border-gray-800">
+              {[
+                { key: 'orders', label: 'Orders' },
+                { key: 'returns', label: `Returns${c.pendingReturns ? ` (${c.pendingReturns})` : ''}` },
+                { key: 'reviews', label: `Reviews${c.pendingReviews ? ` (${c.pendingReviews})` : ''}` }
+              ].map(t => (
+                <button key={t.key} onClick={() => setTab(t.key)}
+                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${tab === t.key ? 'border-red-500 text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            {tab === 'orders' && <OrdersTab onRefresh={refresh} refreshKey={refreshKey} />}
+            {tab === 'returns' && <ReturnsTab refreshKey={refreshKey} />}
+            {tab === 'reviews' && <ReviewsTab refreshKey={refreshKey} />}
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

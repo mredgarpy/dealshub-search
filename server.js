@@ -67,9 +67,29 @@ const { calculateFinalPrice, parsePrice } = require('./src/utils/pricing');
 const { getShippingEstimate, getReturnPolicy, getShippingOptions, getShippingQuote, invalidateShippingCache } = require('./src/services/shipping');
 const { invalidatePricingCache } = require('./src/utils/pricing');
 const adminRouter = require('./src/routes/admin');
+const { setupWebhooks } = require('./src/webhooks');
+const { setupCRMApi } = require('./src/crm-api');
 
 // Initialize adapters
 initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
+
+// ---- CRM CORS ----
+app.use(['/api/customer', '/api/crm'], (req, res, next) => {
+  const origin = req.headers.origin;
+  const allowed = ['https://stylehubmiami.com', 'https://dealshub-search.onrender.com', 'http://localhost:3000'];
+  if (allowed.includes(origin)) res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,X-Admin-Token');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+// ---- ADMIN DASHBOARD (static) ----
+app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')));
+
+// ---- CRM MODULES ----
+setupWebhooks(app);
+setupCRMApi(app);
 
 // ---- HEALTH ----
 app.get('/health', (req, res) => {
@@ -1219,229 +1239,22 @@ app.post('/api/admin/theme-update', express.json(), async (req, res) => {
 });
 
 // ============================================================
-// SHOPIFY WEBHOOKS (CRM)
+// SHOPIFY WEBHOOKS + CRM — Moved to src/webhooks.js & src/crm-api.js
 // ============================================================
 
-// Verify Shopify webhook HMAC signature
-function verifyShopifyWebhook(req) {
-  const hmac = req.headers['x-shopify-hmac-sha256'];
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
-  if (!hmac || !secret) return false;
-  const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-  const hash = crypto.createHmac('sha256', secret)
-    .update(body, 'utf8').digest('base64');
-  return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash));
-}
+// (Old inline webhooks + CRM code removed — now in src/webhooks.js & src/crm-api.js)
 
-// In-memory CRM store (replace with DB in production)
-const crmOrders = new Map();
+// (Old order-created webhook removed — now in src/webhooks.js)
 
-// Webhook: New order created
-app.post('/webhooks/order-created', (req, res) => {
-  try {
-    const hmac = req.headers['x-shopify-hmac-sha256'];
-    const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
-    if (hmac && webhookSecret && req.rawBody) {
-      const hash = crypto.createHmac('sha256', webhookSecret)
-        .update(req.rawBody, 'utf8').digest('base64');
-      if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
-        logger.warn('webhook', 'HMAC verification failed for order-created');
-        // Continue processing anyway - don't reject in case of secret mismatch during setup
-      }
-    }
+// (Old order-fulfilled webhook removed — now in src/webhooks.js)
 
-    const order = req.body;
-    const orderData = {
-      id: order.id,
-      name: order.name || `#${order.order_number}`,
-      email: order.customer?.email || order.email,
-      totalPrice: order.total_price,
-      currency: order.currency,
-      lineItems: (order.line_items || []).map(li => ({
-        title: li.title,
-        quantity: li.quantity,
-        price: li.price,
-        vendor: li.vendor,
-        sku: li.sku,
-        properties: li.properties
-      })),
-      status: 'created',
-      createdAt: order.created_at,
-      fulfillmentStatus: order.fulfillment_status || 'unfulfilled',
-      financialStatus: order.financial_status,
-      shippingAddress: order.shipping_address,
-      trackingNumbers: [],
-      events: [{ type: 'created', at: new Date().toISOString() }]
-    };
+// (Old order-cancelled webhook removed — now in src/webhooks.js)
 
-    crmOrders.set(order.id, orderData);
-    logger.info('webhook', `[CRM] New order: ${orderData.name} - $${order.total_price} ${order.currency} - ${orderData.lineItems.length} items`);
+// (Old refund-created webhook removed — now in src/webhooks.js)
 
-    res.status(200).send('OK');
-  } catch (err) {
-    logger.error('webhook', 'Error processing order-created webhook', { error: err.message });
-    res.status(200).send('OK'); // Always return 200 to prevent Shopify retries
-  }
-});
+// (Old CRM API endpoints removed — now in src/crm-api.js)
 
-// Webhook: Order fulfilled (AutoDS synced tracking)
-app.post('/webhooks/order-fulfilled', (req, res) => {
-  try {
-    const hmac = req.headers['x-shopify-hmac-sha256'];
-    const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
-    if (hmac && webhookSecret && req.rawBody) {
-      const hash = crypto.createHmac('sha256', webhookSecret)
-        .update(req.rawBody, 'utf8').digest('base64');
-      if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
-        logger.warn('webhook', 'HMAC verification failed for order-fulfilled');
-      }
-    }
-
-    const order = req.body;
-    const tracking = order.fulfillments?.[0]?.tracking_number || 'N/A';
-    const carrier = order.fulfillments?.[0]?.tracking_company || 'N/A';
-    const trackingUrl = order.fulfillments?.[0]?.tracking_url || null;
-
-    // Update CRM record
-    const existing = crmOrders.get(order.id);
-    if (existing) {
-      existing.status = 'fulfilled';
-      existing.fulfillmentStatus = 'fulfilled';
-      existing.trackingNumbers = order.fulfillments?.map(f => ({
-        number: f.tracking_number,
-        company: f.tracking_company,
-        url: f.tracking_url
-      })) || [];
-      existing.events.push({ type: 'fulfilled', at: new Date().toISOString(), tracking, carrier });
-    }
-
-    logger.info('webhook', `[CRM] Order fulfilled: ${order.name || order.id} - ${carrier}: ${tracking}`);
-    res.status(200).send('OK');
-  } catch (err) {
-    logger.error('webhook', 'Error processing order-fulfilled webhook', { error: err.message });
-    res.status(200).send('OK');
-  }
-});
-
-// Webhook: Order cancelled
-app.post('/webhooks/order-cancelled', (req, res) => {
-  try {
-    const hmac = req.headers['x-shopify-hmac-sha256'];
-    const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
-    if (hmac && webhookSecret && req.rawBody) {
-      const hash = crypto.createHmac('sha256', webhookSecret)
-        .update(req.rawBody, 'utf8').digest('base64');
-      if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
-        logger.warn('webhook', 'HMAC verification failed for order-cancelled');
-      }
-    }
-
-    const order = req.body;
-    const existing = crmOrders.get(order.id);
-    if (existing) {
-      existing.status = 'cancelled';
-      existing.events.push({ type: 'cancelled', at: new Date().toISOString(), reason: order.cancel_reason });
-    }
-
-    logger.info('webhook', `[CRM] Order cancelled: ${order.name || order.id} - Reason: ${order.cancel_reason || 'N/A'}`);
-    res.status(200).send('OK');
-  } catch (err) {
-    logger.error('webhook', 'Error processing order-cancelled webhook', { error: err.message });
-    res.status(200).send('OK');
-  }
-});
-
-// Webhook: Refund created
-app.post('/webhooks/refund-created', (req, res) => {
-  try {
-    const hmac = req.headers['x-shopify-hmac-sha256'];
-    const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
-    if (hmac && webhookSecret && req.rawBody) {
-      const hash = crypto.createHmac('sha256', webhookSecret)
-        .update(req.rawBody, 'utf8').digest('base64');
-      if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash))) {
-        logger.warn('webhook', 'HMAC verification failed for refund-created');
-      }
-    }
-
-    const refund = req.body;
-    const orderId = refund.order_id;
-    const existing = crmOrders.get(orderId);
-    if (existing) {
-      existing.events.push({
-        type: 'refund',
-        at: new Date().toISOString(),
-        refundId: refund.id,
-        amount: refund.transactions?.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0) || 0
-      });
-    }
-
-    logger.info('webhook', `[CRM] Refund created for order: ${orderId} - Refund ID: ${refund.id}`);
-    res.status(200).send('OK');
-  } catch (err) {
-    logger.error('webhook', 'Error processing refund-created webhook', { error: err.message });
-    res.status(200).send('OK');
-  }
-});
-
-// CRM API: Get order data (for admin panel)
-app.get('/api/crm/orders', (req, res) => {
-  const orders = Array.from(crmOrders.values()).sort((a, b) =>
-    new Date(b.createdAt) - new Date(a.createdAt)
-  );
-  res.json({ orders, total: orders.length });
-});
-
-app.get('/api/crm/orders/:id', (req, res) => {
-  const order = crmOrders.get(parseInt(req.params.id));
-  if (!order) return res.status(404).json({ error: 'Order not found in CRM' });
-  res.json(order);
-});
-
-// ============================================================
-// CUSTOMER UPDATE (Settings inline edit)
-// ============================================================
-app.post('/api/customer/update', express.json(), async (req, res) => {
-  try {
-    const { customerId, firstName, lastName, email, phone } = req.body;
-    if (!customerId) return res.status(400).json({ error: 'Missing customerId' });
-
-    const shopDomain = process.env.SHOPIFY_STORE_DOMAIN || '1rnmax-5z.myshopify.com';
-    const adminToken = process.env.SHOPIFY_ADMIN_TOKEN || process.env.SHOPIFY_TOKEN;
-    if (!adminToken) return res.status(500).json({ error: 'Admin token not configured' });
-
-    const customer = {};
-    if (firstName !== undefined) customer.first_name = firstName;
-    if (lastName !== undefined) customer.last_name = lastName;
-    if (email !== undefined) customer.email = email;
-    if (phone !== undefined) customer.phone = phone || null;
-
-    const response = await fetch(
-      `https://${shopDomain}/admin/api/2024-01/customers/${customerId}.json`,
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': adminToken
-        },
-        body: JSON.stringify({ customer })
-      }
-    );
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      logger.error('customer-update', `Shopify API error: ${response.status}`);
-      return res.status(response.status).json({ error: err.errors || 'Update failed' });
-    }
-
-    const data = await response.json();
-    logger.info('customer-update', `Updated customer ${customerId}`);
-    res.json({ success: true, customer: data.customer });
-  } catch (err) {
-    logger.error('customer-update', err.message);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// (Old customer update endpoint removed — now in src/crm-api.js as /api/customer/update-profile)
 
 // ============================================================
 // START

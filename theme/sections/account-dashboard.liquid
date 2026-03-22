@@ -670,12 +670,12 @@
       <div class="sh-section">
         <div class="sh-section-head">
           <div class="sh-section-title">Addresses</div>
-          <a href="https://account.stylehubmiami.com/" class="sh-section-action" target="_blank" rel="noopener">Manage &rarr;</a>
+          <button class="sh-section-action" data-sh-nav="addresses" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:12px">Manage &rarr;</button>
         </div>
         <div class="sh-section-body">
           {%- if cust_addresses.size == 0 -%}
             <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">
-              No addresses saved yet. <a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" style="color:var(--red)">Add one &rarr;</a>
+              No addresses saved yet. <button data-sh-nav="addresses" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:12px">Add one &rarr;</button>
             </div>
           {%- else -%}
             <div class="sh-addr-row">
@@ -722,14 +722,14 @@
     <div class="sh-section">
       <div class="sh-section-head">
         <div class="sh-section-title">Account settings</div>
-        <a href="https://account.stylehubmiami.com/" class="sh-section-action" target="_blank" rel="noopener">Edit profile &rarr;</a>
+        <button class="sh-section-action" data-sh-nav="settings" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:13px">Edit profile &rarr;</button>
       </div>
       <div class="sh-section-body">
         <div class="sh-set-grid">
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">Managed by Shopify</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Change</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div><button class="sh-set-edit" data-sh-nav="settings" style="background:none;border:none;font-family:inherit;cursor:pointer">Edit</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div><button class="sh-set-edit" data-sh-nav="settings" style="background:none;border:none;font-family:inherit;cursor:pointer">Edit</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">Managed by Shopify</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Orders</div><div class="sh-set-val">{{ cust_order_count }} total orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Language</div><div class="sh-set-val">English (US)</div></div><span class="sh-set-edit" style="opacity:0.5">Default</span></div>
         </div>
@@ -857,7 +857,7 @@
     <div class="sh-section">
       <div class="sh-section-head">
         <div class="sh-section-title">Saved addresses <span class="sh-count">{{ cust_addresses.size }}</span></div>
-        <a href="https://account.stylehubmiami.com/" class="sh-section-action" target="_blank" rel="noopener">Add new &rarr;</a>
+        <button class="sh-section-action" id="sh-addr-add-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:12px">Add new &rarr;</button>
       </div>
       <div class="sh-section-body">
         {%- if cust_addresses.size == 0 -%}
@@ -865,7 +865,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <h3>No addresses saved</h3>
             <p>Add your shipping address to speed up checkout.</p>
-            <a href="https://account.stylehubmiami.com/" class="sh-empty-btn" target="_blank" rel="noopener">Add address &rarr;</a>
+            <button class="sh-empty-btn" id="sh-addr-add-btn2" style="cursor:pointer;font-family:inherit">Add address &rarr;</button>
           </div>
         {%- else -%}
           <div class="sh-addr-row" style="flex-wrap:wrap">
@@ -889,6 +889,76 @@
             {%- endfor -%}
           </div>
         {%- endif -%}
+      </div>
+    </div>
+
+    {%- comment -%} Inline Add Address Form {%- endcomment -%}
+    <div class="sh-section" id="sh-addr-form-wrap" style="display:none">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Add new address</div>
+        <button id="sh-addr-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
+      </div>
+      <div class="sh-section-body">
+        {% form 'customer_address', customer.new_address %}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">First name</label>
+              <input type="text" name="address[first_name]" autocomplete="given-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Last name</label>
+              <input type="text" name="address[last_name]" autocomplete="family-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Company (optional)</label>
+            <input type="text" name="address[company]" autocomplete="organization" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+          </div>
+          <div style="margin-top:12px">
+            <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Address</label>
+            <input type="text" name="address[address1]" autocomplete="address-line1" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+          </div>
+          <div style="margin-top:12px">
+            <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Apartment, suite, etc. (optional)</label>
+            <input type="text" name="address[address2]" autocomplete="address-line2" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">City</label>
+              <input type="text" name="address[city]" autocomplete="address-level2" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">State / Province</label>
+              <input type="text" name="address[province]" autocomplete="address-level1" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">ZIP / Postal code</label>
+              <input type="text" name="address[zip]" autocomplete="postal-code" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Country</label>
+              <select name="address[country]" autocomplete="country-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;background:#fff">
+                <option value="United States" selected>United States</option>
+                <option value="Canada">Canada</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Phone (optional)</label>
+              <input type="tel" name="address[phone]" autocomplete="tel" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;cursor:pointer">
+              <input type="checkbox" name="address[default]" value="1"> Set as default address
+            </label>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:20px">
+            <button type="submit" style="padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600">Save address</button>
+            <button type="button" id="sh-addr-cancel-btn2" style="padding:10px 20px;background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
+          </div>
+        {% endform %}
       </div>
     </div>
   </div>
@@ -970,19 +1040,65 @@
         <div class="sh-welcome-sub">Manage your profile and preferences</div>
       </div>
     </div>
-    <div class="sh-section">
+
+    {%- comment -%} Profile info — read-only view with inline edit toggle {%- endcomment -%}
+    <div class="sh-section" id="sh-profile-view">
       <div class="sh-section-head">
         <div class="sh-section-title">Profile information</div>
-        <a href="https://account.stylehubmiami.com/" class="sh-section-action" target="_blank" rel="noopener">Edit in Shopify &rarr;</a>
+        <button class="sh-section-action" id="sh-profile-edit-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:13px">Edit profile &rarr;</button>
       </div>
       <div class="sh-section-body">
         <div class="sh-set-grid">
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Edit</a></div>
-          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">Managed by Shopify accounts</div></div><a href="https://account.stylehubmiami.com/" target="_blank" rel="noopener" class="sh-set-edit">Change</a></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">Managed by Shopify accounts</div></div></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total orders</div><div class="sh-set-val">{{ cust_order_count }} orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
           <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total spent</div><div class="sh-set-val">{{ customer.total_spent | money }}</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Profile edit form — uses Shopify native customer form (no API token needed) {%- endcomment -%}
+    <div class="sh-section" id="sh-profile-form" style="display:none">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Edit profile</div>
+        <button class="sh-section-action" id="sh-profile-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
+      </div>
+      <div class="sh-section-body">
+        {% form 'customer', customer %}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:500px">
+            <div>
+              <label for="sh-cust-first" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">First name</label>
+              <input type="text" id="sh-cust-first" name="customer[first_name]" value="{{ customer.first_name }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+            <div>
+              <label for="sh-cust-last" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Last name</label>
+              <input type="text" id="sh-cust-last" name="customer[last_name]" value="{{ customer.last_name }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+          </div>
+          <div style="margin-top:14px;max-width:500px">
+            <label for="sh-cust-email" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Email address</label>
+            <input type="email" id="sh-cust-email" name="customer[email]" value="{{ customer.email }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit" disabled>
+            <span style="font-size:11px;color:#999;margin-top:4px;display:block">Email cannot be changed here</span>
+          </div>
+          <div style="margin-top:18px;display:flex;gap:10px">
+            <button type="submit" style="padding:10px 28px;background:var(--red,#e53e3e);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Save changes</button>
+            <button type="button" id="sh-profile-cancel-btn2" style="padding:10px 20px;background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
+          </div>
+        {% endform %}
+      </div>
+    </div>
+
+    {%- comment -%} Account stats (always visible) {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Account overview</div>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-set-grid">
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Member since</div><div class="sh-set-val">{{ customer.created_at | date: "%B %Y" }}</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Default address</div><div class="sh-set-val">{%- if cust_default_address -%}{{ cust_default_address.city }}, {{ cust_default_address.province_code }} {{ cust_default_address.zip }}{%- else -%}Not set{%- endif -%}</div></div><button class="sh-set-edit" data-sh-nav="addresses" style="background:none;border:none;font-family:inherit;cursor:pointer">Manage</button></div>
         </div>
       </div>
     </div>
@@ -1062,6 +1178,41 @@
     var countEls = document.querySelectorAll('[data-sh-wishlist-count]');
     countEls.forEach(function(el) { el.textContent = wl.length; });
   } catch(e) {}
+
+  /* Profile edit/cancel toggle */
+  var profileView = document.getElementById('sh-profile-view');
+  var profileForm = document.getElementById('sh-profile-form');
+  var profileEditBtn = document.getElementById('sh-profile-edit-btn');
+  var profileCancelBtn = document.getElementById('sh-profile-cancel-btn');
+  var profileCancelBtn2 = document.getElementById('sh-profile-cancel-btn2');
+
+  function showProfileEdit() {
+    if (profileView) profileView.style.display = 'none';
+    if (profileForm) profileForm.style.display = 'block';
+  }
+  function hideProfileEdit() {
+    if (profileForm) profileForm.style.display = 'none';
+    if (profileView) profileView.style.display = 'block';
+  }
+
+  if (profileEditBtn) profileEditBtn.addEventListener('click', showProfileEdit);
+  if (profileCancelBtn) profileCancelBtn.addEventListener('click', hideProfileEdit);
+  if (profileCancelBtn2) profileCancelBtn2.addEventListener('click', hideProfileEdit);
+
+  /* Address add form toggle */
+  var addrFormWrap = document.getElementById('sh-addr-form-wrap');
+  function showAddrForm() { if (addrFormWrap) addrFormWrap.style.display = 'block'; }
+  function hideAddrForm() { if (addrFormWrap) addrFormWrap.style.display = 'none'; }
+
+  var addrAddBtn = document.getElementById('sh-addr-add-btn');
+  var addrAddBtn2 = document.getElementById('sh-addr-add-btn2');
+  var addrCancelBtn = document.getElementById('sh-addr-cancel-btn');
+  var addrCancelBtn2 = document.getElementById('sh-addr-cancel-btn2');
+
+  if (addrAddBtn) addrAddBtn.addEventListener('click', showAddrForm);
+  if (addrAddBtn2) addrAddBtn2.addEventListener('click', showAddrForm);
+  if (addrCancelBtn) addrCancelBtn.addEventListener('click', hideAddrForm);
+  if (addrCancelBtn2) addrCancelBtn2.addEventListener('click', hideAddrForm);
 
   /* Hash navigation on load */
   if (window.location.hash) {

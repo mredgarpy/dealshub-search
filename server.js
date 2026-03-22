@@ -1068,7 +1068,11 @@ app.get('/oauth/callback', async (req, res) => {
     logger.info('oauth', 'Exchanging code for token', { shop, clientId: clientId ? clientId.substring(0, 8) + '...' : 'MISSING', secretSet: !!clientSecret });
     const tokenResp = await fetch(tokenUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'DealsHub-Backend/2.3'
+      },
       body: tokenBody
     });
     const rawText = await tokenResp.text();

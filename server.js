@@ -1063,12 +1063,20 @@ app.get('/oauth/callback', async (req, res) => {
   try {
     const clientId = process.env.SHOPIFY_CLIENT_ID;
     const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
-    const tokenResp = await fetch('https://' + shop + '/admin/oauth/access_tokens.json', {
+    const tokenUrl = 'https://' + shop + '/admin/oauth/access_tokens.json';
+    const tokenBody = JSON.stringify({ client_id: clientId, client_secret: clientSecret, code: code });
+    logger.info('oauth', 'Exchanging code for token', { shop, clientId: clientId ? clientId.substring(0, 8) + '...' : 'MISSING', secretSet: !!clientSecret });
+    const tokenResp = await fetch(tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code: code })
+      body: tokenBody
     });
-    const tokenData = await tokenResp.json();
+    const rawText = await tokenResp.text();
+    let tokenData;
+    try { tokenData = JSON.parse(rawText); } catch (e) {
+      logger.error('oauth', 'Non-JSON response from Shopify', { status: tokenResp.status, body: rawText.substring(0, 500) });
+      return res.status(500).send('<h2>Token Exchange Error</h2><p>Status: ' + tokenResp.status + '</p><pre>' + rawText.substring(0, 1000) + '</pre><p>Client ID: ' + (clientId || 'MISSING') + '</p><p>Client Secret set: ' + (!!clientSecret) + '</p>');
+    }
     if (tokenData.access_token) {
       logger.info('oauth', 'New access token obtained for ' + shop + ': ' + tokenData.access_token.substring(0, 15) + '...');
       res.send('<h2>DealsHub App Installed Successfully</h2><p>Access token obtained. First 15 chars: <code>' + tokenData.access_token.substring(0, 15) + '...</code></p><p>Full token (update in Render env vars): <code>' + tokenData.access_token + '</code></p><p>Scopes: ' + (tokenData.scope || 'unknown') + '</p><p><a href="https://admin.shopify.com/store/' + shop.replace('.myshopify.com', '') + '">Back to Shopify Admin</a></p>');

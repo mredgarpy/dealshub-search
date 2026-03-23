@@ -401,9 +401,11 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
 
   // v1.6: Use sourceOriginalPrice to avoid double-markup on compare-at price
   const sourceOrigPrice = productData.sourceOriginalPrice || productData.pricingMeta?.sourceOriginalPrice || productData.originalPrice;
+  // v1.8: Do NOT include shippingCost in product price — shipping is shown separately on PDP
+  // and will be handled through Shopify shipping profiles. This keeps PDP price = cart price.
+  // The source shipping cost is stored in metafields for operations/margin tracking.
   const pricingResult = calculateFinalPrice(sourcePrice, source, {
-    originalPrice: sourceOrigPrice,
-    shippingCost: productData.shippingData?.cost || 0
+    originalPrice: sourceOrigPrice
   });
 
   _timing.pricing = Date.now() - _startTime;

@@ -223,10 +223,12 @@ async function productDetailHandler(req, res) {
     }
 
     // Apply pricing engine markup — v1.6: overwrite product.price so frontend always shows final price
+    // v1.8: Do NOT include shippingCost in landed cost for displayed price —
+    // shipping is shown as a separate line on PDP, so including it here would double-charge.
+    // The shipping cost is still stored in shippingData for display and for prepareCart landed cost.
     if (product.price) {
       const pricing = calculateFinalPrice(product.price, source, {
-        originalPrice: product.originalPrice,
-        shippingCost: product.shippingData?.cost || 0
+        originalPrice: product.originalPrice
       });
       // Save original source prices before overwriting
       product.sourcePrice = product.price;
@@ -245,12 +247,11 @@ async function productDetailHandler(req, res) {
       };
 
       // Also apply markup to variant prices so PDP shows consistent marked-up prices
+      // v1.8: No shippingCost in variant pricing either (shown separately on PDP)
       if (product.variants && product.variants.length) {
         product.variants = product.variants.map(v => {
           if (v.price && typeof v.price === 'number' && v.price > 0) {
-            const vPricing = calculateFinalPrice(v.price, source, {
-              shippingCost: product.shippingData?.cost || 0
-            });
+            const vPricing = calculateFinalPrice(v.price, source, {});
             v.sourcePrice = v.price;
             v.price = vPricing.price;
           }

@@ -1268,17 +1268,47 @@ app.post('/api/admin/theme-update', express.json(), async (req, res) => {
 // ============================================================
 // ---- WARM-UP: Pre-populate cache on startup to reduce perceived cold start ----
 async function warmUpCache() {
-  logger.info('server', 'Warming up cache...');
+  logger.info('server', 'Warming up cache (aggressive)...');
+  const http = require('http');
+  const selfBase = `http://localhost:${PORT}`;
+
+  // Endpoints to pre-warm (same ones the home page loads)
+  const endpoints = [
+    '/api/trending',
+    '/api/bestsellers',
+    '/api/new-arrivals',
+    '/api/flash-deals',
+    '/api/featured?category=fashion',
+    '/api/featured?category=beauty',
+    '/api/featured?category=electronics',
+  ];
+
+  const fetchLocal = (urlPath) => new Promise((resolve) => {
+    const url = selfBase + urlPath;
+    const req = http.get(url, { timeout: 45000 }, (res) => {
+      let body = '';
+      res.on('data', c => { body += c; });
+      res.on('end', () => resolve({ path: urlPath, status: res.statusCode, size: body.length }));
+    });
+    req.on('error', (e) => resolve({ path: urlPath, status: 'error', error: e.message }));
+    req.on('timeout', () => { req.destroy(); resolve({ path: urlPath, status: 'timeout' }); });
+  });
+
   try {
-    const adapter = getAdapter('amazon');
-    if (adapter) {
-      const results = await adapter.search('trending deals', 6);
-      if (results.length > 0) {
-        const valid = results.filter(p => p && p.title && p.price && p.price !== '$0.00');
-        searchCache.set('trending', { results: valid, section: 'trending' }, 600000);
-        logger.info('server', `Warm-up: cached ${valid.length} trending results`);
+    // Run all warm-ups in parallel for speed
+    const results = await Promise.allSettled(endpoints.map(fetchLocal));
+    let ok = 0, fail = 0;
+    results.forEach(r => {
+      if (r.status === 'fulfilled' && r.value.status === 200) {
+        ok++;
+        logger.info('server', `Warm-up OK: ${r.value.path} (${r.value.size} bytes)`);
+      } else {
+        fail++;
+        const detail = r.status === 'fulfilled' ? r.value : r.reason;
+        logger.warn('server', `Warm-up MISS: ${JSON.stringify(detail)}`);
       }
-    }
+    });
+    logger.info('server', `Warm-up complete: ${ok}/${endpoints.length} cached, ${fail} missed`);
   } catch (e) {
     logger.warn('server', 'Warm-up failed (non-critical)', { error: e.message });
   }

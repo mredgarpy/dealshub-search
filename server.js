@@ -919,10 +919,13 @@ app.get('/api/customer-orders', async (req, res) => {
       total_tax: o.total_tax,
       currency: o.currency,
       line_items: (o.line_items || []).map(item => ({
+        product_id: item.product_id || null,
+        variant_id: item.variant_id || null,
         title: item.title,
         variant_title: item.variant_title || null,
         quantity: item.quantity,
         price: item.price,
+        sku: item.sku || null,
         image: item.image ? item.image.src : null
       })),
       tracking_number: o.fulfillments?.[0]?.tracking_number || null,
@@ -1285,3 +1288,4 @@ app.listen(PORT, () => {
   // Warm up cache after server starts (don't await â let it run in background)
   setTimeout(warmUpCache, 2000);
 });
+

@@ -260,6 +260,19 @@ async function productDetailHandler(req, res) {
       }
     }
 
+    // v2.0: Calculate shipping using new shipping-rules engine
+    const { calculateShipping: calcShip } = require('./src/services/shipping-rules');
+    const shipResult = calcShip(source, product.sourcePrice || product.price, product, false);
+    product.shippingCalc = shipResult;
+    // Also update legacy shippingData/deliveryEstimate/returnPolicy for backward compat
+    product.shippingData = {
+      cost: shipResult.cost,
+      method: shipResult.method,
+      note: shipResult.label === 'FREE' ? `FREE ${shipResult.method}` : `Shipping: $${shipResult.cost.toFixed(2)}`
+    };
+    product.deliveryEstimate = shipResult.delivery;
+    product.returnPolicy = shipResult.returnWindow;
+
     // Only cache if returned product matches requested ID (prevent stale fallback pollution)
     const returnedId = String(product.sourceId || '');
     const requestedId = String(id);
@@ -276,6 +289,54 @@ async function productDetailHandler(req, res) {
     res.status(500).json({ error: 'Failed to load product' });
   }
 }
+
+// ---- SHIPPING CALCULATOR ----
+const { calculateShipping } = require('./src/services/shipping-rules');
+
+app.get('/api/shipping', async (req, res) => {
+  const { store, productId, price } = req.query;
+  if (!store || !productId) {
+    return res.status(400).json({ error: 'Missing store or productId' });
+  }
+  try {
+    const srcLower = store.toLowerCase();
+    const sourcePrice = parseFloat(price) || 0;
+
+    // Try to get product data from cache first, then API
+    const cacheKey = `product:${srcLower}:${productId}`;
+    let productData = productCache.get(cacheKey);
+
+    if (!productData) {
+      const adapter = getAdapter(srcLower);
+      if (adapter) {
+        productData = await adapter.getProduct(productId);
+      }
+    }
+
+    const result = calculateShipping(srcLower, sourcePrice, productData || {}, false);
+
+    res.json({
+      store: srcLower,
+      productId,
+      shipping: {
+        cost: result.cost,
+        label: result.label,
+        method: result.method,
+        isFree: result.isFree
+      },
+      delivery: result.delivery,
+      threshold: result.threshold,
+      remaining: result.remaining,
+      thresholdNote: result.thresholdNote,
+      plusSaves: result.plusSaves,
+      plusNote: result.plusSaves > 0 ? 'FREE with StyleHub Plus' : null,
+      returnWindow: result.returnWindow
+    });
+  } catch (e) {
+    logger.error('shipping', 'Shipping calculation failed', { error: e.message, store, productId });
+    res.status(500).json({ error: 'Failed to calculate shipping' });
+  }
+});
 
 // ---- SEARCH BY INDIVIDUAL SOURCE (backward compatible) ----
 VALID_SOURCES.forEach(source => {

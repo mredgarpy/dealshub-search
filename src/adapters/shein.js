@@ -51,7 +51,7 @@ class SheinAdapter extends BaseAdapter {
         }
         // Response came back but empty/null - could be transient 302
         if (attempt < maxAttempts) {
-          const delay = 1500 * attempt; // Increasing delay: 1.5s, 3s
+          const delay = 800; // Quick retry
           logger.warn('shein', `Search returned empty on attempt ${attempt}, retrying in ${delay}ms...`, { query });
           await new Promise(r => setTimeout(r, delay));
           continue;
@@ -59,7 +59,7 @@ class SheinAdapter extends BaseAdapter {
         return [];
       } catch (e) {
         if (attempt < maxAttempts) {
-          const delay = 1500 * attempt;
+          const delay = 800;
           logger.warn('shein', `Search attempt ${attempt} failed, retrying in ${delay}ms...`, { error: e.message, query });
           await new Promise(r => setTimeout(r, delay));
           continue;
@@ -72,84 +72,92 @@ class SheinAdapter extends BaseAdapter {
   }
 
   async getProduct(productId, opts = {}) {
-    // Try multiple detail endpoint variations
+    // ---- OPTIMIZED: parallel detail endpoints + reduced retries ----
+    // Old: 2 endpoints × 3 sequential attempts = up to 16s
+    // New: 2 endpoints in parallel × 2 attempts = up to 4s before fallback
     const detailEndpoints = [
       `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD`,
       `https://${API_HOST}/products/detail?goods_id=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&with_price=true`,
     ];
 
-    for (const baseUrl of detailEndpoints) {
-      for (let attempt = 1; attempt <= 3; attempt++) {
+    // Helper: try one endpoint with up to 2 attempts
+    const tryEndpoint = async (baseUrl, label) => {
+      for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           const url = this._cacheBust(baseUrl);
           const data = await this.fetchJSON(url, this._sheinFetchOpts());
 
-          // Log raw response structure for diagnostics
           if (data) {
             const topKeys = Object.keys(data).join(',');
-            const infoKeys = data.info ? Object.keys(data.info).slice(0, 20).join(',') : 'no-info';
-            logger.info('shein', `Detail response`, { productId, attempt, topKeys, infoKeys, hasInfo: !!data.info, code: data.code, msg: data.msg });
+            logger.info('shein', `Detail response [${label}]`, { productId, attempt, topKeys, hasInfo: !!data.info, code: data.code });
           } else {
-            logger.warn('shein', `Detail returned null`, { productId, attempt, endpoint: url.split('?')[0] });
+            logger.warn('shein', `Detail returned null [${label}]`, { productId, attempt });
           }
 
           if (data?.info) return this.normalizeProduct(data.info);
-          // Some SHEIN API responses nest data differently
           if (data?.data) {
-            logger.info('shein', `Detail has data key instead of info`, { productId, dataKeys: Object.keys(data.data).slice(0, 15).join(',') });
+            logger.info('shein', `Detail has data key [${label}]`, { productId });
             return this.normalizeProduct(data.data);
           }
-          if (data && attempt < 3) {
-            await new Promise(r => setTimeout(r, 1500 * attempt));
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 800));
             continue;
           }
         } catch (e) {
-          logger.warn('shein', `Detail attempt ${attempt} failed`, { error: e.message, productId });
-          if (attempt < 3) {
-            await new Promise(r => setTimeout(r, 1500 * attempt));
+          logger.warn('shein', `Detail attempt ${attempt} failed [${label}]`, { error: e.message, productId });
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 800));
             continue;
           }
         }
       }
+      return null;
+    };
+
+    // Run BOTH detail endpoints in parallel — first to resolve non-null wins
+    const detailResults = await Promise.allSettled([
+      tryEndpoint(detailEndpoints[0], 'ep1'),
+      tryEndpoint(detailEndpoints[1], 'ep2'),
+    ]);
+    for (const r of detailResults) {
+      if (r.status === 'fulfilled' && r.value) return r.value;
     }
 
-    // Fallback to search by ID
+    // Fallback: search by ID (fast, single request)
     logger.warn('shein', `All detail endpoints failed for ${productId}, trying search fallback`);
-    const searchUrl = this._cacheBust(`https://${API_HOST}/products/search?keywords=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&page=1&limit=5`);
-    const sData = await this.fetchJSON(searchUrl, this._sheinFetchOpts());
+    try {
+      const searchUrl = this._cacheBust(`https://${API_HOST}/products/search?keywords=${encodeURIComponent(productId)}&language=en&country=US&currency=USD&page=1&limit=5`);
+      const sData = await this.fetchJSON(searchUrl, this._sheinFetchOpts());
+      const products = sData?.info?.products || sData?.products || [];
+      logger.info('shein', `Search fallback`, { productId, resultCount: products.length });
 
-    // Log search fallback response
-    const products = sData?.info?.products || sData?.products || [];
-    logger.info('shein', `Search fallback response`, { productId, resultCount: products.length, topKeys: sData ? Object.keys(sData).join(',') : 'null' });
-
-    if (products.length) {
-      // Only return exact ID match
-      const exact = products.find(p => String(p.goods_id) === String(productId));
-      if (exact) {
-        logger.info('shein', `Search fallback found exact match for ${productId}`);
-        return this.normalizeProductFromSearch(exact);
+      if (products.length) {
+        const exact = products.find(p => String(p.goods_id) === String(productId));
+        if (exact) {
+          logger.info('shein', `Search fallback found exact match for ${productId}`);
+          return this.normalizeProductFromSearch(exact);
+        }
       }
-      logger.warn('shein', `Search fallback found no exact ID match for ${productId}`);
+    } catch (e) {
+      logger.warn('shein', `Search fallback failed`, { error: e.message, productId });
     }
 
-    // Last resort: search by title if provided (SHEIN detail API often returns 204)
+    // Last resort: search by title if provided
     if (opts.title) {
-      logger.info('shein', `Trying title-based search fallback for ${productId}`, { title: opts.title });
-      const titleUrl = this._cacheBust(`https://${API_HOST}/products/search?keywords=${encodeURIComponent(opts.title)}&language=en&country=US&currency=USD&page=1&limit=5`);
-      const tData = await this.fetchJSON(titleUrl, this._sheinFetchOpts());
-      const titleProducts = tData?.info?.products || tData?.products || [];
-      if (titleProducts.length) {
-        // Try exact ID match first
-        const exactById = titleProducts.find(p => String(p.goods_id) === String(productId));
-        if (exactById) {
-          logger.info('shein', `Title search found exact ID match for ${productId}`);
-          return this.normalizeProductFromSearch(exactById);
+      try {
+        logger.info('shein', `Trying title-based search for ${productId}`, { title: opts.title });
+        const titleUrl = this._cacheBust(`https://${API_HOST}/products/search?keywords=${encodeURIComponent(opts.title)}&language=en&country=US&currency=USD&page=1&limit=5`);
+        const tData = await this.fetchJSON(titleUrl, this._sheinFetchOpts());
+        const titleProducts = tData?.info?.products || tData?.products || [];
+        if (titleProducts.length) {
+          const exactById = titleProducts.find(p => String(p.goods_id) === String(productId));
+          if (exactById) return this.normalizeProductFromSearch(exactById);
+          const result = this.normalizeProductFromSearch(titleProducts[0]);
+          result.sourceId = String(productId);
+          return result;
         }
-        // If no exact ID match, return first result but override the sourceId
-        logger.info('shein', `Title search returning best match for ${productId}`, { matchId: titleProducts[0].goods_id });
-        const result = this.normalizeProductFromSearch(titleProducts[0]);
-        result.sourceId = String(productId); // Keep original ID for consistency
-        return result;
+      } catch (e) {
+        logger.warn('shein', `Title search failed`, { error: e.message, productId });
       }
     }
 

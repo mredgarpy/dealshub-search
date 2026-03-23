@@ -69,6 +69,8 @@ const { invalidatePricingCache } = require('./src/utils/pricing');
 const adminRouter = require('./src/routes/admin');
 const { setupWebhooks } = require('./src/webhooks');
 const { setupCRMApi } = require('./src/crm-api');
+const newsletterRouter = require('./src/routes/newsletter');
+const productImagesRouter = require('./src/routes/product-images');
 
 // Initialize adapters
 initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
@@ -104,6 +106,8 @@ app.get('/health', (req, res) => {
 
 // ---- ADMIN ROUTES ----
 app.use('/api/admin', adminRouter);
+app.use(newsletterRouter);
+app.use(productImagesRouter);
 
 // ============================================================
 // CAPA A â LIVE DISCOVERY LAYER

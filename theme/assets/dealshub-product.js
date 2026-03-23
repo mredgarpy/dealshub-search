@@ -154,36 +154,64 @@
     html+='<button id="dhpdp-buy" style="width:100%;padding:16px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#1a1a1a\'">Buy Now</button>';
     html+='</div>';
 
-    // Shipping info — v1.7: show real shipping cost + delivery date range
-    var shipCost=p.shippingData&&p.shippingData.cost!=null?p.shippingData.cost:null;
-    var shipNote=p.shippingData&&p.shippingData.note?p.shippingData.note:'Standard Shipping';
-    var shipMethod=p.shippingData&&p.shippingData.method?p.shippingData.method:'Standard';
-    var delLabel=p.deliveryEstimate&&p.deliveryEstimate.formattedRange?p.deliveryEstimate.formattedRange:(p.deliveryEstimate&&p.deliveryEstimate.label?p.deliveryEstimate.label:'5-10 business days');
-    var delEarliest=p.deliveryEstimate&&p.deliveryEstimate.earliestDate?p.deliveryEstimate.earliestDate:'';
-    var delLatest=p.deliveryEstimate&&p.deliveryEstimate.latestDate?p.deliveryEstimate.latestDate:'';
-    var retSummary='Returns accepted within 30 days';
-    if(p.returnPolicy){
-      if(typeof p.returnPolicy==='string')retSummary=p.returnPolicy;
-      else if(p.returnPolicy.summary&&typeof p.returnPolicy.summary==='string')retSummary=p.returnPolicy.summary;
-      else if(p.returnPolicy.window)retSummary='Returns accepted within '+p.returnPolicy.window+' days';
-    }
+    // Shipping info — v2.0: enhanced shipping box with location, Plus upsell, threshold hints
+    var sc=p.shippingCalc||{};
+    var shipCost=sc.cost!=null?sc.cost:(p.shippingData&&p.shippingData.cost!=null?p.shippingData.cost:null);
+    var shipMethod=sc.method||p.shippingData&&p.shippingData.method||'Standard';
+    var shipIsFree=sc.isFree||(shipCost===0);
+    var shipThreshold=sc.threshold||null;
+    var shipRemaining=sc.remaining||null;
+    var shipThresholdNote=sc.thresholdNote||null;
+    var plusSaves=sc.plusSaves||0;
+    var del=sc.delivery||p.deliveryEstimate||{};
+    var delFormatted=del.formattedRange||del.label||'5-10 business days';
+    var delEarliest=del.earliest||del.earliestDate||'';
+    var delLatest=del.latest||del.latestDate||'';
+    var ret=sc.returnWindow||p.returnPolicy||{};
+    var retSummary=ret.summary||(ret.days?'Returns accepted within '+ret.days+' days':'30-day returns');
+    if(typeof ret==='string')retSummary=ret;
 
-    // Shipping cost display
-    var shipCostHTML='';
-    if(shipCost===0){
-      shipCostHTML='<span style="color:#16a34a;font-weight:700;font-size:15px">FREE</span>';
-    }else if(shipCost!=null&&shipCost>0){
-      shipCostHTML='<span style="font-weight:700;font-size:15px;color:#333">$'+shipCost.toFixed(2)+'</span>';
-    }else{
-      shipCostHTML='<span style="font-size:13px;color:#666">Calculated at checkout</span>';
-    }
+    // ZIP from localStorage
+    var savedZip=null;
+    try{savedZip=localStorage.getItem('stylehub_zip');}catch(e){}
 
     html+='<div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px">';
-    // Shipping row
-    html+='<div style="padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f0f0f0">';
+
+    // Location row
+    html+='<div style="padding:12px 16px;background:#f8fafc;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0">';
+    html+='<svg width="16" height="16" fill="none" stroke="#6b7280" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+    if(savedZip){
+      html+='<span style="font-size:13px;color:#374151">Deliver to <b>'+escHTML(savedZip)+'</b></span>';
+      html+='<a href="#" onclick="event.preventDefault();document.getElementById(\'dh-zip-input\').style.display=\'flex\';this.parentElement.querySelector(\'.dh-zip-saved\').style.display=\'none\'" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:none" class="dh-zip-saved">Change</a>';
+    }
+    html+='<div id="dh-zip-input" style="display:'+(savedZip?'none':'flex')+';align-items:center;gap:6px;'+(savedZip?'':'flex:1;')+'">';
+    html+='<input type="text" placeholder="Enter ZIP code" maxlength="5" pattern="[0-9]*" style="width:90px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none" id="dh-zip-val"'+(savedZip?' value="'+escHTML(savedZip)+'"':'')+'/>';
+    html+='<button onclick="var z=document.getElementById(\'dh-zip-val\').value.trim();if(z.length>=5){try{localStorage.setItem(\'stylehub_zip\',z)}catch(e){}location.reload()}" style="padding:5px 10px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">Check</button>';
+    html+='</div></div>';
+
+    // Shipping cost row
+    html+='<div style="padding:14px 16px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid #f0f0f0">';
     html+='<div style="flex-shrink:0;width:36px;height:36px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#16a34a" stroke-width="1.5" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>';
-    html+='<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span>'+shipCostHTML+'</div>';
-    html+='<div style="font-size:13px;color:#555">'+escHTML(shipMethod)+' Shipping</div></div></div>';
+    html+='<div style="flex:1">';
+    // Cost line
+    if(shipIsFree){
+      html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="color:#16a34a;font-weight:700;font-size:15px">FREE</span></div>';
+    }else if(shipCost!=null&&shipCost>0){
+      html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="font-weight:700;font-size:15px;color:#333">$'+shipCost.toFixed(2)+'</span></div>';
+    }else{
+      html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="font-size:13px;color:#666">Calculated at checkout</span></div>';
+    }
+    html+='<div style="font-size:12px;color:#6b7280">'+escHTML(shipMethod)+'</div>';
+    // Threshold hint (e.g., "Add $17.01 more for FREE shipping")
+    if(shipThresholdNote&&shipRemaining>0){
+      html+='<div style="font-size:12px;color:#d97706;margin-top:4px">&#128161; Add $'+shipRemaining.toFixed(2)+' more for FREE shipping</div>';
+    }
+    // StyleHub Plus upsell (only if shipping is NOT free)
+    if(plusSaves>0){
+      html+='<div style="font-size:12px;color:#7c3aed;margin-top:4px;display:flex;align-items:center;gap:4px"><span style="font-size:11px">&#9889;</span> <b>FREE</b> with StyleHub Plus ($7.99/mo) <a href="/pages/plus" style="color:#7c3aed;text-decoration:underline;font-size:11px;margin-left:4px">Try free</a></div>';
+    }
+    html+='</div></div>';
+
     // Delivery date row
     html+='<div style="padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f0f0f0">';
     html+='<div style="flex-shrink:0;width:36px;height:36px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#2563eb" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>';
@@ -191,9 +219,10 @@
     if(delEarliest&&delLatest){
       html+='<div style="font-size:15px;font-weight:700;color:#2563eb;margin-top:2px">'+escHTML(delEarliest)+' – '+escHTML(delLatest)+'</div>';
     }else{
-      html+='<div style="font-size:13px;color:#555">'+escHTML(delLabel)+'</div>';
+      html+='<div style="font-size:13px;color:#555">'+escHTML(delFormatted)+'</div>';
     }
     html+='</div></div>';
+
     // Returns row
     html+='<div style="padding:14px 16px;display:flex;align-items:center;gap:12px">';
     html+='<div style="flex-shrink:0;width:36px;height:36px;background:#faf5ff;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#7c3aed" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 12h18M3 12l6-6M3 12l6 6"/></svg></div>';

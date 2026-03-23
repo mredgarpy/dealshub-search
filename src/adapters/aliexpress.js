@@ -133,47 +133,41 @@ class AliExpressAdapter extends BaseAdapter {
   _delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
   async getProduct(productId, opts = {}) {
-    // Try each detail endpoint in fallback chain
-    for (const endpoint of DETAIL_ENDPOINTS) {
+    // ---- OPTIMIZED: Run all 3 detail endpoints in PARALLEL ----
+    // Old: sequential (up to 60s if all timeout). New: parallel (max ~20s)
+    const tryDetailEndpoint = async (endpoint) => {
       try {
         const url = `https://${SEARCH_HOST}${endpoint}?itemId=${encodeURIComponent(productId)}`;
         const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
         if (!data) {
           logger.warn('aliexpress', `${endpoint} returned null/empty`, { productId });
-          continue;
+          return null;
         }
         if (!data.result) {
-          logger.warn('aliexpress', `${endpoint} no result key`, { productId, keys: Object.keys(data).join(','), statusCode: data.status_code || data.code || 'none' });
-          continue;
+          logger.warn('aliexpress', `${endpoint} no result key`, { productId, keys: Object.keys(data).join(',') });
+          return null;
         }
 
-        // Check for API-level error
         const statusData = data.result.status?.data;
         const statusCode = data.result.status?.code;
         if (statusData === 'error' || (statusCode && statusCode >= 5000)) {
-          logger.warn('aliexpress', `${endpoint} returned error`, { productId, statusData, statusCode, msg: data.result.status?.msg || '' });
-          continue;
+          logger.warn('aliexpress', `${endpoint} API error`, { productId, statusCode });
+          return null;
         }
 
-        // Log what keys we got for diagnostics
-        logger.info('aliexpress', `${endpoint} response keys`, { productId, keys: Object.keys(data.result).join(','), hasItem: !!data.result.item });
+        logger.info('aliexpress', `${endpoint} response`, { productId, keys: Object.keys(data.result).join(','), hasItem: !!data.result.item });
 
-        // item_detail_2 shape: { result: { status, settings, item: {...}, sku: {...}, ... } }
         if (data.result.item) {
           logger.info('aliexpress', `Detail success via ${endpoint}`, { productId });
           const product = this.normalizeProduct(data.result);
           if (product && product.price) return product;
-          // Detail returned data but no price — try to fill price from search
           if (product) {
-            logger.warn('aliexpress', `Detail returned no price via ${endpoint}, trying search for price`, { productId });
             const priceProduct = await this._fillPriceFromSearch(product, productId);
             if (priceProduct.price) return priceProduct;
           }
-          // Continue to next endpoint if still no price
-          continue;
+          return null;
         }
 
-        // Legacy shape: result directly is the product data
         if (data.result.itemId || data.result.title) {
           const product = this.normalizeProduct(data.result);
           if (product && product.price) return product;
@@ -181,11 +175,21 @@ class AliExpressAdapter extends BaseAdapter {
             const priceProduct = await this._fillPriceFromSearch(product, productId);
             if (priceProduct.price) return priceProduct;
           }
-          continue;
+          return null;
         }
+        return null;
       } catch (e) {
         logger.warn('aliexpress', `${endpoint} failed`, { error: e.message, productId });
+        return null;
       }
+    };
+
+    // Fire all detail endpoints at once — first valid result wins
+    const detailResults = await Promise.allSettled(
+      DETAIL_ENDPOINTS.map(ep => tryDetailEndpoint(ep))
+    );
+    for (const r of detailResults) {
+      if (r.status === 'fulfilled' && r.value) return r.value;
     }
 
     // Final fallback: search by productId

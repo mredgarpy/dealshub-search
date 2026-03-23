@@ -241,11 +241,15 @@ if (retryData?.currentSku) {
       }));
     }
 
-    // Shipping
+    // Shipping — Sephora offers free standard shipping
     p.shippingData.note = 'FREE Standard Shipping';
     p.shippingData.cost = 0;
     p.shippingData.method = 'Standard';
-    p.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days' };
+    const _now = new Date();
+    const _minD = new Date(_now); _minD.setDate(_minD.getDate() + 3);
+    const _maxD = new Date(_now); _maxD.setDate(_maxD.getDate() + 7);
+    const _fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    p.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days', earliestDate: _fmt(_minD), latestDate: _fmt(_maxD), formattedRange: `${_fmt(_minD)} – ${_fmt(_maxD)}` };
 
     // Return policy
     p.returnPolicy = { window: 30, summary: 'Free returns within 30 days' };
@@ -299,7 +303,13 @@ if (retryData?.currentSku) {
     product.availability = p.currentSku?.isOutOfStock ? 'Out of Stock' : 'In Stock';
     product.stockSignal = p.currentSku?.isOutOfStock ? 'out_of_stock' : 'in_stock';
     product.shippingData.note = 'FREE Standard Shipping';
-    product.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days' };
+    product.shippingData.cost = 0;
+    product.shippingData.method = 'Standard';
+    const _now2 = new Date();
+    const _min2 = new Date(_now2); _min2.setDate(_min2.getDate() + 3);
+    const _max2 = new Date(_now2); _max2.setDate(_max2.getDate() + 7);
+    const _fmt2 = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    product.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days', earliestDate: _fmt2(_min2), latestDate: _fmt2(_max2), formattedRange: `${_fmt2(_min2)} – ${_fmt2(_max2)}` };
     product.returnPolicy = { window: 30, summary: 'Free returns within 30 days' };
     product.normalizedHandle = this._makeHandle(product.title);
     return product;

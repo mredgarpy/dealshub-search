@@ -305,12 +305,24 @@ class MacysAdapter extends BaseAdapter {
       }));
     }
 
-    // Shipping
+    // Shipping — v1.7: extract shipping data from Macy's API if available
     p.shippingData.note = 'FREE Shipping on orders over $25';
-    p.shippingData.cost = null;
+    p.shippingData.cost = null; // Macy's free shipping threshold-based
     p.shippingData.method = 'Standard';
-    if (detail.freeShipMessage) p.shippingData.note = detail.freeShipMessage;
-    p.deliveryEstimate = { minDays: 3, maxDays: 8, label: '3-8 business days' };
+    if (detail.freeShipMessage) {
+      p.shippingData.note = detail.freeShipMessage;
+      if (detail.freeShipMessage.toLowerCase().includes('free')) p.shippingData.cost = 0;
+    }
+    // Check if price qualifies for free shipping ($25+)
+    if (p.price && p.price >= 25) {
+      p.shippingData.cost = 0;
+      p.shippingData.note = 'FREE Shipping';
+    }
+    const _mnow = new Date();
+    const _mmin = new Date(_mnow); _mmin.setDate(_mmin.getDate() + 3);
+    const _mmax = new Date(_mnow); _mmax.setDate(_mmax.getDate() + 8);
+    const _mfmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    p.deliveryEstimate = { minDays: 3, maxDays: 8, label: '3-8 business days', earliestDate: _mfmt(_mmin), latestDate: _mfmt(_mmax), formattedRange: `${_mfmt(_mmin)} – ${_mfmt(_mmax)}` };
 
     // Return policy
     p.returnPolicy = { window: 30, summary: 'Free returns within 30 days' };
@@ -392,8 +404,14 @@ class MacysAdapter extends BaseAdapter {
 
     product.availability = 'In Stock';
     product.stockSignal = 'in_stock';
-    product.shippingData.note = 'FREE Shipping on orders over $25';
-    product.deliveryEstimate = { minDays: 3, maxDays: 8, label: '3-8 business days' };
+    product.shippingData.note = (product.price && product.price >= 25) ? 'FREE Shipping' : 'FREE Shipping on orders over $25';
+    product.shippingData.cost = (product.price && product.price >= 25) ? 0 : null;
+    product.shippingData.method = 'Standard';
+    const _ms2n = new Date();
+    const _ms2min = new Date(_ms2n); _ms2min.setDate(_ms2min.getDate() + 3);
+    const _ms2max = new Date(_ms2n); _ms2max.setDate(_ms2max.getDate() + 8);
+    const _ms2f = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    product.deliveryEstimate = { minDays: 3, maxDays: 8, label: '3-8 business days', earliestDate: _ms2f(_ms2min), latestDate: _ms2f(_ms2max), formattedRange: `${_ms2f(_ms2min)} – ${_ms2f(_ms2max)}` };
     product.returnPolicy = { window: 30, summary: 'Free returns within 30 days' };
     product.sourceUrl = p.url || `https://www.macys.com/shop/product/${product.sourceId}`;
     product.normalizedHandle = this._makeHandle(product.title);

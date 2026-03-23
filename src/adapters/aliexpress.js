@@ -549,10 +549,24 @@ class AliExpressAdapter extends BaseAdapter {
       p.deliveryEstimate.minDays = shippingData.deliveryMinDay || shippingData.deliveryDayMin || 7;
       p.deliveryEstimate.maxDays = shippingData.deliveryMaxDay || shippingData.deliveryDayMax || 21;
       p.deliveryEstimate.label = `${p.deliveryEstimate.minDays}-${p.deliveryEstimate.maxDays} business days`;
+      // Also try explicit shipping cost field
+      if (p.shippingData.cost == null && shippingData.shippingPrice != null) {
+        p.shippingData.cost = parseFloat(shippingData.shippingPrice);
+      }
+      if (p.shippingData.cost != null && p.shippingData.cost > 0) {
+        p.shippingData.note = `Shipping: $${p.shippingData.cost.toFixed(2)}`;
+      }
     } else {
       p.deliveryEstimate = { minDays: 10, maxDays: 25, label: '10-25 business days' };
       p.shippingData.note = 'International Shipping';
     }
+    // Build formatted delivery dates for PDP
+    { const _an=new Date(),_ami=new Date(_an),_amx=new Date(_an);
+      _ami.setDate(_ami.getDate()+(p.deliveryEstimate.minDays||10));
+      _amx.setDate(_amx.getDate()+(p.deliveryEstimate.maxDays||25));
+      const _af=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      p.deliveryEstimate.earliestDate=_af(_ami); p.deliveryEstimate.latestDate=_af(_amx);
+      p.deliveryEstimate.formattedRange=`${_af(_ami)} – ${_af(_amx)}`; }
 
     // Return policy
     p.returnPolicy = { window: 15, summary: 'Returns accepted within 15 days' };
@@ -619,7 +633,9 @@ class AliExpressAdapter extends BaseAdapter {
     p.reviews = d.evaluation?.totalCount || 0;
     p.availability = item.available === false ? 'Out of Stock' : 'In Stock';
     p.stockSignal = item.available === false ? 'out_of_stock' : 'in_stock';
-    p.deliveryEstimate = { minDays: 10, maxDays: 25, label: '10-25 business days' };
+    { const _n2=new Date(),_a2=new Date(_n2),_b2=new Date(_n2); _a2.setDate(_a2.getDate()+10); _b2.setDate(_b2.getDate()+25);
+      const _f2=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      p.deliveryEstimate={minDays:10,maxDays:25,label:'10-25 business days',earliestDate:_f2(_a2),latestDate:_f2(_b2),formattedRange:`${_f2(_a2)} – ${_f2(_b2)}`}; }
     p.shippingData.note = 'International Shipping';
     p.returnPolicy = { window: 15, summary: 'Returns accepted within 15 days' };
     const itemUrl = item.itemUrl || '';
@@ -646,7 +662,9 @@ class AliExpressAdapter extends BaseAdapter {
     p.badge = sr.badge || null;
     p.availability = 'In Stock';
     p.stockSignal = 'in_stock';
-    p.deliveryEstimate = { minDays: 10, maxDays: 25, label: '10-25 business days' };
+    { const _n3=new Date(),_a3=new Date(_n3),_b3=new Date(_n3); _a3.setDate(_a3.getDate()+10); _b3.setDate(_b3.getDate()+25);
+      const _f3=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      p.deliveryEstimate={minDays:10,maxDays:25,label:'10-25 business days',earliestDate:_f3(_a3),latestDate:_f3(_b3),formattedRange:`${_f3(_a3)} – ${_f3(_b3)}`}; }
     p.shippingData.note = 'International Shipping';
     p.returnPolicy = { window: 15, summary: 'Returns accepted within 15 days' };
     p.sourceUrl = sr.url || `https://www.aliexpress.com/item/${p.sourceId}.html`;

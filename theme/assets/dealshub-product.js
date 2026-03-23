@@ -154,9 +154,13 @@
     html+='<button id="dhpdp-buy" style="width:100%;padding:16px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#1a1a1a\'">Buy Now</button>';
     html+='</div>';
 
-    // Shipping info
+    // Shipping info — v1.7: show real shipping cost + delivery date range
+    var shipCost=p.shippingData&&p.shippingData.cost!=null?p.shippingData.cost:null;
     var shipNote=p.shippingData&&p.shippingData.note?p.shippingData.note:'Standard Shipping';
-    var delLabel=p.deliveryEstimate&&p.deliveryEstimate.label?p.deliveryEstimate.label:'5-10 business days';
+    var shipMethod=p.shippingData&&p.shippingData.method?p.shippingData.method:'Standard';
+    var delLabel=p.deliveryEstimate&&p.deliveryEstimate.formattedRange?p.deliveryEstimate.formattedRange:(p.deliveryEstimate&&p.deliveryEstimate.label?p.deliveryEstimate.label:'5-10 business days');
+    var delEarliest=p.deliveryEstimate&&p.deliveryEstimate.earliestDate?p.deliveryEstimate.earliestDate:'';
+    var delLatest=p.deliveryEstimate&&p.deliveryEstimate.latestDate?p.deliveryEstimate.latestDate:'';
     var retSummary='Returns accepted within 30 days';
     if(p.returnPolicy){
       if(typeof p.returnPolicy==='string')retSummary=p.returnPolicy;
@@ -164,9 +168,37 @@
       else if(p.returnPolicy.window)retSummary='Returns accepted within '+p.returnPolicy.window+' days';
     }
 
-    html+='<div style="border:1px solid #eee;border-radius:10px;overflow:hidden;margin-bottom:20px">';
-    html+='<div style="padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f0f0f0"><svg width="18" height="18" fill="none" stroke="#666" stroke-width="1.5" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg><div><div style="font-size:14px;font-weight:600;color:#333">'+escHTML(shipNote)+'</div><div style="font-size:12px;color:#888">Estimated delivery: '+escHTML(delLabel)+'</div></div></div>';
-    html+='<div style="padding:12px 16px;display:flex;align-items:center;gap:10px"><svg width="18" height="18" fill="none" stroke="#666" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 12h18M3 12l6-6M3 12l6 6"/></svg><div><div style="font-size:14px;font-weight:600;color:#333">Easy Returns</div><div style="font-size:12px;color:#888">'+escHTML(retSummary)+'</div></div></div>';
+    // Shipping cost display
+    var shipCostHTML='';
+    if(shipCost===0){
+      shipCostHTML='<span style="color:#16a34a;font-weight:700;font-size:15px">FREE</span>';
+    }else if(shipCost!=null&&shipCost>0){
+      shipCostHTML='<span style="font-weight:700;font-size:15px;color:#333">$'+shipCost.toFixed(2)+'</span>';
+    }else{
+      shipCostHTML='<span style="font-size:13px;color:#666">Calculated at checkout</span>';
+    }
+
+    html+='<div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px">';
+    // Shipping row
+    html+='<div style="padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f0f0f0">';
+    html+='<div style="flex-shrink:0;width:36px;height:36px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#16a34a" stroke-width="1.5" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>';
+    html+='<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span>'+shipCostHTML+'</div>';
+    html+='<div style="font-size:13px;color:#555">'+escHTML(shipMethod)+' Shipping</div></div></div>';
+    // Delivery date row
+    html+='<div style="padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f0f0f0">';
+    html+='<div style="flex-shrink:0;width:36px;height:36px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#2563eb" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>';
+    html+='<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#333">Estimated Delivery</div>';
+    if(delEarliest&&delLatest){
+      html+='<div style="font-size:15px;font-weight:700;color:#2563eb;margin-top:2px">'+escHTML(delEarliest)+' – '+escHTML(delLatest)+'</div>';
+    }else{
+      html+='<div style="font-size:13px;color:#555">'+escHTML(delLabel)+'</div>';
+    }
+    html+='</div></div>';
+    // Returns row
+    html+='<div style="padding:14px 16px;display:flex;align-items:center;gap:12px">';
+    html+='<div style="flex-shrink:0;width:36px;height:36px;background:#faf5ff;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#7c3aed" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 12h18M3 12l6-6M3 12l6 6"/></svg></div>';
+    html+='<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#333">Easy Returns</div>';
+    html+='<div style="font-size:13px;color:#555">'+escHTML(retSummary)+'</div></div></div>';
     html+='</div>';
 
     html+='</div>'; // end info

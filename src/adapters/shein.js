@@ -364,6 +364,14 @@ class SheinAdapter extends BaseAdapter {
     p.deliveryEstimate.minDays = p.deliveryEstimate.minDays || 7;
     p.deliveryEstimate.maxDays = p.deliveryEstimate.maxDays || 14;
     p.deliveryEstimate.label = `${p.deliveryEstimate.minDays}-${p.deliveryEstimate.maxDays} business days`;
+    // Build formatted delivery dates
+    const _snow = new Date();
+    const _smin = new Date(_snow); _smin.setDate(_smin.getDate() + p.deliveryEstimate.minDays);
+    const _smax = new Date(_snow); _smax.setDate(_smax.getDate() + p.deliveryEstimate.maxDays);
+    const _sfmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    p.deliveryEstimate.earliestDate = _sfmt(_smin);
+    p.deliveryEstimate.latestDate = _sfmt(_smax);
+    p.deliveryEstimate.formattedRange = `${_sfmt(_smin)} – ${_sfmt(_smax)}`;
 
     // Return policy
     p.returnPolicy = { window: 45, summary: 'Free returns within 45 days' };
@@ -417,7 +425,9 @@ class SheinAdapter extends BaseAdapter {
     p.availability = 'In Stock';
     p.stockSignal = 'in_stock';
     p.shippingData.note = 'Standard Shipping (7-14 days)';
-    p.deliveryEstimate = { minDays: 7, maxDays: 14, label: '7-14 business days' };
+    { const _n=new Date(),_a=new Date(_n),_b=new Date(_n); _a.setDate(_a.getDate()+7); _b.setDate(_b.getDate()+14);
+      const _f=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      p.deliveryEstimate={minDays:7,maxDays:14,label:'7-14 business days',earliestDate:_f(_a),latestDate:_f(_b),formattedRange:`${_f(_a)} – ${_f(_b)}`}; }
     p.returnPolicy = { window: 45, summary: 'Free returns within 45 days' };
     p.sourceUrl = `https://us.shein.com/${(d.goods_url_name || 'product')}-p-${p.sourceId}.html`;
     p.normalizedHandle = this._makeHandle(p.title);
@@ -441,7 +451,9 @@ class SheinAdapter extends BaseAdapter {
     product.availability = 'In Stock';
     product.stockSignal = 'in_stock';
     product.shippingData.note = 'Standard Shipping (7-14 days)';
-    product.deliveryEstimate = { minDays: 7, maxDays: 14, label: '7-14 business days' };
+    { const _n=new Date(),_a=new Date(_n),_b=new Date(_n); _a.setDate(_a.getDate()+7); _b.setDate(_b.getDate()+14);
+      const _f=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      product.deliveryEstimate={minDays:7,maxDays:14,label:'7-14 business days',earliestDate:_f(_a),latestDate:_f(_b),formattedRange:`${_f(_a)} – ${_f(_b)}`}; }
     product.returnPolicy = { window: 45, summary: 'Free returns within 45 days' };
     product.normalizedHandle = this._makeHandle(product.title);
     return product;

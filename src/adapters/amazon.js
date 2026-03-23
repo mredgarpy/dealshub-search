@@ -181,22 +181,81 @@ class AmazonAdapter extends BaseAdapter {
       }));
     }
 
-    // Shipping & delivery
-    if (d.delivery_info) {
-      p.deliveryEstimate.label = d.delivery_info;
-      // Try to parse min/max from "Delivery by Mon, Jan 5 - Fri, Jan 9" format
-      const match = d.delivery_info.match(/(\d+)\s*-\s*(\d+)/);
-      if (match) {
-        p.deliveryEstimate.minDays = parseInt(match[1]);
-        p.deliveryEstimate.maxDays = parseInt(match[2]);
+    // Shipping & delivery — v1.7: extract real shipping cost and delivery dates
+    // Shipping cost: check multiple possible fields from the API
+    const rawShipCost = d.shipping_charge || d.shipping_cost || d.shipping_price ||
+                        d.delivery_charge || d.delivery_cost || d.delivery_price ||
+                        d.product_shipping_charge || d.product_shipping_cost || null;
+    if (rawShipCost != null) {
+      const parsedCost = parsePrice(rawShipCost);
+      if (parsedCost != null) {
+        p.shippingData.cost = parsedCost;
+        p.shippingData.note = parsedCost === 0 ? 'FREE Shipping' : `Shipping: $${parsedCost.toFixed(2)}`;
       }
     }
-    if (!p.deliveryEstimate.label) {
-      p.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days' };
+    // Prime overrides
+    if (d.is_prime) {
+      p.shippingData.cost = 0;
+      p.shippingData.note = 'FREE Prime Shipping';
+      p.shippingData.method = 'Prime';
+    } else if (p.shippingData.cost == null) {
+      // Check product_minimum_offer_price vs product_price for implicit shipping
+      p.shippingData.method = 'Standard';
+      if (p.shippingData.note === 'Standard shipping') {
+        p.shippingData.note = 'Standard Shipping';
+      }
     }
-    p.shippingData.note = d.is_prime ? 'FREE Prime Shipping' : 'Standard Shipping';
-    p.shippingData.cost = d.is_prime ? 0 : null;
-    p.shippingData.method = d.is_prime ? 'Prime' : 'Standard';
+
+    // Delivery estimate: parse delivery_info for actual dates
+    if (d.delivery_info) {
+      p.deliveryEstimate.label = d.delivery_info;
+      // Parse "Delivery by Mon, Jan 5 - Fri, Jan 9" or "FREE delivery Mon, Jan 6 - Fri, Jan 10"
+      const datePattern = /([A-Z][a-z]{2,8}),?\s+([A-Z][a-z]{2,8})\s+(\d{1,2})\s*[-–]\s*(?:[A-Z][a-z]{2,8},?\s+)?([A-Z][a-z]{2,8})\s+(\d{1,2})/;
+      const dateMatch = d.delivery_info.match(datePattern);
+      if (dateMatch) {
+        // Calculate days from now to delivery dates
+        const now = new Date();
+        const year = now.getFullYear();
+        const months = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+        const minMonth = months[dateMatch[2]];
+        const minDay = parseInt(dateMatch[3]);
+        const maxMonth = months[dateMatch[4]];
+        const maxDay = parseInt(dateMatch[5]);
+        if (minMonth != null && maxMonth != null) {
+          let minDate = new Date(year, minMonth, minDay);
+          let maxDate = new Date(year, maxMonth, maxDay);
+          // If dates are in the past, they must be next year
+          if (minDate < now) minDate.setFullYear(year + 1);
+          if (maxDate < now) maxDate.setFullYear(year + 1);
+          const msPerDay = 86400000;
+          p.deliveryEstimate.minDays = Math.max(1, Math.ceil((minDate - now) / msPerDay));
+          p.deliveryEstimate.maxDays = Math.max(p.deliveryEstimate.minDays + 1, Math.ceil((maxDate - now) / msPerDay));
+        }
+      } else {
+        // Fallback: try "X-Y days" or "X - Y business days" pattern
+        const daysMatch = d.delivery_info.match(/(\d+)\s*[-–]\s*(\d+)/);
+        if (daysMatch) {
+          p.deliveryEstimate.minDays = parseInt(daysMatch[1]);
+          p.deliveryEstimate.maxDays = parseInt(daysMatch[2]);
+        }
+      }
+    }
+    // Set defaults if still missing
+    if (!p.deliveryEstimate.minDays) {
+      p.deliveryEstimate.minDays = d.is_prime ? 1 : 3;
+      p.deliveryEstimate.maxDays = d.is_prime ? 3 : 7;
+    }
+    if (!p.deliveryEstimate.label) {
+      p.deliveryEstimate.label = d.is_prime ? '1-3 business days (Prime)' : '3-7 business days';
+    }
+    // Build formatted delivery dates for PDP
+    const _now = new Date();
+    const _minDel = new Date(_now); _minDel.setDate(_minDel.getDate() + p.deliveryEstimate.minDays);
+    const _maxDel = new Date(_now); _maxDel.setDate(_maxDel.getDate() + p.deliveryEstimate.maxDays);
+    const _fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    p.deliveryEstimate.earliestDate = _fmt(_minDel);
+    p.deliveryEstimate.latestDate = _fmt(_maxDel);
+    p.deliveryEstimate.formattedRange = `${_fmt(_minDel)} – ${_fmt(_maxDel)}`;
 
     // Return policy
     p.returnPolicy.summary = 'Free returns within 30 days';
@@ -221,7 +280,10 @@ class AmazonAdapter extends BaseAdapter {
       itemModelNumber: d.item_model_number || null,
       manufacturer: d.manufacturer || null,
       countryOfOrigin: d.country_of_origin || null,
-      dateFirstAvailable: d.date_first_available || null
+      dateFirstAvailable: d.date_first_available || null,
+      deliveryInfo: d.delivery_info || null,
+      shippingCharge: d.shipping_charge || d.shipping_cost || null,
+      deliveryCharge: d.delivery_charge || d.delivery_cost || null
     };
     return p;
   }
@@ -248,7 +310,19 @@ class AmazonAdapter extends BaseAdapter {
     product.normalizedHandle = this._makeHandle(product.title);
     product.returnPolicy = { summary: 'Free returns within 30 days', window: 30 };
     product.shippingData.note = p.is_prime ? 'FREE Prime Shipping' : 'Standard Shipping';
-    product.deliveryEstimate = { minDays: 3, maxDays: 7, label: '3-7 business days' };
+    product.shippingData.cost = p.is_prime ? 0 : null;
+    product.shippingData.method = p.is_prime ? 'Prime' : 'Standard';
+    const minD = p.is_prime ? 1 : 3;
+    const maxD = p.is_prime ? 3 : 7;
+    product.deliveryEstimate = { minDays: minD, maxDays: maxD, label: `${minD}-${maxD} business days` };
+    // Build formatted dates
+    const _now = new Date();
+    const _min = new Date(_now); _min.setDate(_min.getDate() + minD);
+    const _max = new Date(_now); _max.setDate(_max.getDate() + maxD);
+    const _fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    product.deliveryEstimate.earliestDate = _fmt(_min);
+    product.deliveryEstimate.latestDate = _fmt(_max);
+    product.deliveryEstimate.formattedRange = `${_fmt(_min)} – ${_fmt(_max)}`;
     return product;
   }
 

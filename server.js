@@ -816,6 +816,72 @@ app.get('/api/debug/raw-search', async (req, res) => {
   }
 });
 
+// ---- DEBUG: Raw product API response (for shipping field discovery) ----
+app.get('/api/debug/raw-product', async (req, res) => {
+  const { store, id } = req.query;
+  const source = (store || 'amazon').toLowerCase();
+  if (!id) return res.status(400).json({ error: 'Missing id param' });
+  if (!VALID_SOURCES.includes(source)) return res.status(400).json({ error: `Invalid source: ${source}` });
+
+  const fetch = require('node-fetch');
+  const rapidApiKey = process.env.RAPIDAPI_KEY;
+  const hosts = {
+    amazon: 'real-time-amazon-data.p.rapidapi.com',
+    aliexpress: 'aliexpress-datahub.p.rapidapi.com',
+    macys: 'macys4.p.rapidapi.com',
+    sephora: 'sephora.p.rapidapi.com',
+    shein: 'unofficial-shein.p.rapidapi.com'
+  };
+  const urls = {
+    amazon: `https://${hosts.amazon}/product-details?asin=${encodeURIComponent(id)}&country=US`,
+    aliexpress: `https://${hosts.aliexpress}/item_detail_2?itemId=${encodeURIComponent(id)}&language=en&currency=USD`,
+    macys: `https://${hosts.macys}/api/products/${encodeURIComponent(id)}`,
+    sephora: `https://${hosts.sephora}/us/products/v2/detail?productId=${encodeURIComponent(id)}`,
+    shein: `https://${hosts.shein}/products/detail?goods_id=${encodeURIComponent(id)}&language=en&country=US&currency=USD`
+  };
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const start = Date.now();
+    const resp = await fetch(urls[source], {
+      headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': hosts[source] },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    const text = await resp.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch (e) {}
+
+    // Extract shipping-related fields from the raw response
+    const shippingFields = {};
+    function findShippingFields(obj, path = '') {
+      if (!obj || typeof obj !== 'object') return;
+      for (const [k, v] of Object.entries(obj)) {
+        const fp = path ? `${path}.${k}` : k;
+        if (/ship|deliver|freight|prime|fulfil|carrier|tracking|dispatch|transit/i.test(k)) {
+          shippingFields[fp] = v;
+        }
+        if (typeof v === 'object' && v !== null && !Array.isArray(v) && fp.split('.').length < 4) {
+          findShippingFields(v, fp);
+        }
+      }
+    }
+    if (json) findShippingFields(json);
+
+    res.json({
+      source, id,
+      status: resp.status,
+      latencyMs: Date.now() - start,
+      shippingRelatedFields: shippingFields,
+      topLevelKeys: json ? Object.keys(json) : null,
+      dataKeys: json?.data ? Object.keys(json.data) : null,
+      fullResponse: json ? JSON.stringify(json).substring(0, 8000) : text.substring(0, 5000)
+    });
+  } catch (e) {
+    res.json({ source, id, error: e.message });
+  }
+});
+
 // ---- SHIPPING & RETURNS ----
 app.get('/api/shipping/:source', (req, res) => {
   const source = req.params.source.toLowerCase();

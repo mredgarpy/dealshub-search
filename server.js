@@ -75,6 +75,28 @@ const productImagesRouter = require('./src/routes/product-images');
 // Initialize adapters
 initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
 
+// v1.6: Apply pricing markup to search result arrays so all prices shown are final customer prices
+function applySearchPricing(products) {
+  if (!Array.isArray(products)) return products;
+  return products.map(p => {
+    if (!p || !p.price) return p;
+    const rawPrice = typeof p.price === 'number' ? p.price : parseFloat(String(p.price).replace(/[^0-9.]/g, ''));
+    if (!rawPrice || rawPrice <= 0) return p;
+    const source = (p.source || p.sourceName || 'amazon').toLowerCase();
+    const rawOrig = p.originalPrice ? (typeof p.originalPrice === 'number' ? p.originalPrice : parseFloat(String(p.originalPrice).replace(/[^0-9.]/g, ''))) : null;
+    const pricing = calculateFinalPrice(rawPrice, source, { originalPrice: rawOrig });
+    if (pricing.price) {
+      p.sourcePrice = rawPrice;
+      p.price = pricing.price;
+      if (pricing.compareAt) {
+        p.sourceOriginalPrice = rawOrig;
+        p.originalPrice = pricing.compareAt;
+      }
+    }
+    return p;
+  });
+}
+
 // ---- CRM CORS ----
 app.use(['/api/customer', '/api/crm'], (req, res, next) => {
   const origin = req.headers.origin;
@@ -156,7 +178,7 @@ app.get('/api/search', async (req, res) => {
       page: parseInt(page),
       limit: limitNum,
       total: allResults.length,
-      results: allResults.slice(0, limitNum)
+      results: applySearchPricing(allResults.slice(0, limitNum))
     };
 
     searchCache.set(cacheKey, response);
@@ -200,18 +222,25 @@ async function productDetailHandler(req, res) {
       return res.status(404).json({ error: 'Product not found', source, id });
     }
 
-    // Apply pricing engine markup
+    // Apply pricing engine markup — v1.6: overwrite product.price so frontend always shows final price
     if (product.price) {
       const pricing = calculateFinalPrice(product.price, source, {
         originalPrice: product.originalPrice,
         shippingCost: product.shippingData?.cost || 0
       });
+      // Save original source prices before overwriting
+      product.sourcePrice = product.price;
+      product.sourceOriginalPrice = product.originalPrice;
+      // Overwrite with final marked-up prices so PDP displays what customer pays
+      product.price = pricing.price;
+      product.originalPrice = pricing.compareAt || product.originalPrice;
       product.displayPrice = `$${pricing.price.toFixed(2)}`;
       product.displayCompareAt = pricing.compareAt ? `$${pricing.compareAt.toFixed(2)}` : null;
       product.pricingMeta = {
         finalPrice: pricing.price,
         compareAt: pricing.compareAt,
-        sourcePrice: product.price,
+        sourcePrice: product.sourcePrice,
+        sourceOriginalPrice: product.sourceOriginalPrice,
         margin: pricing.marginPct
       };
 
@@ -260,8 +289,9 @@ VALID_SOURCES.forEach(source => {
     try {
       const adapter = getAdapter(source);
       const results = adapter ? await adapter.search(q, parseInt(limit)) : [];
-      searchCache.set(cacheKey, results);
-      res.json(results);
+      const priced = applySearchPricing(results);
+      searchCache.set(cacheKey, priced);
+      res.json(priced);
     } catch (e) {
       logger.error('search', `${source} search failed`, { error: e.message });
       res.json([]);
@@ -326,7 +356,7 @@ app.get('/api/trending', async (req, res) => {
       })
     );
     const all = interleaveFromSettled(results, 20);
-    const response = { results: all, section: 'trending' };
+    const response = { results: applySearchPricing(all), section: 'trending' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
@@ -355,7 +385,7 @@ app.get('/api/bestsellers', async (req, res) => {
       return revCount >= 50;
     });
     const all = filtered.length >= 5 ? filtered.slice(0, 20) : raw.slice(0, 20);
-    const response = { results: all, section: 'bestsellers' };
+    const response = { results: applySearchPricing(all), section: 'bestsellers' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
@@ -378,7 +408,7 @@ app.get('/api/new-arrivals', async (req, res) => {
       })
     );
     const all = interleaveFromSettled(results, 20);
-    const response = { results: all, section: 'new-arrivals' };
+    const response = { results: applySearchPricing(all), section: 'new-arrivals' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
@@ -410,7 +440,7 @@ app.get('/api/featured', async (req, res) => {
       })
     );
     const all = interleaveFromSettled(results, 12);
-    const response = { results: all, section: 'featured', category };
+    const response = { results: applySearchPricing(all), section: 'featured', category };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
@@ -445,7 +475,7 @@ app.get('/api/flash-deals', async (req, res) => {
       if (!orig || !curr || orig <= curr) return false;
       return true;
     }).slice(0, 15);
-    const response = { results: all.length > 0 ? all : raw.slice(0, 12), section: 'flash-deals' };
+    const response = { results: applySearchPricing(all.length > 0 ? all : raw.slice(0, 12)), section: 'flash-deals' };
     searchCache.set(cacheKey, response, 3600000); // 1 hour
     res.json(response);
   } catch (e) {

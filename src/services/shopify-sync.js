@@ -212,7 +212,9 @@ async function createShopifyProduct(productData, pricingResult) {
   const shopifyVariants = [];
   if (sourceVariants && sourceVariants.length > 0) {
     sourceVariants.slice(0, 100).forEach((v, i) => {
-      const vPrice = v.price ? calculateFinalPrice(v.price, source) : pricingResult;
+      // v1.6: Use sourcePrice to avoid double-markup (frontend may send already-marked-up prices)
+      const vRawPrice = v.sourcePrice || v.price;
+      const vPrice = vRawPrice ? calculateFinalPrice(vRawPrice, source) : pricingResult;
       shopifyVariants.push({
         title: v.title || `Option ${i + 1}`,
         price: vPrice.price.toFixed(2),
@@ -382,7 +384,8 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
   try {
 
   // Calculate final pricing
-  let sourcePrice = productData.price;
+  // v1.6: Prefer sourcePrice to avoid double-markup when frontend sends back already-marked-up productData
+  let sourcePrice = productData.sourcePrice || productData.pricingMeta?.sourcePrice || productData.price;
   if (typeof sourcePrice === 'string') {
     sourcePrice = parseFloat(sourcePrice.replace(/[^0-9.]/g, ''));
   }
@@ -396,8 +399,10 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     throw new Error('Invalid product price');
   }
 
+  // v1.6: Use sourceOriginalPrice to avoid double-markup on compare-at price
+  const sourceOrigPrice = productData.sourceOriginalPrice || productData.pricingMeta?.sourceOriginalPrice || productData.originalPrice;
   const pricingResult = calculateFinalPrice(sourcePrice, source, {
-    originalPrice: productData.originalPrice,
+    originalPrice: sourceOrigPrice,
     shippingCost: productData.shippingData?.cost || 0
   });
 

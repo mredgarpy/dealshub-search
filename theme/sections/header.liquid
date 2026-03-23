@@ -1,11 +1,33 @@
-{% comment %}StyleHub Header v8 - Native Shopify New Customer Accounts{% endcomment %}
+{% comment %}StyleHub Header v9 — Location pill + Plus badge + Dynamic announcement{% endcomment %}
 <style>
+/* ---- Announcement Bar ---- */
 .dh-announce{background:#1a1a2e;color:rgba(255,255,255,0.7);padding:6px 0;font-size:12px;overflow:hidden;white-space:nowrap}
 .dh-announce-track{display:inline-block;animation:announceScroll 25s linear infinite}
 @keyframes announceScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.dh-header{background:#1a1a2e;padding:14px 32px;display:flex;align-items:center;gap:24px;position:sticky;top:0;z-index:100;justify-content:center}
+.dh-announce .dh-ann-plus{color:#a78bfa;font-weight:600}
+
+/* ---- Main Header ---- */
+.dh-header{background:#1a1a2e;padding:14px 32px;display:flex;align-items:center;gap:18px;position:sticky;top:0;z-index:100;justify-content:center}
 .dh-logo{font-size:22px;font-weight:800;color:#fff;white-space:nowrap;text-decoration:none;flex-shrink:0}
-.dh-search-wrap{flex:1;max-width:720px;position:relative}
+
+/* ---- Location Pill ---- */
+.dh-loc{display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);transition:border-color .2s,background .2s;flex-shrink:0;position:relative}
+.dh-loc:hover{border-color:rgba(255,255,255,0.4);background:rgba(255,255,255,0.05)}
+.dh-loc__icon{flex-shrink:0}
+.dh-loc__text{display:flex;flex-direction:column;line-height:1.2}
+.dh-loc__label{font-size:10px;color:rgba(255,255,255,0.5)}
+.dh-loc__zip{font-size:13px;font-weight:700;color:#fff}
+.dh-loc__dropdown{display:none;position:absolute;top:calc(100% + 8px);left:0;background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:20px;z-index:300;min-width:280px}
+.dh-loc__dropdown.active{display:block}
+.dh-loc__dropdown h4{margin:0 0 12px;font-size:14px;color:#1a1a2e}
+.dh-loc__dropdown-row{display:flex;gap:8px;align-items:center}
+.dh-loc__dropdown input{flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none}
+.dh-loc__dropdown input:focus{border-color:#e53e3e}
+.dh-loc__dropdown button{padding:8px 16px;background:#e53e3e;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+.dh-loc__dropdown-note{font-size:11px;color:#999;margin-top:8px}
+
+/* ---- Search ---- */
+.dh-search-wrap{flex:1;max-width:680px;position:relative}
 .dh-search-form{display:flex;border-radius:8px;overflow:hidden;background:#fff;height:42px}
 .dh-search-cat{background:#f0f0f0;border:none;padding:0 14px;font-size:13px;color:#333;cursor:pointer;border-right:1px solid #ddd;white-space:nowrap;font-weight:500}
 .dh-search-input{flex:1;border:none;padding:0 16px;font-size:14px;outline:none;min-width:0;background:#fff}
@@ -20,12 +42,22 @@
 .dh-sr-price{font-size:13px;font-weight:700;color:#e53e3e}
 .dh-sr-orig{font-size:11px;color:#999;text-decoration:line-through;margin-left:4px}
 .dh-sr-source{font-size:9px;background:#1a1a2e;color:#fff;padding:1px 6px;border-radius:3px;text-transform:uppercase}
-.dh-nav{display:flex;align-items:center;gap:24px;flex-shrink:0}
+
+/* ---- Nav icons ---- */
+.dh-nav{display:flex;align-items:center;gap:20px;flex-shrink:0}
 .dh-nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:rgba(255,255,255,0.8);font-size:11px;white-space:nowrap;transition:color .2s}
 .dh-nav-item:hover{color:#fff}
 .dh-nav-icon{font-size:20px}
 .dh-cart-badge{position:relative}
 .dh-cart-count{position:absolute;top:-6px;right:-8px;background:#e53e3e;color:#fff;font-size:9px;font-weight:700;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center}
+
+/* ---- Plus badge in nav ---- */
+.dh-nav-plus{display:none;background:linear-gradient(90deg,#6b46c1,#805ad5);color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;align-items:center;gap:4px;transition:opacity .2s}
+.dh-nav-plus:hover{opacity:.9;color:#fff}
+.dh-nav-plus-cta{display:none;color:#a78bfa;font-size:11px;text-decoration:none;white-space:nowrap;font-weight:600;transition:color .2s;border:1px solid rgba(167,139,250,0.3);padding:4px 10px;border-radius:20px}
+.dh-nav-plus-cta:hover{color:#c4b5fd;border-color:rgba(167,139,250,0.5)}
+
+/* ---- Category Bar ---- */
 .dh-catbar{background:#fff;border-bottom:1px solid #eee;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;white-space:nowrap;padding:0 32px}
 .dh-catbar::-webkit-scrollbar{display:none}
 .dh-catbar-inner{display:flex;gap:0;justify-content:center;max-width:1280px;margin:0 auto}
@@ -33,20 +65,26 @@
 .dh-catbar-item:hover{color:#1a1a2e}
 .dh-catbar-item.active{color:#e53e3e;border-bottom-color:#e53e3e;font-weight:600}
 .dh-catbar-item.flash{color:#e53e3e;font-weight:600}
+
 @media(max-width:768px){
-  .dh-header{padding:10px 12px;gap:8px}
+  .dh-header{padding:10px 12px;gap:6px;flex-wrap:wrap}
   .dh-search-cat{display:none}
-  .dh-nav{gap:12px}
+  .dh-nav{gap:10px}
   .dh-nav-item span:last-child{display:none}
   .dh-logo{font-size:16px}
+  .dh-loc{padding:4px 8px;border:none}
+  .dh-loc__label{display:none}
+  .dh-loc__zip{font-size:12px}
+  .dh-loc__dropdown{left:-20px;min-width:260px}
   .dh-catbar{padding:0 12px}
   .dh-catbar-item{padding:8px 12px;font-size:12px}
+  .dh-nav-plus,.dh-nav-plus-cta{font-size:9px;padding:3px 8px}
 }
 </style>
 
 <!-- Announcement Bar -->
-<div class="dh-announce">
-  <div class="dh-announce-track">
+<div class="dh-announce" id="dh-announce">
+  <div class="dh-announce-track" id="dh-announce-track">
     <span style="margin:0 32px">Free shipping on $50+</span>
     <span style="margin:0 32px">Secure checkout</span>
     <span style="margin:0 32px">24/7 support</span>
@@ -61,6 +99,26 @@
 <!-- Main Header -->
 <header class="dh-header">
   <a href="/" class="dh-logo">StyleHub</a>
+
+  <!-- Location Pill -->
+  <div class="dh-loc" id="dh-loc" onclick="document.getElementById('dh-loc-drop').classList.toggle('active')" role="button" tabindex="0" aria-label="Change delivery location">
+    <span class="dh-loc__icon">
+      <svg width="18" height="18" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    </span>
+    <span class="dh-loc__text">
+      <span class="dh-loc__label">Deliver to</span>
+      <span class="dh-loc__zip" id="dh-loc-zip">Enter ZIP</span>
+    </span>
+    <div class="dh-loc__dropdown" id="dh-loc-drop" onclick="event.stopPropagation()">
+      <h4>Choose your delivery location</h4>
+      <p style="font-size:12px;color:#666;margin:0 0 12px">Delivery options and speeds vary by ZIP code.</p>
+      <div class="dh-loc__dropdown-row">
+        <input type="text" id="dh-loc-input" placeholder="Enter ZIP code" maxlength="5" pattern="[0-9]*" inputmode="numeric">
+        <button onclick="dhSaveZip()">Apply</button>
+      </div>
+      <div class="dh-loc__dropdown-note" id="dh-loc-note"></div>
+    </div>
+  </div>
 
   <div class="dh-search-wrap">
     <form class="dh-search-form" action="/pages/search-results" method="get" id="dh-search-form">
@@ -87,6 +145,10 @@
   </div>
 
   <nav class="dh-nav">
+    <!-- Plus badge or CTA (injected by JS) -->
+    <a href="/pages/plus" class="dh-nav-plus" id="dh-nav-plus-badge">⚡ Plus</a>
+    <a href="/pages/plus" class="dh-nav-plus-cta" id="dh-nav-plus-cta">Try Plus</a>
+
     <a href="/pages/my-account" class="dh-nav-item">
       <span class="dh-nav-icon">👤</span>
       <span>Account</span>
@@ -127,6 +189,84 @@
   </div>
 </div>
 
+<script>
+/* ---- Location pill + Plus badge + Dynamic announcement ---- */
+(function(){
+  var zip='';
+  var isPlus=false;
+  try{zip=localStorage.getItem('stylehub_zip')||'';isPlus=localStorage.getItem('stylehub_plus')==='true'}catch(e){}
+
+  /* Location pill */
+  var locZip=document.getElementById('dh-loc-zip');
+  var locInput=document.getElementById('dh-loc-input');
+  if(locZip&&zip){locZip.textContent=zip}
+  if(locInput&&zip){locInput.value=zip}
+
+  /* Plus badge vs CTA */
+  var plusBadge=document.getElementById('dh-nav-plus-badge');
+  var plusCta=document.getElementById('dh-nav-plus-cta');
+  if(isPlus){
+    if(plusBadge)plusBadge.style.display='inline-flex';
+  }else{
+    if(plusCta)plusCta.style.display='inline-flex';
+  }
+
+  /* Dynamic announcement bar */
+  var track=document.getElementById('dh-announce-track');
+  if(track){
+    var msgs;
+    if(isPlus){
+      msgs=[
+        '<span class="dh-ann-plus">⚡ Plus Member — FREE shipping on every order</span>',
+        'Secure checkout',
+        '24/7 support',
+        'Track your order',
+        '<span class="dh-ann-plus">60-day extended returns with Plus</span>',
+        'Secure checkout',
+        '24/7 support',
+        'Track your order'
+      ];
+    }else{
+      msgs=[
+        'FREE shipping with <span class="dh-ann-plus">StyleHub Plus</span>',
+        'Secure checkout',
+        '24/7 support',
+        'Track your order',
+        'FREE shipping with <span class="dh-ann-plus">StyleHub Plus</span>',
+        'Secure checkout',
+        '24/7 support',
+        'Track your order'
+      ];
+    }
+    track.innerHTML=msgs.map(function(m){return '<span style="margin:0 32px">'+m+'</span>'}).join('');
+  }
+
+  /* Close dropdown on outside click */
+  document.addEventListener('click',function(e){
+    var drop=document.getElementById('dh-loc-drop');
+    var loc=document.getElementById('dh-loc');
+    if(drop&&drop.classList.contains('active')&&!loc.contains(e.target)){
+      drop.classList.remove('active');
+    }
+  });
+})();
+
+function dhSaveZip(){
+  var input=document.getElementById('dh-loc-input');
+  var z=(input?input.value:'').replace(/\D/g,'').substring(0,5);
+  if(z.length<5){
+    var note=document.getElementById('dh-loc-note');
+    if(note){note.textContent='Please enter a valid 5-digit ZIP code';note.style.color='#e53e3e'}
+    return;
+  }
+  try{localStorage.setItem('stylehub_zip',z)}catch(e){}
+  document.getElementById('dh-loc-zip').textContent=z;
+  document.getElementById('dh-loc-drop').classList.remove('active');
+  var note=document.getElementById('dh-loc-note');
+  if(note){note.textContent='Location updated!';note.style.color='#22c55e'}
+}
+</script>
+
 <script src="{{ 'header.js' | asset_url }}" defer></script>
 
 {% schema %}
@@ -136,6 +276,3 @@
   "settings": []
 }
 {% endschema %}
-
-
-

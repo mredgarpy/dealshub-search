@@ -117,6 +117,7 @@
   let currentQuery = '';
   let currentSource = 'all';
   const PAGE_SIZE = 24;
+  try{window.__dhIsPlus=localStorage.getItem('stylehub_plus')==='true'}catch(e){window.__dhIsPlus=false}
 
   // Init from URL params
   function init() {
@@ -258,6 +259,7 @@
               ${origHTML}
             </div>
             <span class="dh-card__source">${esc(p.sourceName || p.source)}</span>
+            <span class="dh-card__plus-ship">${window.__dhIsPlus ? '⚡ FREE shipping' : '🚚 FREE ship with Plus'}</span>
           </div>
         </a>
         <div class="dh-card__actions">
@@ -676,6 +678,13 @@
     color: #aaa;
     display: block;
     margin-top: 2px;
+  }
+  .dh-card__plus-ship {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    margin-top: 4px;
+    color: #7c3aed;
   }
   .dh-card__actions {
     display: flex;

@@ -1,5 +1,5 @@
 {% comment %}
-  DealsHub — Full-width Trust/Value Props Section
+  DealsHub — Full-width Trust/Value Props Section (v2 + Plus)
 {% endcomment %}
 
 <div class="dh-trust-section">
@@ -11,6 +11,13 @@
         </div>
         <h3>100% Secure Checkout</h3>
         <p>Secure checkout powered by Shopify with bank-grade SSL encryption.</p>
+      </div>
+      <div class="dh-trust-item" id="dh-trust-plus">
+        <div class="dh-trust-item__icon" style="background: #f3e8ff;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/><path d="M8 3v-1m0 0L6.5 1M8 2l1.5-1" stroke="#7c3aed" stroke-width="1.5"/></svg>
+        </div>
+        <h3>FREE Shipping with Plus</h3>
+        <p id="dh-trust-plus-text">Join StyleHub Plus for free shipping on every order, from every store.</p>
       </div>
       <div class="dh-trust-item">
         <div class="dh-trust-item__icon" style="background: #e3f2fd;">
@@ -44,12 +51,12 @@
   }
   .dh-trust-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
   }
   .dh-trust-item {
     text-align: center;
-    padding: 24px 16px;
+    padding: 24px 12px;
   }
   .dh-trust-item__icon {
     display: inline-flex;
@@ -60,24 +67,39 @@
     margin-bottom: 14px;
   }
   .dh-trust-item h3 {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: #1a1a2e;
     margin: 0 0 6px;
   }
   .dh-trust-item p {
-    font-size: 13px;
+    font-size: 12px;
     color: #888;
     line-height: 1.5;
     margin: 0;
   }
   @media (max-width: 768px) {
-    .dh-trust-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .dh-trust-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .dh-trust-item { padding: 16px 8px; }
   }
   @media (max-width: 480px) {
-    .dh-trust-grid { grid-template-columns: 1fr; }
+    .dh-trust-grid { grid-template-columns: repeat(2, 1fr); }
   }
 </style>
+
+<script>
+(function(){
+  try{
+    var isPlus=localStorage.getItem('stylehub_plus')==='true';
+    var txt=document.getElementById('dh-trust-plus-text');
+    var h=document.querySelector('#dh-trust-plus h3');
+    if(isPlus){
+      if(h)h.innerHTML='⚡ Plus Member';
+      if(txt)txt.textContent='You enjoy FREE shipping on every order. Plus members also get 60-day returns.';
+    }
+  }catch(e){}
+})();
+</script>
 
 {% schema %}
 {

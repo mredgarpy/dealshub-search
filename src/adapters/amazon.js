@@ -181,12 +181,28 @@ class AmazonAdapter extends BaseAdapter {
       }));
     }
 
-    // Shipping & delivery — v1.7: extract real shipping cost and delivery dates
-    // Shipping cost: check multiple possible fields from the API
-    const rawShipCost = d.shipping_charge || d.shipping_cost || d.shipping_price ||
-                        d.delivery_charge || d.delivery_cost || d.delivery_price ||
-                        d.product_shipping_charge || d.product_shipping_cost || null;
-    if (rawShipCost != null) {
+    // Shipping & delivery — v1.7b: use d.delivery and d.primary_delivery_time from Amazon API
+    // d.delivery contains text like "$14.99 delivery April 10 - 24. Details" or "FREE delivery Tue, Apr 1"
+    // d.primary_delivery_time contains "April 10 - 24" or similar date range
+    const deliveryText = d.delivery || d.delivery_info || '';
+    const primaryDeliveryTime = d.primary_delivery_time || '';
+
+    // Extract shipping cost from delivery text (e.g., "$14.99 delivery...")
+    if (deliveryText) {
+      const costMatch = deliveryText.match(/\$(\d+(?:\.\d{1,2})?)\s*delivery/i);
+      if (costMatch) {
+        p.shippingData.cost = parseFloat(costMatch[1]);
+        p.shippingData.note = `Shipping: $${p.shippingData.cost.toFixed(2)}`;
+        p.shippingData.method = 'Standard';
+      } else if (/free\s*delivery/i.test(deliveryText)) {
+        p.shippingData.cost = 0;
+        p.shippingData.note = 'FREE Delivery';
+        p.shippingData.method = 'Standard';
+      }
+    }
+    // Also check explicit shipping fields
+    const rawShipCost = d.shipping_charge || d.shipping_cost || d.shipping_price || null;
+    if (rawShipCost != null && p.shippingData.cost == null) {
       const parsedCost = parsePrice(rawShipCost);
       if (parsedCost != null) {
         p.shippingData.cost = parsedCost;
@@ -199,44 +215,49 @@ class AmazonAdapter extends BaseAdapter {
       p.shippingData.note = 'FREE Prime Shipping';
       p.shippingData.method = 'Prime';
     } else if (p.shippingData.cost == null) {
-      // Check product_minimum_offer_price vs product_price for implicit shipping
       p.shippingData.method = 'Standard';
-      if (p.shippingData.note === 'Standard shipping') {
-        p.shippingData.note = 'Standard Shipping';
-      }
+      p.shippingData.note = 'Standard Shipping';
     }
 
-    // Delivery estimate: parse delivery_info for actual dates
-    if (d.delivery_info) {
-      p.deliveryEstimate.label = d.delivery_info;
-      // Parse "Delivery by Mon, Jan 5 - Fri, Jan 9" or "FREE delivery Mon, Jan 6 - Fri, Jan 10"
-      const datePattern = /([A-Z][a-z]{2,8}),?\s+([A-Z][a-z]{2,8})\s+(\d{1,2})\s*[-–]\s*(?:[A-Z][a-z]{2,8},?\s+)?([A-Z][a-z]{2,8})\s+(\d{1,2})/;
-      const dateMatch = d.delivery_info.match(datePattern);
-      if (dateMatch) {
-        // Calculate days from now to delivery dates
-        const now = new Date();
-        const year = now.getFullYear();
-        const months = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
-        const minMonth = months[dateMatch[2]];
-        const minDay = parseInt(dateMatch[3]);
-        const maxMonth = months[dateMatch[4]];
-        const maxDay = parseInt(dateMatch[5]);
-        if (minMonth != null && maxMonth != null) {
-          let minDate = new Date(year, minMonth, minDay);
-          let maxDate = new Date(year, maxMonth, maxDay);
-          // If dates are in the past, they must be next year
+    // Delivery dates: use primary_delivery_time first, then parse from delivery text
+    const dateSource = primaryDeliveryTime || deliveryText;
+    if (dateSource) {
+      p.deliveryEstimate.label = primaryDeliveryTime || deliveryText;
+      // Parse "April 10 - 24" or "Apr 10 - Apr 24" or "April 10 - May 2"
+      const months = { Jan:0,January:0,Feb:1,February:1,Mar:2,March:2,Apr:3,April:3,May:4,Jun:5,June:5,Jul:6,July:6,Aug:7,August:7,Sep:8,September:8,Oct:9,October:9,Nov:10,November:10,Dec:11,December:11 };
+      // Pattern 1: "Month Day - Day" (same month) e.g. "April 10 - 24"
+      const sameMonthMatch = dateSource.match(/([A-Z][a-z]+)\s+(\d{1,2})\s*[-–]\s*(\d{1,2})/);
+      // Pattern 2: "Month Day - Month Day" (different months) e.g. "March 30 - April 5"
+      const diffMonthMatch = dateSource.match(/([A-Z][a-z]+)\s+(\d{1,2})\s*[-–]\s*([A-Z][a-z]+)\s+(\d{1,2})/);
+
+      const now = new Date();
+      const year = now.getFullYear();
+      const msPerDay = 86400000;
+
+      if (diffMonthMatch) {
+        const m1 = months[diffMonthMatch[1]];
+        const d1 = parseInt(diffMonthMatch[2]);
+        const m2 = months[diffMonthMatch[3]];
+        const d2 = parseInt(diffMonthMatch[4]);
+        if (m1 != null && m2 != null) {
+          let minDate = new Date(year, m1, d1);
+          let maxDate = new Date(year, m2, d2);
           if (minDate < now) minDate.setFullYear(year + 1);
           if (maxDate < now) maxDate.setFullYear(year + 1);
-          const msPerDay = 86400000;
           p.deliveryEstimate.minDays = Math.max(1, Math.ceil((minDate - now) / msPerDay));
           p.deliveryEstimate.maxDays = Math.max(p.deliveryEstimate.minDays + 1, Math.ceil((maxDate - now) / msPerDay));
         }
-      } else {
-        // Fallback: try "X-Y days" or "X - Y business days" pattern
-        const daysMatch = d.delivery_info.match(/(\d+)\s*[-–]\s*(\d+)/);
-        if (daysMatch) {
-          p.deliveryEstimate.minDays = parseInt(daysMatch[1]);
-          p.deliveryEstimate.maxDays = parseInt(daysMatch[2]);
+      } else if (sameMonthMatch) {
+        const m = months[sameMonthMatch[1]];
+        const d1 = parseInt(sameMonthMatch[2]);
+        const d2 = parseInt(sameMonthMatch[3]);
+        if (m != null) {
+          let minDate = new Date(year, m, d1);
+          let maxDate = new Date(year, m, d2);
+          if (minDate < now) minDate.setFullYear(year + 1);
+          if (maxDate < now) maxDate.setFullYear(year + 1);
+          p.deliveryEstimate.minDays = Math.max(1, Math.ceil((minDate - now) / msPerDay));
+          p.deliveryEstimate.maxDays = Math.max(p.deliveryEstimate.minDays + 1, Math.ceil((maxDate - now) / msPerDay));
         }
       }
     }
@@ -281,9 +302,10 @@ class AmazonAdapter extends BaseAdapter {
       manufacturer: d.manufacturer || null,
       countryOfOrigin: d.country_of_origin || null,
       dateFirstAvailable: d.date_first_available || null,
+      delivery: d.delivery || null,
       deliveryInfo: d.delivery_info || null,
-      shippingCharge: d.shipping_charge || d.shipping_cost || null,
-      deliveryCharge: d.delivery_charge || d.delivery_cost || null
+      primaryDeliveryTime: d.primary_delivery_time || null,
+      shippingCharge: d.shipping_charge || d.shipping_cost || null
     };
     return p;
   }

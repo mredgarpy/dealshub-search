@@ -77,7 +77,7 @@
     <span class="dh-plus-price-period">/month</span>
   </div>
   <br>
-  <a href="#" class="dh-plus-cta-hero">Start Your Free 7-Day Trial</a>
+  <a href="#" class="dh-plus-cta-hero" onclick="event.preventDefault();activatePlusTrial()">Start Your Free 7-Day Trial</a>
   <span class="dh-plus-trial">Cancel anytime · No commitment</span>
 </div>
 
@@ -177,9 +177,35 @@
 <div class="dh-plus-bottom">
   <h2>Ready to Start Saving?</h2>
   <p>Join thousands of smart shoppers who save on every order.</p>
-  <a href="#" class="dh-plus-cta-hero">Start Your Free 7-Day Trial</a>
+  <a href="#" class="dh-plus-cta-hero" onclick="event.preventDefault();activatePlusTrial()">Start Your Free 7-Day Trial</a>
   <span class="dh-plus-trial">$7.99/month after trial · Cancel anytime</span>
 </div>
+
+<script>
+function activatePlusTrial(){
+  try{localStorage.setItem('stylehub_plus','true');localStorage.setItem('stylehub_plus_since',new Date().toISOString())}catch(e){}
+  var btns=document.querySelectorAll('.dh-plus-cta-hero');
+  btns.forEach(function(b){
+    b.textContent='✓ Plus Activated!';
+    b.style.background='#38a169';
+    b.style.pointerEvents='none';
+  });
+  setTimeout(function(){window.location.href='/'},1500);
+}
+// If already Plus, update buttons
+(function(){
+  try{
+    if(localStorage.getItem('stylehub_plus')==='true'){
+      var btns=document.querySelectorAll('.dh-plus-cta-hero');
+      btns.forEach(function(b){
+        b.textContent='✓ You\'re a Plus Member';
+        b.style.background='#38a169';
+        b.style.pointerEvents='none';
+      });
+    }
+  }catch(e){}
+})();
+</script>
 
 {% schema %}
 {

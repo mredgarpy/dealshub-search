@@ -1,9 +1,9 @@
-/* DealsHub Cart v2.0 — Grouped by Store + Real Shipping per Store
+/* DealsHub Cart v2.5 — Grouped by Store + Real Shipping + Plus Integration
    Features:
    - Groups cart items by source store
    - Shows shipping cost per store group (from /api/shipping)
    - Threshold hints (e.g., "Add $X more for FREE shipping")
-   - StyleHub Plus upsell with total savings
+   - StyleHub Plus: FREE shipping when member, upsell when not
    - Quantity controls
    - Remove items
    - Mobile responsive
@@ -17,6 +17,7 @@
   var cartData=null;
   var shippingByStore={};
   var zip=localStorage.getItem('stylehub_zip')||'';
+  var isPlus=localStorage.getItem('stylehub_plus')==='true';
 
   init();
 
@@ -78,6 +79,7 @@
       var url=API+'/api/shipping?store='+encodeURIComponent(src)+'&price='+storeTotal.toFixed(2)+'&mode=rules';
       if(productId)url+='&productId='+encodeURIComponent(productId);
       if(zip)url+='&zip='+encodeURIComponent(zip);
+      if(isPlus)url+='&plus=true';
       return fetch(url,{signal:AbortSignal.timeout(15000)})
         .then(function(r){return r.json()})
         .then(function(d){if(!d.error)shippingByStore[src]=d;else shippingByStore[src]=null;})
@@ -196,12 +198,16 @@
       var method=ship.method||'';
       var label=ship.label||'';
       var delivery=d.delivery||{};
+      var shipIsPlus=ship.isPlus||false;
       totalShipping+=cost;
-      totalPlusSaves+=(d.plusSaves||0);
+      if(!isPlus)totalPlusSaves+=(d.plusSaves||0);
 
       var html='<div class="dh-ship-row">';
       html+='<span class="dh-ship-icon">🚚</span> ';
-      if(isFree){
+      if(shipIsPlus){
+        // Plus member: always FREE with Plus badge
+        html+='<strong style="color:#6b46c1">FREE Shipping</strong> · <span style="color:#6b46c1;font-weight:600">⚡ Plus</span>';
+      } else if(isFree){
         html+='<strong style="color:#38a169">FREE Shipping</strong>';
         if(method)html+=' · '+escHTML(method);
       } else {
@@ -212,13 +218,13 @@
       if(dLabel)html+=' · <span style="color:#2b6cb0">'+escHTML(dLabel)+'</span>';
       html+='</div>';
 
-      // Threshold hint
-      if(d.remaining&&d.remaining>0&&d.thresholdNote){
+      // Threshold hint (only for non-Plus)
+      if(!isPlus&&d.remaining&&d.remaining>0&&d.thresholdNote){
         html+='<div class="dh-ship-threshold">💡 Add $'+d.remaining.toFixed(2)+' more from '+storeLabel(src)+' for FREE shipping</div>';
       }
 
-      // Plus upsell per store
-      if(cost>0){
+      // Plus upsell per store (only for non-Plus members with shipping cost)
+      if(!isPlus&&cost>0){
         html+='<div class="dh-ship-plus">⚡ <strong style="color:#6b46c1">FREE</strong> with StyleHub Plus</div>';
       }
 
@@ -229,7 +235,8 @@
     var shipTotalEl=document.getElementById('dh-cart-shipping-total');
     if(shipTotalEl){
       if(totalShipping===0){
-        shipTotalEl.innerHTML='<span>Shipping</span><span style="color:#38a169;font-weight:700">FREE</span>';
+        var freeLabel=isPlus?'<span style="color:#6b46c1;font-weight:700">FREE ⚡ Plus</span>':'<span style="color:#38a169;font-weight:700">FREE</span>';
+        shipTotalEl.innerHTML='<span>Shipping</span>'+freeLabel;
       } else {
         shipTotalEl.innerHTML='<span>Shipping</span><span>'+formatMoney(totalShipping*100)+'</span>';
       }
@@ -242,14 +249,29 @@
       totalEl.innerHTML='<span>Estimated Total</span><span>'+formatMoney(grandTotal)+'</span>';
     }
 
-    // Plus upsell banner
+    // Plus badge in cart header (if Plus member)
+    if(isPlus){
+      var header=document.querySelector('.dh-cart-header h1');
+      if(header&&!header.querySelector('.dh-plus-badge')){
+        header.insertAdjacentHTML('beforeend',' <span class="dh-plus-badge" style="display:inline-block;background:linear-gradient(90deg,#6b46c1,#805ad5);color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;vertical-align:middle">⚡ PLUS</span>');
+      }
+    }
+
+    // Plus upsell banner (only for non-Plus members)
     var plusEl=document.getElementById('dh-cart-plus-upsell');
-    if(plusEl&&totalPlusSaves>0){
-      plusEl.innerHTML='<div class="dh-cart-plus-banner">'+
-        '<div class="dh-plus-title">⚡ Save $'+totalPlusSaves.toFixed(2)+' on shipping this order</div>'+
-        '<div class="dh-plus-body">Try StyleHub Plus FREE for 7 days<br><span style="color:#999;font-size:12px">Then $7.99/mo · Cancel anytime</span></div>'+
-        '<a href="/pages/plus" class="dh-plus-cta">Start free trial →</a>'+
-      '</div>';
+    if(plusEl){
+      if(!isPlus&&totalPlusSaves>0){
+        plusEl.innerHTML='<div class="dh-cart-plus-banner">'+
+          '<div class="dh-plus-title">⚡ Save $'+totalPlusSaves.toFixed(2)+' on shipping this order</div>'+
+          '<div class="dh-plus-body">Try StyleHub Plus FREE for 7 days<br><span style="color:#999;font-size:12px">Then $7.99/mo · Cancel anytime</span></div>'+
+          '<a href="/pages/plus" class="dh-plus-cta">Start free trial →</a>'+
+        '</div>';
+      } else if(isPlus){
+        plusEl.innerHTML='<div class="dh-cart-plus-member" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #c4b5fd;border-radius:12px;padding:16px;text-align:center;margin-top:16px">'+
+          '<div style="font-size:15px;font-weight:700;color:#6b46c1">⚡ StyleHub Plus Member</div>'+
+          '<div style="font-size:13px;color:#718096;margin-top:4px">FREE shipping on all orders · 60-day returns</div>'+
+        '</div>';
+      }
     }
   }
 

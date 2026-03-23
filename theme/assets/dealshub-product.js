@@ -154,28 +154,40 @@
     html+='<button id="dhpdp-buy" style="width:100%;padding:16px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#1a1a1a\'">Buy Now</button>';
     html+='</div>';
 
-    // Shipping info — v2.0: enhanced shipping box with location, Plus upsell, threshold hints
+    // Shipping info — v2.5: Plus membership integration
     var sc=p.shippingCalc||{};
-    var shipCost=sc.cost!=null?sc.cost:(p.shippingData&&p.shippingData.cost!=null?p.shippingData.cost:null);
-    var shipMethod=sc.method||p.shippingData&&p.shippingData.method||'Standard';
-    var shipIsFree=sc.isFree||(shipCost===0);
+    var pdpIsPlus=false;
+    try{pdpIsPlus=localStorage.getItem('stylehub_plus')==='true';}catch(e){}
+    var shipCost=pdpIsPlus?0:(sc.cost!=null?sc.cost:(p.shippingData&&p.shippingData.cost!=null?p.shippingData.cost:null));
+    var shipMethod=pdpIsPlus?'StyleHub Plus':(sc.method||p.shippingData&&p.shippingData.method||'Standard');
+    var shipIsFree=pdpIsPlus||sc.isFree||(shipCost===0);
     var shipThreshold=sc.threshold||null;
     var shipRemaining=sc.remaining||null;
     var shipThresholdNote=sc.thresholdNote||null;
-    var plusSaves=sc.plusSaves||0;
+    var plusSaves=pdpIsPlus?0:(sc.plusSaves||0);
     var del=sc.delivery||p.deliveryEstimate||{};
     var delFormatted=del.formattedRange||del.label||'5-10 business days';
     var delEarliest=del.earliest||del.earliestDate||'';
     var delLatest=del.latest||del.latestDate||'';
     var ret=sc.returnWindow||p.returnPolicy||{};
-    var retSummary=ret.summary||(ret.days?'Returns accepted within '+ret.days+' days':'30-day returns');
-    if(typeof ret==='string')retSummary=ret;
+    // Plus members get 60-day returns
+    if(pdpIsPlus){
+      retSummary='Extended 60-day returns (Plus benefit)';
+    } else {
+      var retSummary=ret.summary||(ret.days?'Returns accepted within '+ret.days+' days':'30-day returns');
+      if(typeof ret==='string')retSummary=ret;
+    }
 
     // ZIP from localStorage
     var savedZip=null;
     try{savedZip=localStorage.getItem('stylehub_zip');}catch(e){}
 
-    html+='<div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px">';
+    html+='<div style="border:1px solid '+(pdpIsPlus?'#c4b5fd':'#e2e8f0')+';border-radius:10px;overflow:hidden;margin-bottom:20px">';
+
+    // Plus member header badge
+    if(pdpIsPlus){
+      html+='<div style="padding:8px 16px;background:linear-gradient(90deg,#6b46c1,#805ad5);color:#fff;font-size:13px;font-weight:700;text-align:center">⚡ StyleHub Plus Member — FREE Shipping & Extended Returns</div>';
+    }
 
     // Location row
     html+='<div style="padding:12px 16px;background:#f8fafc;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0">';
@@ -191,23 +203,27 @@
 
     // Shipping cost row
     html+='<div style="padding:14px 16px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid #f0f0f0">';
-    html+='<div style="flex-shrink:0;width:36px;height:36px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#16a34a" stroke-width="1.5" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>';
+    html+='<div style="flex-shrink:0;width:36px;height:36px;background:'+(pdpIsPlus?'#f5f3ff':'#f0fdf4')+';border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="'+(pdpIsPlus?'#7c3aed':'#16a34a')+'" stroke-width="1.5" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>';
     html+='<div style="flex:1">';
     // Cost line
-    if(shipIsFree){
+    if(pdpIsPlus){
+      html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="color:#6b46c1;font-weight:700;font-size:15px">FREE</span><span style="background:#6b46c1;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px">PLUS</span></div>';
+      html+='<div style="font-size:12px;color:#6b7280">StyleHub Plus · All orders ship free</div>';
+    }else if(shipIsFree){
       html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="color:#16a34a;font-weight:700;font-size:15px">FREE</span></div>';
+      html+='<div style="font-size:12px;color:#6b7280">'+escHTML(shipMethod)+'</div>';
     }else if(shipCost!=null&&shipCost>0){
       html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="font-weight:700;font-size:15px;color:#333">$'+shipCost.toFixed(2)+'</span></div>';
+      html+='<div style="font-size:12px;color:#6b7280">'+escHTML(shipMethod)+'</div>';
     }else{
       html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="font-size:13px;color:#666">Calculated at checkout</span></div>';
     }
-    html+='<div style="font-size:12px;color:#6b7280">'+escHTML(shipMethod)+'</div>';
-    // Threshold hint (e.g., "Add $17.01 more for FREE shipping")
-    if(shipThresholdNote&&shipRemaining>0){
+    // Threshold hint (only for non-Plus)
+    if(!pdpIsPlus&&shipThresholdNote&&shipRemaining>0){
       html+='<div style="font-size:12px;color:#d97706;margin-top:4px">&#128161; Add $'+shipRemaining.toFixed(2)+' more for FREE shipping</div>';
     }
-    // StyleHub Plus upsell (only if shipping is NOT free)
-    if(plusSaves>0){
+    // StyleHub Plus upsell (only for non-Plus members with shipping cost)
+    if(!pdpIsPlus&&plusSaves>0){
       html+='<div style="font-size:12px;color:#7c3aed;margin-top:4px;display:flex;align-items:center;gap:4px"><span style="font-size:11px">&#9889;</span> <b>FREE</b> with StyleHub Plus ($7.99/mo) <a href="/pages/plus" style="color:#7c3aed;text-decoration:underline;font-size:11px;margin-left:4px">Try free</a></div>';
     }
     html+='</div></div>';
@@ -226,8 +242,8 @@
     // Returns row
     html+='<div style="padding:14px 16px;display:flex;align-items:center;gap:12px">';
     html+='<div style="flex-shrink:0;width:36px;height:36px;background:#faf5ff;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#7c3aed" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 12h18M3 12l6-6M3 12l6 6"/></svg></div>';
-    html+='<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#333">Easy Returns</div>';
-    html+='<div style="font-size:13px;color:#555">'+escHTML(retSummary)+'</div></div></div>';
+    html+='<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#333">Easy Returns'+(pdpIsPlus?' <span style="background:#6b46c1;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:6px">PLUS</span>':'')+'</div>';
+    html+='<div style="font-size:13px;color:'+(pdpIsPlus?'#6b46c1':'#555')+'">'+escHTML(retSummary)+'</div></div></div>';
     html+='</div>';
 
     html+='</div>'; // end info

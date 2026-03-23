@@ -294,13 +294,14 @@ async function productDetailHandler(req, res) {
 const { calculateShipping } = require('./src/services/shipping-rules');
 
 app.get('/api/shipping', async (req, res) => {
-  const { store, productId, price, mode } = req.query;
+  const { store, productId, price, mode, plus } = req.query;
   if (!store) {
     return res.status(400).json({ error: 'Missing store parameter' });
   }
   try {
     const srcLower = store.toLowerCase();
     const sourcePrice = parseFloat(price) || 0;
+    const isPlus = plus === 'true' || plus === '1';
 
     let productData = {};
 
@@ -322,23 +323,25 @@ app.get('/api/shipping', async (req, res) => {
       }
     }
 
-    const result = calculateShipping(srcLower, sourcePrice, productData || {}, false);
+    const result = calculateShipping(srcLower, sourcePrice, productData || {}, isPlus);
 
     res.json({
       store: srcLower,
       productId,
+      isPlus,
       shipping: {
         cost: result.cost,
         label: result.label,
         method: result.method,
-        isFree: result.isFree
+        isFree: result.isFree,
+        isPlus: result.isPlus || false
       },
       delivery: result.delivery,
       threshold: result.threshold,
       remaining: result.remaining,
       thresholdNote: result.thresholdNote,
       plusSaves: result.plusSaves,
-      plusNote: result.plusSaves > 0 ? 'FREE with StyleHub Plus' : null,
+      plusNote: isPlus ? null : (result.plusSaves > 0 ? 'FREE with StyleHub Plus' : null),
       returnWindow: result.returnWindow
     });
   } catch (e) {

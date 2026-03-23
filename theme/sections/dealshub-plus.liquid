@@ -1,0 +1,194 @@
+<style>
+.dh-plus-hero{background:linear-gradient(135deg,#1a1040 0%,#2d1b69 40%,#4c1d95 100%);color:#fff;text-align:center;padding:80px 20px 60px}
+.dh-plus-hero h1{font-size:42px;font-weight:800;margin:0 0 8px;letter-spacing:-0.5px}
+.dh-plus-hero h1 span{background:linear-gradient(90deg,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.dh-plus-hero .dh-plus-sub{font-size:18px;color:#c4b5fd;margin-bottom:32px;max-width:560px;margin-left:auto;margin-right:auto}
+.dh-plus-price-box{display:inline-flex;align-items:baseline;gap:8px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:16px;padding:16px 32px;margin-bottom:28px}
+.dh-plus-price-big{font-size:48px;font-weight:800}
+.dh-plus-price-period{font-size:18px;color:#c4b5fd}
+.dh-plus-cta-hero{display:inline-block;padding:16px 40px;background:linear-gradient(90deg,#fbbf24,#f59e0b);color:#1a1040;font-weight:800;font-size:18px;border-radius:12px;text-decoration:none;transition:transform .15s}
+.dh-plus-cta-hero:hover{transform:scale(1.04)}
+.dh-plus-trial{display:block;margin-top:12px;font-size:14px;color:#c4b5fd}
+
+.dh-plus-wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+
+/* Benefits */
+.dh-plus-benefits{padding:60px 20px;background:#faf5ff}
+.dh-plus-benefits h2{text-align:center;font-size:28px;color:#1a202c;margin:0 0 40px}
+.dh-plus-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1100px;margin:0 auto}
+.dh-plus-card{background:#fff;border:1px solid #e9d5ff;border-radius:16px;padding:28px 24px;text-align:center;transition:box-shadow .2s}
+.dh-plus-card:hover{box-shadow:0 8px 24px rgba(107,70,193,0.12)}
+.dh-plus-card-icon{font-size:36px;margin-bottom:12px}
+.dh-plus-card h3{font-size:17px;color:#2d3748;margin:0 0 8px}
+.dh-plus-card p{font-size:14px;color:#718096;margin:0;line-height:1.5}
+
+/* Comparison */
+.dh-plus-compare{padding:60px 20px}
+.dh-plus-compare h2{text-align:center;font-size:28px;color:#1a202c;margin:0 0 32px}
+.dh-plus-table{max-width:700px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+.dh-plus-table table{width:100%;border-collapse:collapse}
+.dh-plus-table th{padding:14px 20px;background:#f7fafc;font-size:14px;text-align:left;border-bottom:1px solid #e2e8f0;color:#4a5568}
+.dh-plus-table th:nth-child(2),.dh-plus-table th:nth-child(3){text-align:center}
+.dh-plus-table td{padding:12px 20px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#2d3748}
+.dh-plus-table td:nth-child(2),.dh-plus-table td:nth-child(3){text-align:center}
+.dh-plus-table tr:last-child td{border-bottom:none}
+.dh-check{color:#38a169;font-weight:700}
+.dh-cross{color:#e53e3e}
+
+/* Savings calculator */
+.dh-plus-savings{padding:60px 20px;background:#f7fafc}
+.dh-plus-savings h2{text-align:center;font-size:28px;color:#1a202c;margin:0 0 12px}
+.dh-plus-savings .dh-savings-sub{text-align:center;color:#718096;font-size:15px;margin-bottom:32px}
+.dh-savings-example{max-width:600px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;text-align:center}
+.dh-savings-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:15px}
+.dh-savings-row:last-child{border-bottom:none}
+.dh-savings-total{font-weight:700;color:#6b46c1;font-size:18px;margin-top:12px;padding-top:12px;border-top:2px solid #e9d5ff}
+
+/* FAQ */
+.dh-plus-faq{padding:60px 20px}
+.dh-plus-faq h2{text-align:center;font-size:28px;color:#1a202c;margin:0 0 32px}
+.dh-plus-faq-list{max-width:700px;margin:0 auto}
+.dh-plus-faq-item{border:1px solid #e2e8f0;border-radius:10px;margin-bottom:12px;overflow:hidden}
+.dh-plus-faq-q{padding:16px 20px;font-weight:600;color:#2d3748;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:15px}
+.dh-plus-faq-q:hover{background:#f7fafc}
+.dh-plus-faq-a{padding:0 20px 16px;font-size:14px;color:#4a5568;line-height:1.6;display:none}
+.dh-plus-faq-item.open .dh-plus-faq-a{display:block}
+.dh-plus-faq-item.open .dh-faq-arrow{transform:rotate(180deg)}
+.dh-faq-arrow{transition:transform .2s;font-size:12px}
+
+/* Bottom CTA */
+.dh-plus-bottom{padding:60px 20px;text-align:center;background:linear-gradient(135deg,#1a1040,#4c1d95);color:#fff}
+.dh-plus-bottom h2{font-size:32px;margin:0 0 12px}
+.dh-plus-bottom p{color:#c4b5fd;font-size:16px;margin-bottom:24px}
+
+@media(max-width:768px){
+  .dh-plus-hero h1{font-size:28px}
+  .dh-plus-price-big{font-size:36px}
+  .dh-plus-grid{grid-template-columns:1fr}
+  .dh-plus-hero{padding:50px 16px 40px}
+}
+</style>
+
+<div class="dh-plus-hero">
+  <h1>StyleHub <span>Plus</span></h1>
+  <p class="dh-plus-sub">FREE shipping on every order. Exclusive deals. Extended returns. One membership, total savings.</p>
+  <div class="dh-plus-price-box">
+    <span class="dh-plus-price-big">$7.99</span>
+    <span class="dh-plus-price-period">/month</span>
+  </div>
+  <br>
+  <a href="#" class="dh-plus-cta-hero">Start Your Free 7-Day Trial</a>
+  <span class="dh-plus-trial">Cancel anytime · No commitment</span>
+</div>
+
+<div class="dh-plus-benefits">
+  <h2>Everything You Get with Plus</h2>
+  <div class="dh-plus-grid">
+    <div class="dh-plus-card">
+      <div class="dh-plus-card-icon">🚚</div>
+      <h3>FREE Shipping on Everything</h3>
+      <p>No minimums, no exceptions. Every order ships free — from any store in our network.</p>
+    </div>
+    <div class="dh-plus-card">
+      <div class="dh-plus-card-icon">⚡</div>
+      <h3>Priority Processing</h3>
+      <p>Your orders are processed first. Get your items faster with priority handling.</p>
+    </div>
+    <div class="dh-plus-card">
+      <div class="dh-plus-card-icon">🏷️</div>
+      <h3>Exclusive Deals & Early Access</h3>
+      <p>Member-only flash deals and early access to new arrivals before anyone else.</p>
+    </div>
+    <div class="dh-plus-card">
+      <div class="dh-plus-card-icon">↩️</div>
+      <h3>Extended 60-Day Returns</h3>
+      <p>Double the standard return window. Shop with confidence knowing you have more time.</p>
+    </div>
+    <div class="dh-plus-card">
+      <div class="dh-plus-card-icon">⭐</div>
+      <h3>Double Loyalty Points</h3>
+      <p>Earn 2x points on every purchase. Redeem faster for discounts and free products.</p>
+    </div>
+    <div class="dh-plus-card">
+      <div class="dh-plus-card-icon">🔥</div>
+      <h3>Member-Only Flash Deals</h3>
+      <p>Exclusive deals curated just for Plus members, with deeper discounts on top brands.</p>
+    </div>
+  </div>
+</div>
+
+<div class="dh-plus-compare">
+  <h2>Standard vs Plus</h2>
+  <div class="dh-plus-table">
+    <table>
+      <tr><th>Feature</th><th>Standard</th><th>Plus ⭐</th></tr>
+      <tr><td>Amazon Shipping</td><td class="dh-cross">$5–$15</td><td class="dh-check">FREE</td></tr>
+      <tr><td>SHEIN Shipping (under $29)</td><td class="dh-cross">$3.99</td><td class="dh-check">FREE</td></tr>
+      <tr><td>Macy's Shipping (under $25)</td><td class="dh-cross">$10.95</td><td class="dh-check">FREE</td></tr>
+      <tr><td>AliExpress Shipping</td><td class="dh-check">FREE</td><td class="dh-check">FREE</td></tr>
+      <tr><td>Sephora Shipping</td><td class="dh-check">FREE</td><td class="dh-check">FREE</td></tr>
+      <tr><td>Return Window</td><td>15–45 days</td><td class="dh-check">60 days</td></tr>
+      <tr><td>Processing Priority</td><td class="dh-cross">Standard</td><td class="dh-check">Priority</td></tr>
+      <tr><td>Exclusive Deals</td><td class="dh-cross">No</td><td class="dh-check">Yes</td></tr>
+      <tr><td>Loyalty Points</td><td>1x</td><td class="dh-check">2x</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="dh-plus-savings">
+  <h2>How Much Can You Save?</h2>
+  <p class="dh-savings-sub">Average member buying 3 items per month from different stores</p>
+  <div class="dh-savings-example">
+    <div class="dh-savings-row"><span>Amazon order shipping</span><span>$12.00</span></div>
+    <div class="dh-savings-row"><span>SHEIN order shipping</span><span>$3.99</span></div>
+    <div class="dh-savings-row"><span>Macy's order shipping</span><span>$10.95</span></div>
+    <div class="dh-savings-row"><span><strong>Total shipping without Plus</strong></span><span><strong>$26.94</strong></span></div>
+    <div class="dh-savings-row"><span>StyleHub Plus membership</span><span style="color:#e53e3e">−$7.99</span></div>
+    <div class="dh-savings-total">You save $18.95/month with Plus</div>
+  </div>
+</div>
+
+<div class="dh-plus-faq">
+  <h2>Frequently Asked Questions</h2>
+  <div class="dh-plus-faq-list">
+    <div class="dh-plus-faq-item">
+      <div class="dh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">How does the free trial work? <span class="dh-faq-arrow">▼</span></div>
+      <div class="dh-plus-faq-a">Start your 7-day free trial with no commitment. You won't be charged during the trial period. After 7 days, you'll be billed $7.99/month. Cancel anytime before the trial ends and you won't be charged.</div>
+    </div>
+    <div class="dh-plus-faq-item">
+      <div class="dh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">Does free shipping apply to all stores? <span class="dh-faq-arrow">▼</span></div>
+      <div class="dh-plus-faq-a">Yes! With Plus, you get free shipping on every order regardless of the source store — Amazon, AliExpress, SHEIN, Macy's, Sephora, and any future stores we add.</div>
+    </div>
+    <div class="dh-plus-faq-item">
+      <div class="dh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">Can I cancel anytime? <span class="dh-faq-arrow">▼</span></div>
+      <div class="dh-plus-faq-a">Absolutely. There's no long-term commitment. Cancel your Plus membership anytime from your account settings. You'll continue to enjoy benefits until the end of your current billing period.</div>
+    </div>
+    <div class="dh-plus-faq-item">
+      <div class="dh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">How do extended returns work? <span class="dh-faq-arrow">▼</span></div>
+      <div class="dh-plus-faq-a">Plus members get a 60-day return window on all purchases, compared to the standard 15-45 days depending on the store. This gives you twice the time to decide if a product is right for you.</div>
+    </div>
+    <div class="dh-plus-faq-item">
+      <div class="dh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">Is there a minimum order for free shipping? <span class="dh-faq-arrow">▼</span></div>
+      <div class="dh-plus-faq-a">No minimum at all. Even a $1 order ships free with Plus. This is one of the biggest advantages — no need to add items to reach a free shipping threshold.</div>
+    </div>
+  </div>
+</div>
+
+<div class="dh-plus-bottom">
+  <h2>Ready to Start Saving?</h2>
+  <p>Join thousands of smart shoppers who save on every order.</p>
+  <a href="#" class="dh-plus-cta-hero">Start Your Free 7-Day Trial</a>
+  <span class="dh-plus-trial">$7.99/month after trial · Cancel anytime</span>
+</div>
+
+{% schema %}
+{
+  "name": "StyleHub Plus",
+  "settings": [],
+  "presets": [
+    {
+      "name": "StyleHub Plus"
+    }
+  ]
+}
+{% endschema %}

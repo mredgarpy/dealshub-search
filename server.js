@@ -1291,5 +1291,22 @@ app.listen(PORT, () => {
   logger.info('server', `Shopify: ${process.env.SHOPIFY_STORE_DOMAIN ? 'configured' : 'NOT configured'}`);
   // Warm up cache after server starts (don't await â let it run in background)
   setTimeout(warmUpCache, 2000);
+
+  // ---- KEEP-ALIVE SELF-PING ----
+  // Render free tier spins down after ~15min of inactivity.
+  // This pings /health every 12 minutes to prevent cold starts.
+  const KEEP_ALIVE_INTERVAL = 12 * 60 * 1000; // 12 minutes
+  setInterval(async () => {
+    try {
+      const url = `http://localhost:${PORT}/health`;
+      const resp = await fetch(url);
+      if (resp.ok) {
+        logger.info('server', `Keep-alive ping OK (uptime: ${Math.floor(process.uptime())}s)`);
+      }
+    } catch (e) {
+      logger.warn('server', 'Keep-alive ping failed', { error: e.message });
+    }
+  }, KEEP_ALIVE_INTERVAL);
+  logger.info('server', `Keep-alive enabled: self-ping every ${KEEP_ALIVE_INTERVAL / 60000}min`);
 });
 

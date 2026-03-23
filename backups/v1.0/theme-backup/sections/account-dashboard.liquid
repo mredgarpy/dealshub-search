@@ -1,0 +1,2189 @@
+{% comment %}
+  StyleHub Miami — Account Dashboard (Liquid-powered)
+  Uses Shopify customer object for real data.
+  If customer is nil, redirects to login.
+  Design reference: stylehub_account_pro_v2 mockup
+{% endcomment %}
+
+{%- unless customer -%}
+  <script>
+    window.location.href = "{{ routes.account_login_url | default: '/account/login' }}";
+  </script>
+  <meta http-equiv="refresh" content="0;url={{ routes.account_login_url | default: '/account/login' }}">
+  <div style="text-align:center;padding:80px 20px;font-family:'DM Sans',sans-serif">
+    <p>Redirecting to login...</p>
+    <a href="{{ routes.account_login_url | default: '/account/login' }}">Click here if not redirected</a>
+  </div>
+  {%- break -%}
+{%- endunless -%}
+
+{%- comment -%} Compute customer data from Liquid {%- endcomment -%}
+{%- assign cust_first = customer.first_name | default: "Member" -%}
+{%- assign cust_last = customer.last_name | default: "" -%}
+{%- assign cust_name = customer.name | default: "StyleHub Member" -%}
+{%- assign cust_email = customer.email | default: "" -%}
+{%- assign cust_orders = customer.orders -%}
+{%- assign cust_order_count = customer.orders_count | default: 0 -%}
+{%- assign cust_addresses = customer.addresses -%}
+{%- assign cust_default_address = customer.default_address -%}
+
+{%- comment -%} Build initials {%- endcomment -%}
+{%- assign initial1 = cust_first | slice: 0 | upcase -%}
+{%- assign initial2 = cust_last | slice: 0 | upcase -%}
+{%- if initial2 == blank -%}
+  {%- assign initials = initial1 -%}
+{%- else -%}
+  {%- assign initials = initial1 | append: initial2 -%}
+{%- endif -%}
+
+{%- comment -%} Count active orders (unfulfilled/partial) {%- endcomment -%}
+{%- assign active_orders = 0 -%}
+{%- assign total_savings = 0 -%}
+{%- for order in cust_orders -%}
+  {%- if order.fulfillment_status == null or order.fulfillment_status == "partial" -%}
+    {%- assign active_orders = active_orders | plus: 1 -%}
+  {%- endif -%}
+  {%- comment -%} Calculate savings from compare_at vs price {%- endcomment -%}
+  {%- for item in order.line_items -%}
+    {%- if item.variant.compare_at_price > item.variant.price -%}
+      {%- assign item_saving = item.variant.compare_at_price | minus: item.variant.price | times: item.quantity -%}
+      {%- assign total_savings = total_savings | plus: item_saving -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endfor -%}
+
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+
+<style>
+/* ========== ACCOUNT DASHBOARD CSS ========== */
+.sh-acct *{margin:0;padding:0;box-sizing:border-box}
+.sh-acct{--red:#E53E3E;--navy:#1A1A2E;--gray:#F7F7F8;--border:#f0f0f0;--text2:#888;--text3:#bbb;--green:#1D9E75;--amber:#D97706;--radius:10px;font-family:'DM Sans',sans-serif;background:var(--gray);color:var(--navy);font-size:13px;-webkit-font-smoothing:antialiased}
+.sh-acct a{text-decoration:none;color:inherit}
+
+/* Layout */
+.sh-page{max-width:1140px;margin:0 auto;padding:24px 20px;display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px}
+
+/* Sidebar */
+.sh-side{display:flex;flex-direction:column;gap:0;position:sticky;top:20px;align-self:start}
+.sh-side-profile{background:#fff;border-radius:14px;padding:20px;margin-bottom:12px;text-align:center;border:0.5px solid var(--border)}
+.sh-side-av{width:56px;height:56px;border-radius:50%;background:var(--navy);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;letter-spacing:-0.5px}
+.sh-side-name{font-size:15px;font-weight:600}
+.sh-side-email{font-size:11px;color:var(--text2);margin-top:2px}
+.sh-side-tier{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:10px;font-weight:600;color:var(--amber);background:#FEF3C7;padding:3px 10px;border-radius:20px}
+.sh-side-tier svg{width:12px;height:12px}
+
+.sh-side-nav{background:#fff;border-radius:14px;padding:8px;border:0.5px solid var(--border)}
+.sh-nav-group{padding:4px 0}
+.sh-nav-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;padding:10px 12px 4px}
+.sh-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:#666;font-size:13px;cursor:pointer;transition:all 0.15s;position:relative;border:none;background:none;width:100%;text-align:left;font-family:inherit}
+.sh-nav-item:hover{background:var(--gray);color:var(--navy)}
+.sh-nav-item.active{background:var(--navy);color:#fff;font-weight:500}
+.sh-nav-item svg{width:18px;height:18px;opacity:0.5;flex-shrink:0}
+.sh-nav-item.active svg{opacity:1}
+.sh-nav-badge{position:absolute;right:10px;font-size:10px;font-weight:600;background:var(--red);color:#fff;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.sh-nav-sep{height:0.5px;background:var(--border);margin:4px 8px}
+
+/* Mobile toggle */
+.sh-mobile-toggle{display:none;position:fixed;bottom:20px;right:20px;z-index:100;width:48px;height:48px;border-radius:50%;background:var(--navy);color:#fff;border:none;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.2);align-items:center;justify-content:center}
+
+/* Main content */
+.sh-main{display:flex;flex-direction:column;gap:16px}
+.sh-welcome{display:flex;justify-content:space-between;align-items:flex-end}
+.sh-welcome h1{font-size:22px;font-weight:700;letter-spacing:-0.5px}
+.sh-welcome-sub{font-size:13px;color:var(--text2);margin-top:2px}
+.sh-welcome-date{font-size:12px;color:var(--text2)}
+
+/* Alert bar */
+.sh-alert{background:#FEF3C7;border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;font-size:12px;color:#92400E}
+.sh-alert svg{width:18px;height:18px;flex-shrink:0;color:var(--amber)}
+.sh-alert b{font-weight:600}
+.sh-alert-close{margin-left:auto;opacity:0.5;cursor:pointer;font-size:16px;background:none;border:none;color:#92400E}
+
+/* Metrics */
+.sh-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sh-metric{background:#fff;border-radius:var(--radius);padding:16px;border:0.5px solid var(--border);position:relative;overflow:hidden}
+.sh-metric::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sh-metric.m-orders::after{background:var(--navy)}
+.sh-metric.m-wish::after{background:var(--red)}
+.sh-metric.m-save::after{background:var(--green)}
+.sh-metric.m-points::after{background:var(--amber)}
+.sh-metric-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sh-metric-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff}
+.sh-metric-change{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500}
+.sh-metric-num{font-size:26px;font-weight:700;letter-spacing:-1px;line-height:1}
+.sh-metric-label{font-size:11px;color:var(--text2);margin-top:4px}
+
+/* Sections / Cards */
+.sh-section{background:#fff;border-radius:14px;padding:0;border:0.5px solid var(--border);overflow:hidden}
+.sh-section-head{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 0}
+.sh-section-title{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.sh-section-title .sh-count{font-size:11px;background:var(--gray);padding:2px 8px;border-radius:10px;color:var(--text2);font-weight:500}
+.sh-section-action{font-size:12px;color:var(--red);font-weight:500;cursor:pointer;display:flex;align-items:center;gap:4px;text-decoration:none}
+.sh-section-body{padding:16px 20px 20px}
+
+/* Order cards */
+.sh-order-card{border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;transition:box-shadow 0.2s}
+.sh-order-card:hover{box-shadow:0 2px 12px rgba(0,0,0,0.04)}
+.sh-order-card:last-child{margin-bottom:0}
+.sh-oc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:11px;color:var(--text2)}
+.sh-oc-id{font-weight:600;color:var(--navy);font-size:12px}
+.sh-oc-items{display:flex;gap:12px;align-items:center}
+.sh-oc-img{width:64px;height:64px;border-radius:8px;background:var(--gray);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#ccc;overflow:hidden}
+.sh-oc-img img{width:100%;height:100%;object-fit:cover}
+.sh-oc-info{flex:1;min-width:0}
+.sh-oc-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-oc-variant{font-size:11px;color:var(--text2);margin-top:2px}
+.sh-oc-price-row{display:flex;align-items:baseline;gap:6px;margin-top:4px}
+.sh-oc-price{font-size:15px;font-weight:700;color:var(--red)}
+.sh-oc-qty{font-size:11px;color:var(--text2)}
+
+/* Tracking timeline */
+.sh-oc-track{margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border)}
+.sh-track{display:flex;align-items:center;gap:0}
+.sh-track-node{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
+.sh-track-dot{width:12px;height:12px;border-radius:50%;background:#eee;border:2px solid #eee;z-index:1;transition:all 0.3s}
+.sh-track-dot.done{background:var(--green);border-color:var(--green)}
+.sh-track-dot.now{background:#fff;border-color:var(--green);box-shadow:0 0 0 3px rgba(29,158,117,0.2)}
+.sh-track-line{position:absolute;top:5px;left:50%;width:100%;height:2px;background:#eee}
+.sh-track-node:last-child .sh-track-line{display:none}
+.sh-track-line.done{background:var(--green)}
+.sh-track-label{font-size:10px;color:var(--text2);margin-top:6px;text-align:center;line-height:1.2}
+.sh-track-label.active{color:var(--green);font-weight:500}
+.sh-track-date{font-size:9px;color:var(--text3)}
+
+.sh-oc-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.sh-oc-status{font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px}
+.sh-st-shipped{background:#E8F5E9;color:#1B5E20}
+.sh-st-processing{background:#FEF3C7;color:#92400E}
+.sh-st-delivered{background:#E6F1FB;color:#0C447C}
+.sh-st-cancelled{background:#FEE2E2;color:#991B1B}
+.sh-oc-actions{display:flex;gap:6px}
+.sh-oc-btn{font-size:11px;padding:6px 14px;border-radius:6px;font-weight:500;cursor:pointer;border:none;font-family:inherit}
+.sh-oc-btn-primary{background:var(--navy);color:#fff}
+.sh-oc-btn-outline{background:#fff;color:var(--navy);border:1px solid #ddd}
+
+/* Two-column grid */
+.sh-g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* Wishlist */
+.sh-wish-list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sh-wish-item{display:flex;gap:10px;background:var(--gray);border-radius:8px;padding:10px;position:relative}
+.sh-wish-img{width:60px;height:60px;border-radius:6px;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#ddd;overflow:hidden;position:relative}
+.sh-wish-img img{width:100%;height:100%;object-fit:cover}
+.sh-wish-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.sh-wish-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-wish-pr{font-size:14px;font-weight:700;color:var(--red);margin-top:2px}
+.sh-wish-pr .orig{font-size:10px;color:var(--text3);text-decoration:line-through;font-weight:400;margin-left:4px}
+.sh-wish-cart{font-size:10px;color:var(--navy);font-weight:500;margin-top:3px;cursor:pointer}
+.sh-wish-cart:hover{color:var(--red)}
+.sh-wish-x{position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:10px;color:#999;cursor:pointer;border:none}
+
+/* Coupons */
+.sh-coupon-card{display:flex;align-items:center;gap:12px;border:1px dashed #e5c77e;background:#FFFDF5;border-radius:8px;padding:12px;margin-bottom:8px}
+.sh-coupon-card:last-child{margin-bottom:0}
+.sh-coupon-left{text-align:center;min-width:60px}
+.sh-coupon-val{font-size:20px;font-weight:700;color:var(--amber);line-height:1}
+.sh-coupon-type{font-size:9px;color:var(--amber);font-weight:500}
+.sh-coupon-mid{flex:1}
+.sh-coupon-name{font-size:12px;font-weight:600;color:var(--navy)}
+.sh-coupon-desc{font-size:11px;color:var(--text2);margin-top:1px}
+.sh-coupon-exp{font-size:10px;color:var(--text3);margin-top:3px}
+.sh-coupon-use{font-size:11px;background:var(--navy);color:#fff;padding:6px 14px;border-radius:6px;font-weight:500;cursor:pointer;white-space:nowrap;border:none;font-family:inherit}
+
+/* Points */
+.sh-points-wrap{display:flex;align-items:center;gap:16px}
+.sh-points-circle{width:72px;height:72px;border-radius:50%;background:conic-gradient(var(--red) 0% 60%, #eee 60% 100%);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.sh-points-inner{width:58px;height:58px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.sh-points-num{font-size:18px;font-weight:700;color:var(--red);line-height:1}
+.sh-points-lbl{font-size:8px;color:var(--text2);font-weight:500}
+.sh-points-info{flex:1}
+.sh-points-tier{font-size:14px;font-weight:600}
+.sh-points-next{font-size:11px;color:var(--text2);margin-top:2px}
+.sh-points-earn{display:flex;gap:6px;margin-top:8px}
+.sh-points-tag{font-size:10px;background:var(--gray);padding:3px 8px;border-radius:4px;color:#666}
+
+/* Addresses */
+.sh-addr-row{display:flex;gap:10px}
+.sh-addr-item{flex:1;border:0.5px solid var(--border);border-radius:8px;padding:14px;position:relative}
+.sh-addr-item.default{border-color:var(--green)}
+.sh-addr-default-badge{position:absolute;top:10px;right:10px;font-size:9px;background:#E8F5E9;color:#1B5E20;padding:2px 8px;border-radius:4px;font-weight:500}
+.sh-addr-type{font-size:12px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.sh-addr-type svg{width:14px;height:14px;color:var(--text2)}
+.sh-addr-text{font-size:11px;color:var(--text2);line-height:1.6}
+.sh-addr-actions{display:flex;gap:8px;margin-top:8px}
+.sh-addr-btn{font-size:10px;color:var(--red);font-weight:500;cursor:pointer}
+
+/* Messages */
+.sh-msg-row{display:flex;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--border);align-items:start}
+.sh-msg-row:last-child{border-bottom:none}
+.sh-msg-dot{width:6px;height:6px;border-radius:50%;background:var(--red);margin-top:6px;flex-shrink:0}
+.sh-msg-dot.read{background:#ddd}
+.sh-msg-body{flex:1}
+.sh-msg-title{font-size:12px;font-weight:600}
+.sh-msg-text{font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4}
+.sh-msg-time{font-size:10px;color:var(--text3);flex-shrink:0;margin-top:2px}
+
+/* Settings grid */
+.sh-set-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.sh-set-item{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:0.5px solid var(--border)}
+.sh-set-item:nth-child(odd){padding-right:20px;border-right:0.5px solid var(--border)}
+.sh-set-item:nth-child(even){padding-left:20px}
+.sh-set-left{display:flex;flex-direction:column;gap:1px}
+.sh-set-key{font-size:12px;font-weight:500}
+.sh-set-val{font-size:11px;color:var(--text2)}
+.sh-set-edit{font-size:11px;color:var(--red);font-weight:500;cursor:pointer}
+
+/* Buy again / Reorder */
+.sh-reorder{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.sh-reorder-item{min-width:80px;text-align:center;flex-shrink:0}
+.sh-reorder-img{width:80px;height:80px;border-radius:8px;background:var(--gray);margin-bottom:6px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#ddd;overflow:hidden}
+.sh-reorder-img img{width:100%;height:100%;object-fit:cover}
+.sh-reorder-name{font-size:10px;color:#666;height:26px;overflow:hidden}
+.sh-reorder-btn{font-size:10px;color:var(--red);font-weight:500;margin-top:2px;cursor:pointer;text-decoration:none;display:block}
+
+/* Quick actions */
+.sh-quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.sh-quick-item{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;background:var(--gray);border-radius:10px;text-decoration:none;color:var(--navy);font-size:12px;font-weight:500;transition:box-shadow 0.2s;cursor:pointer;border:none;font-family:inherit}
+.sh-quick-item:hover{box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+
+/* Tab bar for orders */
+.sh-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sh-tab{padding:10px 16px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.sh-tab.active{color:var(--navy);border-bottom-color:var(--red);font-weight:600}
+.sh-tab:hover{color:var(--navy)}
+
+/* Empty state */
+.sh-empty{text-align:center;padding:40px 20px}
+.sh-empty svg{margin:0 auto 16px;display:block;opacity:0.4}
+.sh-empty h3{font-size:1.1rem;color:var(--navy);margin:0 0 8px}
+.sh-empty p{color:var(--text2);font-size:0.9rem;margin:0 0 20px;max-width:400px;margin-left:auto;margin-right:auto}
+.sh-empty-btn{display:inline-block;background:var(--navy);color:#fff;padding:12px 28px;border-radius:8px;font-size:0.9rem;font-weight:600;text-decoration:none;transition:opacity 0.2s}
+.sh-empty-btn:hover{opacity:0.9}
+.sh-empty a,.sh-empty-btn{color:#fff !important}
+
+/* Content sections toggling */
+.sh-content-section{display:none}
+.sh-content-section.active{display:block}
+
+/* ========== RESPONSIVE ========== */
+@media(max-width:900px){
+  .sh-page{grid-template-columns:1fr;padding:16px 12px}
+  .sh-side{position:fixed;top:0;left:-280px;width:270px;height:100vh;z-index:200;background:var(--gray);padding:16px;overflow-y:auto;transition:left 0.3s ease;box-shadow:4px 0 24px rgba(0,0,0,0.1)}
+  .sh-side.open{left:0}
+  .sh-mobile-toggle{display:flex}
+  .sh-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:199}
+  .sh-overlay.open{display:block}
+  .sh-metrics{grid-template-columns:repeat(2,1fr)}
+  .sh-g2{grid-template-columns:1fr}
+  .sh-wish-list{grid-template-columns:1fr}
+  .sh-set-grid{grid-template-columns:1fr}
+  .sh-set-item:nth-child(odd){padding-right:0;border-right:none}
+  .sh-set-item:nth-child(even){padding-left:0}
+  .sh-addr-row{flex-direction:column}
+  .sh-welcome{flex-direction:column;gap:4px;align-items:flex-start}
+}
+@media(max-width:480px){
+  .sh-metrics{grid-template-columns:1fr 1fr}
+  .sh-oc-items{flex-direction:column;align-items:flex-start}
+  .sh-oc-bottom{flex-direction:column;gap:8px;align-items:flex-start}
+}
+</style>
+
+<div class="sh-acct">
+<div class="sh-overlay" data-sh-overlay></div>
+
+<div class="sh-page">
+
+{%- comment -%} ========== SIDEBAR ========== {%- endcomment -%}
+<div class="sh-side" data-sh-sidebar>
+
+  <button class="sh-mobile-toggle" data-sh-mobile-toggle aria-label="Toggle menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+
+  <div class="sh-side-profile">
+    <div class="sh-side-av">{{ initials }}</div>
+    <div class="sh-side-name">{{ cust_name }}</div>
+    <div class="sh-side-email">{{ cust_email }}</div>
+    <div class="sh-side-tier">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      <span>Member</span>
+    </div>
+  </div>
+
+  <div class="sh-side-nav">
+    <div class="sh-nav-group">
+      <button class="sh-nav-item active" data-sh-nav="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </button>
+      <button class="sh-nav-item" data-sh-nav="orders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        My orders
+        {%- if cust_order_count > 0 -%}<span class="sh-nav-badge">{{ cust_order_count }}</span>{%- endif -%}
+      </button>
+      <button class="sh-nav-item" data-sh-nav="orders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Track order
+      </button>
+      <button class="sh-nav-item" data-sh-nav="wishlist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Wishlist
+      </button>
+      <button class="sh-nav-item" data-sh-nav="recently-viewed">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Recently viewed
+      </button>
+    </div>
+
+    <div class="sh-nav-sep"></div>
+    <div class="sh-nav-group">
+      <div class="sh-nav-label">Shopping</div>
+      <button class="sh-nav-item" data-sh-nav="coupons">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 5H3l2 14h14l2-14z"/><path d="M7 5V3a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/></svg>
+        My coupons
+      </button>
+      <a class="sh-nav-item" href="/pages/rewards">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Reward points
+      </a>
+      <button class="sh-nav-item" data-sh-nav="orders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Buy again
+      </button>
+    </div>
+
+    <div class="sh-nav-sep"></div>
+    <div class="sh-nav-group">
+      <div class="sh-nav-label">Support</div>
+      <button class="sh-nav-item" data-sh-nav="returns">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Returns & refunds
+      </button>
+      <button class="sh-nav-item" data-sh-nav="reviews">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        My reviews
+      </button>
+      <button class="sh-nav-item" data-sh-nav="messages">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Messages
+      </button>
+      <a class="sh-nav-item" href="/pages/help-center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Help center
+      </a>
+    </div>
+
+    <div class="sh-nav-sep"></div>
+    <div class="sh-nav-group">
+      <div class="sh-nav-label">Account</div>
+      <button class="sh-nav-item" data-sh-nav="addresses">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Addresses
+      </button>
+      <button class="sh-nav-item" data-sh-nav="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+      <a class="sh-nav-item" href="/account/logout" style="color:var(--red)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Log out
+      </a>
+    </div>
+  </div>
+</div>
+
+{%- comment -%} ========== MAIN CONTENT ========== {%- endcomment -%}
+<div class="sh-main">
+
+  {%- comment -%} === DASHBOARD === {%- endcomment -%}
+  <div class="sh-content-section active" data-sh-section="dashboard">
+
+    <div class="sh-welcome">
+      <div>
+        <h1>Welcome back, {{ cust_first }}</h1>
+        <div class="sh-welcome-sub">Here's what's happening with your account today</div>
+      </div>
+      <div class="sh-welcome-date">{{ 'now' | date: '%B %d, %Y' }}</div>
+    </div>
+
+    {%- comment -%} Alert for latest order in transit {%- endcomment -%}
+    {%- for order in cust_orders limit: 1 -%}
+      {%- if order.fulfillment_status == "fulfilled" and order.financial_status == "paid" -%}
+        <div class="sh-alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          <div>Your order <b>{{ order.name }}</b> has been fulfilled and is on its way!</div>
+          <button class="sh-alert-close" data-sh-dismiss>&times;</button>
+        </div>
+      {%- endif -%}
+    {%- endfor -%}
+
+    {%- comment -%} Metrics cards {%- endcomment -%}
+    <div class="sh-metrics">
+      <div class="sh-metric m-orders">
+        <div class="sh-metric-top">
+          <div class="sh-metric-icon" style="background:var(--navy)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="16" height="16"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/></svg>
+          </div>
+          {%- if active_orders > 0 -%}
+            <span class="sh-metric-change" style="background:#E8F5E9;color:#1B5E20">{{ active_orders }} active</span>
+          {%- endif -%}
+        </div>
+        <div class="sh-metric-num" id="sh-metric-orders-num">{{ cust_order_count }}</div>
+        <div class="sh-metric-label">Total orders</div>
+      </div>
+
+      <div class="sh-metric m-wish">
+        <div class="sh-metric-top">
+          <div class="sh-metric-icon" style="background:var(--red)">
+            <svg viewBox="0 0 24 24" fill="#fff" width="14" height="14"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </div>
+        </div>
+        <div class="sh-metric-num" data-sh-wishlist-count>0</div>
+        <div class="sh-metric-label">Wishlist items</div>
+      </div>
+
+      <div class="sh-metric m-save">
+        <div class="sh-metric-top">
+          <div class="sh-metric-icon" style="background:var(--green)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="14" height="14"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+        </div>
+        <div class="sh-metric-num" style="color:var(--green)">{{ total_savings | money }}</div>
+        <div class="sh-metric-label">Total savings</div>
+      </div>
+
+      <div class="sh-metric m-points">
+        <div class="sh-metric-top">
+          <div class="sh-metric-icon" style="background:var(--amber)">
+            <svg viewBox="0 0 24 24" fill="#fff" width="14" height="14"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          </div>
+          <span class="sh-metric-change" style="background:#FEF3C7;color:#92400E">Member</span>
+        </div>
+        <div class="sh-metric-num" style="color:var(--amber)">0</div>
+        <div class="sh-metric-label">Reward points</div>
+      </div>
+    </div>
+
+    {%- comment -%} Active orders section {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Recent orders <span class="sh-count" id="sh-dash-orders-count">{{ cust_order_count }}</span></div>
+        <button class="sh-section-action" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View all orders &rarr;</button>
+      </div>
+      <div class="sh-section-body" id="sh-dash-orders-container">
+        {%- if cust_order_count == 0 -%}
+          <div class="sh-empty" id="sh-dash-orders-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            <h3>Loading orders&hellip;</h3>
+            <p style="font-size:12px;color:#999">Checking your order history</p>
+          </div>
+        {%- else -%}
+          {%- for order in cust_orders limit: 3 -%}
+            <div class="sh-order-card">
+              <div class="sh-oc-top">
+                <div>
+                  <span class="sh-oc-id">{{ order.name }}</span> &middot; {{ order.created_at | date: '%b %d, %Y' }}
+                </div>
+              </div>
+              <div class="sh-oc-items">
+                {%- assign first_item = order.line_items | first -%}
+                <div class="sh-oc-img">
+                  {%- if first_item.image -%}
+                    <img src="{{ first_item.image | image_url: width: 128 }}" alt="{{ first_item.title | escape }}" loading="lazy">
+                  {%- else -%}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  {%- endif -%}
+                </div>
+                <div class="sh-oc-info">
+                  <div class="sh-oc-name">{{ first_item.title }}</div>
+                  {%- if first_item.variant_title != blank -%}
+                    <div class="sh-oc-variant">{{ first_item.variant_title }}</div>
+                  {%- endif -%}
+                  <div class="sh-oc-price-row">
+                    <span class="sh-oc-price">{{ order.total_price | money }}</span>
+                    <span class="sh-oc-qty">{{ order.line_items.size }} item{%- if order.line_items.size > 1 -%}s{%- endif -%}</span>
+                  </div>
+                </div>
+              </div>
+
+              {%- comment -%} Tracking timeline {%- endcomment -%}
+              {%- assign ff_status = order.fulfillment_status -%}
+              {%- assign fn_status = order.financial_status -%}
+              {%- if ff_status == "fulfilled" or ff_status == "partial" -%}
+                <div class="sh-oc-track">
+                  <div class="sh-track">
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot done"></div>
+                      <div class="sh-track-line done"></div>
+                      <div class="sh-track-label active">Confirmed<br><span class="sh-track-date">{{ order.created_at | date: '%b %d' }}</span></div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot done"></div>
+                      <div class="sh-track-line {% if ff_status == 'fulfilled' %}done{% endif %}"></div>
+                      <div class="sh-track-label active">Shipped</div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot {% if ff_status == 'fulfilled' %}done{% else %}now{% endif %}"></div>
+                      <div class="sh-track-line"></div>
+                      <div class="sh-track-label {% if ff_status == 'fulfilled' %}active{% endif %}">In transit</div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot"></div>
+                      <div class="sh-track-label">Delivered</div>
+                    </div>
+                  </div>
+                </div>
+              {%- endif -%}
+
+              <div class="sh-oc-bottom">
+                {%- if ff_status == "fulfilled" -%}
+                  <span class="sh-oc-status sh-st-shipped">Shipped</span>
+                {%- elsif ff_status == "partial" -%}
+                  <span class="sh-oc-status sh-st-processing">Partially fulfilled</span>
+                {%- elsif order.cancelled_at != blank -%}
+                  <span class="sh-oc-status sh-st-cancelled">Cancelled</span>
+                {%- else -%}
+                  <span class="sh-oc-status sh-st-processing">Processing</span>
+                {%- endif -%}
+                <div class="sh-oc-actions">
+                  <button class="sh-oc-btn sh-oc-btn-outline" data-sh-nav="orders" style="border:none;font-family:inherit;cursor:pointer">View details</button>
+                  {%- if ff_status == "fulfilled" -%}
+                    <button class="sh-oc-btn sh-oc-btn-primary" data-sh-nav="orders" style="border:none;font-family:inherit;cursor:pointer;color:#fff">Track package</button>
+                  {%- endif -%}
+                </div>
+              </div>
+            </div>
+          {%- endfor -%}
+        {%- endif -%}
+      </div>
+    </div>
+
+    {%- comment -%} Quick actions {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Quick actions</div>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-quick-grid">
+          <button class="sh-quick-item" data-sh-nav="orders">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            My orders
+          </button>
+          <button class="sh-quick-item" data-sh-nav="orders">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            Track package
+          </button>
+          <button class="sh-quick-item" data-sh-nav="wishlist">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            Wishlist
+          </button>
+          <a class="sh-quick-item" href="/pages/rewards">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Rewards
+          </a>
+          <a class="sh-quick-item" href="/pages/help-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            Returns
+          </a>
+          <a class="sh-quick-item" href="/pages/help-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Help center
+          </a>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Two columns: Coupons + Reward points {%- endcomment -%}
+    <div class="sh-g2">
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">My coupons</div>
+        </div>
+        <div class="sh-section-body">
+          <div class="sh-coupon-card">
+            <div class="sh-coupon-left"><div class="sh-coupon-val">10%</div><div class="sh-coupon-type">OFF</div></div>
+            <div class="sh-coupon-mid"><div class="sh-coupon-name">WELCOME10</div><div class="sh-coupon-desc">First order discount</div><div class="sh-coupon-exp">New customers only</div></div>
+            <button class="sh-coupon-use" data-sh-copy="WELCOME10">Copy code</button>
+          </div>
+          <div class="sh-coupon-card" style="border-color:#a7d5c0;background:#F0FFF8">
+            <div class="sh-coupon-left"><div class="sh-coupon-val" style="color:var(--green)">FREE</div><div class="sh-coupon-type" style="color:var(--green)">SHIP</div></div>
+            <div class="sh-coupon-mid"><div class="sh-coupon-name">FREESHIP</div><div class="sh-coupon-desc">Free shipping on orders $30+</div><div class="sh-coupon-exp">No expiration</div></div>
+            <button class="sh-coupon-use" data-sh-copy="FREESHIP">Copy code</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">Reward points</div>
+          <a href="/pages/rewards" class="sh-section-action">How it works &rarr;</a>
+        </div>
+        <div class="sh-section-body">
+          <div class="sh-points-wrap">
+            <div class="sh-points-circle">
+              <div class="sh-points-inner">
+                <div class="sh-points-num">0</div>
+                <div class="sh-points-lbl">POINTS</div>
+              </div>
+            </div>
+            <div class="sh-points-info">
+              <div class="sh-points-tier">Member</div>
+              <div class="sh-points-next">Start earning points today!</div>
+              <div class="sh-points-earn">
+                <span class="sh-points-tag">1pt / $1 spent</span>
+                <span class="sh-points-tag">200pts = $10 off</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Buy again — from past orders {%- endcomment -%}
+    {%- if cust_order_count > 0 -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Buy again</div>
+        <button class="sh-section-action" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View order history &rarr;</button>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-reorder">
+          {%- for order in cust_orders limit: 6 -%}
+            {%- for item in order.line_items limit: 1 -%}
+              <div class="sh-reorder-item">
+                <div class="sh-reorder-img">
+                  {%- if item.image -%}
+                    <img src="{{ item.image | image_url: width: 160 }}" alt="{{ item.title | escape }}" loading="lazy">
+                  {%- else -%}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                  {%- endif -%}
+                </div>
+                <div class="sh-reorder-name">{{ item.title | truncate: 30 }}</div>
+                <a href="{{ item.url }}" class="sh-reorder-btn">Reorder &rarr;</a>
+              </div>
+            {%- endfor -%}
+          {%- endfor -%}
+        </div>
+      </div>
+    </div>
+    {%- endif -%}
+
+    {%- comment -%} Two columns: Addresses + Messages {%- endcomment -%}
+    <div class="sh-g2">
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">Addresses</div>
+          <button class="sh-section-action" data-sh-nav="addresses" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:12px">Manage &rarr;</button>
+        </div>
+        <div class="sh-section-body">
+          {%- if cust_addresses.size == 0 -%}
+            <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">
+              No addresses saved yet. <button data-sh-nav="addresses" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:12px">Add one &rarr;</button>
+            </div>
+          {%- else -%}
+            <div class="sh-addr-row">
+              {%- for address in cust_addresses limit: 2 -%}
+                <div class="sh-addr-item{% if address == cust_default_address %} default{% endif %}">
+                  {%- if address == cust_default_address -%}
+                    <span class="sh-addr-default-badge">Default</span>
+                  {%- endif -%}
+                  <div class="sh-addr-type">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {%- if address.company != blank -%}{{ address.company }}{%- else -%}Address{%- endif -%}
+                  </div>
+                  <div class="sh-addr-text">
+                    {{ address.first_name }} {{ address.last_name }}<br>
+                    {{ address.address1 }}{%- if address.address2 != blank -%}, {{ address.address2 }}{%- endif -%}<br>
+                    {{ address.city }}, {{ address.province_code }} {{ address.zip }}<br>
+                    {%- if address.phone != blank -%}{{ address.phone }}{%- endif -%}
+                  </div>
+                </div>
+              {%- endfor -%}
+            </div>
+          {%- endif -%}
+        </div>
+      </div>
+
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">Messages</div>
+        </div>
+        <div class="sh-section-body">
+          <div class="sh-msg-row">
+            <div class="sh-msg-dot"></div>
+            <div class="sh-msg-body">
+              <div class="sh-msg-title">Welcome to StyleHub Miami!</div>
+              <div class="sh-msg-text">Thank you for being a member. Browse our latest deals and start saving today. Need help? Contact our support team.</div>
+            </div>
+            <div class="sh-msg-time">Welcome</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Account settings preview {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Account settings</div>
+        <button class="sh-section-action" data-sh-nav="settings" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:13px">Edit profile &rarr;</button>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-set-grid">
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div><button class="sh-set-edit" data-sh-nav="settings" style="background:none;border:none;font-family:inherit;cursor:pointer">Edit</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div><button class="sh-set-edit" data-sh-nav="settings" style="background:none;border:none;font-family:inherit;cursor:pointer">Edit</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">••••••••</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Orders</div><div class="sh-set-val" id="sh-dash-settings-orders">{{ cust_order_count }} total orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Language</div><div class="sh-set-val">English (US)</div></div><span class="sh-set-edit" style="opacity:0.5">Default</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end dashboard -->
+
+  {%- comment -%} === ORDERS SECTION === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="orders">
+    <div class="sh-welcome">
+      <div>
+        <h1>My orders</h1>
+        <div class="sh-welcome-sub">View and manage your order history</div>
+      </div>
+    </div>
+
+    {%- if cust_order_count == 0 -%}
+      <div class="sh-section" id="sh-orders-api-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">All orders <span class="sh-count" id="sh-orders-api-count">...</span></div>
+        </div>
+        <div class="sh-section-body" id="sh-orders-api-container">
+          <div style="text-align:center;padding:24px 0;color:var(--text2)">
+            <div class="sh-skeleton" style="height:60px;border-radius:8px;margin-bottom:12px;background:#f0f0f0;animation:pulse 1.5s infinite"></div>
+            <div class="sh-skeleton" style="height:60px;border-radius:8px;background:#f0f0f0;animation:pulse 1.5s infinite"></div>
+            <p style="margin-top:12px;font-size:12px;color:#999">Loading order history&hellip;</p>
+          </div>
+        </div>
+      </div>
+    {%- else -%}
+      <div class="sh-section">
+        <div class="sh-section-head">
+          <div class="sh-section-title">All orders <span class="sh-count">{{ cust_order_count }}</span></div>
+        </div>
+        <div class="sh-section-body">
+          {%- for order in cust_orders -%}
+            <div class="sh-order-card">
+              <div class="sh-oc-top">
+                <div>
+                  <span class="sh-oc-id">{{ order.name }}</span> &middot; {{ order.created_at | date: '%b %d, %Y' }}
+                </div>
+              </div>
+              <div class="sh-oc-items">
+                {%- for item in order.line_items -%}
+                  <div style="display:flex;gap:12px;align-items:center;{%- unless forloop.first -%}margin-top:8px{%- endunless -%}">
+                    <div class="sh-oc-img">
+                      {%- if item.image -%}
+                        <img src="{{ item.image | image_url: width: 128 }}" alt="{{ item.title | escape }}" loading="lazy">
+                      {%- else -%}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                      {%- endif -%}
+                    </div>
+                    <div class="sh-oc-info">
+                      <div class="sh-oc-name">{{ item.title }}</div>
+                      {%- if item.variant_title != blank -%}
+                        <div class="sh-oc-variant">{{ item.variant_title }}</div>
+                      {%- endif -%}
+                      <div class="sh-oc-price-row">
+                        <span class="sh-oc-price">{{ item.final_price | money }}</span>
+                        <span class="sh-oc-qty">&times; {{ item.quantity }}</span>
+                      </div>
+                    </div>
+                  </div>
+                {%- endfor -%}
+              </div>
+
+              {%- assign ff_status = order.fulfillment_status -%}
+              {%- if ff_status == "fulfilled" or ff_status == "partial" -%}
+                <div class="sh-oc-track">
+                  <div class="sh-track">
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot done"></div>
+                      <div class="sh-track-line done"></div>
+                      <div class="sh-track-label active">Confirmed<br><span class="sh-track-date">{{ order.created_at | date: '%b %d' }}</span></div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot done"></div>
+                      <div class="sh-track-line {% if ff_status == 'fulfilled' %}done{% endif %}"></div>
+                      <div class="sh-track-label active">Shipped</div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot {% if ff_status == 'fulfilled' %}done{% else %}now{% endif %}"></div>
+                      <div class="sh-track-line"></div>
+                      <div class="sh-track-label {% if ff_status == 'fulfilled' %}active{% endif %}">In transit</div>
+                    </div>
+                    <div class="sh-track-node">
+                      <div class="sh-track-dot"></div>
+                      <div class="sh-track-label">Delivered</div>
+                    </div>
+                  </div>
+                </div>
+              {%- endif -%}
+
+              <div class="sh-oc-bottom">
+                {%- if order.cancelled_at != blank -%}
+                  <span class="sh-oc-status sh-st-cancelled">Cancelled</span>
+                {%- elsif ff_status == "fulfilled" -%}
+                  <span class="sh-oc-status sh-st-shipped">Shipped</span>
+                {%- elsif ff_status == "partial" -%}
+                  <span class="sh-oc-status sh-st-processing">Partially fulfilled</span>
+                {%- else -%}
+                  <span class="sh-oc-status sh-st-processing">Processing</span>
+                {%- endif -%}
+                <div class="sh-oc-actions">
+                  <button class="sh-oc-btn sh-oc-btn-outline" data-sh-nav="orders" style="border:none;font-family:inherit;cursor:pointer">View details</button>
+                  {%- if ff_status == "fulfilled" -%}
+                    <button class="sh-oc-btn sh-oc-btn-primary" data-sh-nav="orders" style="border:none;font-family:inherit;cursor:pointer;color:#fff">Track package</button>
+                  {%- endif -%}
+                </div>
+              </div>
+            </div>
+          {%- endfor -%}
+        </div>
+      </div>
+    {%- endif -%}
+  </div>
+
+  {%- comment -%} === ADDRESSES === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="addresses">
+    <div class="sh-welcome">
+      <div>
+        <h1>My addresses</h1>
+        <div class="sh-welcome-sub">Manage your shipping and billing addresses</div>
+      </div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Saved addresses <span class="sh-count">{{ cust_addresses.size }}</span></div>
+        <button class="sh-section-action" id="sh-addr-add-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:12px">Add new &rarr;</button>
+      </div>
+      <div class="sh-section-body">
+        {%- if cust_addresses.size == 0 -%}
+          <div class="sh-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <h3>No addresses saved</h3>
+            <p>Add your shipping address to speed up checkout.</p>
+            <button class="sh-empty-btn" id="sh-addr-add-btn2" style="cursor:pointer;font-family:inherit">Add address &rarr;</button>
+          </div>
+        {%- else -%}
+          <div class="sh-addr-row" style="flex-wrap:wrap">
+            {%- for address in cust_addresses -%}
+              <div class="sh-addr-item{% if address == cust_default_address %} default{% endif %}" style="min-width:220px">
+                {%- if address == cust_default_address -%}
+                  <span class="sh-addr-default-badge">Default</span>
+                {%- endif -%}
+                <div class="sh-addr-type">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  {%- if address.company != blank -%}{{ address.company }}{%- else -%}Address {{ forloop.index }}{%- endif -%}
+                </div>
+                <div class="sh-addr-text">
+                  {{ address.first_name }} {{ address.last_name }}<br>
+                  {{ address.address1 }}{%- if address.address2 != blank -%}, {{ address.address2 }}{%- endif -%}<br>
+                  {{ address.city }}, {{ address.province_code }} {{ address.zip }}<br>
+                  {{ address.country }}<br>
+                  {%- if address.phone != blank -%}{{ address.phone }}{%- endif -%}
+                </div>
+              </div>
+            {%- endfor -%}
+          </div>
+        {%- endif -%}
+      </div>
+    </div>
+
+    {%- comment -%} Inline Add Address Form {%- endcomment -%}
+    <div class="sh-section" id="sh-addr-form-wrap" style="display:none">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Add new address</div>
+        <button id="sh-addr-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
+      </div>
+      <div class="sh-section-body">
+        <div id="sh-addr-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">First name</label>
+              <input type="text" id="sh-addr-first" autocomplete="given-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Last name</label>
+              <input type="text" id="sh-addr-last" autocomplete="family-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Company (optional)</label>
+            <input type="text" id="sh-addr-company" autocomplete="organization" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+          </div>
+          <div style="margin-top:12px">
+            <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Address</label>
+            <input type="text" id="sh-addr-address1" autocomplete="address-line1" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+          </div>
+          <div style="margin-top:12px">
+            <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Apartment, suite, etc. (optional)</label>
+            <input type="text" id="sh-addr-address2" autocomplete="address-line2" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">City</label>
+              <input type="text" id="sh-addr-city" autocomplete="address-level2" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">State / Province</label>
+              <input type="text" id="sh-addr-province" autocomplete="address-level1" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">ZIP / Postal code</label>
+              <input type="text" id="sh-addr-zip" autocomplete="postal-code" required style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Country</label>
+              <select id="sh-addr-country" autocomplete="country-name" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;background:#fff">
+                <option value="United States" selected>United States</option>
+                <option value="Canada">Canada</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Phone (optional)</label>
+              <input type="tel" id="sh-addr-phone" autocomplete="tel" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;cursor:pointer">
+              <input type="checkbox" id="sh-addr-default" value="1"> Set as default address
+            </label>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:20px">
+            <button type="button" id="sh-addr-save-btn" style="padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600">Save address</button>
+            <button type="button" id="sh-addr-cancel-btn2" style="padding:10px 20px;background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
+          </div>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} === COUPONS === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="coupons">
+    <div class="sh-welcome">
+      <div>
+        <h1>My coupons</h1>
+        <div class="sh-welcome-sub">Available discount codes for your next order</div>
+      </div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-body">
+        <div class="sh-coupon-card">
+          <div class="sh-coupon-left"><div class="sh-coupon-val">10%</div><div class="sh-coupon-type">OFF</div></div>
+          <div class="sh-coupon-mid"><div class="sh-coupon-name">WELCOME10</div><div class="sh-coupon-desc">First order discount &middot; New customers only</div><div class="sh-coupon-exp">Min. order $15</div></div>
+          <button class="sh-coupon-use" data-sh-copy="WELCOME10">Copy code</button>
+        </div>
+        <div class="sh-coupon-card" style="border-color:#a7d5c0;background:#F0FFF8">
+          <div class="sh-coupon-left"><div class="sh-coupon-val" style="color:var(--green)">FREE</div><div class="sh-coupon-type" style="color:var(--green)">SHIP</div></div>
+          <div class="sh-coupon-mid"><div class="sh-coupon-name">FREESHIP</div><div class="sh-coupon-desc">Free shipping on orders $30+</div><div class="sh-coupon-exp">No expiration</div></div>
+          <button class="sh-coupon-use" data-sh-copy="FREESHIP">Copy code</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} === MESSAGES === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="messages">
+    <div class="sh-welcome">
+      <div>
+        <h1>Messages</h1>
+        <div class="sh-welcome-sub">Your conversations with StyleHub support</div>
+      </div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-body">
+        <div class="sh-msg-row">
+          <div class="sh-msg-dot"></div>
+          <div class="sh-msg-body">
+            <div class="sh-msg-title">Welcome to StyleHub Miami!</div>
+            <div class="sh-msg-text">Thank you for creating your account. If you need help with anything, our support team is here for you.</div>
+          </div>
+          <div class="sh-msg-time">Welcome</div>
+        </div>
+        <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">
+          Need help? <a href="/pages/help-center" style="color:var(--red)">Visit our Help Center</a> or use the chat widget below.
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  {%- comment -%} === WISHLIST === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="wishlist">
+    <div class="sh-welcome">
+      <div>
+        <h1>My wishlist</h1>
+        <div class="sh-welcome-sub">Products you've saved for later</div>
+      </div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-body" id="sh-wishlist-items">
+        <div class="sh-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <h3>Your wishlist is empty</h3>
+          <p>Browse products and click the heart icon to save items here.</p>
+          <a href="/" class="sh-empty-btn">Browse products &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} === RECENTLY VIEWED === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="recently-viewed">
+    <div class="sh-welcome">
+      <div>
+        <h1>Recently viewed</h1>
+        <div class="sh-welcome-sub">Products you've browsed recently</div>
+      </div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-body" data-sh-recently-viewed>
+        <div class="sh-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <h3>No recently viewed products</h3>
+          <p>Products you browse will appear here.</p>
+          <a href="/" class="sh-empty-btn">Start browsing &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} === RETURNS === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="returns">
+    <div class="sh-welcome">
+      <div>
+        <h1>Returns & refunds</h1>
+        <div class="sh-welcome-sub">Request a return or check the status of an existing one</div>
+      </div>
+    </div>
+
+    {%- comment -%} New Return Request Form {%- endcomment -%}
+    <div class="sh-section" id="sh-return-form-section" style="display:none">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Request a return</div>
+        <button id="sh-return-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
+      </div>
+      <div class="sh-section-body">
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Order</label>
+          <select id="sh-return-order-select" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;background:#fff">
+            <option value="">Select an order...</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Reason for return</label>
+          <select id="sh-return-reason" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;background:#fff">
+            <option value="">Select a reason...</option>
+            <option value="wrong_item">Wrong item received</option>
+            <option value="damaged">Item arrived damaged</option>
+            <option value="not_as_described">Not as described</option>
+            <option value="doesnt_fit">Doesn't fit</option>
+            <option value="changed_mind">Changed my mind</option>
+            <option value="quality">Quality issue</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Additional details (optional)</label>
+          <textarea id="sh-return-comment" rows="3" placeholder="Describe the issue..." style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+        </div>
+        <div id="sh-return-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
+        <button id="sh-return-submit-btn" style="padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600">Submit return request</button>
+      </div>
+    </div>
+
+    {%- comment -%} Existing Returns List {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">My returns <span class="sh-count" id="sh-returns-count">0</span></div>
+        <button id="sh-return-new-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:12px">New return request &rarr;</button>
+      </div>
+      <div class="sh-section-body" id="sh-returns-container">
+        <div class="sh-empty" id="sh-returns-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          <h3>No returns</h3>
+          <p>You haven't submitted any return requests yet.</p>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Return policy summary {%- endcomment -%}
+    <div class="sh-section" style="background:linear-gradient(135deg,#fafafa,#f5f5f5);border:1px solid #eee;border-radius:12px">
+      <div class="sh-section-body" style="padding:20px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:10px">📦 Return policy</div>
+        <div style="font-size:13px;color:#555;line-height:1.7">
+          <div style="margin-bottom:6px"><strong>30-day window</strong> — Returns accepted within 30 days of delivery</div>
+          <div style="margin-bottom:6px"><strong>Condition</strong> — Items must be unused, in original packaging</div>
+          <div style="margin-bottom:6px"><strong>Process</strong> — Submit a request, we'll review within 24-48 hours</div>
+          <div><strong>Refunds</strong> — Processed to original payment method within 5-10 business days</div>
+        </div>
+        <a href="/policies/refund-policy" style="display:inline-block;margin-top:12px;font-size:12px;color:var(--red);font-weight:600;text-decoration:none">Read full policy &rarr;</a>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} === REVIEWS === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="reviews">
+    <div class="sh-welcome">
+      <div>
+        <h1>My reviews</h1>
+        <div class="sh-welcome-sub">Share your experience with products you've purchased</div>
+      </div>
+    </div>
+
+    {%- comment -%} Write Review Form (hidden by default) {%- endcomment -%}
+    <div class="sh-section" id="sh-review-form-section" style="display:none">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Write a review</div>
+        <button id="sh-review-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
+      </div>
+      <div class="sh-section-body">
+        <div id="sh-review-product-info" style="display:flex;gap:12px;align-items:center;padding:12px;background:#f9f9f9;border-radius:8px;margin-bottom:16px"></div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:8px">Rating</label>
+          <div id="sh-review-stars" style="display:flex;gap:4px">
+            <button class="sh-star-btn" data-star="1" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+            <button class="sh-star-btn" data-star="2" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+            <button class="sh-star-btn" data-star="3" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+            <button class="sh-star-btn" data-star="4" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+            <button class="sh-star-btn" data-star="5" style="background:none;border:none;cursor:pointer;font-size:28px;color:#ddd;padding:0">★</button>
+          </div>
+          <input type="hidden" id="sh-review-rating" value="0">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Review title</label>
+          <input type="text" id="sh-review-title" placeholder="Summarize your experience" style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px">Your review</label>
+          <textarea id="sh-review-text" rows="4" placeholder="Tell us what you liked or didn't like..." style="width:100%;padding:10px 12px;border:1px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+        </div>
+        <div id="sh-review-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px"></div>
+        <input type="hidden" id="sh-review-product-id" value="">
+        <input type="hidden" id="sh-review-product-title-val" value="">
+        <input type="hidden" id="sh-review-order-id" value="">
+        <button id="sh-review-submit-btn" style="padding:10px 24px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:600">Submit review</button>
+      </div>
+    </div>
+
+    {%- comment -%} Products available to review {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Products to review</div>
+      </div>
+      <div class="sh-section-body" id="sh-reviewable-container">
+        <div style="text-align:center;padding:24px 0;color:var(--text2);font-size:12px">
+          <div class="sh-skeleton" style="height:50px;border-radius:8px;background:#f0f0f0;animation:pulse 1.5s infinite"></div>
+          <p style="margin-top:10px">Loading your orders&hellip;</p>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Submitted reviews {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">My submitted reviews <span class="sh-count" id="sh-reviews-count">0</span></div>
+      </div>
+      <div class="sh-section-body" id="sh-reviews-list-container">
+        <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">No reviews submitted yet.</div>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} === SETTINGS === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="settings">
+    <div class="sh-welcome">
+      <div>
+        <h1>Account settings</h1>
+        <div class="sh-welcome-sub">Manage your profile and preferences</div>
+      </div>
+    </div>
+
+    {%- comment -%} Profile info — read-only view with inline edit toggle {%- endcomment -%}
+    <div class="sh-section" id="sh-profile-view">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Profile information</div>
+        <button class="sh-section-action" id="sh-profile-edit-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:var(--red);font-weight:600;font-size:13px">Edit profile &rarr;</button>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-set-grid">
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Full name</div><div class="sh-set-val">{{ cust_name }}</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Email address</div><div class="sh-set-val">{{ cust_email }}</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Phone number</div><div class="sh-set-val">{%- if cust_default_address and cust_default_address.phone != blank -%}{{ cust_default_address.phone }}{%- else -%}Not set{%- endif -%}</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Password</div><div class="sh-set-val">••••••••</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total orders</div><div class="sh-set-val" id="sh-settings-orders-count">{{ cust_order_count }} orders</div></div><button class="sh-set-edit" data-sh-nav="orders" style="background:none;border:none;font-family:inherit;cursor:pointer">View</button></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Total spent</div><div class="sh-set-val">{{ customer.total_spent | money }}</div></div><span class="sh-set-edit" style="opacity:0.5">-</span></div>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Profile edit form — uses backend API to bypass New Customer Accounts redirect {%- endcomment -%}
+    <div class="sh-section" id="sh-profile-form" style="display:none">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Edit profile</div>
+        <button class="sh-section-action" id="sh-profile-cancel-btn" style="background:none;border:none;font-family:inherit;cursor:pointer;color:#666;font-weight:600;font-size:13px">Cancel</button>
+      </div>
+      <div class="sh-section-body">
+        <div id="sh-profile-msg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:500px">
+          <div>
+            <label for="sh-cust-first" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">First name</label>
+            <input type="text" id="sh-cust-first" value="{{ customer.first_name }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit">
+          </div>
+          <div>
+            <label for="sh-cust-last" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Last name</label>
+            <input type="text" id="sh-cust-last" value="{{ customer.last_name }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit">
+          </div>
+        </div>
+        <div style="margin-top:14px;max-width:500px">
+          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px">Email address</label>
+          <input type="email" value="{{ customer.email }}" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;background:#f9f9f9;color:#999" disabled>
+          <span style="font-size:11px;color:#999;margin-top:4px;display:block">Email cannot be changed here</span>
+        </div>
+        <div style="margin-top:18px;display:flex;gap:10px">
+          <button type="button" id="sh-profile-save-btn" style="padding:10px 28px;background:var(--red,#e53e3e);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Save changes</button>
+          <button type="button" id="sh-profile-cancel-btn2" style="padding:10px 20px;background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Account stats (always visible) {%- endcomment -%}
+    <div class="sh-section">
+      <div class="sh-section-head">
+        <div class="sh-section-title">Account overview</div>
+      </div>
+      <div class="sh-section-body">
+        <div class="sh-set-grid">
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Member since</div><div class="sh-set-val">{{ customer.created_at | date: "%B %Y" }}</div></div></div>
+          <div class="sh-set-item"><div class="sh-set-left"><div class="sh-set-key">Default address</div><div class="sh-set-val">{%- if cust_default_address -%}{{ cust_default_address.city }}, {{ cust_default_address.province_code }} {{ cust_default_address.zip }}{%- else -%}Not set{%- endif -%}</div></div><button class="sh-set-edit" data-sh-nav="addresses" style="background:none;border:none;font-family:inherit;cursor:pointer">Manage</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end main -->
+</div><!-- end page -->
+</div><!-- end sh-acct -->
+
+<script>
+(function() {
+  'use strict';
+
+  /* Navigation */
+  var navItems = document.querySelectorAll('[data-sh-nav]');
+  var sections = document.querySelectorAll('[data-sh-section]');
+  var sidebar = document.querySelector('[data-sh-sidebar]');
+  var overlay = document.querySelector('[data-sh-overlay]');
+  var mobileToggle = document.querySelector('[data-sh-mobile-toggle]');
+
+  function showSection(name) {
+    sections.forEach(function(s) { s.classList.remove('active'); });
+    navItems.forEach(function(n) { n.classList.remove('active'); });
+    var target = document.querySelector('[data-sh-section="' + name + '"]');
+    if (target) target.classList.add('active');
+    var _firstMatch = false;
+    navItems.forEach(function(n) {
+      if (n.getAttribute('data-sh-nav') === name && !_firstMatch) {
+        n.classList.add('active');
+        _firstMatch = true;
+      }
+    });
+    closeSidebar();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  navItems.forEach(function(item) {
+    item.addEventListener('click', function(e) {
+      e.preventDefault();
+      showSection(this.getAttribute('data-sh-nav'));
+    });
+  });
+
+  /* Mobile sidebar */
+  function closeSidebar() {
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
+  }
+
+  if (mobileToggle) {
+    mobileToggle.addEventListener('click', function() {
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('open');
+    });
+  }
+  if (overlay) overlay.addEventListener('click', closeSidebar);
+
+  /* Copy coupon code */
+  document.querySelectorAll('[data-sh-copy]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var code = this.getAttribute('data-sh-copy');
+      var self = this;
+      function onCopied() {
+        self.textContent = 'Copied!';
+        self.style.background = '#16a34a';
+        setTimeout(function() { self.textContent = 'Copy code'; self.style.background = ''; }, 2000);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(onCopied).catch(function() {
+          var ta = document.createElement('textarea');
+          ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+          document.body.removeChild(ta); onCopied();
+        });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta); onCopied();
+      }
+    });
+  });
+
+  /* Dismiss alert */
+  document.querySelectorAll('[data-sh-dismiss]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      this.closest('.sh-alert').style.display = 'none';
+    });
+  });
+
+  /* Wishlist count from localStorage */
+  try {
+    var wl = JSON.parse(localStorage.getItem('dh_wishlist') || '[]');
+    var countEls = document.querySelectorAll('[data-sh-wishlist-count]');
+    countEls.forEach(function(el) { el.textContent = wl.length; });
+  } catch(e) {}
+
+  /* Wishlist section — render items from localStorage (reads dh_wishlist written by search results) */
+  (function() {
+    var container = document.getElementById('sh-wishlist-items');
+    if (!container) return;
+    var items = [];
+    try { items = JSON.parse(localStorage.getItem('dh_wishlist') || '[]'); } catch(e) {}
+    if (items.length === 0) return; /* keep empty state */
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">';
+    items.forEach(function(item) {
+      var itemUrl = item.url || (item.id && item.source ? '/pages/product?id=' + encodeURIComponent(item.id) + '&store=' + encodeURIComponent(item.source) : '#');
+      var priceDisplay = item.price || '';
+      if (typeof priceDisplay === 'number') priceDisplay = '$' + priceDisplay.toFixed(2);
+      else if (typeof priceDisplay === 'string' && priceDisplay && priceDisplay.indexOf('$') < 0) priceDisplay = '$' + priceDisplay;
+      html += '<div style="border:1px solid #eee;border-radius:10px;overflow:hidden;background:#fff">'
+        + '<a href="' + itemUrl + '" style="display:block">'
+        + '<div style="aspect-ratio:1;overflow:hidden;background:#f7f7f8">'
+        + (item.image ? '<img src="' + item.image + '" alt="" style="width:100%;height:100%;object-fit:cover" loading="lazy">' : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:32px">♡</div>')
+        + '</div></a>'
+        + '<div style="padding:10px">'
+        + '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (item.title || 'Product') + '</div>'
+        + '<div style="font-size:13px;font-weight:700;color:var(--red,#E53E3E);margin-top:4px">' + priceDisplay + '</div>'
+        + '<div style="display:flex;gap:6px;margin-top:8px">'
+        + '<a href="' + itemUrl + '" style="flex:1;text-align:center;font-size:11px;padding:6px;background:var(--navy,#1A1A2E);color:#fff;border-radius:6px;font-weight:500;text-decoration:none">View</a>'
+        + '<button onclick="shRemoveWishlist(\'' + (item.id || '') + '\')" style="flex:1;text-align:center;font-size:11px;padding:6px;background:#fee;color:#c00;border-radius:6px;font-weight:500;border:none;cursor:pointer;font-family:inherit">Remove</button>'
+        + '</div></div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  })();
+  window.shRemoveWishlist = function(id) {
+    var items = [];
+    try { items = JSON.parse(localStorage.getItem('dh_wishlist') || '[]'); } catch(e) {}
+    items = items.filter(function(i) { return i.id !== id; });
+    localStorage.setItem('dh_wishlist', JSON.stringify(items));
+    /* Update counts */
+    var countEls = document.querySelectorAll('[data-sh-wishlist-count]');
+    countEls.forEach(function(el) { el.textContent = items.length; });
+    /* Re-render by reloading section */
+    var container = document.getElementById('sh-wishlist-items');
+    if (!container) return;
+    if (items.length === 0) {
+      container.innerHTML = '<div class="sh-empty"><svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><h3>Your wishlist is empty</h3><p>Browse products and click the heart icon to save items here.</p><a href="/" class="sh-empty-btn">Browse products &rarr;</a></div>';
+      return;
+    }
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">';
+    items.forEach(function(item) {
+      var itemUrl = item.url || (item.id && item.source ? '/pages/product?id=' + encodeURIComponent(item.id) + '&store=' + encodeURIComponent(item.source) : '#');
+      var priceDisplay = item.price || '';
+      if (typeof priceDisplay === 'number') priceDisplay = '$' + priceDisplay.toFixed(2);
+      html += '<div style="border:1px solid #eee;border-radius:10px;overflow:hidden;background:#fff"><a href="' + itemUrl + '" style="display:block"><div style="aspect-ratio:1;overflow:hidden;background:#f7f7f8">' + (item.image ? '<img src="' + item.image + '" alt="" style="width:100%;height:100%;object-fit:cover" loading="lazy">' : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:32px">♡</div>') + '</div></a><div style="padding:10px"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (item.title || 'Product') + '</div><div style="font-size:13px;font-weight:700;color:var(--red,#E53E3E);margin-top:4px">' + priceDisplay + '</div><div style="display:flex;gap:6px;margin-top:8px"><a href="' + itemUrl + '" style="flex:1;text-align:center;font-size:11px;padding:6px;background:var(--navy,#1A1A2E);color:#fff;border-radius:6px;font-weight:500;text-decoration:none">View</a><button onclick="shRemoveWishlist(\'' + (item.id || '') + '\')" style="flex:1;text-align:center;font-size:11px;padding:6px;background:#fee;color:#c00;border-radius:6px;font-weight:500;border:none;cursor:pointer;font-family:inherit">Remove</button></div></div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  };
+
+  /* Recently Viewed — render items from localStorage (reads dh_recent written by PDP) */
+  (function() {
+    var container = document.querySelector('[data-sh-recently-viewed]');
+    if (!container) return;
+    var items = [];
+    try { items = JSON.parse(localStorage.getItem('dh_recent') || '[]'); } catch(e) {}
+    if (items.length === 0) return; /* keep empty state */
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">';
+    items.slice(0, 12).forEach(function(item) {
+      var itemUrl = item.url || (item.id && item.store ? '/pages/product?id=' + encodeURIComponent(item.id) + '&store=' + encodeURIComponent(item.store) : '#');
+      var priceDisplay = item.price || '';
+      if (typeof priceDisplay === 'number') priceDisplay = '$' + priceDisplay.toFixed(2);
+      else if (typeof priceDisplay === 'string' && priceDisplay && priceDisplay.indexOf('$') < 0) priceDisplay = '$' + priceDisplay;
+      html += '<a href="' + itemUrl + '" style="display:block;border:1px solid #eee;border-radius:10px;overflow:hidden;background:#fff;text-decoration:none;color:inherit">'
+        + '<div style="aspect-ratio:1;overflow:hidden;background:#f7f7f8">'
+        + (item.image ? '<img src="' + item.image + '" alt="" style="width:100%;height:100%;object-fit:cover" loading="lazy">' : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:24px">👁</div>')
+        + '</div>'
+        + '<div style="padding:8px">'
+        + '<div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (item.title || 'Product') + '</div>'
+        + '<div style="font-size:12px;font-weight:700;color:var(--red,#E53E3E);margin-top:3px">' + priceDisplay + '</div>'
+        + '</div></a>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  })();
+
+  /* Profile edit/cancel toggle */
+  var profileView = document.getElementById('sh-profile-view');
+  var profileForm = document.getElementById('sh-profile-form');
+  var profileEditBtn = document.getElementById('sh-profile-edit-btn');
+  var profileCancelBtn = document.getElementById('sh-profile-cancel-btn');
+  var profileCancelBtn2 = document.getElementById('sh-profile-cancel-btn2');
+  var profileSaveBtn = document.getElementById('sh-profile-save-btn');
+  var profileMsg = document.getElementById('sh-profile-msg');
+  var customerId = '{{ customer.id }}';
+
+  function showProfileEdit() {
+    if (profileMsg) { profileMsg.style.display = 'none'; }
+    if (profileView) profileView.style.display = 'none';
+    if (profileForm) profileForm.style.display = 'block';
+  }
+  function hideProfileEdit() {
+    if (profileForm) profileForm.style.display = 'none';
+    if (profileView) profileView.style.display = 'block';
+  }
+
+  if (profileEditBtn) profileEditBtn.addEventListener('click', showProfileEdit);
+  if (profileCancelBtn) profileCancelBtn.addEventListener('click', hideProfileEdit);
+  if (profileCancelBtn2) profileCancelBtn2.addEventListener('click', hideProfileEdit);
+
+  /* Profile save via API (bypasses New Customer Accounts redirect) */
+  if (profileSaveBtn) {
+    profileSaveBtn.addEventListener('click', function() {
+      var firstName = document.getElementById('sh-cust-first').value.trim();
+      var lastName = document.getElementById('sh-cust-last').value.trim();
+      profileSaveBtn.disabled = true;
+      profileSaveBtn.textContent = 'Saving...';
+      if (profileMsg) profileMsg.style.display = 'none';
+
+      function doProfileSave(attempt) {
+        fetch('https://dealshub-search.onrender.com/api/update-customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customer_id: customerId, first_name: firstName, last_name: lastName })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          profileSaveBtn.disabled = false;
+          profileSaveBtn.textContent = 'Save changes';
+          if (data.success) {
+            if (profileMsg) {
+              profileMsg.style.display = 'block';
+              profileMsg.style.background = '#D1FAE5';
+              profileMsg.style.color = '#065F46';
+              profileMsg.innerHTML = '<strong>Profile updated!</strong> Your changes have been saved.';
+            }
+            /* Update displayed name across the page */
+            var fullName = (data.customer.first_name || '') + ' ' + (data.customer.last_name || '');
+            document.querySelectorAll('.sh-side-name').forEach(function(el) { el.textContent = fullName.trim(); });
+            document.querySelectorAll('.sh-set-val').forEach(function(el) {
+              if (el.closest('.sh-set-item') && el.closest('.sh-set-item').querySelector('.sh-set-key') &&
+                  el.closest('.sh-set-item').querySelector('.sh-set-key').textContent.trim() === 'Full name') {
+                el.textContent = fullName.trim();
+              }
+          });
+          /* Update initials */
+          var i1 = (data.customer.first_name || '').charAt(0).toUpperCase();
+          var i2 = (data.customer.last_name || '').charAt(0).toUpperCase();
+          document.querySelectorAll('.sh-side-av').forEach(function(el) { el.textContent = i1 + i2; });
+          /* Update welcome */
+          var welcomeH1 = document.querySelector('.sh-welcome h1');
+          if (welcomeH1) welcomeH1.textContent = 'Welcome back, ' + (data.customer.first_name || 'Member').toUpperCase();
+          setTimeout(function() { hideProfileEdit(); }, 1500);
+        } else {
+          if (profileMsg) {
+            profileMsg.style.display = 'block';
+            profileMsg.style.background = '#FEE2E2';
+            profileMsg.style.color = '#991B1B';
+            profileMsg.innerHTML = '<strong>Error:</strong> ' + (data.error || 'Could not save changes. Please try again.');
+          }
+        }
+      })
+      .catch(function(err) {
+        if (attempt < 2) {
+          /* Auto-retry once (handles Render cold start) */
+          if (profileMsg) {
+            profileMsg.style.display = 'block';
+            profileMsg.style.background = '#FEF3C7';
+            profileMsg.style.color = '#92400E';
+            profileMsg.innerHTML = 'Connection slow, retrying...';
+          }
+          setTimeout(function() { doProfileSave(attempt + 1); }, 2000);
+          return;
+        }
+        profileSaveBtn.disabled = false;
+        profileSaveBtn.textContent = 'Save changes';
+        if (profileMsg) {
+          profileMsg.style.display = 'block';
+          profileMsg.style.background = '#FEE2E2';
+          profileMsg.style.color = '#991B1B';
+          profileMsg.innerHTML = '<strong>Error:</strong> Connection failed. Please try again.';
+        }
+      });
+      }
+      doProfileSave(0);
+    });
+  }
+
+  /* Address add form toggle */
+  var addrFormWrap = document.getElementById('sh-addr-form-wrap');
+  function showAddrForm() { if (addrFormWrap) addrFormWrap.style.display = 'block'; }
+  function hideAddrForm() { if (addrFormWrap) addrFormWrap.style.display = 'none'; }
+
+  var addrAddBtn = document.getElementById('sh-addr-add-btn');
+  var addrAddBtn2 = document.getElementById('sh-addr-add-btn2');
+  var addrCancelBtn = document.getElementById('sh-addr-cancel-btn');
+  var addrCancelBtn2 = document.getElementById('sh-addr-cancel-btn2');
+
+  if (addrAddBtn) addrAddBtn.addEventListener('click', showAddrForm);
+  if (addrAddBtn2) addrAddBtn2.addEventListener('click', showAddrForm);
+  if (addrCancelBtn) addrCancelBtn.addEventListener('click', hideAddrForm);
+  if (addrCancelBtn2) addrCancelBtn2.addEventListener('click', hideAddrForm);
+
+  /* Save address via API (bypasses New Customer Accounts form issue) */
+  var addrSaveBtn = document.getElementById('sh-addr-save-btn');
+  var addrMsg = document.getElementById('sh-addr-msg');
+  if (addrSaveBtn) {
+    addrSaveBtn.addEventListener('click', function() {
+      var address = {
+        firstName: (document.getElementById('sh-addr-first') || {}).value || '',
+        lastName: (document.getElementById('sh-addr-last') || {}).value || '',
+        company: (document.getElementById('sh-addr-company') || {}).value || '',
+        address1: (document.getElementById('sh-addr-address1') || {}).value || '',
+        address2: (document.getElementById('sh-addr-address2') || {}).value || '',
+        city: (document.getElementById('sh-addr-city') || {}).value || '',
+        province: (document.getElementById('sh-addr-province') || {}).value || '',
+        zip: (document.getElementById('sh-addr-zip') || {}).value || '',
+        country: (document.getElementById('sh-addr-country') || {}).value || 'United States',
+        phone: (document.getElementById('sh-addr-phone') || {}).value || '',
+        isDefault: (document.getElementById('sh-addr-default') || {}).checked || false
+      };
+
+      if (!address.firstName || !address.lastName || !address.address1 || !address.city || !address.zip) {
+        if (addrMsg) {
+          addrMsg.style.display = 'block';
+          addrMsg.style.background = '#FEE2E2';
+          addrMsg.style.color = '#991B1B';
+          addrMsg.textContent = 'Please fill in first name, last name, address, city, and ZIP code.';
+        }
+        return;
+      }
+
+      addrSaveBtn.disabled = true;
+      addrSaveBtn.textContent = 'Saving...';
+
+      fetch('https://dealshub-search.onrender.com/api/customer/address/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: customerId, address: address })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        addrSaveBtn.disabled = false;
+        addrSaveBtn.textContent = 'Save address';
+        if (data.success) {
+          window.location.href = '/pages/my-account#addresses';
+          window.location.reload();
+        } else {
+          if (addrMsg) {
+            addrMsg.style.display = 'block';
+            addrMsg.style.background = '#FEE2E2';
+            addrMsg.style.color = '#991B1B';
+            addrMsg.textContent = data.error || 'Could not save address. Please try again.';
+          }
+        }
+      })
+      .catch(function() {
+        addrSaveBtn.disabled = false;
+        addrSaveBtn.textContent = 'Save address';
+        if (addrMsg) {
+          addrMsg.style.display = 'block';
+          addrMsg.style.background = '#FEE2E2';
+          addrMsg.style.color = '#991B1B';
+          addrMsg.textContent = 'Connection error. Please try again.';
+        }
+      });
+    });
+  }
+
+  /* ---- Fetch orders via API (includes cancelled/refunded) ---- */
+  var customerEmail = '{{ customer.email | escape }}';
+  var liquidOrderCount = {{ cust_order_count | default: 0 }};
+
+  function formatOrderDate(d) {
+    var dt = new Date(d);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+  }
+
+  function orderStatusBadge(o) {
+    if (o.cancelled_at) return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#FEE2E2;color:#991B1B">Cancelled</span>';
+    if (o.financial_status === 'refunded') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#FEF3C7;color:#92400E">Refunded</span>';
+    if (o.financial_status === 'partially_refunded') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#FEF3C7;color:#92400E">Partially refunded</span>';
+    if (o.fulfillment_status === 'fulfilled') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#D1FAE5;color:#065F46">Delivered</span>';
+    if (o.fulfillment_status === 'partial') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#DBEAFE;color:#1E40AF">Partially shipped</span>';
+    if (o.financial_status === 'paid') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#DBEAFE;color:#1E40AF">Processing</span>';
+    if (o.financial_status === 'pending') return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#F3F4F6;color:#374151">Pending</span>';
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#F3F4F6;color:#374151">' + (o.financial_status || 'Unknown') + '</span>';
+  }
+
+  var _cardCounter = 0;
+  function renderOrderCard(o, compact) {
+    _cardCounter++;
+    var itemsHtml = '';
+    var items = o.line_items || [];
+    var showItems = compact ? items.slice(0, 2) : items;
+    showItems.forEach(function(item, idx) {
+      var imgStyle48 = 'width:48px;height:48px;object-fit:cover;border-radius:6px';
+      var imgHtml = item.image
+        ? '<img src="' + item.image + '" alt="" style="' + imgStyle48 + '" loading="lazy">'
+        : '<div data-product-id="' + (item.product_id || '') + '" data-img-style="' + imgStyle48 + '" style="width:48px;height:48px;background:#f5f5f5;border-radius:6px;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
+      itemsHtml += '<div style="display:flex;gap:10px;align-items:center;' + (idx > 0 ? 'margin-top:8px;' : '') + '">'
+        + imgHtml
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + item.title + '</div>'
+        + (item.variant_title ? '<div style="font-size:11px;color:#888">' + item.variant_title + '</div>' : '')
+        + '<div style="font-size:12px;color:#555">$' + parseFloat(item.price).toFixed(2) + ' &times; ' + item.quantity + '</div>'
+        + '</div></div>';
+    });
+    if (compact && items.length > 2) {
+      itemsHtml += '<div style="font-size:12px;color:#888;margin-top:6px">+ ' + (items.length - 2) + ' more item(s)</div>';
+    }
+
+    var orderId = 'sh-od-' + o.id + '-' + _cardCounter;
+    /* Build full line items for detail */
+    var detailItems = o.line_items || [];
+    var detailItemsHtml = '';
+    detailItems.forEach(function(item, idx) {
+      var imgStyle56 = 'width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #eee';
+      var imgEl = item.image
+        ? '<img src="' + item.image + '" alt="" style="' + imgStyle56 + '" loading="lazy">'
+        : '<div data-product-id="' + (item.product_id || '') + '" data-img-style="' + imgStyle56 + '" style="width:56px;height:56px;background:#f5f5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid #eee"><svg viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
+      var lineTotal = (parseFloat(item.price) * item.quantity).toFixed(2);
+      detailItemsHtml += '<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;' + (idx > 0 ? 'border-top:1px solid #f0f0f0;' : '') + '">'
+        + imgEl
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;font-weight:600;line-height:1.3">' + item.title + '</div>'
+        + (item.variant_title ? '<div style="font-size:11px;color:#888;margin-top:2px">' + item.variant_title + '</div>' : '')
+        + (item.sku ? '<div style="font-size:10px;color:#aaa;margin-top:2px">SKU: ' + item.sku + '</div>' : '')
+        + '<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px"><span style="color:#666">$' + parseFloat(item.price).toFixed(2) + ' &times; ' + item.quantity + '</span><span style="font-weight:700">$' + lineTotal + '</span></div>'
+        + '</div></div>';
+    });
+
+    var detailHtml = '<div id="' + orderId + '" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #eee">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+      + '<div style="font-size:14px;font-weight:700">Order details</div>'
+      + '<button onclick="shPrintInvoice(\'' + orderId + '\')" style="font-size:12px;color:#fff;background:var(--navy,#1A1A2E);padding:6px 14px;border-radius:6px;font-weight:500;text-decoration:none;border:none;cursor:pointer;font-family:inherit">Print invoice</button>'
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;padding:12px;background:#f9fafb;border-radius:8px;margin-bottom:14px">'
+      + '<div><span style="color:#888">Order:</span> <strong>' + o.name + '</strong></div>'
+      + '<div><span style="color:#888">Date:</span> ' + formatOrderDate(o.created_at) + '</div>'
+      + '<div><span style="color:#888">Payment:</span> <strong style="text-transform:capitalize">' + (o.financial_status || 'N/A').replace(/_/g, ' ') + '</strong></div>'
+      + '<div><span style="color:#888">Fulfillment:</span> <strong style="text-transform:capitalize">' + (o.fulfillment_status || 'unfulfilled').replace(/_/g, ' ') + '</strong></div>'
+      + (o.cancelled_at ? '<div style="grid-column:span 2"><span style="color:#888">Cancelled:</span> <strong style="color:#991B1B">' + formatOrderDate(o.cancelled_at) + '</strong></div>' : '')
+      + (o.tracking_number ? '<div style="grid-column:span 2"><span style="color:#888">Tracking:</span> <strong>' + o.tracking_number + '</strong></div>' : '')
+      + '</div>'
+      + '<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Items ordered</div>' + detailItemsHtml + '</div>'
+      + '<div style="padding:14px;background:#f9fafb;border-radius:8px;font-size:13px">'
+      + '<div style="font-weight:700;margin-bottom:10px">Payment summary</div>'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:#666">Subtotal</span><span>$' + parseFloat(o.subtotal_price).toFixed(2) + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:#666">Tax</span><span>$' + parseFloat(o.total_tax).toFixed(2) + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between;font-weight:700;padding-top:8px;border-top:1.5px solid #e2e2e2;font-size:14px"><span>Total</span><span>$' + parseFloat(o.total_price).toFixed(2) + ' ' + (o.currency || 'USD') + '</span></div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+      + (o.tracking_url ? '<a href="' + o.tracking_url + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#fff;background:var(--red,#e53e3e);padding:8px 16px;border-radius:6px;font-weight:600;text-decoration:none">Track shipment &rarr;</a>' : '')
+      + '<button onclick="shPrintInvoice(\'' + orderId + '\')" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--navy,#1A1A2E);background:#fff;border:1px solid #ddd;padding:8px 16px;border-radius:6px;font-weight:500;cursor:pointer;font-family:inherit">Print invoice</button>'
+      + '</div>'
+      + '</div>';
+
+    return '<div class="sh-order-card" style="border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer" onclick="(function(e){var d=document.getElementById(\'' + orderId + '\');if(d){d.style.display=d.style.display===\'none\'?\'block\':\'none\';}e.querySelector(\'.sh-order-toggle\').textContent=d&&d.style.display===\'block\'?\'Hide details\':\'View details\';})(this)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      + '<div><span style="font-weight:700;font-size:14px">' + o.name + '</span> <span style="color:#888;font-size:12px">&middot; ' + formatOrderDate(o.created_at) + '</span></div>'
+      + '<div style="display:flex;align-items:center;gap:8px">' + orderStatusBadge(o) + '<span style="font-weight:700;font-size:14px">$' + parseFloat(o.total_price).toFixed(2) + '</span></div>'
+      + '</div>'
+      + '<div>' + itemsHtml + '</div>'
+      + '<div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">'
+      + '<span class="sh-order-toggle" style="font-size:12px;color:var(--red,#e53e3e);font-weight:600">View details</span>'
+      + '</div>'
+      + detailHtml
+      + '</div>';
+  }
+
+  /* Always fetch from API to get complete order history (Liquid excludes cancelled) */
+  if (customerEmail) {
+    fetch('https://dealshub-search.onrender.com/api/customer-orders?email=' + encodeURIComponent(customerEmail))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var orders = data.orders || [];
+        /* Update metric card */
+        var metricEl = document.getElementById('sh-metric-orders-num');
+        if (metricEl) metricEl.textContent = orders.length;
+
+        /* Update orders count in settings (by ID, reliable) */
+        var dashSettingsOrders = document.getElementById('sh-dash-settings-orders');
+        if (dashSettingsOrders) dashSettingsOrders.textContent = orders.length + ' total orders';
+        var settingsOrdersCount = document.getElementById('sh-settings-orders-count');
+        if (settingsOrdersCount) settingsOrdersCount.textContent = orders.length + ' orders';
+        /* Resolve product images */
+        resolveOrderImages(orders);
+        /* Also update nav badge */
+        var navBadges = document.querySelectorAll('.sh-nav-badge');
+        if (orders.length > 0) {
+          var ordersNavItem = document.querySelector('[data-sh-nav="orders"]');
+          if (ordersNavItem && !ordersNavItem.querySelector('.sh-nav-badge')) {
+            ordersNavItem.insertAdjacentHTML('beforeend', '<span class="sh-nav-badge">' + orders.length + '</span>');
+          }
+        }
+
+        /* Update dashboard preview */
+        var dashCount = document.getElementById('sh-dash-orders-count');
+        if (dashCount) dashCount.textContent = orders.length;
+        var dashContainer = document.getElementById('sh-dash-orders-container');
+        var dashEmpty = document.getElementById('sh-dash-orders-empty');
+        if (orders.length > 0 && dashEmpty) {
+          dashEmpty.remove();
+          orders.slice(0, 3).forEach(function(o) {
+            dashContainer.insertAdjacentHTML('beforeend', renderOrderCard(o));
+          });
+        } else if (orders.length === 0 && dashEmpty) {
+          dashEmpty.querySelector('h3').textContent = 'No orders yet';
+          dashEmpty.querySelector('p').innerHTML = 'Start shopping to see your orders here.';
+          dashEmpty.insertAdjacentHTML('beforeend', '<a href="/" class="sh-empty-btn" style="margin-top:12px;display:inline-block">Start shopping &rarr;</a>');
+        }
+
+        /* Update full orders section */
+        var apiCount = document.getElementById('sh-orders-api-count');
+        var apiContainer = document.getElementById('sh-orders-api-container');
+        if (apiCount) apiCount.textContent = orders.length;
+        if (apiContainer) {
+          if (orders.length > 0) {
+            apiContainer.innerHTML = '';
+            orders.forEach(function(o) {
+              apiContainer.insertAdjacentHTML('beforeend', renderOrderCard(o));
+            });
+          } else {
+            apiContainer.innerHTML = '<div class="sh-empty">'
+              + '<svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>'
+              + '<h3>No orders yet</h3><p>Start shopping to see your orders here.</p>'
+              + '<a href="/" class="sh-empty-btn">Start shopping &rarr;</a></div>';
+          }
+        }
+      })
+      .catch(function(err) {
+        console.error('Failed to load orders:', err);
+        var apiContainer = document.getElementById('sh-orders-api-container');
+        if (apiContainer) {
+          apiContainer.innerHTML = '<div class="sh-empty"><h3>No orders yet</h3><p>Start shopping to see your orders here.</p><a href="/" class="sh-empty-btn">Start shopping &rarr;</a></div>';
+        }
+        var dashEmpty = document.getElementById('sh-dash-orders-empty');
+        if (dashEmpty) {
+          dashEmpty.querySelector('h3').textContent = 'No orders yet';
+          dashEmpty.querySelector('p').innerHTML = 'Start shopping to see your orders here.';
+        }
+      });
+  }
+
+  /* ---- RETURNS SECTION ---- */
+  var returnFormSection = document.getElementById('sh-return-form-section');
+  var returnNewBtn = document.getElementById('sh-return-new-btn');
+  var returnCancelBtn = document.getElementById('sh-return-cancel-btn');
+  var returnOrderSelect = document.getElementById('sh-return-order-select');
+  var returnSubmitBtn = document.getElementById('sh-return-submit-btn');
+  var returnMsg = document.getElementById('sh-return-msg');
+  var returnsContainer = document.getElementById('sh-returns-container');
+  var returnsEmpty = document.getElementById('sh-returns-empty');
+  var returnsCount = document.getElementById('sh-returns-count');
+
+  if (returnNewBtn) returnNewBtn.addEventListener('click', function() {
+    returnFormSection.style.display = 'block';
+    if (returnMsg) { returnMsg.style.display = 'none'; }
+  });
+  if (returnCancelBtn) returnCancelBtn.addEventListener('click', function() {
+    returnFormSection.style.display = 'none';
+  });
+
+  /* Populate return order select from API orders */
+  function populateReturnOrders(orders) {
+    if (!returnOrderSelect) return;
+    returnOrderSelect.innerHTML = '<option value="">Select an order...</option>';
+    orders.forEach(function(o) {
+      if (o.financial_status !== 'refunded' && !o.cancelled_at) {
+        var opt = document.createElement('option');
+        opt.value = o.id;
+        opt.textContent = o.name + ' — $' + parseFloat(o.total_price).toFixed(2) + ' (' + formatOrderDate(o.created_at) + ')';
+        returnOrderSelect.appendChild(opt);
+      }
+    });
+  }
+
+  /* Submit return */
+  if (returnSubmitBtn) {
+    returnSubmitBtn.addEventListener('click', function() {
+      var orderId = returnOrderSelect.value;
+      var reason = document.getElementById('sh-return-reason').value;
+      var comment = document.getElementById('sh-return-comment').value;
+
+      if (!orderId) { showReturnMsg('Please select an order.', true); return; }
+      if (!reason) { showReturnMsg('Please select a reason.', true); return; }
+
+      returnSubmitBtn.disabled = true;
+      returnSubmitBtn.textContent = 'Submitting...';
+
+      fetch('https://dealshub-search.onrender.com/api/crm/returns/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: orderId,
+          customerId: customerId,
+          reason: reason,
+          comment: comment
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        returnSubmitBtn.disabled = false;
+        returnSubmitBtn.textContent = 'Submit return request';
+        if (data.success) {
+          showReturnMsg('Return request submitted successfully! We will review it within 24-48 hours.', false);
+          document.getElementById('sh-return-reason').value = '';
+          document.getElementById('sh-return-comment').value = '';
+          returnOrderSelect.value = '';
+          loadCustomerReturns();
+        } else {
+          showReturnMsg(data.error || 'Something went wrong. Please try again.', true);
+        }
+      })
+      .catch(function() {
+        returnSubmitBtn.disabled = false;
+        returnSubmitBtn.textContent = 'Submit return request';
+        showReturnMsg('Connection error. Please try again.', true);
+      });
+    });
+  }
+
+  function showReturnMsg(msg, isError) {
+    if (!returnMsg) return;
+    returnMsg.style.display = 'block';
+    returnMsg.style.background = isError ? '#FEE2E2' : '#D1FAE5';
+    returnMsg.style.color = isError ? '#991B1B' : '#065F46';
+    returnMsg.textContent = msg;
+  }
+
+  function renderReturnCard(r) {
+    var statusColors = {
+      pending: { bg: '#FEF3C7', color: '#92400E', label: 'Pending review' },
+      approved: { bg: '#D1FAE5', color: '#065F46', label: 'Approved' },
+      rejected: { bg: '#FEE2E2', color: '#991B1B', label: 'Rejected' },
+      completed: { bg: '#DBEAFE', color: '#1E40AF', label: 'Completed' }
+    };
+    var st = statusColors[r.status] || statusColors.pending;
+    var reasonLabels = {
+      wrong_item: 'Wrong item received',
+      damaged: 'Item arrived damaged',
+      not_as_described: 'Not as described',
+      doesnt_fit: "Doesn't fit",
+      changed_mind: 'Changed my mind',
+      quality: 'Quality issue',
+      other: 'Other'
+    };
+
+    return '<div style="border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:12px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      + '<div><span style="font-weight:700;font-size:14px">Return ' + r.id + '</span> <span style="color:#888;font-size:12px">&middot; ' + r.orderNumber + '</span></div>'
+      + '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:' + st.bg + ';color:' + st.color + '">' + st.label + '</span>'
+      + '</div>'
+      + '<div style="font-size:13px;color:#555">'
+      + '<div style="margin-bottom:4px"><strong>Reason:</strong> ' + (reasonLabels[r.reason] || r.reason || 'Not specified') + '</div>'
+      + (r.comment ? '<div style="margin-bottom:4px"><strong>Details:</strong> ' + r.comment + '</div>' : '')
+      + '<div style="color:#999;font-size:11px;margin-top:6px">Submitted ' + formatOrderDate(r.createdAt) + '</div>'
+      + (r.adminNotes ? '<div style="margin-top:8px;padding:10px;background:#f9f9f9;border-radius:8px;font-size:12px"><strong>Staff note:</strong> ' + r.adminNotes + '</div>' : '')
+      + (r.refundAmount > 0 ? '<div style="margin-top:6px;font-weight:600;color:var(--green)">Refund: $' + parseFloat(r.refundAmount).toFixed(2) + '</div>' : '')
+      + '</div></div>';
+  }
+
+  function loadCustomerReturns() {
+    if (!customerId) return;
+    fetch('https://dealshub-search.onrender.com/api/crm/returns/customer/' + customerId)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var returns = data.returns || [];
+        if (returnsCount) returnsCount.textContent = returns.length;
+        if (returns.length > 0 && returnsContainer) {
+          returnsContainer.innerHTML = '';
+          returns.forEach(function(r) {
+            returnsContainer.insertAdjacentHTML('beforeend', renderReturnCard(r));
+          });
+        }
+      })
+      .catch(function() {});
+  }
+  loadCustomerReturns();
+
+  /* ---- REVIEWS SECTION ---- */
+  var reviewFormSection = document.getElementById('sh-review-form-section');
+  var reviewCancelBtn = document.getElementById('sh-review-cancel-btn');
+  var reviewSubmitBtn = document.getElementById('sh-review-submit-btn');
+  var reviewMsg = document.getElementById('sh-review-msg');
+  var reviewableContainer = document.getElementById('sh-reviewable-container');
+  var reviewsListContainer = document.getElementById('sh-reviews-list-container');
+  var reviewsCount = document.getElementById('sh-reviews-count');
+  var selectedRating = 0;
+
+  if (reviewCancelBtn) reviewCancelBtn.addEventListener('click', function() {
+    reviewFormSection.style.display = 'none';
+  });
+
+  /* Star rating */
+  document.querySelectorAll('.sh-star-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      selectedRating = parseInt(this.getAttribute('data-star'));
+      document.getElementById('sh-review-rating').value = selectedRating;
+      document.querySelectorAll('.sh-star-btn').forEach(function(s) {
+        var val = parseInt(s.getAttribute('data-star'));
+        s.style.color = val <= selectedRating ? '#F59E0B' : '#ddd';
+      });
+    });
+    btn.addEventListener('mouseenter', function() {
+      var hoverVal = parseInt(this.getAttribute('data-star'));
+      document.querySelectorAll('.sh-star-btn').forEach(function(s) {
+        var val = parseInt(s.getAttribute('data-star'));
+        s.style.color = val <= hoverVal ? '#F59E0B' : '#ddd';
+      });
+    });
+    btn.addEventListener('mouseleave', function() {
+      document.querySelectorAll('.sh-star-btn').forEach(function(s) {
+        var val = parseInt(s.getAttribute('data-star'));
+        s.style.color = val <= selectedRating ? '#F59E0B' : '#ddd';
+      });
+    });
+  });
+
+  function openReviewForm(productId, productTitle, productImage, orderId) {
+    reviewFormSection.style.display = 'block';
+    document.getElementById('sh-review-product-id').value = productId || '';
+    document.getElementById('sh-review-product-title-val').value = productTitle || '';
+    document.getElementById('sh-review-order-id').value = orderId || '';
+    var info = document.getElementById('sh-review-product-info');
+    if (info) {
+      var imgHtml = productImage
+        ? '<img src="' + productImage + '" style="width:48px;height:48px;object-fit:cover;border-radius:8px">'
+        : '<div style="width:48px;height:48px;background:#eee;border-radius:8px"></div>';
+      info.innerHTML = imgHtml + '<div><div style="font-weight:600;font-size:14px">' + (productTitle || 'Product') + '</div><div style="font-size:12px;color:#888">From order ' + (orderId || '') + '</div></div>';
+    }
+    /* Reset form */
+    selectedRating = 0;
+    document.getElementById('sh-review-rating').value = '0';
+    document.getElementById('sh-review-title').value = '';
+    document.getElementById('sh-review-text').value = '';
+    document.querySelectorAll('.sh-star-btn').forEach(function(s) { s.style.color = '#ddd'; });
+    if (reviewMsg) reviewMsg.style.display = 'none';
+    reviewFormSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  window.shOpenReviewForm = openReviewForm;
+
+  /* Submit review */
+  if (reviewSubmitBtn) {
+    reviewSubmitBtn.addEventListener('click', function() {
+      var rating = parseInt(document.getElementById('sh-review-rating').value);
+      var title = document.getElementById('sh-review-title').value.trim();
+      var text = document.getElementById('sh-review-text').value.trim();
+      var productId = document.getElementById('sh-review-product-id').value;
+      var productTitle = document.getElementById('sh-review-product-title-val').value;
+      var orderId = document.getElementById('sh-review-order-id').value;
+
+      if (!rating || rating < 1) { showReviewMsg('Please select a star rating.', true); return; }
+      if (!text) { showReviewMsg('Please write your review.', true); return; }
+
+      reviewSubmitBtn.disabled = true;
+      reviewSubmitBtn.textContent = 'Submitting...';
+
+      fetch('https://dealshub-search.onrender.com/api/crm/reviews/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: productId,
+          productTitle: productTitle,
+          customerId: customerId,
+          customerName: '{{ customer.name | escape }}',
+          rating: rating,
+          title: title,
+          text: text,
+          orderId: orderId
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        reviewSubmitBtn.disabled = false;
+        reviewSubmitBtn.textContent = 'Submit review';
+        if (data.success) {
+          showReviewMsg('Thank you! Your review has been submitted and is pending approval.', false);
+          reviewFormSection.style.display = 'none';
+        } else {
+          showReviewMsg(data.error || 'Something went wrong. Please try again.', true);
+        }
+      })
+      .catch(function() {
+        reviewSubmitBtn.disabled = false;
+        reviewSubmitBtn.textContent = 'Submit review';
+        showReviewMsg('Connection error. Please try again.', true);
+      });
+    });
+  }
+
+  function showReviewMsg(msg, isError) {
+    if (!reviewMsg) return;
+    reviewMsg.style.display = 'block';
+    reviewMsg.style.background = isError ? '#FEE2E2' : '#D1FAE5';
+    reviewMsg.style.color = isError ? '#991B1B' : '#065F46';
+    reviewMsg.textContent = msg;
+  }
+
+  function renderReviewableProducts(orders) {
+    if (!reviewableContainer) return;
+    var deliveredItems = [];
+    orders.forEach(function(o) {
+      if (o.fulfillment_status === 'fulfilled') {
+        (o.line_items || []).forEach(function(item) {
+          deliveredItems.push({
+            productId: item.product_id,
+            title: item.title,
+            image: item.image,
+            orderId: o.id,
+            orderName: o.name
+          });
+        });
+      }
+    });
+
+    if (deliveredItems.length === 0) {
+      reviewableContainer.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--text2);font-size:13px">'
+        + '<p>No delivered orders to review yet.</p>'
+        + '<p style="font-size:12px;color:#999;margin-top:4px">Once your orders are delivered, you can leave reviews here.</p></div>';
+      return;
+    }
+
+    reviewableContainer.innerHTML = '';
+    deliveredItems.forEach(function(item) {
+      var imgHtml = item.image
+        ? '<img src="' + item.image + '" style="width:48px;height:48px;object-fit:cover;border-radius:8px" loading="lazy">'
+        : '<div style="width:48px;height:48px;background:#f5f5f5;border-radius:8px"></div>';
+      reviewableContainer.insertAdjacentHTML('beforeend',
+        '<div style="display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #eee;border-radius:10px;margin-bottom:8px">'
+        + imgHtml
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + item.title + '</div>'
+        + '<div style="font-size:11px;color:#888">From ' + item.orderName + '</div>'
+        + '</div>'
+        + '<button onclick="shOpenReviewForm(\'' + (item.productId || '') + '\',\'' + (item.title || '').replace(/'/g, "\\'") + '\',\'' + (item.image || '') + '\',\'' + item.orderId + '\')" style="padding:6px 14px;background:var(--navy);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap">Write review</button>'
+        + '</div>'
+      );
+    });
+  }
+
+  /* Load reviewable products from orders + populate return dropdown */
+  if (customerEmail) {
+    fetch('https://dealshub-search.onrender.com/api/customer-orders?email=' + encodeURIComponent(customerEmail))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var orders = data.orders || [];
+        populateReturnOrders(orders);
+        renderReviewableProducts(orders);
+      })
+      .catch(function() {
+        if (reviewableContainer) reviewableContainer.innerHTML = '<div style="text-align:center;padding:16px 0;color:#999;font-size:12px">Could not load orders.</div>';
+      });
+  }
+
+  /* Print invoice function */
+  window.shPrintInvoice = function(orderId) {
+    var detail = document.getElementById(orderId);
+    if (!detail) return;
+    var printWin = window.open('', '_blank', 'width=700,height=900');
+    printWin.document.write('<!DOCTYPE html><html><head><title>Invoice</title>');
+    printWin.document.write('<style>body{font-family:"DM Sans",system-ui,sans-serif;padding:30px;color:#1a1a2e;font-size:13px}h2{margin:0 0 4px}img{border-radius:6px}.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #1a1a2e}.logo{font-size:22px;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;background:#f9fafb;border-radius:8px;margin-bottom:16px}.sum{padding:14px;background:#f9fafb;border-radius:8px}.row{display:flex;justify-content:space-between;margin-bottom:6px}.tot{font-weight:700;padding-top:8px;border-top:2px solid #ddd;font-size:14px}@media print{body{padding:0}}</style>');
+    printWin.document.write('</head><body>');
+    printWin.document.write('<div class="hdr"><div><div class="logo">STYLEHUB MIAMI</div><div style="color:#888;font-size:12px">stylehubmiami.com</div></div><div style="text-align:right"><h2>INVOICE</h2><div style="color:#888;font-size:12px">' + new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}) + '</div></div></div>');
+    printWin.document.write(detail.innerHTML);
+    printWin.document.write('<div style="margin-top:30px;padding-top:16px;border-top:1px solid #eee;text-align:center;color:#888;font-size:11px">Thank you for shopping with StyleHub Miami</div>');
+    printWin.document.write('</' + 'body></' + 'html>');
+    printWin.document.close();
+    setTimeout(function() { printWin.print(); }, 300);
+  };
+
+  /* Resolve product images for order line items */
+  function resolveOrderImages(orders) {
+    var productIds = [];
+    orders.forEach(function(o) {
+      (o.line_items || []).forEach(function(li) {
+        if (li.product_id && !li.image && productIds.indexOf(li.product_id) < 0) {
+          productIds.push(li.product_id);
+        }
+      });
+    });
+    if (productIds.length === 0) return;
+    /* Fetch product images from backend */
+    fetch('https://dealshub-search.onrender.com/api/admin/product-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productIds: productIds })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.images) return;
+      /* Update all img placeholders in order cards */
+      document.querySelectorAll('.sh-order-card').forEach(function(card) {
+        card.querySelectorAll('[data-product-id]').forEach(function(el) {
+          var pid = el.getAttribute('data-product-id');
+          if (data.images[pid]) {
+            el.innerHTML = '<img src="' + data.images[pid] + '" alt="" style="' + el.getAttribute('data-img-style') + '" loading="lazy">';
+          }
+        });
+      });
+    })
+    .catch(function() { /* silently fail */ });
+  }
+
+  /* Hash navigation on load */
+  if (window.location.hash) {
+    var hashSection = window.location.hash.replace('#', '');
+    var validSections = ['dashboard','orders','addresses','coupons','messages','recently-viewed','wishlist','settings','returns','reviews'];
+    if (validSections.indexOf(hashSection) !== -1) {
+      showSection(hashSection);
+    }
+  }
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Account Dashboard",
+  "class": "sh-account-dashboard-section",
+  "settings": [],
+  "presets": [
+    {
+      "name": "Account Dashboard"
+    }
+  ]
+}
+{% endschema %}

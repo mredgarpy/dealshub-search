@@ -1,0 +1,19 @@
+{% comment %} StyleHub Newsletter v1.0 {% endcomment %}
+<section style="padding:48px 24px;background:#fff;margin-top:20px">
+  <div style="max-width:600px;margin:0 auto;text-align:center">
+    <h2 style="font-size:24px;font-weight:800;color:#1a1a2e;margin-bottom:8px">Get Exclusive Deals</h2>
+    <p style="color:#666;font-size:14px;margin-bottom:24px;line-height:1.5">Join our list and be the first to know about flash sales, new arrivals and special offers. No spam, unsubscribe anytime.</p>
+    {% form 'customer', id: 'newsletter-home' %}
+      <input type="hidden" name="contact[tags]" value="newsletter">
+      <div style="display:flex;gap:0;max-width:480px;margin:0 auto;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
+        <input type="email" name="contact[email]" placeholder="Enter your email address" required style="flex:1;padding:14px 18px;border:1px solid #e0e0e0;border-right:none;border-radius:10px 0 0 10px;font-size:15px;outline:none;color:#333" aria-label="Email address">
+        <button type="submit" style="padding:14px 28px;background:#e53e3e;color:#fff;border:none;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;transition:background .2s" onmouseenter="this.style.background='#c53030'" onmouseleave="this.style.background='#e53e3e'">Subscribe</button>
+      </div>
+      {% if form.posted_successfully? %}
+        <p style="color:#22c55e;font-size:14px;margin-top:12px;font-weight:600">Thanks for subscribing! Check your inbox for a welcome offer.</p>
+      {% endif %}
+    {% endform %}
+    <p style="color:#999;font-size:11px;margin-top:12px">By subscribing you agree to our <a href="/policies/privacy-policy" style="color:#999;text-decoration:underline">Privacy Policy</a></p>
+  </div>
+</section>
+{% schema %}{"name":"Newsletter Section","settings":[]}{% endschema %}

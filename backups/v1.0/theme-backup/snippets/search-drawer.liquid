@@ -1,0 +1,88 @@
+<!-- Search Drawer (mobile) -->
+<div class="search-drawer" id="search-drawer" role="search" aria-label="Search" aria-hidden="true">
+  <div class="search-drawer__inner">
+    <form class="search-drawer__form" action="{{ routes.search_url }}" method="get" id="mobile-search-form">
+      <input type="hidden" name="type" value="product">
+      <input
+        type="search"
+        name="q"
+        class="search-drawer__input"
+        id="mobile-search-input"
+        placeholder="Search deals, brands, products..."
+        autocomplete="off"
+        aria-label="Search">
+      <button type="button" class="search-drawer__close" id="search-drawer-close" aria-label="Close search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <button type="submit" class="search-drawer__btn">Search</button>
+    </form>
+
+    <!-- Trending searches -->
+    {%- if settings.search_show_trending -%}
+    <div class="search-suggestions" id="search-trending">
+      <span class="search-suggestions__label">🔥 Trending</span>
+      {%- assign trending = settings.search_trending_terms | default: 'sneakers, dresses, electronics, beauty, home decor' | split: ', ' -%}
+      {%- for term in trending -%}
+        <button class="search-tag" onclick="document.getElementById('mobile-search-input').value='{{ term }}'; document.getElementById('mobile-search-form').submit();">
+          {{ term }}
+        </button>
+      {%- endfor -%}
+    </div>
+    {%- endif -%}
+
+    <!-- Live results preview -->
+    <div class="search-results-preview" id="mobile-search-results" hidden></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const drawer  = document.getElementById('search-drawer');
+  const closeBtn = document.getElementById('search-drawer-close');
+  const input   = document.getElementById('mobile-search-input');
+  const resultsEl = document.getElementById('mobile-search-results');
+  const overlay = document.getElementById('overlay');
+
+  function closeSearch() {
+    if (!drawer) return;
+    drawer.classList.remove('is-open');
+    drawer.setAttribute('aria-hidden', 'true');
+    if (!document.querySelector('.cart-drawer.is-open') && !document.querySelector('.mobile-nav.is-open')) {
+      overlay && overlay.classList.remove('is-visible');
+    }
+  }
+
+  closeBtn && closeBtn.addEventListener('click', closeSearch);
+
+  // Live preview
+  if (input && resultsEl) {
+    let debounce;
+    input.addEventListener('input', function () {
+      const q = this.value.trim();
+      clearTimeout(debounce);
+      if (q.length < 2) { resultsEl.hidden = true; return; }
+      debounce = setTimeout(async () => {
+        try {
+          const api = window.DealsHubAPI;
+          if (!api) return;
+          const data = await api.search(q, { limit: 4 });
+          if (!data.results.length) { resultsEl.hidden = true; return; }
+          resultsEl.innerHTML = `<div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.4);margin-bottom:10px;">Results</div>` +
+            data.results.slice(0, 4).map(p => {
+              const price = '$' + (parseFloat(p.price) || 0).toFixed(2);
+              const imgHtml = p.image ? `<img src="${p.image}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : '';
+              return `<a href="${p.url}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:12px;padding:8px 0;color:rgba(255,255,255,.85);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.08);">
+                ${imgHtml}
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.title}</div>
+                  <div style="font-size:.82rem;color:var(--color-primary);font-weight:700;">${price}</div>
+                </div>
+              </a>`;
+            }).join('');
+          resultsEl.hidden = false;
+        } catch { /* empty */ }
+      }, 350);
+    });
+  }
+})();
+</script>

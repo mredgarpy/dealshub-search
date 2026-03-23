@@ -1,0 +1,788 @@
+{% comment %}
+  DealsHub — Search Results Page Section
+  Multi-source product search with filters & sorting
+{% endcomment %}
+
+<div id="dh-search-page" class="dh-search-page">
+  <!-- Search Bar -->
+  <div class="dh-search-hero">
+    <div class="dh-search-hero__inner page-width">
+      <h1 class="dh-search-hero__title">{{ section.settings.title | default: 'Search Products' }}</h1>
+      <form class="dh-search-bar" id="dh-search-form" autocomplete="off">
+        <div class="dh-search-bar__wrap">
+          <svg class="dh-search-bar__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            type="search"
+            id="dh-search-input"
+            class="dh-search-bar__input"
+            placeholder="{{ section.settings.placeholder | default: 'Search all stores...' }}"
+            aria-label="Search products"
+          >
+          <button type="submit" class="dh-search-bar__btn">Search</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toolbar: Filters & Sort -->
+  <div class="dh-toolbar page-width">
+    <div class="dh-toolbar__left">
+      <div class="dh-filter-group">
+        <label class="dh-filter-label">Store:</label>
+        <div class="dh-filter-chips" id="dh-source-filters">
+          <button class="dh-chip dh-chip--active" data-source="all">All</button>
+          <button class="dh-chip" data-source="amazon">Amazon</button>
+          <button class="dh-chip" data-source="aliexpress">AliExpress</button>
+          <button class="dh-chip" data-source="sephora">Sephora</button>
+          <button class="dh-chip" data-source="macys">Macy's</button>
+          <button class="dh-chip" data-source="shein">SHEIN</button>
+        </div>
+      </div>
+    </div>
+    <div class="dh-toolbar__right">
+      <select id="dh-sort" class="dh-sort-select">
+        <option value="relevance">Relevance</option>
+        <option value="price_asc">Price: Low to High</option>
+        <option value="price_desc">Price: High to Low</option>
+        <option value="rating">Top Rated</option>
+      </select>
+      <span id="dh-result-count" class="dh-result-count"></span>
+    </div>
+  </div>
+
+  <!-- Results Grid -->
+  <div class="dh-results page-width">
+    <!-- Loading Skeleton -->
+    <div id="dh-skeleton" class="dh-grid dh-grid--hidden">
+      {% for i in (1..12) %}
+        <div class="dh-skel-card">
+          <div class="dh-skel-card__img dh-skel-pulse"></div>
+          <div class="dh-skel-card__body">
+            <div class="dh-skel-line dh-skel-pulse" style="width:40%"></div>
+            <div class="dh-skel-line dh-skel-pulse" style="width:90%"></div>
+            <div class="dh-skel-line dh-skel-pulse" style="width:60%"></div>
+            <div class="dh-skel-line dh-skel-pulse" style="width:30%"></div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Empty State -->
+    <div id="dh-empty" class="dh-empty dh-empty--hidden">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <h2 class="dh-empty__title">No products found</h2>
+      <p class="dh-empty__text">Try a different search or change the filters</p>
+    </div>
+
+    <!-- Product Grid -->
+    <div id="dh-product-grid" class="dh-grid dh-grid--hidden"></div>
+
+    <!-- Load More -->
+    <div id="dh-load-more-wrap" class="dh-load-more dh-load-more--hidden">
+      <button id="dh-load-more" class="dh-load-more__btn">Load More Products</button>
+    </div>
+  </div>
+
+  <!-- Recently Viewed -->
+  <div id="dh-recently-viewed" class="dh-section page-width dh-section--hidden">
+    <h2 class="dh-section__title">Recently Viewed</h2>
+    <div id="dh-recently-grid" class="dh-hscroll"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const API = window.DealsHub || window.StyleHub;
+  if (!API) { console.error('DealsHub/StyleHub API not loaded'); return; }
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => document.querySelectorAll(s);
+
+  // DOM refs
+  const form = $('#dh-search-form');
+  const input = $('#dh-search-input');
+  const grid = $('#dh-product-grid');
+  const skeleton = $('#dh-skeleton');
+  const empty = $('#dh-empty');
+  const loadMoreWrap = $('#dh-load-more-wrap');
+  const loadMoreBtn = $('#dh-load-more');
+  const resultCount = $('#dh-result-count');
+  const sortSelect = $('#dh-sort');
+
+  let allResults = [];
+  let filteredResults = [];
+  let displayedCount = 0;
+  let currentQuery = '';
+  let currentSource = 'all';
+  const PAGE_SIZE = 24;
+
+  // Init from URL params
+  function init() {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q') || params.get('query') || '';
+    const source = params.get('source') || 'all';
+
+    // Hide duplicate search hero when query is present
+    const urlQ = new URLSearchParams(window.location.search).get('q');
+    if (urlQ && urlQ.trim()) {
+      const hero = document.querySelector('.dh-search-hero');
+      if (hero) hero.classList.add('dh-search-hero--hidden');
+    }
+
+    if (q) {
+      input.value = q;
+      currentQuery = q;
+      currentSource = source;
+      setActiveChip(source);
+      doSearch(q, source);
+    }
+  }
+
+  // Search
+  async function doSearch(query, source) {
+    if (!query.trim()) return;
+
+    showSkeleton();
+    hideEmpty();
+    hideGrid();
+    hideLoadMore();
+
+    try {
+      const sources = source === 'all'
+        ? ['amazon', 'aliexpress', 'sephora', 'macys', 'shein']
+        : [source];
+
+      // Parallel search across sources
+      // StyleHub.search(q, store, limit) returns { results: [...] }
+      const promises = sources.map(s =>
+        API.search(query, s, 20)
+          .then(resp => (resp && resp.results) ? resp.results : (Array.isArray(resp) ? resp : []))
+          .catch(() => [])
+      );
+
+      const arrays = await Promise.all(promises);
+      allResults = arrays.flat();
+
+      // Update URL
+      const url = new URL(window.location);
+      url.searchParams.set('q', query);
+      if (source !== 'all') url.searchParams.set('source', source);
+      else url.searchParams.delete('source');
+      history.replaceState(null, '', url);
+
+      applySort();
+      displayedCount = 0;
+      showResults();
+    } catch (err) {
+      console.error('Search error:', err);
+      showEmpty();
+    } finally {
+      hideSkeleton();
+    }
+  }
+
+  // Sort
+  function applySort() {
+    const sort = sortSelect.value;
+    filteredResults = [...allResults];
+
+    if (sort === 'price_asc') {
+      filteredResults.sort((a, b) => parseNum(a.price) - parseNum(b.price));
+    } else if (sort === 'price_desc') {
+      filteredResults.sort((a, b) => parseNum(b.price) - parseNum(a.price));
+    } else if (sort === 'rating') {
+      filteredResults.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    }
+  }
+
+  function parseNum(s) {
+    if (!s) return 999999;
+    return parseFloat(String(s).replace(/[^0-9.]/g, '')) || 999999;
+  }
+
+  // Display results
+  function showResults() {
+    if (filteredResults.length === 0) {
+      showEmpty();
+      resultCount.textContent = '';
+      return;
+    }
+
+    const next = filteredResults.slice(displayedCount, displayedCount + PAGE_SIZE);
+    const html = next.map((p, i) => renderCard(p, displayedCount + i)).join('');
+
+    if (displayedCount === 0) {
+      grid.innerHTML = html;
+    } else {
+      grid.insertAdjacentHTML('beforeend', html);
+    }
+
+    displayedCount += next.length;
+    resultCount.textContent = `${filteredResults.length} result${filteredResults.length !== 1 ? 's' : ''}`;
+
+    showGrid();
+
+    if (displayedCount < filteredResults.length) {
+      showLoadMore();
+    } else {
+      hideLoadMore();
+    }
+
+    bindCardActions();
+  }
+
+  // Render a single card
+  function renderCard(p, idx) {
+    const badgeHTML = p.badge
+      ? `<span class="dh-card__badge dh-card__badge--${(p.badge || '').toLowerCase().replace(/\s/g,'-')}">${p.badge}</span>`
+      : '';
+    const ratingHTML = p.rating
+      ? `<div class="dh-card__rating">
+           <span class="dh-card__stars" style="--rating:${p.rating}"></span>
+           ${p.reviews ? `<span class="dh-card__reviews">(${formatNum(p.reviews)})</span>` : ''}
+         </div>`
+      : '';
+    const origHTML = p.originalPrice
+      ? `<span class="dh-card__price-orig">${p.originalPrice}</span>`
+      : '';
+
+    return `
+      <div class="dh-card" data-product-id="${p.id}" data-source="${p.source}">
+        ${badgeHTML}
+        <a href="/pages/product?id=${p.id}&store=${p.source}" class="dh-card__link">
+          <div class="dh-card__img-wrap">
+            <img src="${p.image || ''}" alt="${esc(p.title)}" loading="${idx < 8 ? 'eager' : 'lazy'}" width="300" height="300" class="dh-card__img"
+              onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22300%22 height=%22300%22/%3E%3C/svg%3E'">
+          </div>
+          <div class="dh-card__body">
+            ${p.brand ? `<span class="dh-card__brand">${esc(p.brand)}</span>` : ''}
+            <h3 class="dh-card__title">${esc(p.title)}</h3>
+            ${ratingHTML}
+            <div class="dh-card__price-row">
+              ${p.price ? `<span class="dh-card__price">${p.price}</span>` : ''}
+              ${origHTML}
+            </div>
+            <span class="dh-card__source">${esc(p.sourceName || p.source)}</span>
+          </div>
+        </a>
+        <div class="dh-card__actions">
+          <button class="dh-card__btn-cart" data-id="${p.id}" data-src="${p.source}" aria-label="Add to cart">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+          </button>
+          <button class="dh-card__btn-wish js-wish" data-id="${p.id}" data-src="${p.source}" aria-label="Wishlist">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+  function formatNum(n) { return n >= 1000 ? (n/1000).toFixed(1) + 'k' : n; }
+
+  // Card action bindings
+  function bindCardActions() {
+    grid.querySelectorAll('.dh-card__btn-cart').forEach(btn => {
+      btn.onclick = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (btn.disabled) return;
+        const id = btn.dataset.id;
+        const src = btn.dataset.src;
+        btn.disabled = true;
+        const origHTML = btn.innerHTML;
+        btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="dh-spin"><path d="M12 2v4m0 12v4m-7.07-2.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>';
+        try {
+          const resp = await fetch('https://dealshub-search.onrender.com/api/prepare-cart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: src, sourceId: id, quantity: 1 })
+          });
+          const data = await resp.json();
+          if (data.success && data.shopifyVariantId) {
+            const payload = data.cartAddPayload || { id: data.shopifyVariantId, quantity: data.quantity || 1 };
+            const cartResp = await fetch('/cart/add.js', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ items: [payload] })
+            });
+            if (cartResp.ok) {
+              btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+              btn.style.background = '#f0fdf4';
+              // Update cart count in header
+              try {
+                const cartData = await (await fetch('/cart.js')).json();
+                document.querySelectorAll('.cart-count, [data-cart-count], .dh-cart-count').forEach(el => { el.textContent = cartData.item_count; });
+              } catch(ex) {}
+              setTimeout(() => { btn.innerHTML = origHTML; btn.style.background = ''; btn.disabled = false; }, 2000);
+            } else {
+              throw new Error('Cart add failed');
+            }
+          } else {
+            throw new Error(data.error || 'Sync failed');
+          }
+        } catch (err) {
+          btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+          btn.style.background = '#fef2f2';
+          setTimeout(() => { btn.innerHTML = origHTML; btn.style.background = ''; btn.disabled = false; }, 2500);
+        }
+      };
+    });
+
+    grid.querySelectorAll('.js-wish').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        btn.classList.toggle('active');
+        // Save to localStorage wishlist
+        try {
+          const id = btn.dataset.id;
+          const src = btn.dataset.src;
+          const product = allResults.find(p => p.id === id && p.source === src);
+          if (!product) return;
+          let wish = JSON.parse(localStorage.getItem('dh_wishlist') || '[]');
+          const idx = wish.findIndex(w => w.id === id && w.source === src);
+          if (idx >= 0) { wish.splice(idx, 1); btn.classList.remove('active'); }
+          else { wish.unshift({ id, source: src, title: product.title, image: product.image, price: product.price }); btn.classList.add('active'); }
+          if (wish.length > 50) wish = wish.slice(0, 50);
+          localStorage.setItem('dh_wishlist', JSON.stringify(wish));
+        } catch (ex) {}
+      };
+    });
+
+    // Mark existing wishlist items
+    try {
+      const wish = JSON.parse(localStorage.getItem('dh_wishlist') || '[]');
+      grid.querySelectorAll('.js-wish').forEach(btn => {
+        if (wish.some(w => w.id === btn.dataset.id && w.source === btn.dataset.src)) {
+          btn.classList.add('active');
+        }
+      });
+    } catch (ex) {}
+  }
+
+  // Source filter chips
+  $$('#dh-source-filters .dh-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      currentSource = chip.dataset.source;
+      setActiveChip(currentSource);
+      if (currentQuery) doSearch(currentQuery, currentSource);
+    });
+  });
+
+  function setActiveChip(source) {
+    $$('#dh-source-filters .dh-chip').forEach(c => {
+      c.classList.toggle('dh-chip--active', c.dataset.source === source);
+    });
+  }
+
+  // Sort change
+  sortSelect.addEventListener('change', () => {
+    applySort();
+    displayedCount = 0;
+    showResults();
+  });
+
+  // Form submit
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    currentQuery = input.value.trim();
+    if (currentQuery) doSearch(currentQuery, currentSource);
+  });
+
+  // Load more
+  loadMoreBtn.addEventListener('click', () => showResults());
+
+  // Show/hide helpers
+  function showSkeleton() { skeleton.classList.remove('dh-grid--hidden'); }
+  function hideSkeleton() { skeleton.classList.add('dh-grid--hidden'); }
+  function showGrid() { grid.classList.remove('dh-grid--hidden'); }
+  function hideGrid() { grid.classList.add('dh-grid--hidden'); grid.innerHTML = ''; }
+  function showEmpty() { empty.classList.remove('dh-empty--hidden'); }
+  function hideEmpty() { empty.classList.add('dh-empty--hidden'); }
+  function showLoadMore() { loadMoreWrap.classList.remove('dh-load-more--hidden'); }
+  function hideLoadMore() { loadMoreWrap.classList.add('dh-load-more--hidden'); }
+
+  init();
+})();
+</script>
+
+<style>
+  /* Search Hero */
+  .dh-search-hero {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    padding: 40px 0 32px;
+  }
+  .dh-search-hero--hidden { display: none !important; }
+  .dh-search-hero__title {
+    color: #fff;
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 0 20px;
+    text-align: center;
+  }
+  .dh-search-bar__wrap {
+    display: flex;
+    max-width: 680px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,.15);
+  }
+  .dh-search-bar__icon {
+    margin: 14px 0 14px 16px;
+    color: #999;
+    flex-shrink: 0;
+  }
+  .dh-search-bar__input {
+    flex: 1;
+    border: none;
+    padding: 14px 12px;
+    font-size: 16px;
+    outline: none;
+    background: transparent;
+    color: #1a1a2e;
+  }
+  .dh-search-bar__input::placeholder {
+    color: #999;
+  }
+  .dh-search-bar__btn {
+    padding: 14px 28px;
+    background: #e53e3e;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .dh-search-bar__btn:hover { background: #c53030; }
+
+  /* Toolbar */
+  .dh-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .dh-toolbar__left, .dh-toolbar__right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .dh-filter-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+  }
+  .dh-filter-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .dh-chip {
+    padding: 6px 14px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .2s;
+    color: #555;
+  }
+  .dh-chip:hover { border-color: #1a1a2e; color: #1a1a2e; }
+  .dh-chip--active {
+    background: #1a1a2e;
+    color: #fff;
+    border-color: #1a1a2e;
+  }
+  .dh-sort-select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .dh-result-count {
+    font-size: 13px;
+    color: #888;
+  }
+
+  /* Grid */
+  .dh-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+    padding-bottom: 32px;
+  }
+  .dh-grid--hidden { display: none; }
+
+  /* Skeleton */
+  .dh-skel-card {
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .dh-skel-card__img {
+    padding-top: 100%;
+    background: #f0f0f0;
+  }
+  .dh-skel-card__body { padding: 12px; }
+  .dh-skel-line {
+    height: 12px;
+    border-radius: 6px;
+    background: #f0f0f0;
+    margin-bottom: 8px;
+  }
+  .dh-skel-pulse {
+    animation: dhSkelPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes dhSkelPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .4; }
+  }
+
+  /* Empty */
+  .dh-empty {
+    text-align: center;
+    padding: 60px 20px;
+  }
+  .dh-empty--hidden { display: none; }
+  .dh-empty__title {
+    font-size: 20px;
+    color: #333;
+    margin: 16px 0 8px;
+  }
+  .dh-empty__text {
+    color: #888;
+    font-size: 14px;
+  }
+
+  /* Load More */
+  .dh-load-more {
+    text-align: center;
+    padding: 20px 0 40px;
+  }
+  .dh-load-more--hidden { display: none; }
+  .dh-load-more__btn {
+    padding: 12px 40px;
+    background: #1a1a2e;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .dh-load-more__btn:hover { background: #2a2a4e; }
+
+  /* Section */
+  .dh-section { padding: 32px 0; }
+  .dh-section--hidden { display: none; }
+  .dh-section__title {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 20px;
+    color: #1a1a2e;
+  }
+  .dh-hscroll {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scroll-snap-type: x mandatory;
+  }
+  .dh-hscroll > * {
+    min-width: 200px;
+    max-width: 220px;
+    scroll-snap-align: start;
+  }
+
+  /* Spinner */
+  .dh-spinner-sm {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid #ccc;
+    border-top-color: #333;
+    border-radius: 50%;
+    animation: dhSpin .6s linear infinite;
+  }
+  @keyframes dhSpin { to { transform: rotate(360deg); } }
+  @keyframes dh-spin { to { transform: rotate(360deg); } }
+  .dh-spin { animation: dh-spin 0.8s linear infinite; }
+
+  /* Product Card */
+  .dh-card {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #f0f0f0;
+    transition: box-shadow .2s, transform .15s;
+  }
+  .dh-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,.08);
+    transform: translateY(-2px);
+  }
+  .dh-card__badge {
+    position: absolute;
+    top: 10px; left: 10px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 6px;
+    z-index: 2;
+    background: #e53e3e;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+  }
+  .dh-card__badge--bestseller { background: #2563eb; }
+  .dh-card__badge--sale, .dh-card__badge--deal { background: #e53e3e; }
+  .dh-card__badge--new { background: #16a34a; }
+  .dh-card__link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+  .dh-card__img-wrap {
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: #fafafa;
+  }
+  .dh-card__img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    transition: transform .3s;
+  }
+  .dh-card:hover .dh-card__img { transform: scale(1.05); }
+  .dh-card__body {
+    padding: 12px;
+  }
+  .dh-card__brand {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .dh-card__title {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1a1a2e;
+    margin: 0 0 6px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .dh-card__rating {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .dh-card__stars {
+    display: inline-block;
+    width: 70px;
+    height: 14px;
+    background: linear-gradient(90deg, #f59e0b var(--rating-pct, 0%), #e5e7eb var(--rating-pct, 0%));
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 70 14'%3E%3Ctext x='0' y='12' font-size='14'%3E%E2%98%85%E2%98%85%E2%98%85%E2%98%85%E2%98%85%3C/text%3E%3C/svg%3E") no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 70 14'%3E%3Ctext x='0' y='12' font-size='14'%3E%E2%98%85%E2%98%85%E2%98%85%E2%98%85%E2%98%85%3C/text%3E%3C/svg%3E") no-repeat;
+    --rating-pct: calc(var(--rating, 0) / 5 * 100%);
+  }
+  .dh-card__reviews {
+    font-size: 11px;
+    color: #888;
+  }
+  .dh-card__price-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .dh-card__price {
+    font-size: 16px;
+    font-weight: 700;
+    color: #e53e3e;
+  }
+  .dh-card__price-orig {
+    font-size: 12px;
+    color: #999;
+    text-decoration: line-through;
+  }
+  .dh-card__source {
+    font-size: 11px;
+    color: #aaa;
+    display: block;
+    margin-top: 2px;
+  }
+  .dh-card__actions {
+    display: flex;
+    gap: 6px;
+    padding: 0 12px 12px;
+  }
+  .dh-card__btn-cart, .dh-card__btn-wish {
+    padding: 8px 12px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+  }
+  .dh-card__btn-cart:hover { background: #e53e3e; color: #fff; border-color: #e53e3e; }
+  .dh-card__btn-wish:hover, .dh-card__btn-wish.active { color: #e53e3e; }
+  .dh-card__btn-wish.active svg { fill: #e53e3e; }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .dh-search-hero { padding: 24px 0 20px; }
+    .dh-search-hero__title { font-size: 22px; }
+    .dh-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .dh-toolbar { flex-direction: column; align-items: flex-start; }
+  }
+  @media (max-width: 480px) {
+    .dh-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .dh-search-bar__btn { padding: 14px 16px; font-size: 14px; }
+  }
+</style>
+
+{% schema %}
+{
+  "name": "DealsHub Search Results",
+  "tag": "section",
+  "class": "dealshub-search-section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Page Title",
+      "default": "Search Products"
+    },
+    {
+      "type": "text",
+      "id": "placeholder",
+      "label": "Search Placeholder",
+      "default": "Search all stores..."
+    }
+  ],
+  "presets": [
+    {
+      "name": "DealsHub Search"
+    }
+  ]
+}
+{% endschema %}

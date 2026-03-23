@@ -1,0 +1,124 @@
+{% comment %}
+  StyleHub Miami — Cookie Consent Banner
+  Lightweight GDPR/CCPA-aware consent banner
+  Integrates with Shopify Customer Privacy API
+{% endcomment %}
+
+<div id="dh-cookie-banner" class="dh-cookie" style="display:none;">
+  <div class="dh-cookie__inner">
+    <div class="dh-cookie__text">
+      <p>We use cookies to improve your experience and analyze site traffic. By continuing, you agree to our <a href="/pages/privacy-policy">Privacy Policy</a>.</p>
+    </div>
+    <div class="dh-cookie__actions">
+      <button id="dh-cookie-accept" class="dh-cookie__btn dh-cookie__btn--accept">Accept All</button>
+      <button id="dh-cookie-decline" class="dh-cookie__btn dh-cookie__btn--decline">Decline</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.dh-cookie {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #1a1a2e;
+  color: #fff;
+  padding: 16px 20px;
+  box-shadow: 0 -2px 12px rgba(0,0,0,.15);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.dh-cookie__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.dh-cookie__text p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+  color: #ccc;
+}
+.dh-cookie__text a {
+  color: #e53e3e;
+  text-decoration: underline;
+}
+.dh-cookie__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.dh-cookie__btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .2s;
+  white-space: nowrap;
+}
+.dh-cookie__btn:hover { opacity: .9; }
+.dh-cookie__btn--accept {
+  background: #e53e3e;
+  color: #fff;
+}
+.dh-cookie__btn--decline {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #555;
+}
+@media (max-width: 600px) {
+  .dh-cookie__inner {
+    flex-direction: column;
+    text-align: center;
+  }
+  .dh-cookie__actions {
+    width: 100%;
+  }
+  .dh-cookie__btn {
+    flex: 1;
+  }
+}
+</style>
+
+<script>
+(function() {
+  var COOKIE_KEY = 'dh_consent';
+  var banner = document.getElementById('dh-cookie-banner');
+  var acceptBtn = document.getElementById('dh-cookie-accept');
+  var declineBtn = document.getElementById('dh-cookie-decline');
+
+  if (!banner) return;
+
+  // Check if already consented
+  var consent = localStorage.getItem(COOKIE_KEY);
+  if (consent) return; // Already made a choice
+
+  // Show banner after short delay
+  setTimeout(function() {
+    banner.style.display = 'block';
+  }, 1500);
+
+  acceptBtn.addEventListener('click', function() {
+    localStorage.setItem(COOKIE_KEY, 'accepted');
+    banner.style.display = 'none';
+    // Notify Shopify Customer Privacy API if available
+    if (window.Shopify && window.Shopify.customerPrivacy) {
+      window.Shopify.customerPrivacy.setTrackingConsent(true, function() {});
+    }
+  });
+
+  declineBtn.addEventListener('click', function() {
+    localStorage.setItem(COOKIE_KEY, 'declined');
+    banner.style.display = 'none';
+    if (window.Shopify && window.Shopify.customerPrivacy) {
+      window.Shopify.customerPrivacy.setTrackingConsent(false, function() {});
+    }
+  });
+})();
+</script>

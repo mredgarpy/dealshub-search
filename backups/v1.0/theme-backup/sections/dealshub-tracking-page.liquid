@@ -1,0 +1,442 @@
+{% comment %}
+  DealsHub — Order Tracking Page Section
+  Integrates with ParcelPanel (if installed) + Shopify native order lookup
+{% endcomment %}
+
+<div class="dh-tracking page-width">
+  <div class="dh-tracking__hero">
+    <h1 class="dh-tracking__title">{{ section.settings.title | default: 'Track My Order' }}</h1>
+    <p class="dh-tracking__sub">{{ section.settings.subtitle | default: 'Enter your order number and email to see real-time tracking updates' }}</p>
+  </div>
+
+  <!-- ParcelPanel Widget Container (auto-detected) -->
+  <div id="pp-tracking-container">
+    {%- comment -%}
+      ParcelPanel injects its tracking widget here if the app is installed.
+      The app uses the CSS class .parcel-panel-tracking or a specific div ID.
+      If ParcelPanel is not installed, our custom tracker shows below.
+    {%- endcomment -%}
+  </div>
+
+  <!-- Custom Tracking Form (fallback + primary) -->
+  <div class="dh-tracking__form-wrap" id="dh-tracking-form-wrap">
+    <form id="dh-tracking-form" class="dh-tracking__form">
+      <div class="dh-tracking__form-fields">
+        <div class="dh-tracking__field">
+          <label for="dh-tracking-order">Order Number</label>
+          <input type="text" id="dh-tracking-order" class="dh-tracking__input" placeholder="e.g. #1001" required>
+        </div>
+        <div class="dh-tracking__field">
+          <label for="dh-tracking-email">Email Address</label>
+          <input type="email" id="dh-tracking-email" class="dh-tracking__input" placeholder="you@example.com" required>
+        </div>
+      </div>
+      <button type="submit" class="dh-tracking__btn" id="dh-tracking-submit">
+        <span class="dh-tracking__btn-text">Track Order</span>
+        <span class="dh-tracking__btn-spinner" style="display:none"></span>
+      </button>
+    </form>
+  </div>
+
+  <!-- Order Result -->
+  <div id="dh-tracking-result" class="dh-tracking__result dh-tracking__result--hidden">
+    <div class="dh-tracking__card">
+      <div class="dh-tracking__card-header">
+        <div>
+          <span class="dh-tracking__order-num" id="dh-track-order"></span>
+          <span class="dh-tracking__date" id="dh-track-date"></span>
+        </div>
+        <span class="dh-tracking__status" id="dh-track-status"></span>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="dh-tracking__progress">
+        <div class="dh-tracking__steps">
+          <div class="dh-track-step" data-step="confirmed">
+            <div class="dh-track-step__dot"></div>
+            <span class="dh-track-step__label">Confirmed</span>
+          </div>
+          <div class="dh-track-step" data-step="processing">
+            <div class="dh-track-step__dot"></div>
+            <span class="dh-track-step__label">Processing</span>
+          </div>
+          <div class="dh-track-step" data-step="shipped">
+            <div class="dh-track-step__dot"></div>
+            <span class="dh-track-step__label">Shipped</span>
+          </div>
+          <div class="dh-track-step" data-step="in_transit">
+            <div class="dh-track-step__dot"></div>
+            <span class="dh-track-step__label">In Transit</span>
+          </div>
+          <div class="dh-track-step" data-step="delivered">
+            <div class="dh-track-step__dot"></div>
+            <span class="dh-track-step__label">Delivered</span>
+          </div>
+        </div>
+        <div class="dh-tracking__bar">
+          <div class="dh-tracking__bar-fill" id="dh-track-bar"></div>
+        </div>
+      </div>
+
+      <!-- Tracking Info -->
+      <div class="dh-tracking__tracking-info" id="dh-track-tracking" style="display:none">
+        <div class="dh-tracking__tracking-row">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3182CE" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          <div>
+            <strong>Tracking Number</strong>
+            <a id="dh-track-number" href="#" target="_blank" rel="noopener"></a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Items -->
+      <div class="dh-tracking__items" id="dh-track-items"></div>
+
+      <!-- Delivery Estimate -->
+      <div class="dh-tracking__delivery" id="dh-track-delivery" style="display:none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38A169" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span id="dh-track-eta"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Not Found -->
+  <div id="dh-tracking-notfound" class="dh-tracking__notfound dh-tracking__result--hidden">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    <h3>Order Not Found</h3>
+    <p>We couldn't find an order matching that number and email. Please double-check your information and try again.</p>
+    <p style="margin-top:12px"><a href="/pages/contact-us" style="color:#3182CE">Contact Support</a> if you need help.</p>
+  </div>
+
+  <!-- Shipping Info Cards -->
+  <div class="dh-tracking__info-cards">
+    <div class="dh-tracking__info-card">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3182CE" stroke-width="1.5"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      <h4>Shipping Times</h4>
+      <p>Standard shipping takes 5-14 business days depending on your location and the product source.</p>
+    </div>
+    <div class="dh-tracking__info-card">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#38A169" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <h4>Order Confirmation</h4>
+      <p>You'll receive an email confirmation within minutes of placing your order with tracking details.</p>
+    </div>
+    <div class="dh-tracking__info-card">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#DD6B20" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <h4>Delayed Order?</h4>
+      <p>If your order hasn't arrived within the estimated window, <a href="/pages/contact-us">contact us</a> and we'll investigate.</p>
+    </div>
+  </div>
+
+  <!-- Help section -->
+  <div class="dh-tracking__help">
+    <h3>{{ section.settings.help_title | default: 'Frequently Asked Questions' }}</h3>
+    <div class="dh-tracking__faq">
+      <details class="dh-tracking__faq-item">
+        <summary>Where is my order?</summary>
+        <p>Enter your order number and email above to check your order status. You'll also receive tracking updates via email when your order ships.</p>
+      </details>
+      <details class="dh-tracking__faq-item">
+        <summary>My tracking hasn't updated in days</summary>
+        <p>Tracking can sometimes take 24-48 hours to update after shipping. International shipments may show fewer updates during transit. If there's no update after 5 days, please contact us.</p>
+      </details>
+      <details class="dh-tracking__faq-item">
+        <summary>I received the wrong item</summary>
+        <p>We're sorry about that! Please <a href="/pages/contact-us">contact our support team</a> with your order number and a photo of the item received. We'll make it right.</p>
+      </details>
+      <details class="dh-tracking__faq-item">
+        <summary>My package shows delivered but I didn't receive it</summary>
+        <p>Check with neighbors and your local post office first. If you still can't find it after 48 hours, contact us and we'll help resolve the issue.</p>
+      </details>
+      <details class="dh-tracking__faq-item">
+        <summary>How do I return or exchange an item?</summary>
+        <p>Visit our <a href="/pages/returns-refund-policy">Returns & Refunds</a> page for full details. Most items can be returned within 30 days of delivery.</p>
+      </details>
+    </div>
+  </div>
+
+  <!-- Contact -->
+  <div class="dh-tracking__contact">
+    <h3>Need Help?</h3>
+    <div class="dh-tracking__contact-grid">
+      <a href="mailto:{{ section.settings.support_email | default: 'support@stylehubmiami.com' }}" class="dh-tracking__contact-item">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3182CE" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span>{{ section.settings.support_email | default: 'support@stylehubmiami.com' }}</span>
+      </a>
+      <a href="/pages/help-center" class="dh-tracking__contact-item">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38A169" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Help Center</span>
+      </a>
+      <a href="/pages/contact-us" class="dh-tracking__contact-item">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E53E3E" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span>Contact Us</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const BACKEND = 'https://dealshub-search.onrender.com';
+  const form = document.getElementById('dh-tracking-form');
+  const orderInput = document.getElementById('dh-tracking-order');
+  const emailInput = document.getElementById('dh-tracking-email');
+  const result = document.getElementById('dh-tracking-result');
+  const notfound = document.getElementById('dh-tracking-notfound');
+  const submitBtn = document.getElementById('dh-tracking-submit');
+
+  // Pre-fill from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('order')) orderInput.value = urlParams.get('order');
+  if (urlParams.get('email')) emailInput.value = urlParams.get('email');
+
+  // Pre-fill for logged in customers
+  {%- if customer -%}
+  if (!emailInput.value) emailInput.value = '{{ customer.email }}';
+  {%- endif -%}
+
+  // Auto-submit if both fields pre-filled
+  if (orderInput.value && emailInput.value) {
+    setTimeout(() => form.dispatchEvent(new Event('submit')), 500);
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const orderNum = orderInput.value.trim().replace('#', '');
+    const email = emailInput.value.trim();
+    if (!orderNum || !email) return;
+
+    result.classList.add('dh-tracking__result--hidden');
+    notfound.classList.add('dh-tracking__result--hidden');
+    submitBtn.querySelector('.dh-tracking__btn-text').textContent = 'Tracking...';
+    submitBtn.querySelector('.dh-tracking__btn-spinner').style.display = 'inline-block';
+    submitBtn.disabled = true;
+
+    try {
+      // Try backend order lookup (Shopify API proxy)
+      const res = await fetch(BACKEND + '/api/order-status?order=' + encodeURIComponent(orderNum) + '&email=' + encodeURIComponent(email));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.order) {
+          renderOrder(data.order);
+          result.classList.remove('dh-tracking__result--hidden');
+          resetBtn();
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Backend tracking error:', err);
+    }
+
+    // Fallback: Try Shopify native order status (if app proxy exists)
+    try {
+      const res2 = await fetch('/apps/proxy/order-status?order=' + encodeURIComponent(orderNum) + '&email=' + encodeURIComponent(email));
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2.order) {
+          renderOrder(data2.order);
+          result.classList.remove('dh-tracking__result--hidden');
+          resetBtn();
+          return;
+        }
+      }
+    } catch (err2) {
+      console.warn('Proxy tracking error:', err2);
+    }
+
+    notfound.classList.remove('dh-tracking__result--hidden');
+    resetBtn();
+  });
+
+  function resetBtn() {
+    submitBtn.querySelector('.dh-tracking__btn-text').textContent = 'Track Order';
+    submitBtn.querySelector('.dh-tracking__btn-spinner').style.display = 'none';
+    submitBtn.disabled = false;
+  }
+
+  const statusLabels = {
+    unfulfilled: 'Order Placed',
+    confirmed: 'Confirmed',
+    processing: 'Processing',
+    shipped: 'Shipped',
+    in_transit: 'In Transit',
+    out_for_delivery: 'Out for Delivery',
+    delivered: 'Delivered',
+    partial: 'Partially Shipped'
+  };
+
+  function renderOrder(order) {
+    document.getElementById('dh-track-order').textContent = 'Order ' + (order.name || '#' + order.order_number);
+    document.getElementById('dh-track-date').textContent = order.created_at ? new Date(order.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+
+    const status = order.fulfillment_status || 'unfulfilled';
+    const statusEl = document.getElementById('dh-track-status');
+    statusEl.textContent = statusLabels[status] || status.replace(/_/g, ' ');
+    statusEl.className = 'dh-tracking__status dh-tracking__status--' + status;
+
+    // Progress bar with 5 steps
+    const steps = { unfulfilled: 0, confirmed: 20, processing: 40, shipped: 60, in_transit: 80, out_for_delivery: 90, delivered: 100 };
+    const pct = steps[status] || 0;
+    document.getElementById('dh-track-bar').style.width = pct + '%';
+
+    const stepMap = { confirmed: 20, processing: 40, shipped: 60, in_transit: 80, delivered: 100 };
+    document.querySelectorAll('.dh-track-step').forEach(step => {
+      const stepPct = stepMap[step.dataset.step] || 0;
+      step.classList.toggle('dh-track-step--active', stepPct <= pct);
+    });
+
+    // Tracking info
+    if (order.tracking) {
+      document.getElementById('dh-track-tracking').style.display = 'flex';
+      const trackLink = document.getElementById('dh-track-number');
+      trackLink.textContent = order.tracking;
+      trackLink.href = order.tracking_url || '#';
+    } else {
+      document.getElementById('dh-track-tracking').style.display = 'none';
+    }
+
+    // Items
+    const itemsEl = document.getElementById('dh-track-items');
+    if (order.line_items && order.line_items.length) {
+      itemsEl.innerHTML = order.line_items.map(function(item) {
+        return '<div class="dh-track-item"><span class="dh-track-item__name">' + item.title + ' x ' + item.quantity + '</span><span class="dh-track-item__price">$' + parseFloat(item.price).toFixed(2) + '</span></div>';
+      }).join('');
+    }
+
+    // Delivery estimate
+    if (order.delivery_estimate) {
+      document.getElementById('dh-track-delivery').style.display = 'flex';
+      document.getElementById('dh-track-eta').textContent = 'Estimated delivery: ' + order.delivery_estimate;
+    }
+  }
+})();
+</script>
+
+<style>
+  .dh-tracking { padding: 40px 0 60px; max-width: 720px; margin: 0 auto; }
+  .dh-tracking__hero { text-align: center; margin-bottom: 32px; }
+  .dh-tracking__title { font-size: 32px; font-weight: 700; color: #1a1a2e; margin: 0 0 8px; }
+  .dh-tracking__sub { color: #888; font-size: 15px; margin: 0; }
+
+  .dh-tracking__form-wrap { margin-bottom: 32px; }
+  .dh-tracking__form { max-width: 520px; margin: 0 auto; }
+  .dh-tracking__form-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .dh-tracking__field label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .dh-tracking__input {
+    width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px;
+    font-size: 15px; outline: none; transition: border-color .2s; background: #fff;
+  }
+  .dh-tracking__input:focus { border-color: #1a1a2e; }
+  .dh-tracking__btn {
+    width: 100%; padding: 14px 28px; background: #1a1a2e; color: #fff; border: none;
+    border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity .2s;
+  }
+  .dh-tracking__btn:hover { opacity: 0.9; }
+  .dh-tracking__btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .dh-tracking__btn-spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff; border-radius: 50%; animation: dh-spin .6s linear infinite;
+  }
+  @keyframes dh-spin { to { transform: rotate(360deg); } }
+
+  .dh-tracking__result--hidden { display: none; }
+
+  .dh-tracking__card {
+    background: #fff; border: 1px solid #e8e8e8; border-radius: 16px;
+    padding: 28px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  }
+  .dh-tracking__card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 8px; }
+  .dh-tracking__order-num { font-size: 18px; font-weight: 700; color: #1a1a2e; }
+  .dh-tracking__date { font-size: 13px; color: #888; margin-left: 12px; }
+  .dh-tracking__status { padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .dh-tracking__status--unfulfilled { background: #fff3cd; color: #856404; }
+  .dh-tracking__status--confirmed { background: #e8f4fd; color: #1a5276; }
+  .dh-tracking__status--processing { background: #fef3cd; color: #856404; }
+  .dh-tracking__status--shipped { background: #d4edda; color: #155724; }
+  .dh-tracking__status--in_transit { background: #cce5ff; color: #004085; }
+  .dh-tracking__status--delivered { background: #d4edda; color: #155724; }
+
+  .dh-tracking__progress { margin-bottom: 24px; }
+  .dh-tracking__steps { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .dh-track-step { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+  .dh-track-step__dot { width: 14px; height: 14px; border-radius: 50%; background: #e0e0e0; transition: background .3s; }
+  .dh-track-step--active .dh-track-step__dot { background: #38A169; }
+  .dh-track-step__label { font-size: 10px; color: #888; text-align: center; }
+  .dh-track-step--active .dh-track-step__label { color: #1a1a2e; font-weight: 600; }
+  .dh-tracking__bar { height: 4px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+  .dh-tracking__bar-fill { height: 100%; background: #38A169; border-radius: 4px; transition: width .6s ease; width: 0; }
+
+  .dh-tracking__tracking-info {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    background: #EBF8FF; border-radius: 10px; margin-bottom: 16px;
+  }
+  .dh-tracking__tracking-info a { color: #3182CE; font-weight: 600; }
+
+  .dh-track-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+  .dh-track-item:last-child { border-bottom: none; }
+  .dh-track-item__name { color: #333; }
+  .dh-track-item__price { font-weight: 600; color: #1a1a2e; }
+
+  .dh-tracking__delivery {
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+    background: #F0FFF4; border-radius: 10px; margin-top: 16px; font-size: 14px; color: #22543D; font-weight: 500;
+  }
+
+  .dh-tracking__notfound { text-align: center; padding: 40px; color: #888; }
+  .dh-tracking__notfound h3 { color: #333; margin: 16px 0 8px; font-size: 20px; }
+
+  .dh-tracking__info-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 40px 0; }
+  .dh-tracking__info-card {
+    padding: 24px; background: #f8f9fa; border-radius: 14px; text-align: center;
+    border: 1px solid #e8e8e8; transition: box-shadow .2s;
+  }
+  .dh-tracking__info-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+  .dh-tracking__info-card h4 { margin: 12px 0 6px; font-size: 15px; color: #1a1a2e; }
+  .dh-tracking__info-card p { margin: 0; font-size: 13px; color: #666; line-height: 1.5; }
+  .dh-tracking__info-card a { color: #3182CE; }
+
+  .dh-tracking__help { margin-top: 40px; }
+  .dh-tracking__help h3 { font-size: 20px; color: #1a1a2e; margin: 0 0 16px; text-align: center; }
+  .dh-tracking__faq { max-width: 600px; margin: 0 auto; }
+  .dh-tracking__faq-item { border-bottom: 1px solid #e8e8e8; }
+  .dh-tracking__faq-item summary {
+    padding: 14px 0; cursor: pointer; font-weight: 600; color: #1a1a2e;
+    font-size: 14px; list-style: none; display: flex; justify-content: space-between; align-items: center;
+  }
+  .dh-tracking__faq-item summary::after { content: '+'; font-size: 18px; color: #888; transition: transform .2s; }
+  .dh-tracking__faq-item[open] summary::after { content: '-'; }
+  .dh-tracking__faq-item p { padding: 0 0 14px; font-size: 13px; color: #666; line-height: 1.6; }
+  .dh-tracking__faq-item a { color: #3182CE; }
+
+  .dh-tracking__contact { margin-top: 40px; text-align: center; }
+  .dh-tracking__contact h3 { font-size: 20px; color: #1a1a2e; margin: 0 0 16px; }
+  .dh-tracking__contact-grid { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+  .dh-tracking__contact-item {
+    display: flex; align-items: center; gap: 8px; padding: 12px 20px;
+    background: #f8f9fa; border-radius: 10px; border: 1px solid #e8e8e8;
+    color: #333; font-size: 14px; text-decoration: none; transition: all .2s;
+  }
+  .dh-tracking__contact-item:hover { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+
+  @media (max-width: 600px) {
+    .dh-tracking__form-fields { grid-template-columns: 1fr; }
+    .dh-tracking__info-cards { grid-template-columns: 1fr; }
+    .dh-tracking__steps { gap: 2px; }
+    .dh-track-step__label { font-size: 9px; }
+    .dh-tracking__title { font-size: 24px; }
+  }
+</style>
+
+{% schema %}
+{
+  "name": "DealsHub Tracking",
+  "tag": "section",
+  "settings": [
+    { "type": "text", "id": "title", "label": "Title", "default": "Track My Order" },
+    { "type": "text", "id": "subtitle", "label": "Subtitle", "default": "Enter your order number and email to see real-time tracking updates" },
+    { "type": "text", "id": "help_title", "label": "Help Title", "default": "Frequently Asked Questions" },
+    { "type": "text", "id": "support_email", "label": "Support Email", "default": "support@stylehubmiami.com" }
+  ],
+  "presets": [{ "name": "DealsHub Tracking" }]
+}
+{% endschema %}

@@ -1,0 +1,37 @@
+{% comment %} StyleHub Browse v3.2 {% endcomment %}
+<section style="padding:40px 24px;max-width:1400px;margin:20px auto">
+  <h2 style="font-size:24px;font-weight:800;color:#1a1a2e;margin-bottom:4px">Search Deals</h2>
+  <div style="width:50px;height:3px;background:#e53e3e;border-radius:2px;margin-bottom:16px"></div>
+  <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+    <div style="flex:1;min-width:260px;display:flex;border:2px solid #e0e0e0;border-radius:10px;overflow:hidden">
+      <input type="text" id="dh-browse-input" placeholder="Search thousands of deals..." style="flex:1;border:none;padding:12px 16px;font-size:15px;outline:none">
+      <button onclick="doBrowseSearch()" style="background:#1a1a2e;border:none;padding:12px 24px;color:#fff;font-size:15px;cursor:pointer;font-weight:600">🔍 Search</button>
+    </div>
+  </div>
+  <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="color:#999;font-size:13px">Trending:</span>
+    <button onclick="doBrowseChip('dresses')" class="dh-chip">dresses</button>
+    <button onclick="doBrowseChip('sneakers')" class="dh-chip">sneakers</button>
+    <button onclick="doBrowseChip('skincare')" class="dh-chip">skincare</button>
+    <button onclick="doBrowseChip('iphone case')" class="dh-chip">iphone case</button>
+    <button onclick="doBrowseChip('perfume')" class="dh-chip">perfume</button>
+    <button onclick="doBrowseChip('gadgets')" class="dh-chip">gadgets</button>
+  </div>
+  <style>.dh-chip{padding:5px 14px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;cursor:pointer;font-size:12px;transition:all .2s}.dh-chip:hover{border-color:#e53e3e;color:#e53e3e}</style>
+  <div style="margin-bottom:20px;display:flex;gap:8px;flex-wrap:wrap">
+    <button onclick="setBrowseStore('all')" class="dh-bs active" data-store="all" style="padding:6px 16px;border-radius:20px;border:1px solid #e0e0e0;background:#1a1a2e;color:#fff;cursor:pointer;font-size:12px;font-weight:500">All Stores</button>
+    <button onclick="setBrowseStore('amazon')" class="dh-bs" data-store="amazon" style="padding:6px 16px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#333;cursor:pointer;font-size:12px;font-weight:500">Amazon</button>
+    <button onclick="setBrowseStore('aliexpress')" class="dh-bs" data-store="aliexpress" style="padding:6px 16px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#333;cursor:pointer;font-size:12px;font-weight:500">AliExpress</button>
+    <button onclick="setBrowseStore('sephora')" class="dh-bs" data-store="sephora" style="padding:6px 16px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#333;cursor:pointer;font-size:12px;font-weight:500">Sephora</button>
+  </div>
+  <div id="dh-browse-count" style="font-size:14px;color:#666;margin-bottom:12px"></div>
+  <div class="dh-grid" id="dh-browse-grid"></div>
+</section>
+<script>
+var _bStore='all';
+function setBrowseStore(s){_bStore=s;document.querySelectorAll('.dh-bs').forEach(function(b){b.style.background=b.dataset.store===s?'#1a1a2e':'#fff';b.style.color=b.dataset.store===s?'#fff':'#333'});var q=document.getElementById('dh-browse-input').value.trim();if(q)doBrowseSearch();}
+function doBrowseSearch(){var q=document.getElementById('dh-browse-input').value.trim();if(!q)return;if(window.StyleHub)StyleHub.searchAndDisplay(q,'dh-browse-grid',_bStore,24);}
+function doBrowseChip(t){document.getElementById('dh-browse-input').value=t;doBrowseSearch();}
+document.getElementById('dh-browse-input').addEventListener('keydown',function(e){if(e.key==='Enter')doBrowseSearch();});
+</script>
+{% schema %}{"name":"API Browse","settings":[]}{% endschema %}

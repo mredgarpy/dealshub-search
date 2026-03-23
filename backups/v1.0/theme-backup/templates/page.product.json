@@ -1,0 +1,11 @@
+{
+  "sections": {
+    "main": {
+      "type": "dealshub-product-page",
+      "settings": {}
+    }
+  },
+  "order": [
+    "main"
+  ]
+}

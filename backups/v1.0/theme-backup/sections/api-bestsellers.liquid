@@ -1,0 +1,14 @@
+{% comment %} StyleHub Bestsellers v3.2 {% endcomment %}
+<section style="padding:40px 24px;max-width:1400px;margin:0 auto;background:#fff;border-radius:16px;margin-top:20px">
+  <div style="margin-bottom:20px">
+    <h2 style="font-size:24px;font-weight:800;color:#1a1a2e">🏆 Best Sellers</h2>
+    <p style="color:#666;font-size:14px;margin-top:4px">Top-rated products with the most sales and best reviews</p>
+  </div>
+  <div class="dh-grid" id="dh-bestsellers-grid"></div>
+</section>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if(window.StyleHub) StyleHub.loadSection('/bestsellers','dh-bestsellers-grid',{count:10});
+});
+</script>
+{% schema %}{"name":"API Bestsellers","settings":[]}{% endschema %}

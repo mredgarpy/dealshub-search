@@ -1,0 +1,13 @@
+{
+  "sections": {
+    "dealshub_home": {
+      "type": "dealshub-home",
+      "settings": {
+        "api_url": "https:\/\/dealshub-search.onrender.com"
+      }
+    }
+  },
+  "order": [
+    "dealshub_home"
+  ]
+}

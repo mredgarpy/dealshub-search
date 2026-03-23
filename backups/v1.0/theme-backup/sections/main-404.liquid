@@ -1,0 +1,19 @@
+<div class="section" style="min-height:60vh;display:flex;align-items:center;justify-content:center;">
+  <div class="empty-state">
+    <div class="empty-state__icon" style="font-size:6rem;">404</div>
+    <h1 class="empty-state__title">Page Not Found</h1>
+    <p class="empty-state__text">Oops! The page you're looking for doesn't exist or has been moved.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <a href="{{ routes.root_url }}" class="btn btn--primary btn--lg">Go Home</a>
+      <a href="/pages/stylehub" class="btn btn--ghost btn--lg">Shop Deals</a>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "404 Page",
+  "settings": [],
+  "presets": [{ "name": "404 Page" }]
+}
+{% endschema %}

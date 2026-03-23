@@ -1,0 +1,11 @@
+{
+  "sections": {
+    "main": {
+      "type": "dealshub-terms",
+      "settings": {}
+    }
+  },
+  "order": [
+    "main"
+  ]
+}

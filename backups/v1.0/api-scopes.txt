@@ -1,0 +1,35 @@
+====================================================
+SHOPIFY API SCOPES - DealsHub App
+Store: 1rnmax-5z.myshopify.com
+Token: shpat_***REDACTED*** (see Shopify admin or Render env vars)
+Documented: 2026-03-23
+====================================================
+
+Total scopes: 15
+
+READ SCOPES:
+  - read_all_orders          (access to all orders, not just app-created)
+  - read_customers           (read customer data)
+  - read_fulfillments        (read fulfillment data)
+  - read_orders              (read orders)
+  - read_products            (read products)
+  - read_content             (read pages, blogs, articles)
+  - read_themes              (read theme files)
+  - read_merchant_managed_fulfillment_orders  (read MMFO data)
+
+WRITE SCOPES:
+  - write_customers          (create/update customers - used for newsletter)
+  - write_fulfillments       (create/update fulfillments)
+  - write_orders             (create/update orders)
+  - write_products           (create/update products - used for sync-on-demand)
+  - write_content            (create/update pages)
+  - write_themes             (upload theme assets)
+  - write_merchant_managed_fulfillment_orders  (manage MMFO)
+
+NOTABLE MISSING SCOPES (may need later):
+  - write_inventory          (for inventory management)
+  - read_inventory           (for stock checks)
+  - write_shipping           (for carrier service)
+  - read_shipping            (for shipping profiles)
+  - write_price_rules        (for automated discounts)
+  - read_analytics           (for dashboard data)

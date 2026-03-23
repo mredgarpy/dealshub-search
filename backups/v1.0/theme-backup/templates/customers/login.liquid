@@ -1,0 +1,62 @@
+{% comment %} Customer Login Page {% endcomment %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-card__logo">
+      {%- if settings.logo != blank -%}
+        <img src="{{ settings.logo | image_url: width: 120 }}" alt="{{ shop.name }}" style="max-width:120px;margin:0 auto;">
+      {%- else -%}
+        <span style="font-family:var(--font-heading);font-weight:800;font-size:1.4rem;color:var(--color-secondary);">{{ settings.logo_text | default: shop.name }}</span>
+      {%- endif -%}
+    </div>
+
+    <h1 class="auth-card__title">Welcome Back</h1>
+    <p class="auth-card__subtitle">Sign in to access your deals and wishlist</p>
+
+    {%- form 'customer_login', id: 'login-form' -%}
+      {%- if form.errors -%}
+        <div style="background:rgba(231,76,60,.08);border:1px solid var(--color-danger);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:.875rem;color:var(--color-danger);">
+          {{ form.errors | default_errors }}
+        </div>
+      {%- endif -%}
+
+      <div class="form-group">
+        <label class="form-label" for="CustomerEmail">Email Address</label>
+        <input type="email" name="customer[email]" id="CustomerEmail" class="form-input"
+          autocomplete="email" autocorrect="off" autocapitalize="off"
+          placeholder="you@example.com"
+          value="{{ form.email }}" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="CustomerPassword">Password</label>
+        <input type="password" name="customer[password]" id="CustomerPassword" class="form-input"
+          autocomplete="current-password"
+          placeholder="Your password" required>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;font-size:.82rem;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" style="accent-color:var(--color-primary);">
+          <span>Remember me</span>
+        </label>
+        <a href="{{ routes.account_recover_url }}" style="color:var(--color-primary);">Forgot password?</a>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--full btn--lg">
+        Sign In
+      </button>
+    {%- endform -%}
+
+    <div class="form-divider"><span>Don't have an account?</span></div>
+
+    <a href="{{ routes.account_register_url }}" class="btn btn--ghost btn--full">
+      Create Account
+    </a>
+
+    <p style="text-align:center;font-size:.8rem;color:var(--color-text-muted);margin-top:20px;">
+      By signing in you agree to our
+      <a href="/policies/terms-of-service" style="color:var(--color-primary);">Terms</a> &
+      <a href="/policies/privacy-policy" style="color:var(--color-primary);">Privacy Policy</a>
+    </p>
+  </div>
+</div>

@@ -1,0 +1,39 @@
+{% comment %} StyleHub Featured by Category v1.3 — uses loadSection {% endcomment %}
+<section style="padding:40px 24px;background:#f8fafc;margin-top:20px">
+  <div style="max-width:1400px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:24px">
+      <h2 style="font-size:24px;font-weight:800;color:#1a1a2e">Shop by Category</h2>
+      <p style="color:#666;font-size:14px;margin-top:4px">Explore curated picks across our top categories</p>
+    </div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:24px;flex-wrap:wrap" id="dh-cat-tabs">
+      <button data-cat="moda" data-label="Fashion" class="dh-cat-tab" style="padding:8px 20px;border-radius:20px;border:1px solid #e0e0e0;background:#1a1a2e;color:#fff;font-size:13px;cursor:pointer;font-weight:600;transition:all .2s">Fashion</button>
+      <button data-cat="belleza" data-label="Beauty" class="dh-cat-tab" style="padding:8px 20px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#333;font-size:13px;cursor:pointer;font-weight:600;transition:all .2s">Beauty</button>
+      <button data-cat="electronica" data-label="Electronics" class="dh-cat-tab" style="padding:8px 20px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#333;font-size:13px;cursor:pointer;font-weight:600;transition:all .2s">Electronics</button>
+      <button data-cat="hogar" data-label="Home" class="dh-cat-tab" style="padding:8px 20px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#333;font-size:13px;cursor:pointer;font-weight:600;transition:all .2s">Home</button>
+      <button data-cat="deportes" data-label="Sports" class="dh-cat-tab" style="padding:8px 20px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#333;font-size:13px;cursor:pointer;font-weight:600;transition:all .2s">Sports</button>
+    </div>
+    <div class="dh-grid" id="dh-featured-grid"></div>
+    <div style="text-align:center;margin-top:20px">
+      <a id="dh-cat-viewall" href="/pages/search-results?q=fashion" style="color:#e53e3e;font-size:14px;font-weight:600;text-decoration:none">View All in Fashion \u2192</a>
+    </div>
+  </div>
+</section>
+<script>
+(function(){
+  function loadCat(btn){
+    var cat=btn.getAttribute('data-cat'),label=btn.getAttribute('data-label');
+    document.querySelectorAll('.dh-cat-tab').forEach(function(b){b.style.background='#fff';b.style.color='#333'});
+    btn.style.background='#1a1a2e';btn.style.color='#fff';
+    var link=document.getElementById('dh-cat-viewall');
+    if(link){link.href='/pages/search-results?q='+encodeURIComponent(label.toLowerCase());link.textContent='View All in '+label+' \u2192'}
+    StyleHub.loadSection('/featured?category='+cat,'dh-featured-grid',{count:6});
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    if(!window.StyleHub)return;
+    var tabs=document.querySelectorAll('.dh-cat-tab');
+    tabs.forEach(function(b){b.addEventListener('click',function(){loadCat(this)})});
+    if(tabs.length)loadCat(tabs[0]);
+  });
+})();
+</script>
+{% schema %}{"name":"API Featured Categories","settings":[]}{% endschema %}

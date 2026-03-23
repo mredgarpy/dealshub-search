@@ -1,0 +1,311 @@
+{% comment %}
+  StyleHub Miami — Enhanced Cart Page
+  2-column layout: items left, order summary right (sticky)
+  Features: source badges, qty controls (Cart API), free shipping bar ($50),
+  promo code, trust badges, payment icons, recommendations
+{% endcomment %}
+
+<style>
+.sh-cart{--red:#E53E3E;--navy:#1A1A2E;--gray:#F7F7F8;--border:#eee;--text2:#888;--green:#1D9E75;--radius:10px;font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;color:var(--navy)}
+.sh-cart *{margin:0;padding:0;box-sizing:border-box}
+.sh-cart-wrap{max-width:1140px;margin:0 auto;padding:24px 20px 60px}
+.sh-cart-title{font-size:22px;font-weight:700;letter-spacing:-0.5px;margin-bottom:4px}
+.sh-cart-count{font-size:13px;color:var(--text2);margin-bottom:20px}
+
+/* Free shipping bar */
+.sh-ship-bar{background:var(--gray);border-radius:var(--radius);padding:14px 16px;margin-bottom:20px}
+.sh-ship-bar-text{font-size:12px;margin-bottom:6px;color:#555}
+.sh-ship-bar-text strong{color:var(--green)}
+.sh-ship-bar-track{height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden}
+.sh-ship-bar-fill{height:100%;background:var(--green);border-radius:3px;transition:width .4s ease}
+
+/* Grid layout */
+.sh-cart-grid{display:grid;grid-template-columns:1fr 380px;gap:28px;align-items:start}
+
+/* Cart items */
+.sh-cart-items{display:flex;flex-direction:column;gap:0}
+.sh-ci{display:flex;gap:16px;padding:20px 0;border-bottom:1px solid var(--border);position:relative}
+.sh-ci-img{width:100px;height:100px;border-radius:8px;object-fit:contain;background:var(--gray);flex-shrink:0}
+.sh-ci-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.sh-ci-title{font-size:13px;font-weight:500;color:var(--navy);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4}
+.sh-ci-variant{font-size:11px;color:var(--text2)}
+.sh-ci-source{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#fff;padding:2px 8px;border-radius:4px;margin-top:2px;width:fit-content}
+.sh-ci-source.s-amazon{background:var(--navy)}
+.sh-ci-source.s-aliexpress{background:var(--red)}
+.sh-ci-source.s-sephora{background:var(--red)}
+.sh-ci-source.s-macys{background:var(--navy)}
+.sh-ci-source.s-shein{background:var(--navy)}
+.sh-ci-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:6px}
+.sh-ci-price{font-size:15px;font-weight:700;color:var(--red)}
+.sh-ci-orig{font-size:11px;color:var(--text2);text-decoration:line-through;margin-left:6px}
+.sh-ci-qty{display:flex;align-items:center;border:1px solid #ddd;border-radius:6px;overflow:hidden}
+.sh-ci-qty button{width:32px;height:32px;border:none;background:#fff;cursor:pointer;font-size:16px;color:var(--navy);display:flex;align-items:center;justify-content:center;transition:background .15s}
+.sh-ci-qty button:hover{background:var(--gray)}
+.sh-ci-qty span{width:36px;text-align:center;font-size:13px;font-weight:600;border-left:1px solid #ddd;border-right:1px solid #ddd}
+.sh-ci-remove{position:absolute;top:20px;right:0;font-size:11px;color:var(--text2);cursor:pointer;border:none;background:none;padding:4px 8px;border-radius:4px;transition:all .15s}
+.sh-ci-remove:hover{color:var(--red);background:#FEE2E2}
+
+/* Order summary */
+.sh-summary{background:#fff;border:1px solid var(--border);border-radius:14px;padding:24px;position:sticky;top:100px}
+.sh-summary-title{font-size:16px;font-weight:700;margin-bottom:16px}
+.sh-summary-rows{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.sh-summary-row{display:flex;justify-content:space-between;font-size:13px}
+.sh-summary-row.total{font-size:16px;font-weight:700;border-top:1.5px solid var(--navy);padding-top:12px;margin-top:4px}
+.sh-summary-row.total .sh-price{color:var(--red)}
+.sh-summary-row .sh-label{color:#555}
+.sh-summary-row.savings .sh-price{color:var(--green);font-weight:600}
+
+/* Promo code */
+.sh-promo{display:flex;gap:0;margin:16px 0}
+.sh-promo input{flex:1;border:1px solid #ddd;border-right:none;border-radius:6px 0 0 6px;padding:10px 12px;font-size:13px;outline:none;font-family:inherit}
+.sh-promo input:focus{border-color:var(--navy)}
+.sh-promo button{padding:10px 18px;background:var(--navy);color:#fff;border:none;border-radius:0 6px 6px 0;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
+
+/* Checkout button */
+.sh-checkout-btn{display:block;width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;text-align:center;font-family:inherit;margin-top:16px;transition:background .2s;text-decoration:none}
+.sh-checkout-btn:hover{background:#c53030}
+.sh-continue{display:block;text-align:center;font-size:12px;color:var(--text2);text-decoration:none;margin-top:10px}
+.sh-continue:hover{color:var(--navy)}
+
+/* Trust badges */
+.sh-trust{display:flex;justify-content:center;gap:24px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.sh-trust-item{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;color:#666;text-align:center}
+.sh-trust-item svg{width:24px;height:24px;color:var(--green)}
+
+/* Payment icons */
+.sh-payments{display:flex;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.sh-payments svg,.sh-payments img{height:22px;opacity:0.6}
+
+/* Empty cart */
+.sh-empty{text-align:center;padding:60px 20px}
+.sh-empty-icon{font-size:64px;margin-bottom:16px;opacity:0.3}
+.sh-empty h2{font-size:20px;font-weight:700;margin-bottom:8px}
+.sh-empty p{font-size:13px;color:var(--text2);margin-bottom:24px}
+.sh-empty-cta{display:inline-block;padding:12px 32px;background:var(--red);color:#fff;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none}
+
+/* Recommendations */
+.sh-reco{margin-top:40px}
+.sh-reco h3{font-size:16px;font-weight:700;margin-bottom:16px}
+.sh-reco-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.sh-reco-card{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;text-decoration:none;color:inherit;transition:box-shadow .2s}
+.sh-reco-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.sh-reco-card img{width:100%;height:140px;object-fit:contain;background:var(--gray)}
+.sh-reco-card-info{padding:10px}
+.sh-reco-card-title{font-size:11px;color:#333;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;margin-bottom:4px}
+.sh-reco-card-price{font-size:13px;font-weight:700;color:var(--red)}
+
+/* Responsive */
+@media(max-width:900px){
+  .sh-cart-grid{grid-template-columns:1fr}
+  .sh-summary{position:static}
+  .sh-reco-grid{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:600px){
+  .sh-cart-wrap{padding:16px 12px 80px}
+  .sh-ci{gap:12px}
+  .sh-ci-img{width:80px;height:80px}
+  .sh-reco-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+
+<div class="sh-cart">
+  <div class="sh-cart-wrap">
+
+    {%- if cart.item_count == 0 -%}
+      <!-- EMPTY CART -->
+      <div class="sh-empty">
+        <div class="sh-empty-icon">🛒</div>
+        <h2>Your cart is empty</h2>
+        <p>Looks like you haven't added anything yet. Start browsing our deals!</p>
+        <a href="/" class="sh-empty-cta">Browse deals</a>
+      </div>
+
+    {%- else -%}
+      <h1 class="sh-cart-title">Shopping Cart</h1>
+      <div class="sh-cart-count">{{ cart.item_count }} item{{ cart.item_count | plus: 0 | at_least: 2 | minus: 1 | at_most: 1 | times: -1 | plus: 1 | at_most: 0 }}{% if cart.item_count != 1 %}s{% endif %} in your cart</div>
+
+      <!-- FREE SHIPPING BAR -->
+      {%- assign free_ship_threshold = 5000 -%}
+      {%- assign remaining = free_ship_threshold | minus: cart.total_price -%}
+      {%- if remaining > 0 -%}
+        {%- assign progress = cart.total_price | times: 100 | divided_by: free_ship_threshold -%}
+        <div class="sh-ship-bar">
+          <div class="sh-ship-bar-text">Add <strong>{{ remaining | money }}</strong> more for <strong>FREE shipping!</strong></div>
+          <div class="sh-ship-bar-track"><div class="sh-ship-bar-fill" style="width:{{ progress }}%"></div></div>
+        </div>
+      {%- else -%}
+        <div class="sh-ship-bar" style="background:#ECFDF5">
+          <div class="sh-ship-bar-text" style="color:var(--green)"><strong>🎉 You've unlocked FREE shipping!</strong></div>
+          <div class="sh-ship-bar-track"><div class="sh-ship-bar-fill" style="width:100%"></div></div>
+        </div>
+      {%- endif -%}
+
+      <div class="sh-cart-grid">
+        <!-- LEFT: Cart items -->
+        <div class="sh-cart-items">
+          {%- for item in cart.items -%}
+            {%- assign source_store = item.properties['_source_store'] | default: '' | downcase -%}
+            <div class="sh-ci" data-key="{{ item.key }}">
+              {%- if item.image -%}
+                <img class="sh-ci-img" src="{{ item.image | image_url: width: 200 }}" alt="{{ item.title | escape }}" loading="lazy">
+              {%- else -%}
+                <div class="sh-ci-img" style="display:flex;align-items:center;justify-content:center;color:#ccc;font-size:24px">📦</div>
+              {%- endif -%}
+              <div class="sh-ci-info">
+                <a href="{{ item.url }}" class="sh-ci-title">{{ item.product.title | truncate: 80 }}</a>
+                {%- unless item.variant.title == 'Default Title' -%}
+                  <div class="sh-ci-variant">{{ item.variant.title }}</div>
+                {%- endunless -%}
+                {%- if source_store != blank -%}
+                  <span class="sh-ci-source s-{{ source_store }}">{{ source_store }}</span>
+                {%- endif -%}
+                <div class="sh-ci-bottom">
+                  <div>
+                    <span class="sh-ci-price">{{ item.final_line_price | money }}</span>
+                    {%- if item.variant.compare_at_price > item.variant.price -%}
+                      <span class="sh-ci-orig">{{ item.variant.compare_at_price | times: item.quantity | money }}</span>
+                    {%- endif -%}
+                  </div>
+                  <div class="sh-ci-qty">
+                    <button type="button" onclick="shCartQty('{{ item.key }}',{{ item.quantity | minus: 1 }})" aria-label="Decrease quantity">−</button>
+                    <span>{{ item.quantity }}</span>
+                    <button type="button" onclick="shCartQty('{{ item.key }}',{{ item.quantity | plus: 1 }})" aria-label="Increase quantity">+</button>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="sh-ci-remove" onclick="shCartQty('{{ item.key }}',0)" aria-label="Remove item">Remove</button>
+            </div>
+          {%- endfor -%}
+        </div>
+
+        <!-- RIGHT: Order summary -->
+        <div class="sh-summary">
+          <div class="sh-summary-title">Order Summary</div>
+          <div class="sh-summary-rows">
+            <div class="sh-summary-row">
+              <span class="sh-label">Subtotal ({{ cart.item_count }} items)</span>
+              <span>{{ cart.original_total_price | money }}</span>
+            </div>
+            {%- if cart.total_discount > 0 -%}
+              <div class="sh-summary-row savings">
+                <span class="sh-label">Savings</span>
+                <span class="sh-price">-{{ cart.total_discount | money }}</span>
+              </div>
+            {%- endif -%}
+            <div class="sh-summary-row">
+              <span class="sh-label">Shipping</span>
+              <span style="color:var(--green);font-weight:500">
+                {%- if cart.total_price >= free_ship_threshold -%}FREE{%- else -%}Calculated at checkout{%- endif -%}
+              </span>
+            </div>
+            <div class="sh-summary-row total">
+              <span>Total</span>
+              <span class="sh-price">{{ cart.total_price | money }}</span>
+            </div>
+          </div>
+
+          <!-- Promo code -->
+          <div class="sh-promo">
+            <input type="text" id="sh-promo-input" placeholder="Promo code" aria-label="Promo code">
+            <button type="button" onclick="shApplyPromo()">Apply</button>
+          </div>
+
+          <!-- Checkout -->
+          <form action="/checkout" method="post">
+            <button type="submit" class="sh-checkout-btn">Proceed to Checkout</button>
+          </form>
+          <a href="/" class="sh-continue">← Continue shopping</a>
+
+          <!-- Trust badges -->
+          <div class="sh-trust">
+            <div class="sh-trust-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Secure<br>Checkout
+            </div>
+            <div class="sh-trust-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Money-Back<br>Guarantee
+            </div>
+            <div class="sh-trust-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+              Free Shipping<br>$50+
+            </div>
+          </div>
+
+          <!-- Payment icons -->
+          <div class="sh-payments">
+            {%- for type in shop.enabled_payment_types -%}
+              {{ type | payment_type_svg_tag }}
+            {%- endfor -%}
+          </div>
+        </div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="sh-reco" id="sh-reco"></div>
+
+    {%- endif -%}
+  </div>
+</div>
+
+<script>
+(function(){
+  // Qty update via Cart API
+  window.shCartQty = function(key, qty) {
+    var el = document.querySelector('[data-key="'+key+'"]');
+    if(el) el.style.opacity = '0.5';
+    fetch('/cart/change.js', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ id: key, quantity: Math.max(0, qty) })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(){ location.reload(); })
+    .catch(function(){ location.reload(); });
+  };
+
+  // Promo code
+  window.shApplyPromo = function() {
+    var code = document.getElementById('sh-promo-input').value.trim();
+    if(code) window.location.href = '/checkout?discount=' + encodeURIComponent(code);
+  };
+  // Enter key on promo input
+  var promoInput = document.getElementById('sh-promo-input');
+  if(promoInput) promoInput.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); shApplyPromo(); }});
+
+  // Load recommendations from trending API
+  {% if cart.item_count > 0 %}
+  var recoEl = document.getElementById('sh-reco');
+  if(recoEl) {
+    fetch('https://dealshub-search.onrender.com/api/trending', {signal: AbortSignal.timeout(8000)})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var items = (d.results || d.products || []).slice(0, 5);
+        if(!items.length) return;
+        var h = '<h3>You might also like</h3><div class="sh-reco-grid">';
+        items.forEach(function(p){
+          var img = p.image || '';
+          var title = (p.title || '').replace(/</g,'&lt;');
+          var price = p.price || '';
+          var link = '/pages/product?id=' + encodeURIComponent(p.id || '') + '&store=' + encodeURIComponent(p.source || '');
+          h += '<a class="sh-reco-card" href="' + link + '">';
+          h += '<img src="' + img + '" alt="" loading="lazy">';
+          h += '<div class="sh-reco-card-info"><div class="sh-reco-card-title">' + title + '</div>';
+          h += '<div class="sh-reco-card-price">' + price + '</div></div></a>';
+        });
+        h += '</div>';
+        recoEl.innerHTML = h;
+      })
+      .catch(function(){});
+  }
+  {% endif %}
+})();
+</script>
+
+{% schema %}
+{
+  "name": "StyleHub Cart",
+  "class": "sh-cart-section",
+  "settings": []
+}
+{% endschema %}

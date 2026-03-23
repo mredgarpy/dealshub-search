@@ -1,0 +1,108 @@
+{% comment %} DealsHub main deals page — feeds from external API {% endcomment %}
+
+<div id="dealshub-page" class="section">
+  <div class="container">
+
+    <!-- Page Header -->
+    <div class="customer-page__header">
+      <h1 class="customer-page__title">⚡ DealsHub Miami</h1>
+      <p style="color:var(--color-text-muted);margin-top:6px;">Thousands of curated deals from Amazon, SHEIN, Sephora & more — updated daily.</p>
+    </div>
+
+    <!-- Search + Sort bar -->
+    <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center;">
+      <form id="dh-search-form" style="flex:1;min-width:240px;">
+        <div style="display:flex;border:1.5px solid var(--color-border);border-radius:40px;overflow:hidden;background:var(--color-surface);">
+          <input type="text" id="dh-search-input"
+                 value="{{ request.param.q | default: '' | escape }}"
+                 placeholder="Search deals (fashion, electronics, beauty...)"
+                 style="flex:1;padding:11px 18px;border:none;outline:none;font-size:.9rem;background:transparent;color:var(--color-text);">
+          <button type="submit" style="background:var(--color-primary);border:none;padding:11px 20px;color:#fff;cursor:pointer;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </button>
+        </div>
+      </form>
+
+      <select id="dh-sort" style="padding:11px 16px;border:1.5px solid var(--color-border);border-radius:40px;font-size:.875rem;background:var(--color-surface);color:var(--color-text);cursor:pointer;outline:none;">
+        <option value="relevance">Sort: Relevance</option>
+        <option value="price_asc">Price: Low to High</option>
+        <option value="price_desc">Price: High to Low</option>
+        <option value="discount">Biggest Discount</option>
+        <option value="rating">Best Rated</option>
+      </select>
+    </div>
+
+    <!-- Store filter chips -->
+    <div class="store-filters" style="margin-bottom:28px;" role="group" aria-label="Filter by store">
+      <button class="store-filter-chip chip-all is-active" data-store-chip="all">
+        <span class="store-filter-chip__dot" style="background:var(--color-primary);"></span>
+        All Stores
+      </button>
+      {%- if settings.api_show_amazon -%}
+      <button class="store-filter-chip chip-amazon" data-store-chip="amazon">
+        <span class="store-filter-chip__dot"></span>Amazon
+      </button>
+      {%- endif -%}
+      {%- if settings.api_show_aliexpress -%}
+      <button class="store-filter-chip chip-aliexpress" data-store-chip="aliexpress">
+        <span class="store-filter-chip__dot"></span>AliExpress
+      </button>
+      {%- endif -%}
+      {%- if settings.api_show_sephora -%}
+      <button class="store-filter-chip chip-sephora" data-store-chip="sephora">
+        <span class="store-filter-chip__dot"></span>Sephora
+      </button>
+      {%- endif -%}
+      {%- if settings.api_show_macys -%}
+      <button class="store-filter-chip chip-macys" data-store-chip="macys">
+        <span class="store-filter-chip__dot"></span>Macy's
+      </button>
+      {%- endif -%}
+      {%- if settings.api_show_shein -%}
+      <button class="store-filter-chip chip-shein" data-store-chip="shein">
+        <span class="store-filter-chip__dot"></span>SHEIN
+      </button>
+      {%- endif -%}
+    </div>
+
+    <!-- Products Grid -->
+    <div id="dh-grid" class="grid grid--products" role="list" aria-label="Deal products">
+      <div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--color-text-muted);">
+        <div class="loading-spinner" style="margin:0 auto 12px;"></div>
+        Loading deals...
+      </div>
+    </div>
+
+    <!-- Load More -->
+    <div style="text-align:center;margin-top:36px;">
+      <button id="dh-load-more" class="btn btn--secondary btn--lg" style="display:none;">
+        Load More Deals
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Back to top -->
+<button id="back-to-top" aria-label="Back to top"
+  style="display:none;position:fixed;bottom:80px;right:24px;width:44px;height:44px;border-radius:50%;background:var(--color-primary);color:#fff;border:none;cursor:pointer;box-shadow:var(--shadow-md);z-index:100;align-items:center;justify-content:center;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>
+</button>
+
+<script>
+// Pre-set search from URL params on page load
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const q     = params.get('q');
+  const store = params.get('store');
+  const input = document.getElementById('dh-search-input');
+  if (input && q) input.value = q;
+
+  // Pre-select store chip
+  if (store) {
+    document.querySelectorAll('[data-store-chip]').forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.storeChip === store);
+    });
+  }
+})();
+</script>

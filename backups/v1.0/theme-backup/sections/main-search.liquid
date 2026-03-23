@@ -1,0 +1,87 @@
+<div class="section">
+  <div class="container">
+    <h1 style="font-size:clamp(1.4rem,3vw,2rem);font-weight:800;margin-bottom:24px;">
+      {%- if search.performed -%}
+        {%- if search.results_count > 0 -%}
+          {{ search.results_count }} results for "{{ search.terms | escape }}"
+        {%- else -%}
+          No results for "{{ search.terms | escape }}"
+        {%- endif -%}
+      {%- else -%}
+        Search StyleHub Miami
+      {%- endif -%}
+    </h1>
+
+    <!-- Search form -->
+    <form action="{{ routes.search_url }}" method="get" style="margin-bottom:32px;">
+      <input type="hidden" name="type" value="product">
+      <div style="display:flex;max-width:600px;border:1.5px solid var(--color-border);border-radius:40px;overflow:hidden;background:var(--color-surface);">
+        <input type="search" name="q" value="{{ search.terms | escape }}" placeholder="Search deals..."
+          style="flex:1;padding:13px 20px;border:none;outline:none;font-size:.9rem;background:transparent;">
+        <button type="submit" style="background:var(--color-primary);border:none;padding:13px 24px;color:#fff;font-weight:700;cursor:pointer;">
+          Search
+        </button>
+      </div>
+    </form>
+
+    {%- if search.performed -%}
+      {%- if search.results_count > 0 -%}
+        <div class="grid grid--products" role="list">
+          {%- for item in search.results -%}
+            {%- if item.object_type == 'product' -%}
+              {%- render 'product-card', product: item -%}
+            {%- endif -%}
+          {%- endfor -%}
+        </div>
+
+        {%- if paginate.pages > 1 -%}
+        <div class="pagination" role="navigation">
+          {%- if paginate.previous -%}
+            <a href="{{ paginate.previous.url }}" class="pagination__btn">← Prev</a>
+          {%- endif -%}
+          {%- for part in paginate.parts -%}
+            {%- if part.is_link -%}
+              <a href="{{ part.url }}" class="pagination__btn">{{ part.title }}</a>
+            {%- elsif part.title == paginate.current_page -%}
+              <span class="pagination__btn is-active">{{ part.title }}</span>
+            {%- else -%}
+              <span class="pagination__btn">{{ part.title }}</span>
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if paginate.next -%}
+            <a href="{{ paginate.next.url }}" class="pagination__btn">Next →</a>
+          {%- endif -%}
+        </div>
+        {%- endif -%}
+      {%- else -%}
+        <div class="empty-state">
+          <div class="empty-state__icon">🔍</div>
+          <h2 class="empty-state__title">No results in Shopify store</h2>
+          <p class="empty-state__text">Try searching for deals from our external partner stores:</p>
+          <a href="/pages/stylehub?q={{ search.terms | url_encode }}" class="btn btn--primary btn--lg">
+            Search in StyleHub →
+          </a>
+        </div>
+      {%- endif -%}
+    {%- else -%}
+      <!-- Trending searches when no query -->
+      <div>
+        <h2 style="font-size:1rem;font-weight:700;margin-bottom:16px;color:var(--color-text-muted);">🔥 Trending Searches</h2>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+          {%- assign trending = settings.search_trending_terms | default: 'sneakers, dresses, electronics, beauty, home decor' | split: ', ' -%}
+          {%- for term in trending -%}
+          <a href="{{ routes.search_url }}?q={{ term | url_encode }}&type=product" class="search-tag">{{ term }}</a>
+          {%- endfor -%}
+        </div>
+      </div>
+    {%- endif -%}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Main Search",
+  "settings": [],
+  "presets": [{ "name": "Main Search" }]
+}
+{% endschema %}

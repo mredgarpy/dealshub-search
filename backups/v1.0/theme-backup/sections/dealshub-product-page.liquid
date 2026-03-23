@@ -1,0 +1,28 @@
+<div id="dealshub-pdp" class="page-width" style="min-height:600px;padding:20px 0;">
+  <div style="text-align:center;padding:60px 0;color:#888;">
+    <div style="width:40px;height:40px;border:3px solid #e53e3e;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;"></div>
+    Loading product...
+  </div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<script>
+(function(){
+  var d=document,s=d.createElement('script');
+  s.src='{{ 'dealshub-product.js' | asset_url }}';
+  s.async=true;
+  s.onerror=function(){
+    var c=d.getElementById('dealshub-pdp');
+    if(c)c.innerHTML='<div style="text-align:center;padding:60px 0;color:#888;"><p style="font-size:18px;margin-bottom:12px;">Loading takes a moment...</p><p>Our server is waking up. Please <a href="javascript:location.reload()" style="color:#e53e3e;text-decoration:underline;">refresh</a> in a few seconds.</p></div>';
+  };
+  d.body.appendChild(s);
+})();
+</script>
+
+{% schema %}
+{
+  "name": "DealsHub Product Page",
+  "tag": "section",
+  "class": "dealshub-pdp-section",
+  "settings": []
+} 
+{% endschema %}

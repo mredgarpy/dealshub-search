@@ -1,0 +1,17 @@
+{% comment %} StyleHub New Arrivals v1.0 {% endcomment %}
+<section style="padding:40px 24px;max-width:1400px;margin:0 auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <div>
+      <h2 style="font-size:24px;font-weight:800;color:#1a1a2e">✨ New Arrivals</h2>
+      <p style="color:#666;font-size:14px;margin-top:4px">Just dropped — the latest finds from top stores</p>
+    </div>
+    <a href="/pages/search-results?q=new" style="color:#e53e3e;font-size:14px;font-weight:600;text-decoration:none">View All →</a>
+  </div>
+  <div class="dh-grid" id="dh-new-arrivals-grid"></div>
+</section>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.StyleHub) StyleHub.loadSection('/new-arrivals', 'dh-new-arrivals-grid', {count: 6});
+});
+</script>
+{% schema %}{"name":"API New Arrivals","settings":[]}{% endschema %}

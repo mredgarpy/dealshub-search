@@ -1,0 +1,185 @@
+<div class="product-page section--sm">
+  <div class="container">
+
+    <!-- Breadcrumbs -->
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <a href="{{ routes.root_url }}">Home</a>
+      <span class="breadcrumbs__sep" aria-hidden="true">›</span>
+      {%- if product.collections.first -%}
+        <a href="{{ product.collections.first.url }}">{{ product.collections.first.title }}</a>
+        <span class="breadcrumbs__sep" aria-hidden="true">›</span>
+      {%- endif -%}
+      <span class="breadcrumbs__current" aria-current="page">{{ product.title | truncate: 50 }}</span>
+    </nav>
+
+    <div class="product-page__grid">
+
+      <!-- Gallery -->
+      <div class="product-gallery">
+        <div class="product-gallery__main" id="gallery-main">
+          {%- if product.featured_image -%}
+            <img src="{{ product.featured_image | image_url: width: 800 }}"
+                 alt="{{ product.featured_image.alt | escape | default: product.title }}"
+                 id="main-gallery-img"
+                 width="800">
+          {%- else -%}
+            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--color-bg);">
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ddd" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+          {%- endif -%}
+        </div>
+
+        {%- if product.images.size > 1 -%}
+        <div class="product-gallery__thumbs">
+          {%- for image in product.images limit: 6 -%}
+          <div class="product-gallery__thumb{% if forloop.first %} is-active{% endif %}"
+               data-src="{{ image | image_url: width: 800 }}"
+               onclick="setMainImg(this)">
+            <img src="{{ image | image_url: width: 144 }}" alt="{{ image.alt | escape }}" loading="lazy">
+          </div>
+          {%- endfor -%}
+        </div>
+        {%- endif -%}
+      </div>
+
+      <!-- Product Info -->
+      <div class="product-info">
+
+        <!-- Source -->
+        {%- assign source = product.metafields.stylehub.source -%}
+        {%- assign source_name = product.metafields.stylehub.source_name | default: source -%}
+        {%- if source != blank -%}
+        <div class="product-info__source-badge">
+          <span class="product-card__source-badge source-badge--{{ source }}" style="position:static;">{{ source_name }}</span>
+        </div>
+        {%- endif -%}
+
+        <h1 class="product-info__title">{{ product.title }}</h1>
+
+        <!-- Rating -->
+        {%- assign rating = product.metafields.reviews.rating.value -%}
+        {%- assign rating_count = product.metafields.reviews.rating_count.value -%}
+        {%- if rating -%}
+        <div class="product-info__rating">
+          <span class="stars">
+            {%- for i in (1..5) -%}
+              {%- if i <= rating -%}★{%- else -%}☆{%- endif -%}
+            {%- endfor -%}
+          </span>
+          <span>{{ rating }}</span>
+          {%- if rating_count -%}
+            <a href="#reviews" class="product-info__reviews-link">({{ rating_count }} reviews)</a>
+          {%- endif -%}
+        </div>
+        {%- endif -%}
+
+        <!-- Pricing -->
+        <div class="product-info__pricing">
+          <span class="product-info__price">{{ product.price | money }}</span>
+          {%- if product.compare_at_price > product.price -%}
+            <span class="product-info__original">{{ product.compare_at_price | money }}</span>
+            {%- assign savings_pct = product.compare_at_price | minus: product.price | times: 100 | divided_by: product.compare_at_price | floor -%}
+            <span class="product-info__savings">Save {{ savings_pct }}%</span>
+          {%- endif -%}
+        </div>
+
+        <!-- Description -->
+        {%- if product.description != blank -%}
+        <div class="product-info__description">
+          {{ product.description }}
+        </div>
+        {%- endif -%}
+
+        <!-- Trust badges -->
+        <div class="product-trust">
+          <div class="trust-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+            <span>Verified Deal</span>
+          </div>
+          <div class="trust-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            <span>Secure Checkout</span>
+          </div>
+          <div class="trust-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            <span>Free Returns</span>
+          </div>
+        </div>
+
+        <!-- CTA Actions -->
+        <div class="product-info__actions">
+          {%- assign deal_url = product.metafields.stylehub.deal_url -%}
+          {%- if deal_url != blank -%}
+          <a href="{{ deal_url }}" target="_blank" rel="noopener noreferrer sponsored" class="btn btn--primary btn--full btn--lg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Shop on {{ source_name | default: 'Store' }} →
+          </a>
+          {%- endif -%}
+
+          {%- if product.available -%}
+          <div class="product-info__actions-row">
+            {%- form 'product', product, id: 'product-form' -%}
+              <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
+              <button type="submit" class="btn btn--dark btn--full">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                Add to Cart
+              </button>
+            {%- endform -%}
+
+            <button class="btn btn--ghost wishlist-btn" style="flex-shrink:0;width:50px;"
+              data-id="{{ product.id }}"
+              data-title="{{ product.title | escape }}"
+              data-image="{{ product.featured_image | image_url: width: 300 }}"
+              data-price="{{ product.price | divided_by: 100.0 }}"
+              data-url="{{ product.url }}"
+              data-source="{{ source }}"
+              aria-label="Add to wishlist">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            </button>
+          </div>
+          {%- else -%}
+          <button class="btn btn--ghost btn--full" disabled>Sold Out</button>
+          {%- endif -%}
+        </div>
+
+        <!-- Vendor / Tags -->
+        {%- if product.vendor != blank -%}
+        <div style="font-size:.82rem;color:var(--color-text-muted);margin-top:8px;">
+          Brand: <strong>{{ product.vendor }}</strong>
+        </div>
+        {%- endif -%}
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function setMainImg(thumb) {
+  const img = document.getElementById('main-gallery-img');
+  if (img) img.src = thumb.dataset.src;
+  document.querySelectorAll('.product-gallery__thumb').forEach(t => t.classList.remove('is-active'));
+  thumb.classList.add('is-active');
+}
+
+// Cart form AJAX
+document.getElementById('product-form') && document.getElementById('product-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+  const variantId = formData.get('id');
+  if (window.StyleHubCart) {
+    try {
+      await window.StyleHubCart.addItem(variantId, 1);
+    } catch { /* handled inside cart.js */ }
+  }
+});
+</script>
+
+{% schema %}
+{
+  "name": "Main Product",
+  "settings": [],
+  "presets": [{ "name": "Main Product" }]
+}
+{% endschema %}

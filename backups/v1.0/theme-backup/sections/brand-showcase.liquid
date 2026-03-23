@@ -1,0 +1,130 @@
+<section class="section section--sm" data-brand-section>
+  <div class="container">
+    <div class="section__header section__header--row">
+      <div>
+        <h2 class="section__title">{{ section.settings.title | default: 'Shop By Store' }}</h2>
+        <p class="section__subtitle">{{ section.settings.subtitle | default: 'Browse deals from your favorite retailers' }}</p>
+      </div>
+    </div>
+
+    <!-- Brand tabs -->
+    <div class="brand-showcase">
+      <div class="brand-list" role="tablist" aria-label="Filter by store">
+
+        <button class="brand-item chip-all is-active" data-store="all" role="tab" aria-selected="true">
+          🛍️ All Stores
+        </button>
+
+        {%- if settings.api_show_amazon -%}
+        <button class="brand-item brand-item--amazon chip-amazon" data-store="amazon" role="tab" aria-selected="false">
+          <span class="store-filter-chip__dot" style="background:#FF9900;border-radius:50%;width:8px;height:8px;flex-shrink:0;"></span>
+          Amazon
+        </button>
+        {%- endif -%}
+
+        {%- if settings.api_show_aliexpress -%}
+        <button class="brand-item brand-item--aliexpress chip-aliexpress" data-store="aliexpress" role="tab" aria-selected="false">
+          <span class="store-filter-chip__dot" style="background:#e52222;border-radius:50%;width:8px;height:8px;flex-shrink:0;"></span>
+          AliExpress
+        </button>
+        {%- endif -%}
+
+        {%- if settings.api_show_sephora -%}
+        <button class="brand-item brand-item--sephora chip-sephora" data-store="sephora" role="tab" aria-selected="false">
+          <span class="store-filter-chip__dot" style="background:#000;border-radius:50%;width:8px;height:8px;flex-shrink:0;"></span>
+          Sephora
+        </button>
+        {%- endif -%}
+
+        {%- if settings.api_show_macys -%}
+        <button class="brand-item brand-item--macys chip-macys" data-store="macys" role="tab" aria-selected="false">
+          <span class="store-filter-chip__dot" style="background:#CC0000;border-radius:50%;width:8px;height:8px;flex-shrink:0;"></span>
+          Macy's
+        </button>
+        {%- endif -%}
+
+        {%- if settings.api_show_shein -%}
+        <button class="brand-item brand-item--shein chip-shein" data-store="shein" role="tab" aria-selected="false">
+          <span class="store-filter-chip__dot" style="background:#CC5500;border-radius:50%;width:8px;height:8px;flex-shrink:0;"></span>
+          SHEIN
+        </button>
+        {%- endif -%}
+
+        {%- for block in section.blocks -%}
+        {%- if block.type == 'custom_brand' and block.settings.name != blank -%}
+        <button class="brand-item" data-store="{{ block.settings.store_id }}" style="color:{{ block.settings.color }};" role="tab" aria-selected="false">
+          {{ block.settings.name }}
+        </button>
+        {%- endif -%}
+        {%- endfor -%}
+      </div>
+    </div>
+
+    <!-- Products grid (controlled by tabs) -->
+    <div style="margin-top:28px;" data-products-section
+         data-query="{{ section.settings.search_query | default: 'trending deals' }}"
+         data-limit="{{ section.settings.products_count | default: 12 }}">
+      <div class="grid grid--products" data-products-target role="list" aria-label="Products">
+        <!-- Loaded by brand tabs JS -->
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<script>
+(function () {
+  // Bootstrap the brand section immediately
+  const section = document.querySelector('[data-brand-section]');
+  if (!section) return;
+
+  function waitAndInit() {
+    if (window.StyleHubCarousels && window.StyleHubCarousels.initBrandTabs) {
+      window.StyleHubCarousels.initBrandTabs(section);
+      // Also auto-load initial 'all' tab
+      const grid = section.querySelector('[data-products-section]');
+      const target = section.querySelector('[data-products-target]');
+      if (grid && target && window.StyleHubAPI) {
+        const query = grid.dataset.query || 'deals';
+        const limit = parseInt(grid.dataset.limit) || 12;
+        target.innerHTML = window.StyleHubCarousels.buildSkeleton(limit);
+        window.StyleHubAPI.getMultiStore(query, [], limit).then(resp => {
+          target.innerHTML = resp.results.map(p => window.StyleHubCarousels.buildCard(p)).join('');
+        }).catch(() => {});
+      }
+    } else {
+      setTimeout(waitAndInit, 200);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waitAndInit);
+  } else {
+    setTimeout(waitAndInit, 100);
+  }
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Brand Showcase",
+  "settings": [
+    { "type": "text", "id": "title", "label": "Section Title", "default": "Shop By Store" },
+    { "type": "text", "id": "subtitle", "label": "Subtitle", "default": "Browse deals from your favorite retailers" },
+    { "type": "text", "id": "search_query", "label": "Default Search Query", "default": "trending deals" },
+    { "type": "range", "id": "products_count", "label": "Products to Show", "min": 4, "max": 24, "step": 4, "default": 12 }
+  ],
+  "blocks": [
+    {
+      "type": "custom_brand",
+      "name": "Custom Brand Tab",
+      "settings": [
+        { "type": "text", "id": "name", "label": "Brand Name" },
+        { "type": "text", "id": "store_id", "label": "Store ID (for API)" },
+        { "type": "color", "id": "color", "label": "Brand Color", "default": "#333333" }
+      ]
+    }
+  ],
+  "presets": [{ "name": "Brand Showcase" }]
+}
+{% endschema %}

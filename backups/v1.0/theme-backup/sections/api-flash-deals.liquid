@@ -1,0 +1,42 @@
+{% comment %} StyleHub Flash Deals v3.2 {% endcomment %}
+<section style="padding:40px 24px;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);margin-top:20px">
+  <div style="max-width:1400px;margin:0 auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-size:24px;font-weight:800;color:#e53e3e">⚡ Flash Deals</h2>
+        <p style="color:rgba(255,255,255,.7);font-size:14px;margin-top:4px">Limited deals — when they're gone, they're gone</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="color:rgba(255,255,255,.7);font-size:14px">Ends in</span>
+        <div style="display:flex;gap:4px">
+          <span id="dh-fh" style="background:#e53e3e;color:#fff;padding:6px 10px;border-radius:6px;font-weight:700;font-size:18px;min-width:40px;text-align:center">00</span>
+          <span style="color:#e53e3e;font-size:20px;font-weight:700">:</span>
+          <span id="dh-fm" style="background:#e53e3e;color:#fff;padding:6px 10px;border-radius:6px;font-weight:700;font-size:18px;min-width:40px;text-align:center">00</span>
+          <span style="color:#e53e3e;font-size:20px;font-weight:700">:</span>
+          <span id="dh-fs" style="background:#e53e3e;color:#fff;padding:6px 10px;border-radius:6px;font-weight:700;font-size:18px;min-width:40px;text-align:center">00</span>
+        </div>
+      </div>
+    </div>
+    <div class="dh-grid" id="dh-flash-grid"></div>
+  </div>
+</section>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  function tick() {
+    var now=new Date(),mid=new Date(now);mid.setHours(24,0,0,0);var d=mid-now;
+    document.getElementById('dh-fh').textContent=Math.floor(d/36e5).toString().padStart(2,'0');
+    document.getElementById('dh-fm').textContent=Math.floor((d%36e5)/6e4).toString().padStart(2,'0');
+    document.getElementById('dh-fs').textContent=Math.floor((d%6e4)/1e3).toString().padStart(2,'0');
+  }
+  tick();setInterval(tick,1000);
+  if(window.StyleHub){
+    StyleHub.showLoading('dh-flash-grid',4);
+    StyleHub.trending().then(function(data){
+      var p=(data.results||[]).filter(function(x){return x.originalPrice&&x.originalPrice>x.price}).slice(0,8);
+      if(!p.length)p=(data.results||[]).slice(0,4);
+      StyleHub.buildGrid(p,'dh-flash-grid',{flash:true});
+    }).catch(function(){StyleHub.showError('dh-flash-grid','Error loading Flash Deals');});
+  }
+});
+</script>
+{% schema %}{"name":"API Flash Deals","settings":[]}{% endschema %}

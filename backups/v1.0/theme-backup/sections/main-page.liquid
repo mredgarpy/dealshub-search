@@ -1,0 +1,16 @@
+<div class="section">
+  <div class="container" style="max-width:800px;">
+    <h1 style="font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;margin-bottom:24px;">{{ page.title }}</h1>
+    <div class="rte" style="font-size:.95rem;line-height:1.8;color:var(--color-text);">
+      {{ page.content }}
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Page Content",
+  "settings": [],
+  "presets": [{ "name": "Page Content" }]
+}
+{% endschema %}

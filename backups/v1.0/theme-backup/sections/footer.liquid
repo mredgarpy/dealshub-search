@@ -1,0 +1,209 @@
+<style>
+.dh-footer {
+  background: #111;
+  color: #ccc;
+  padding: 48px 0 0;
+  font-size: 0.88rem;
+}
+.dh-footer-grid {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+}
+.dh-footer h4 {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 16px;
+}
+.dh-footer a {
+  color: #bbb;
+  text-decoration: none;
+  display: block;
+  padding: 4px 0;
+  transition: color 0.2s;
+}
+.dh-footer a:hover {
+  color: #E53E3E;
+}
+.dh-footer-bottom {
+  max-width: 1200px;
+  margin: 36px auto 0;
+  padding: 20px;
+  border-top: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.dh-footer-bottom p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #777;
+}
+.dh-footer-social {
+  display: flex;
+  gap: 12px;
+}
+.dh-footer-social a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #222;
+  border-radius: 50%;
+  color: #ccc;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+.dh-footer-social a:hover {
+  background: #E53E3E;
+  color: #fff;
+}
+.dh-footer-newsletter {
+  margin-top: 12px;
+}
+.dh-footer-newsletter .nl-form {
+  display: flex;
+  margin-top: 8px;
+}
+.dh-footer-newsletter input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #333;
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 0.85rem;
+  outline: none;
+}
+.dh-footer-newsletter button {
+  padding: 8px 16px;
+  background: #E53E3E;
+  color: #fff;
+  border: none;
+  border-radius: 0 6px 6px 0;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+@media (max-width: 768px) {
+  .dh-footer-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  .dh-footer-bottom {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+</style>
+
+<footer class="dh-footer">
+  <div class="dh-footer-grid">
+    <div>
+      <h4>STYLEHUB MIAMI</h4>
+      <p style="margin:0 0 12px;line-height:1.5;color:#999;">Your #1 destination for the best deals on fashion, beauty, electronics & more.</p>
+      <div class="dh-footer-newsletter">
+        <p style="margin:0;color:#ddd;font-weight:500;">Get exclusive deals</p>
+        <form class="nl-form" id="dh-footer-newsletter" action="#" method="post">
+          <input type="email" placeholder="Your email..." required aria-label="Email for newsletter">
+          <button type="submit">OK</button>
+        </form>
+      </div>
+    </div>
+    <div>
+      <h4>Categories</h4>
+      <a href="/pages/search-results?q=fashion">Fashion</a>
+      <a href="/pages/search-results?q=beauty">Beauty</a>
+      <a href="/pages/search-results?q=electronics">Electronics</a>
+      <a href="/pages/search-results?q=home+decor">Home</a>
+      <a href="/pages/search-results?q=sports">Sports</a>
+      <a href="/pages/search-results?q=flash+deals">Flash Deals</a>
+    </div>
+    <div>
+      <h4>My Account</h4>
+      <a href="/pages/my-account#orders">My Orders</a>
+      <a href="/pages/my-account#wishlist">Wishlist</a>
+      <a href="/pages/my-account#addresses">My Addresses</a>
+      <a href="/pages/my-account#settings">Account Settings</a>
+      <a href="/pages/my-account#tracking" style="color:#E53E3E;font-weight:600;">Track Order</a>
+    </div>
+    <div>
+      <h4>Help</h4>
+      <a href="/pages/my-account#tracking">Track My Order</a>
+      <a href="/pages/help-center">Help Center</a>
+      <a href="/pages/shipping-policy">Shipping Policy</a>
+      <a href="/pages/returns-refund-policy">Returns & Refunds</a>
+      <a href="/pages/contact-us">Contact Us</a>
+      <a href="/pages/faq">FAQ</a>
+      <!-- Social links: add real URLs when available -->
+      <!-- <div class="dh-footer-social" style="margin-top:16px;">
+        <a href="https://instagram.com/stylehubmiami" title="Instagram">IG</a>
+        <a href="https://tiktok.com/@stylehubmiami" title="TikTok">TT</a>
+        <a href="https://facebook.com/stylehubmiami" title="Facebook">FB</a>
+        <a href="https://x.com/stylehubmiami" title="Twitter">X</a>
+      </div> -->
+    </div>
+  </div>
+  <div class="dh-footer-bottom">
+    <p>© {{ 'now' | date: '%Y' }} STYLEHUB MIAMI. All rights reserved.</p>
+    <p>Powered by Shopify • Miami, FL</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var form = document.getElementById('dh-footer-newsletter');
+  if(!form) return;
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var input = form.querySelector('input[type="email"]');
+    var btn   = form.querySelector('button');
+    var email = (input.value || '').trim();
+    if(!email) return;
+    btn.disabled = true;
+    btn.textContent = '...';
+    fetch('https://dealshub-search.onrender.com/api/newsletter-subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      btn.textContent = '\u2713';
+      btn.style.background = '#22c55e';
+      input.value = '';
+      input.placeholder = (data && data.message) ? data.message : 'Subscribed!';
+    })
+    .catch(function(){
+      btn.textContent = '\u2717';
+      btn.style.background = '#ef4444';
+      setTimeout(function(){ btn.textContent = 'OK'; btn.style.background = '#E53E3E'; btn.disabled = false; }, 2500);
+    })
+    .finally(function(){
+      setTimeout(function(){
+        btn.textContent = 'OK';
+        btn.style.background = '#E53E3E';
+        btn.disabled = false;
+        input.placeholder = 'Your email...';
+      }, 3000);
+    });
+  });
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Footer",
+  "settings": [],
+  "presets": [{"name": "Footer"}]
+}
+{% endschema %}
+

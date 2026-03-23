@@ -1,0 +1,91 @@
+<section id="stylehub-browse" style="padding:50px 0;background:#f8f8f8;">
+  <div style="max-width:1400px;margin:0 auto;padding:0 20px;">
+    <h2 style="font-size:28px;font-weight:800;margin-bottom:8px;">Browse All Deals</h2>
+    <div style="width:40px;height:3px;background:#e74c3c;margin-bottom:20px;"></div>
+
+    <form action="/search" method="get" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+      <input type="search" name="q" placeholder="Search thousands of deals..." style="flex:1;min-width:250px;padding:14px 20px;border:2px solid #e5e5e5;border-radius:8px;font-size:15px;outline:none;" onfocus="this.style.borderColor='#e74c3c'" onblur="this.style.borderColor='#e5e5e5'">
+      <input type="hidden" name="type" value="product">
+      <button type="submit" style="padding:14px 32px;background:#000;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:15px;">&#x1F50D; Search</button>
+    </form>
+
+    <!-- Fix #12: Trending Searches -->
+    <div style="margin-bottom:24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:12px;color:#999;font-weight:600;">Trending:</span>
+      <a href="/search?q=vestidos&type=product" style="padding:4px 12px;border-radius:20px;font-size:12px;text-decoration:none;color:#666;background:#fff;border:1px solid #e5e5e5;">vestidos</a>
+      <a href="/search?q=sneakers&type=product" style="padding:4px 12px;border-radius:20px;font-size:12px;text-decoration:none;color:#666;background:#fff;border:1px solid #e5e5e5;">sneakers</a>
+      <a href="/search?q=skincare&type=product" style="padding:4px 12px;border-radius:20px;font-size:12px;text-decoration:none;color:#666;background:#fff;border:1px solid #e5e5e5;">skincare</a>
+      <a href="/search?q=perfume&type=product" style="padding:4px 12px;border-radius:20px;font-size:12px;text-decoration:none;color:#666;background:#fff;border:1px solid #e5e5e5;">perfume</a>
+      <a href="/search?q=gadgets&type=product" style="padding:4px 12px;border-radius:20px;font-size:12px;text-decoration:none;color:#666;background:#fff;border:1px solid #e5e5e5;">gadgets</a>
+      <a href="/search?q=iphone+case&type=product" style="padding:4px 12px;border-radius:20px;font-size:12px;text-decoration:none;color:#666;background:#fff;border:1px solid #e5e5e5;">iphone case</a>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:30px;">
+      <a href="/collections/all" style="padding:8px 18px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;background:#000;color:#fff;">All Stores</a>
+      <a href="/collections/all" style="padding:8px 18px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;background:#fff;color:#333;border:1px solid #ddd;">Amazon</a>
+      <a href="/collections/all" style="padding:8px 18px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;background:#fff;color:#333;border:1px solid #ddd;">AliExpress</a>
+      <a href="/collections/all" style="padding:8px 18px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;background:#fff;color:#333;border:1px solid #ddd;">Sephora</a>
+      <a href="/collections/all" style="padding:8px 18px;border-radius:20px;font-size:13px;font-weight:600;text-decoration:none;background:#fff;color:#333;border:1px solid #ddd;">Shein</a>
+    </div>
+
+    {%- assign all_products = collections.all.products -%}
+    {%- assign seen_titles = '' -%}
+    {% if all_products.size > 0 %}
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;">
+        {%- assign rendered = 0 -%}
+        {% for product in all_products limit: 30 %}
+          {%- if rendered >= 12 -%}{%- break -%}{%- endif -%}
+          {%- assign tl = product.title | downcase -%}
+          {%- if tl contains 'test product' or tl contains 'checkout flow' -%}{%- continue -%}{%- endif -%}
+          {%- assign dk = product.title | handleize -%}
+          {%- if seen_titles contains dk -%}{%- continue -%}{%- endif -%}
+          {%- assign seen_titles = seen_titles | append: dk | append: '|' -%}
+          {%- assign rendered = rendered | plus: 1 -%}
+
+          <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:transform .2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform=''">
+            <a href="{{ product.url }}" style="display:block;text-decoration:none;color:inherit;">
+              <div style="position:relative;padding-top:100%;background:#f5f5f5;overflow:hidden;">
+                {% if product.featured_image %}
+                  <img src="{{ product.featured_image | image_url: width: 400 }}" alt="{{ product.featured_image.alt | escape }}" loading="lazy" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;">
+                {% endif %}
+                {% if product.compare_at_price > product.price %}
+                  {%- assign discount = product.compare_at_price | minus: product.price | times: 100 | divided_by: product.compare_at_price -%}
+                  <span style="position:absolute;top:10px;left:10px;background:#e74c3c;color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">-{{ discount }}%</span>
+                {% endif %}
+              </div>
+              <div style="padding:14px;">
+                {% if product.vendor != blank %}
+                  <p style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">{{ product.vendor }}</p>
+                {% endif %}
+                <h3 style="font-size:13px;font-weight:600;margin:0;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ product.title }}</h3>
+                <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:16px;font-weight:700;color:#e74c3c;">{{ product.price | money }}</span>
+                  {% if product.compare_at_price > product.price %}
+                    <span style="font-size:12px;color:#999;text-decoration:line-through;">{{ product.compare_at_price | money }}</span>
+                  {% endif %}
+                </div>
+                <form action="/cart/add" method="post" style="margin-top:10px;">
+                  <input type="hidden" name="id" value="{{ product.variants.first.id }}">
+                  <button type="submit" style="width:100%;padding:10px;background:#000;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" onmouseover="this.style.background='#e74c3c'" onmouseout="this.style.background='#000'">Add to Cart</button>
+                </form>
+              </div>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+      <div style="text-align:center;margin-top:30px;">
+        <a href="/collections/all" style="display:inline-block;padding:14px 40px;background:#000;color:#fff;border-radius:8px;font-weight:600;text-decoration:none;">View All Products</a>
+      </div>
+    {% else %}
+      <p style="text-align:center;color:#999;padding:40px 0;">No products found.</p>
+    {% endif %}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Browse Deals",
+  "settings": [],
+  "presets": [{"name":"Browse Deals"}]
+}
+{% endschema %}

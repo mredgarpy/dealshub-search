@@ -1,0 +1,141 @@
+<section class="hero-search" style="position:relative;overflow:hidden;background:linear-gradient(135deg,#0f172a 0%,#1e293b 40%,#0f3460 100%);min-height:420px;display:flex;align-items:center;justify-content:center;padding:48px 20px 40px;">
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 30% 20%,rgba(99,102,241,0.15) 0%,transparent 60%),radial-gradient(ellipse at 70% 80%,rgba(236,72,153,0.1) 0%,transparent 60%);pointer-events:none;"></div>
+  <div style="position:relative;z-index:2;max-width:780px;width:100%;text-align:center;">
+    <p style="font-size:13px;letter-spacing:2.5px;text-transform:uppercase;color:#f97316;font-weight:700;margin:0 0 14px;">{{ section.settings.pretitle | default: "SHOP SMARTER. SAVE MORE." }}</p>
+    <h1 style="font-size:clamp(28px,5vw,48px);font-weight:900;line-height:1.12;color:#fff;margin:0 0 14px;">{{ section.settings.title | default: "Discover Top Deals from the Best Stores" }}</h1>
+    <p style="font-size:clamp(15px,2vw,17px);color:rgba(255,255,255,0.72);line-height:1.55;margin:0 auto 28px;max-width:560px;">{{ section.settings.subtitle | default: "Search millions of products from trusted brands \u2014 all in one place, with secure checkout and fast shipping." }}</p>
+
+    <!-- Search Bar -->
+    <form id="hero-search-form" action="/pages/search-results" method="get" style="display:flex;max-width:620px;margin:0 auto 20px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.25);">
+      <div style="flex:1;display:flex;align-items:center;padding:0 4px 0 18px;gap:8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" placeholder="{{ section.settings.search_placeholder | default: 'Search deals \u2014 shoes, electronics, skincare...' }}" style="flex:1;border:none;outline:none;font-size:16px;padding:16px 4px;color:#1e293b;background:transparent;" autocomplete="off" id="hero-search-input">
+      </div>
+      <select name="store" id="hero-store-select" style="border:none;border-left:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:13px;font-weight:600;padding:0 14px;cursor:pointer;outline:none;min-width:110px;-webkit-appearance:none;appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2364748b%22 stroke-width=%222.5%22><polyline points=%226 9 12 15 18 9%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
+        <option value="">All Stores</option>
+        <option value="amazon">Amazon</option>
+        <option value="aliexpress">AliExpress</option>
+        <option value="shein">SHEIN</option>
+        <option value="macys">Macy's</option>
+        <option value="sephora">Sephora</option>
+      </select>
+      <button type="submit" style="background:#f97316;border:none;color:#fff;padding:0 28px;cursor:pointer;font-weight:700;font-size:15px;transition:background .2s;" aria-label="Search">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+    </form>
+
+    <!-- Trending Chips -->
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:12px;" id="hero-trending-chips">
+      <span style="color:rgba(255,255,255,0.5);font-size:13px;font-weight:500;padding:6px 0;">Trending:</span>
+      {% assign chips = section.settings.trending_chips | default: "wireless earbuds,summer dresses,skincare sets,running shoes,home decor" %}
+      {% assign chip_list = chips | split: "," %}
+      {% for chip in chip_list %}
+        <a href="/pages/search-results?q={{ chip | strip | url_encode }}" style="padding:6px 14px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:20px;color:rgba(255,255,255,0.8);font-size:13px;text-decoration:none;transition:all .2s;white-space:nowrap;" onmouseover="this.style.background='rgba(249,115,22,0.2)';this.style.borderColor='rgba(249,115,22,0.5)';this.style.color='#fff'" onmouseout="this.style.background='rgba(255,255,255,0.1)';this.style.borderColor='rgba(255,255,255,0.15)';this.style.color='rgba(255,255,255,0.8)'">{{ chip | strip }}</a>
+      {% endfor %}
+    </div>
+
+    <!-- Recent Searches (populated by JS from localStorage) -->
+    <div style="display:none;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:32px;" id="hero-recent-chips"></div>
+
+    <!-- Trust Stats -->
+    <div style="display:flex;justify-content:center;gap:32px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(34,197,94,0.15);display:flex;align-items:center;justify-content:center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div style="text-align:left;">
+          <p style="color:#fff;font-size:14px;font-weight:700;margin:0;line-height:1.2;">Secure Checkout</p>
+          <p style="color:rgba(255,255,255,0.5);font-size:11px;margin:0;">SSL encrypted</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(59,130,246,0.15);display:flex;align-items:center;justify-content:center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        </div>
+        <div style="text-align:left;">
+          <p style="color:#fff;font-size:14px;font-weight:700;margin:0;line-height:1.2;">Fast Shipping</p>
+          <p style="color:rgba(255,255,255,0.5);font-size:11px;margin:0;">Tracked delivery</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(249,115,22,0.15);display:flex;align-items:center;justify-content:center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        </div>
+        <div style="text-align:left;">
+          <p style="color:#fff;font-size:14px;font-weight:700;margin:0;line-height:1.2;">Best Prices</p>
+          <p style="color:rgba(255,255,255,0.5);font-size:11px;margin:0;">Up to 70% off</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(168,85,247,0.15);display:flex;align-items:center;justify-content:center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div style="text-align:left;">
+          <p style="color:#fff;font-size:14px;font-weight:700;margin:0;line-height:1.2;">24/7 Support</p>
+          <p style="color:rgba(255,255,255,0.5);font-size:11px;margin:0;">We're here to help</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero-search { box-sizing: border-box; }
+  .hero-search * { box-sizing: border-box; }
+  @media(max-width:640px){
+    .hero-search { min-height:380px !important; padding:36px 16px 32px !important; }
+    #hero-search-form { flex-direction:column !important; border-radius:12px !important; }
+    #hero-search-form input { font-size:16px !important; }
+    #hero-store-select { border-left:none !important; border-top:1px solid #e2e8f0 !important; padding:12px 14px !important; min-width:auto !important; }
+    #hero-search-form button[type="submit"] { padding:14px !important; }
+  }
+</style>
+
+<script>
+(function(){
+  var form = document.getElementById('hero-search-form');
+  if(!form) return;
+  form.addEventListener('submit', function(e){
+    var q = document.getElementById('hero-search-input').value.trim();
+    if(!q) { e.preventDefault(); return; }
+    try {
+      var recent = JSON.parse(localStorage.getItem('sh_recent_searches') || '[]');
+      recent = recent.filter(function(s){ return s !== q; });
+      recent.unshift(q);
+      if(recent.length > 10) recent = recent.slice(0, 10);
+      localStorage.setItem('sh_recent_searches', JSON.stringify(recent));
+    } catch(ex){}
+  });
+  /* Render recent searches chips */
+  try {
+    var rc = JSON.parse(localStorage.getItem('sh_recent_searches') || '[]');
+    if(rc.length) {
+      var wrap = document.getElementById('hero-recent-chips');
+      if(wrap) {
+        var h = '<span style="color:rgba(255,255,255,0.5);font-size:13px;font-weight:500;padding:6px 0;">Recent:</span>';
+        rc.slice(0,5).forEach(function(s){
+          h += '<a href="/pages/search-results?q='+encodeURIComponent(s)+'" style="padding:6px 14px;background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);border-radius:20px;color:rgba(255,255,255,0.85);font-size:13px;text-decoration:none;transition:all .2s;white-space:nowrap;">'+s+'</a>';
+        });
+        h += '<a href="#" id="hero-clear-recent" style="padding:6px 10px;color:rgba(255,255,255,0.4);font-size:11px;text-decoration:none;" title="Clear recent searches">\u2715</a>';
+        wrap.innerHTML = h;
+        wrap.style.display = 'flex';
+        document.getElementById('hero-clear-recent').addEventListener('click',function(ev){ev.preventDefault();localStorage.removeItem('sh_recent_searches');wrap.style.display='none';});
+      }
+    }
+  } catch(ex2){}
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Hero Search",
+  "settings": [
+    {"type": "text", "id": "pretitle", "label": "Pretitle", "default": "SHOP SMARTER. SAVE MORE."},
+    {"type": "text", "id": "title", "label": "Title", "default": "Discover Top Deals from the Best Stores"},
+    {"type": "textarea", "id": "subtitle", "label": "Subtitle", "default": "Search millions of products from trusted brands \u2014 all in one place, with secure checkout and fast shipping."},
+    {"type": "text", "id": "search_placeholder", "label": "Search placeholder", "default": "Search deals \u2014 shoes, electronics, skincare..."},
+    {"type": "text", "id": "trending_chips", "label": "Trending chips (comma separated)", "default": "wireless earbuds,summer dresses,skincare sets,running shoes,home decor"}
+  ],
+  "presets": [{"name": "Hero Search"}]
+}
+{% endschema %}

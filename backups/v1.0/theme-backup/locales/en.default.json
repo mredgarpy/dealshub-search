@@ -1,0 +1,104 @@
+{
+  "general": {
+    "search": {
+      "placeholder": "Search deals, brands, products...",
+      "submit": "Search",
+      "no_results": "No results for \"{{ terms }}\""
+    },
+    "password_page": {
+      "coming_soon": "Coming Soon",
+      "opening_soon": "Opening Soon"
+    }
+  },
+  "products": {
+    "product": {
+      "add_to_cart": "Add to Cart",
+      "sold_out": "Sold Out",
+      "unavailable": "Unavailable",
+      "view_deal": "View Deal",
+      "shop_on": "Shop on {{ store }}",
+      "save": "Save {{ percent }}%"
+    },
+    "facets": {
+      "filter_by": "Filter By",
+      "sort_by_label": "Sort",
+      "clear_all": "Clear All",
+      "price": "Price",
+      "availability": "Availability",
+      "brand": "Brand"
+    },
+    "general": {
+      "reviews": "{{ count }} reviews",
+      "shipping": "Free shipping on orders over ${{ amount }}"
+    }
+  },
+  "customer": {
+    "login": {
+      "title": "Sign In",
+      "email": "Email",
+      "password": "Password",
+      "forgot_password": "Forgot password?",
+      "submit": "Sign In",
+      "create_account": "Create Account"
+    },
+    "register": {
+      "title": "Create Account",
+      "submit": "Create Account",
+      "have_account": "Already have an account?"
+    },
+    "account": {
+      "title": "My Account",
+      "orders": "Orders",
+      "addresses": "Addresses",
+      "sign_out": "Sign Out",
+      "no_orders": "No orders yet."
+    },
+    "addresses": {
+      "title": "My Addresses",
+      "add_new": "Add New Address",
+      "default": "Default",
+      "edit": "Edit",
+      "delete": "Delete",
+      "set_default": "Set as Default"
+    },
+    "reset_password": {
+      "title": "Reset Password",
+      "submit": "Reset Password"
+    },
+    "recover_password": {
+      "title": "Forgot Password?",
+      "subtext": "Enter your email address and we'll send you a reset link.",
+      "submit": "Send Reset Email"
+    }
+  },
+  "cart": {
+    "general": {
+      "title": "Your Cart",
+      "empty": "Your cart is empty",
+      "subtotal": "Subtotal",
+      "checkout": "Checkout",
+      "view_cart": "View Cart",
+      "remove": "Remove",
+      "free_shipping_threshold": "Add ${{ amount }} more for free shipping",
+      "free_shipping_reached": "You qualify for Free Shipping!"
+    }
+  },
+  "sections": {
+    "header": {
+      "logo_alt": "{{ shop_name }}"
+    },
+    "announcement": {
+      "close": "Close announcement"
+    }
+  },
+  "accessibility": {
+    "skip_to_content": "Skip to content",
+    "close": "Close",
+    "open_menu": "Open menu",
+    "close_menu": "Close menu",
+    "search": "Search",
+    "cart": "Cart ({{ count }} items)",
+    "wishlist": "Wishlist",
+    "account": "Account"
+  }
+}

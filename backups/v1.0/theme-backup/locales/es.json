@@ -1,0 +1,83 @@
+{
+  "general": {
+    "search": {
+      "placeholder": "Buscar ofertas, marcas, productos...",
+      "submit": "Buscar",
+      "no_results": "Sin resultados para \"{{ terms }}\""
+    }
+  },
+  "products": {
+    "product": {
+      "add_to_cart": "Agregar al carrito",
+      "sold_out": "Agotado",
+      "unavailable": "No disponible",
+      "view_deal": "Ver Oferta",
+      "shop_on": "Comprar en {{ store }}",
+      "save": "Ahorrar {{ percent }}%"
+    },
+    "facets": {
+      "filter_by": "Filtrar por",
+      "sort_by_label": "Ordenar",
+      "clear_all": "Limpiar Todo",
+      "price": "Precio",
+      "availability": "Disponibilidad",
+      "brand": "Marca"
+    },
+    "general": {
+      "reviews": "{{ count }} reseñas",
+      "shipping": "Envío gratis en pedidos mayores de ${{ amount }}"
+    }
+  },
+  "customer": {
+    "login": {
+      "title": "Iniciar sesión",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "forgot_password": "¿Olvidaste tu contraseña?",
+      "submit": "Iniciar sesión",
+      "create_account": "Crear cuenta"
+    },
+    "register": {
+      "title": "Crear cuenta",
+      "submit": "Crear cuenta",
+      "have_account": "¿Ya tienes una cuenta?"
+    },
+    "account": {
+      "title": "Mi cuenta",
+      "orders": "Pedidos",
+      "addresses": "Direcciones",
+      "sign_out": "Cerrar sesión",
+      "no_orders": "Aún no tienes pedidos."
+    },
+    "addresses": {
+      "title": "Mis direcciones",
+      "add_new": "Agregar nueva dirección",
+      "default": "Por defecto",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "set_default": "Establecer como predeterminada"
+    }
+  },
+  "cart": {
+    "general": {
+      "title": "Tu carrito",
+      "empty": "Tu carrito está vacío",
+      "subtotal": "Subtotal",
+      "checkout": "Pagar",
+      "view_cart": "Ver carrito",
+      "remove": "Eliminar",
+      "free_shipping_threshold": "Agrega ${{ amount }} más para envío gratis",
+      "free_shipping_reached": "¡Tienes envío gratis!"
+    }
+  },
+  "accessibility": {
+    "skip_to_content": "Saltar al contenido",
+    "close": "Cerrar",
+    "open_menu": "Abrir menú",
+    "close_menu": "Cerrar menú",
+    "search": "Buscar",
+    "cart": "Carrito ({{ count }} artículos)",
+    "wishlist": "Lista de deseos",
+    "account": "Mi cuenta"
+  }
+}

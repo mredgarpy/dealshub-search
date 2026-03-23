@@ -1,0 +1,160 @@
+<div class="section">
+  <div class="container">
+
+    <!-- Header -->
+    <div style="margin-bottom:28px;">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="{{ routes.root_url }}">Home</a>
+        <span class="breadcrumbs__sep" aria-hidden="true">›</span>
+        <span class="breadcrumbs__current" aria-current="page">{{ collection.title }}</span>
+      </nav>
+      <h1 style="font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;margin-top:8px;">{{ collection.title }}</h1>
+      {%- if collection.description != blank -%}
+        <div style="color:var(--color-text-muted);margin-top:8px;max-width:600px;">{{ collection.description }}</div>
+      {%- endif -%}
+      <p style="font-size:.875rem;color:var(--color-text-muted);margin-top:8px;">{{ collection.products_count }} products</p>
+    </div>
+
+    <div class="collection-layout">
+
+      <!-- Filter Sidebar -->
+      <aside class="filter-sidebar" aria-label="Product filters">
+        <div class="filter-header">
+          <span>Filters</span>
+          <button class="filter-clear" id="clear-filters-btn">Clear All</button>
+        </div>
+
+        <!-- Availability -->
+        <div class="filter-group is-open">
+          <div class="filter-group__header" data-collapsible="filter-availability">
+            Availability
+            <svg class="filter-group__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="filter-group__body" id="filter-availability">
+            <label class="filter-option">
+              <input type="checkbox" data-filter="availability" value="in_stock">
+              <span>In Stock</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Price -->
+        <div class="filter-group is-open">
+          <div class="filter-group__header" data-collapsible="filter-price">
+            Price Range
+            <svg class="filter-group__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="filter-group__body" id="filter-price">
+            <div class="price-range">
+              <div class="price-range__inputs">
+                <input type="number" class="price-range__input" id="price-min" placeholder="$0" min="0">
+                <span>—</span>
+                <input type="number" class="price-range__input" id="price-max" placeholder="$999" min="0">
+              </div>
+              <button class="btn btn--sm btn--primary" style="margin-top:10px;width:100%;" id="apply-price-filter">Apply</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vendor/Brand -->
+        {%- if section.settings.show_vendor_filter -%}
+        <div class="filter-group">
+          <div class="filter-group__header">
+            Brand
+            <svg class="filter-group__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="filter-group__body">
+            {%- assign vendors = collection.products | map: 'vendor' | uniq | sort -%}
+            {%- for vendor in vendors limit: 10 -%}
+            <label class="filter-option">
+              <input type="checkbox" data-filter="vendor" value="{{ vendor | escape }}">
+              <span>{{ vendor }}</span>
+            </label>
+            {%- endfor -%}
+          </div>
+        </div>
+        {%- endif -%}
+
+        <!-- Sort (inside sidebar for mobile) -->
+        <div class="filter-group is-open" style="padding:16px 20px;border-bottom:none;">
+          <div class="filter-group__header" style="padding:0;margin-bottom:10px;">Sort By</div>
+          <select id="collection-sort" style="width:100%;padding:8px 12px;border:1.5px solid var(--color-border);border-radius:8px;font-size:.875rem;cursor:pointer;outline:none;background:var(--color-bg);">
+            <option value="">Relevance</option>
+            <option value="price-ascending">Price: Low to High</option>
+            <option value="price-descending">Price: High to Low</option>
+            <option value="best-selling">Best Selling</option>
+            <option value="created-descending">Newest</option>
+          </select>
+        </div>
+
+      </aside>
+
+      <!-- Products -->
+      <div>
+        <div id="collection-grid" class="grid grid--products" role="list">
+          {%- for product in collection.products -%}
+            {%- render 'product-card', product: product -%}
+          {%- else -%}
+            <div class="empty-state" style="grid-column:1/-1;">
+              <div class="empty-state__icon">🔍</div>
+              <h2 class="empty-state__title">No products found</h2>
+              <p class="empty-state__text">Try removing some filters or <a href="/pages/stylehub" style="color:var(--color-primary);">browse all deals</a>.</p>
+            </div>
+          {%- endfor -%}
+        </div>
+
+        <!-- Pagination -->
+        {%- if paginate.pages > 1 -%}
+        <div class="pagination" role="navigation" aria-label="Pagination">
+          {%- if paginate.previous -%}
+            <a href="{{ paginate.previous.url }}" class="pagination__btn" aria-label="Previous page">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+            </a>
+          {%- endif -%}
+
+          {%- for part in paginate.parts -%}
+            {%- if part.is_link -%}
+              <a href="{{ part.url }}" class="pagination__btn">{{ part.title }}</a>
+            {%- elsif part.title == paginate.current_page -%}
+              <span class="pagination__btn is-active" aria-current="page">{{ part.title }}</span>
+            {%- else -%}
+              <span class="pagination__btn" style="opacity:.5;pointer-events:none;">{{ part.title }}</span>
+            {%- endif -%}
+          {%- endfor -%}
+
+          {%- if paginate.next -%}
+            <a href="{{ paginate.next.url }}" class="pagination__btn" aria-label="Next page">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+            </a>
+          {%- endif -%}
+        </div>
+        {%- endif -%}
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Filter accordion
+document.querySelectorAll('.filter-group__header').forEach(h => {
+  h.addEventListener('click', () => h.closest('.filter-group').classList.toggle('is-open'));
+});
+// Sort
+document.getElementById('collection-sort') && document.getElementById('collection-sort').addEventListener('change', function () {
+  const url = new URL(window.location.href);
+  if (this.value) url.searchParams.set('sort_by', this.value);
+  else url.searchParams.delete('sort_by');
+  window.location.href = url.toString();
+});
+</script>
+
+{% schema %}
+{
+  "name": "Main Collection",
+  "settings": [
+    { "type": "checkbox", "id": "show_vendor_filter", "label": "Show Brand Filter", "default": true }
+  ],
+  "presets": [{ "name": "Main Collection" }]
+}
+{% endschema %}

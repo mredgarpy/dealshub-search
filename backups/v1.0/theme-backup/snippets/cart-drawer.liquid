@@ -1,0 +1,95 @@
+<!-- Cart Drawer -->
+<div class="cart-drawer" id="cart-drawer" role="dialog" aria-label="Shopping cart" aria-modal="true" aria-hidden="true">
+
+  <!-- Header -->
+  <div class="cart-drawer__header">
+    <div>
+      <span class="cart-drawer__title">Your Cart</span>
+      <span class="cart-drawer__count" id="cart-drawer-count">{{ cart.item_count }}</span>
+    </div>
+    <button class="cart-drawer__close" id="cart-close-btn" aria-label="Close cart">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <!-- Free Shipping Progress Bar -->
+  {%- if settings.cart_show_shipping_bar -%}
+  <div class="cart-shipping-bar" id="cart-shipping-bar">
+    <div class="cart-shipping-bar__text" id="cart-shipping-text">
+      {%- assign threshold = settings.cart_free_shipping_threshold | default: 35 -%}
+      {%- assign cart_total = cart.total_price | divided_by: 100.0 -%}
+      {%- if cart_total >= threshold -%}
+        🎉 You qualify for <strong>Free Shipping!</strong>
+      {%- else -%}
+        {%- assign remaining = threshold | minus: cart_total -%}
+        Add <strong>${{ remaining | round: 2 }}</strong> more for free shipping
+      {%- endif -%}
+    </div>
+    <div class="cart-shipping-bar__track">
+      {%- assign fill_pct = cart_total | divided_by: threshold | times: 100 | at_most: 100 -%}
+      <div class="cart-shipping-bar__fill" id="cart-shipping-fill" style="width:{{ fill_pct }}%;"></div>
+    </div>
+  </div>
+  {%- endif -%}
+
+  <!-- Items -->
+  <div class="cart-drawer__body" id="cart-drawer-body">
+    {%- if cart.item_count == 0 -%}
+    <div class="cart-empty" id="cart-empty-state">
+      <div class="cart-empty__icon">🛒</div>
+      <h3 class="cart-empty__title">Your cart is empty</h3>
+      <p class="cart-empty__text">Start adding deals to your cart!</p>
+      <a href="/pages/dealshub" class="btn btn--primary">Shop Deals</a>
+    </div>
+    {%- else -%}
+    <div id="cart-items-list">
+      {%- for item in cart.items -%}
+      <div class="cart-item" data-cart-item="{{ item.key }}">
+        {%- if item.image -%}
+          <img class="cart-item__img" src="{{ item.image | image_url: width: 160 }}" alt="{{ item.title | escape }}" loading="lazy">
+        {%- else -%}
+          <div class="cart-item__img" style="background:var(--color-bg);display:flex;align-items:center;justify-content:center;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </div>
+        {%- endif -%}
+        <div class="cart-item__details">
+          <div class="cart-item__title">{{ item.product.title | truncate: 60 }}</div>
+          {%- if item.product.metafields.dealshub.source != blank -%}
+            <div class="cart-item__source">from {{ item.product.metafields.dealshub.source_name | default: item.product.metafields.dealshub.source }}</div>
+          {%- endif -%}
+          <div class="cart-item__footer">
+            <span class="cart-item__price">{{ item.final_price | money }}</span>
+            <div class="cart-item__qty">
+              <button class="qty-btn" data-action="decrease" data-key="{{ item.key }}" aria-label="Decrease quantity">−</button>
+              <span>{{ item.quantity }}</span>
+              <button class="qty-btn" data-action="increase" data-key="{{ item.key }}" aria-label="Increase quantity">+</button>
+            </div>
+          </div>
+          <button class="cart-item__remove" data-key="{{ item.key }}" aria-label="Remove {{ item.title | escape }} from cart">Remove</button>
+        </div>
+      </div>
+      {%- endfor -%}
+    </div>
+    {%- endif -%}
+  </div>
+
+  <!-- Footer -->
+  {%- if cart.item_count > 0 -%}
+  <div class="cart-drawer__footer" id="cart-drawer-footer">
+    <div class="cart-subtotal">
+      <span>Subtotal</span>
+      <span class="cart-subtotal__price" id="cart-subtotal">{{ cart.total_price | money }}</span>
+    </div>
+    <a href="{{ routes.cart_url }}" class="btn btn--primary btn--full btn--lg" style="margin-bottom:10px;">
+      View Cart
+    </a>
+    <form action="/checkout" method="post">
+      <button type="submit" class="btn btn--dark btn--full btn--lg">
+        Checkout →
+      </button>
+    </form>
+    <p class="cart-note">Taxes and shipping calculated at checkout</p>
+  </div>
+  {%- endif -%}
+
+</div>

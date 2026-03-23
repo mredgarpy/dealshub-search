@@ -1,0 +1,100 @@
+<div id="social-proof-container" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+(function () {
+  const cfg = window.DealsHub || {};
+  const delay    = (cfg.socialProofDelay    || 8000);
+  const interval = (cfg.socialProofInterval || 12000);
+  const position = (cfg.socialProofPosition || 'bottom-left');
+
+  const names   = ['Emma R.', 'Sofia M.', 'Isabella T.', 'Lucas G.', 'Mia P.', 'Noah K.', 'Olivia S.', 'Liam D.', 'Ava W.', 'Ethan B.'];
+  const cities  = ['Miami, FL', 'New York, NY', 'Los Angeles, CA', 'Chicago, IL', 'Houston, TX', 'Phoenix, AZ', 'Dallas, TX', 'Atlanta, GA'];
+  const actions = [
+    'just purchased',
+    'added to cart',
+    'is viewing',
+    'just bought'
+  ];
+
+  let products = [];
+  let timer;
+  const container = document.getElementById('social-proof-container');
+  if (!container) return;
+
+  // Position
+  Object.assign(container.style, {
+    position: 'fixed',
+    [position.includes('left') ? 'left' : 'right']: '24px',
+    [position.includes('bottom') ? 'bottom' : 'top']: '24px',
+    zIndex: '999'
+  });
+
+  // Fetch some products to use in notifications
+  async function loadProducts() {
+    try {
+      const api = window.DealsHubAPI;
+      if (!api) return;
+      const data = await api.getMultiStore('trending deals', [], 10);
+      products = data.results.filter(p => p.image && p.title);
+    } catch { /* silent */ }
+  }
+
+  function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function showNotification() {
+    if (!products.length) return;
+    const p    = rand(products);
+    const name = rand(names);
+    const city = rand(cities);
+    const act  = rand(actions);
+    const minsAgo = Math.floor(Math.random() * 29) + 1;
+
+    const el = document.createElement('div');
+    el.className = 'social-proof-notification';
+    el.setAttribute('role', 'status');
+    el.innerHTML = `
+      <img class="social-proof-notification__img"
+           src="${p.image}"
+           alt="${p.title}"
+           loading="lazy"
+           onerror="this.style.display='none'">
+      <div class="social-proof-notification__body">
+        <div class="social-proof-notification__name">${name} from ${city}</div>
+        <div class="social-proof-notification__text">${act} ${p.title.slice(0, 55)}${p.title.length > 55 ? '…' : ''}</div>
+        <div class="social-proof-notification__time">${minsAgo} min${minsAgo !== 1 ? 's' : ''} ago</div>
+      </div>
+      <div class="social-proof-notification__dot" aria-hidden="true"></div>`;
+
+    container.appendChild(el);
+
+    // Auto remove after 5s
+    setTimeout(() => {
+      el.classList.add('is-hiding');
+      setTimeout(() => el.remove(), 350);
+    }, 5000);
+
+    // Click to dismiss
+    el.addEventListener('click', () => {
+      el.classList.add('is-hiding');
+      setTimeout(() => el.remove(), 350);
+    });
+  }
+
+  // Start
+  loadProducts().then(() => {
+    setTimeout(() => {
+      showNotification();
+      timer = setInterval(showNotification, interval);
+    }, delay);
+  });
+
+  // Stop when tab is not visible
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      clearInterval(timer);
+    } else {
+      timer = setInterval(showNotification, interval);
+    }
+  });
+})();
+</script>

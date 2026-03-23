@@ -1,0 +1,377 @@
+<style>
+.pd-wrap{max-width:1200px;margin:0 auto;padding:20px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.pd-loading{text-align:center;padding:80px 20px;color:#666}
+.pd-loading .spinner{width:40px;height:40px;border:3px solid #eee;border-top-color:#ff6b35;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pd-error{text-align:center;padding:60px 20px;color:#e53935}
+.pd-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px}
+@media(max-width:768px){.pd-grid{grid-template-columns:1fr;gap:20px}}
+.pd-breadcrumb{margin-bottom:16px;font-size:13px;color:#888}
+.pd-breadcrumb a{color:#ff6b35;text-decoration:none}
+/* Gallery */
+.pd-gallery{position:relative}
+.pd-main-img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:12px;background:#f8f8f8;border:1px solid #eee}
+.pd-thumbs{display:flex;gap:8px;margin-top:12px;overflow-x:auto;padding-bottom:4px}
+.pd-thumb{width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid transparent;cursor:pointer;background:#f8f8f8;flex-shrink:0}
+.pd-thumb.active{border-color:#ff6b35}
+.pd-badge{position:absolute;top:12px;left:12px;background:#ff6b35;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+/* Info */
+.pd-info{display:flex;flex-direction:column;gap:12px}
+.pd-store{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#888;background:#f5f5f5;padding:4px 10px;border-radius:20px;width:fit-content}
+.pd-store img{width:16px;height:16px;border-radius:50%}
+.pd-title{font-size:24px;font-weight:700;color:#1a1a1a;line-height:1.3;margin:0}
+.pd-brand{font-size:14px;color:#666;margin:0}
+.pd-rating{display:flex;align-items:center;gap:8px;font-size:14px}
+.pd-stars{color:#f59e0b}
+.pd-rating-count{color:#888}
+.pd-prices{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.pd-price{font-size:32px;font-weight:800;color:#ff6b35}
+.pd-orig-price{font-size:18px;color:#999;text-decoration:line-through}
+.pd-discount{background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600}
+/* Variants */
+.pd-variant-group{margin-top:4px}
+.pd-variant-label{font-size:14px;font-weight:600;color:#333;margin-bottom:8px}
+.pd-variant-options{display:flex;flex-wrap:wrap;gap:8px}
+.pd-variant-btn{padding:8px 16px;border:2px solid #e0e0e0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;color:#333;transition:all 0.2s}
+.pd-variant-btn:hover{border-color:#ff6b35}
+.pd-variant-btn.selected{border-color:#ff6b35;background:#fff8f5;color:#ff6b35;font-weight:600}
+.pd-variant-btn img{width:24px;height:24px;border-radius:4px;margin-right:6px;vertical-align:middle}
+/* Actions */
+.pd-actions{display:flex;gap:12px;margin-top:8px}
+.pd-buy-btn{flex:1;padding:16px 32px;background:#ff6b35;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s;text-transform:uppercase;letter-spacing:0.5px}
+.pd-buy-btn:hover{background:#e55a2b}
+.pd-buy-btn:disabled{background:#ccc;cursor:not-allowed}
+.pd-buy-btn .btn-spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px}
+.pd-availability{font-size:13px;color:#4caf50;font-weight:500}
+.pd-availability.out{color:#e53935}
+/* Tabs */
+.pd-tabs{margin-top:40px;border-top:1px solid #eee;padding-top:20px}
+.pd-tab-nav{display:flex;gap:0;border-bottom:2px solid #eee;margin-bottom:20px;overflow-x:auto}
+.pd-tab-btn{padding:12px 24px;border:none;background:none;font-size:14px;font-weight:600;color:#888;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.pd-tab-btn.active{color:#ff6b35;border-bottom-color:#ff6b35}
+.pd-tab-content{display:none}
+.pd-tab-content.active{display:block}
+.pd-desc{font-size:15px;line-height:1.7;color:#444}
+.pd-desc p{margin:0 0 12px}
+.pd-features{list-style:none;padding:0;margin:0}
+.pd-features li{padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:14px;color:#444;display:flex;align-items:flex-start;gap:8px}
+.pd-features li::before{content:'✓';color:#ff6b35;font-weight:700;flex-shrink:0}
+.pd-specs-table{width:100%;border-collapse:collapse}
+.pd-specs-table tr:nth-child(even){background:#f8f8f8}
+.pd-specs-table td{padding:10px 14px;font-size:14px;border-bottom:1px solid #eee}
+.pd-specs-table td:first-child{font-weight:600;color:#333;width:35%}
+.pd-specs-table td:last-child{color:#555}
+</style>
+
+<div class="pd-wrap" id="productDetail">
+  <div class="pd-loading" id="pdLoading">
+    <div class="spinner"></div>
+    <p>Loading product...</p>
+  </div>
+  <div class="pd-error" id="pdError" style="display:none">
+    <p style="font-size:48px;margin:0">😕</p>
+    <h2>Product not found</h2>
+    <p>No pudimos encontrar este producto. <a href="/" style="color:#ff6b35">Volver al inicio</a></p>
+  </div>
+  <div id="pdContent" style="display:none">
+    <div class="pd-breadcrumb">
+      <a href="/">Home</a> / <a href="/pages/search-results">Products</a> / <span id="pdBreadcrumbTitle"></span>
+    </div>
+    <div class="pd-grid">
+      <!-- Gallery -->
+      <div class="pd-gallery">
+        <span class="pd-badge" id="pdBadge" style="display:none"></span>
+        <img class="pd-main-img" id="pdMainImg" src="" alt="">
+        <div class="pd-thumbs" id="pdThumbs"></div>
+      </div>
+      <!-- Info -->
+      <div class="pd-info">
+        <div class="pd-store" id="pdStore"></div>
+        <h1 class="pd-title" id="pdTitle"></h1>
+        <p class="pd-brand" id="pdBrand" style="display:none"></p>
+        <div class="pd-rating" id="pdRating" style="display:none">
+          <span class="pd-stars" id="pdStars"></span>
+          <span id="pdRatingNum"></span>
+          <span class="pd-rating-count" id="pdReviewCount"></span>
+        </div>
+        <div class="pd-prices">
+          <span class="pd-price" id="pdPrice"></span>
+          <span class="pd-orig-price" id="pdOrigPrice" style="display:none"></span>
+          <span class="pd-discount" id="pdDiscount" style="display:none"></span>
+        </div>
+        <p class="pd-availability" id="pdAvailability" style="display:none"></p>
+        <div id="pdVariants"></div>
+        <div class="pd-actions">
+          <button class="pd-buy-btn" id="pdBuyBtn" onclick="handleBuy()">
+            Buy Now
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Tabs -->
+    <div class="pd-tabs">
+      <div class="pd-tab-nav" id="pdTabNav"></div>
+      <div id="pdTabPanels"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const API = 'https://dealshub-search.onrender.com';
+  const params = new URLSearchParams(window.location.search);
+  const productId = params.get('id') || window.location.pathname.split('/').pop();
+  const store = (params.get('store') || 'amazon').toLowerCase();
+  let productData = null;
+  let selectedVariants = {};
+
+  if (!productId) { showError(); return; }
+
+  // Fetch product detail
+  fetch(`${API}/api/product/${encodeURIComponent(productId)}?store=${store}`)
+    .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
+    .then(data => { productData = data; renderProduct(data); })
+    .catch(() => showError());
+
+  function showError() {
+          if (productData) return;
+    document.getElementById('pdLoading').style.display = 'none';
+    document.getElementById('pdError').style.display = 'block';
+  }
+
+  function renderProduct(p) {
+    document.getElementById('pdLoading').style.display = 'none';
+          document.getElementById('pdError').style.display = 'none';
+    document.getElementById('pdContent').style.display = 'block';
+
+    // Title & breadcrumb
+    document.getElementById('pdTitle').textContent = p.title;
+    document.getElementById('pdBreadcrumbTitle').textContent = p.title.length > 50 ? p.title.substring(0, 50) + '...' : p.title;
+    document.title = p.title + ' | STYLEHUB MIAMI';
+
+    // Store badge
+    const storeIcons = { amazon: '🛒', aliexpress: '🌐', sephora: '💄' };
+    document.getElementById('pdStore').innerHTML = `${storeIcons[p.source] || '🛒'} ${p.source.charAt(0).toUpperCase()+p.source.slice(1)}`;
+
+    // Brand
+    if (p.brand) {
+      const brandEl = document.getElementById('pdBrand');
+      brandEl.textContent = p.brand;
+      brandEl.style.display = 'block';
+    }
+
+    // Badge
+    if (p.badge) {
+      const badgeEl = document.getElementById('pdBadge');
+      badgeEl.textContent = p.badge;
+      badgeEl.style.display = 'inline-block';
+    }
+
+    // Images
+    const imgs = (p.images || []).filter(i => i && i !== '');
+    if (imgs.length > 0) {
+      document.getElementById('pdMainImg').src = imgs[0];
+      document.getElementById('pdMainImg').alt = p.title;
+      const thumbsEl = document.getElementById('pdThumbs');
+      imgs.forEach((img, i) => {
+        const thumb = document.createElement('img');
+        thumb.className = 'pd-thumb' + (i === 0 ? ' active' : '');
+        thumb.src = img;
+        thumb.alt = `${p.title} - imagen ${i + 1}`;
+        thumb.onclick = function() {
+          document.getElementById('pdMainImg').src = img;
+          thumbsEl.querySelectorAll('.pd-thumb').forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+        };
+        thumbsEl.appendChild(thumb);
+      });
+    }
+
+    // Rating
+    if (p.rating) {
+      const ratingEl = document.getElementById('pdRating');
+      ratingEl.style.display = 'flex';
+      const stars = parseFloat(p.rating);
+      let starsHtml = '';
+      for (let i = 1; i <= 5; i++) {
+        starsHtml += i <= Math.round(stars) ? '★' : '☆';
+      }
+      document.getElementById('pdStars').textContent = starsHtml;
+      document.getElementById('pdRatingNum').textContent = stars.toFixed(1);
+      if (p.reviews) {
+        document.getElementById('pdReviewCount').textContent = `(${Number(p.reviews).toLocaleString()} reviews)`;
+      }
+    }
+
+    // Price
+    if (p.price) {
+            document.getElementById('pdPrice').textContent = '$' + parseFloat(String(p.price).replace(/[^0-9.]/g,'')).toFixed(2);
+    }
+    if (p.originalPrice && p.originalPrice !== p.price) {
+      const origEl = document.getElementById('pdOrigPrice');
+            origEl.textContent = '$' + parseFloat(String(p.originalPrice).replace(/[^0-9.]/g,'')).toFixed(2);
+      origEl.style.display = 'inline';
+      // Discount calc
+      const pNum = parseFloat(p.price.replace(/[^0-9.]/g, ''));
+      const oNum = parseFloat(p.originalPrice.replace(/[^0-9.]/g, ''));
+      if (oNum > pNum) {
+        const disc = Math.round((1 - pNum / oNum) * 100);
+        if (disc > 0) {
+          const discEl = document.getElementById('pdDiscount');
+          discEl.textContent = `-${disc}%`;
+          discEl.style.display = 'inline';
+        }
+      }
+    }
+
+    // Availability
+    if (p.availability) {
+      const availEl = document.getElementById('pdAvailability');
+      availEl.textContent = p.availability;
+      availEl.style.display = 'block';
+      if (p.availability.toLowerCase().includes('out') || p.availability.toLowerCase().includes('no disponible')) {
+        availEl.classList.add('out');
+      }
+    }
+
+    // Variants
+    if (p.variants && p.variants.length > 0) {
+      const variantsEl = document.getElementById('pdVariants');
+      p.variants.forEach(variant => {
+        const group = document.createElement('div');
+        group.className = 'pd-variant-group';
+        group.innerHTML = `<div class="pd-variant-label">${variant.name}:</div><div class="pd-variant-options" data-variant="${variant.name}"></div>`;
+        const optionsEl = group.querySelector('.pd-variant-options');
+        variant.values.forEach((val, idx) => {
+          const btn = document.createElement('button');
+          btn.className = 'pd-variant-btn' + (val.selected ? ' selected' : '');
+          if (val.selected) selectedVariants[variant.name] = val.value;
+          let inner = '';
+          if (val.image) inner += `<img src="${val.image}" alt="${val.value}">`;
+          inner += val.value;
+          btn.innerHTML = inner;
+          btn.onclick = function() {
+            optionsEl.querySelectorAll('.pd-variant-btn').forEach(b => b.classList.remove('selected'));
+            this.classList.add('selected');
+            selectedVariants[variant.name] = val.value;
+            if (val.image) document.getElementById('pdMainImg').src = val.image;
+            if (val.asin && p.source === 'amazon') {
+              window.location.search = `?id=${val.asin}&store=amazon`;
+            }
+          };
+          optionsEl.appendChild(btn);
+        });
+        variantsEl.appendChild(group);
+      });
+    }
+
+    // Tabs
+    const tabs = [];
+    // Description tab
+    const descContent = p.description || '';
+    if (descContent) {
+      tabs.push({ id: 'desc', label: 'Description', content: `<div class="pd-desc">${descContent.replace(/\n/g, '<br>')}</div>` });
+    }
+    // Features tab
+    if (p.features && p.features.length > 0) {
+      let featHtml = '<ul class="pd-features">';
+      p.features.forEach(f => { featHtml += `<li>${f}</li>`; });
+      featHtml += '</ul>';
+      tabs.push({ id: 'features', label: 'Características', content: featHtml });
+    }
+    // About tab (for Amazon about_product)
+    if (p.about && p.about.length > 0 && (!p.features || p.features.length === 0)) {
+      let aboutHtml = '<ul class="pd-features">';
+      p.about.forEach(a => { aboutHtml += `<li>${a}</li>`; });
+      aboutHtml += '</ul>';
+      tabs.push({ id: 'about', label: 'Acerca del producto', content: aboutHtml });
+    }
+    // Specs tab
+    if (p.specifications && Object.keys(p.specifications).length > 0) {
+      let specHtml = '<table class="pd-specs-table">';
+      Object.entries(p.specifications).forEach(([k, v]) => {
+        specHtml += `<tr><td>${k}</td><td>${v}</td></tr>`;
+      });
+      specHtml += '</table>';
+      tabs.push({ id: 'specs', label: 'Especificaciones', content: specHtml });
+    }
+
+    if (tabs.length > 0) {
+      const tabNav = document.getElementById('pdTabNav');
+      const tabPanels = document.getElementById('pdTabPanels');
+      tabs.forEach((tab, i) => {
+        tabNav.innerHTML += `<button class="pd-tab-btn${i === 0 ? ' active' : ''}" onclick="switchTab('${tab.id}')">${tab.label}</button>`;
+        tabPanels.innerHTML += `<div class="pd-tab-content${i === 0 ? ' active' : ''}" id="tab-${tab.id}">${tab.content}</div>`;
+      });
+    }
+  }
+
+  // Tab switching
+  window.switchTab = function(id) {
+    document.querySelectorAll('.pd-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.pd-tab-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + id).classList.add('active');
+  };
+
+  // Buy button - Shopify native checkout
+  window.handleBuy = function() {
+    if (!productData) return;
+    const btn = document.getElementById('pdBuyBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span> Processing...';
+
+    const priceNum = productData.price ? parseFloat(String(productData.price).replace(/[^0-9.]/g, '')) : 0;
+    const mainImg = (productData.images && productData.images[0]) || '';
+    let variantTitle = Object.values(selectedVariants).join(' / ') || 'Default';
+
+    const payload = {
+      title: productData.title,
+      price: priceNum.toFixed(2),
+      image: mainImg,
+      quantity: 1,
+      variant_title: variantTitle,
+      source: productData.source,
+      source_url: productData.url,
+      product_id: productData.id
+    };
+
+    fetch(`${API}/api/create-and-add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(r => {
+      if (r.redirected) {
+        window.location.href = r.url;
+        return;
+      }
+      return r.json();
+    })
+    .then(data => {
+      if (data && data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else if (data && data.cart_url) {
+        window.location.href = data.cart_url;
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Buy Now';
+        alert('Error al procesar. Intente de nuevo.');
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = 'Buy Now';
+      alert('Error de conexión. Intente de nuevo.');
+    });
+  };
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Product Detail",
+  "settings": [],
+  "presets": [{ "name": "Product Detail" }]
+}
+{% endschema %}

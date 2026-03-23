@@ -1,0 +1,59 @@
+{% comment %}
+  DealsHub — Trust Badges Snippet
+  Reusable trust indicators for PDP, cart, footer
+  Usage: {% render 'trust-badges' %}
+  Optional: {% render 'trust-badges', style: 'compact' %}
+{% endcomment %}
+
+{% assign badge_style = style | default: 'full' %}
+
+<div class="dealshub-trust-badges" data-style="{{ badge_style }}">
+  <style>
+    .dealshub-trust-badges { padding: 16px 0; }
+    .dealshub-trust-badges .trust-grid {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      justify-content: center; align-items: center;
+    }
+    .dealshub-trust-badges .trust-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px; background: #f8f9fa; border-radius: 8px;
+      font-size: 13px; color: #333; white-space: nowrap;
+    }
+    .dealshub-trust-badges .trust-item svg { flex-shrink: 0; }
+    .dealshub-trust-badges[data-style="compact"] .trust-grid { gap: 8px; }
+    .dealshub-trust-badges[data-style="compact"] .trust-item {
+      padding: 6px 10px; font-size: 12px; background: transparent; border: 1px solid #e5e7eb;
+    }
+    .dealshub-trust-badges[data-style="bar"] {
+      background: #f0fdf4; border-top: 1px solid #bbf7d0; border-bottom: 1px solid #bbf7d0;
+      padding: 12px 20px;
+    }
+    .dealshub-trust-badges[data-style="bar"] .trust-item { background: transparent; }
+    @media(max-width:640px) {
+      .dealshub-trust-badges .trust-grid { gap: 6px; }
+      .dealshub-trust-badges .trust-item { padding: 6px 10px; font-size: 11px; }
+    }
+  </style>
+  <div class="trust-grid">
+    <div class="trust-item">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>Secure Checkout</span>
+    </div>
+    <div class="trust-item">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      <span>Free Shipping</span>
+    </div>
+    <div class="trust-item">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/><path d="M12 8v4l2 2"/></svg>
+      <span>Easy Returns</span>
+    </div>
+    <div class="trust-item">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+      <span>Safe Payment</span>
+    </div>
+    <div class="trust-item">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+      <span>Quality Guaranteed</span>
+    </div>
+  </div>
+</div>

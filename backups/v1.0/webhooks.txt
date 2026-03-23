@@ -1,0 +1,40 @@
+====================================================
+SHOPIFY WEBHOOKS - DealsHub / StyleHub Miami
+Store: 1rnmax-5z.myshopify.com
+Documented: 2026-03-23
+====================================================
+
+Webhook 1:
+  ID: 1585318264963
+  Topic: orders/create
+  Address: https://dealshub-search.onrender.com/webhooks/order-created
+  Format: json
+  Created: 2026-03-21T14:40:20-07:00
+  Handler: src/webhooks.js → stores order in CRM DB
+
+Webhook 2:
+  ID: 1585318297731
+  Topic: orders/fulfilled
+  Address: https://dealshub-search.onrender.com/webhooks/order-fulfilled
+  Format: json
+  Created: 2026-03-21T14:40:21-07:00
+  Handler: src/webhooks.js → updates order fulfillment status in CRM DB
+
+Webhook 3:
+  ID: 1585318330499
+  Topic: orders/cancelled
+  Address: https://dealshub-search.onrender.com/webhooks/order-cancelled
+  Format: json
+  Created: 2026-03-21T14:40:22-07:00
+  Handler: src/webhooks.js → updates order cancellation status in CRM DB
+
+Webhook 4:
+  ID: 1585318363267
+  Topic: refunds/create
+  Address: https://dealshub-search.onrender.com/webhooks/refund-created
+  Format: json
+  Created: 2026-03-21T14:40:23-07:00
+  Handler: src/webhooks.js → stores refund event in CRM DB
+
+All webhooks point to: https://dealshub-search.onrender.com
+HMAC verification uses: SHOPIFY_WEBHOOK_SECRET or SHOPIFY_CLIENT_SECRET env var

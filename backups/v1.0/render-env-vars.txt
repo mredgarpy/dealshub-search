@@ -1,0 +1,90 @@
+====================================================
+RENDER ENV VARS - DealsHub Backend
+Service: dealshub-backend
+URL: https://dealshub-search.onrender.com
+Service ID: srv-d6pfuu7kijhs73aa0c90
+Documented: 2026-03-23
+====================================================
+
+REQUIRED ENV VARS:
+------------------
+
+RAPIDAPI_KEY
+  - Used by: src/adapters/base.js, src/adapters/sephora-macys.js, server.js (initAdapters, /api/shipping-estimate)
+  - Purpose: API key for RapidAPI (Amazon, AliExpress, Sephora, Macy's, SHEIN data)
+
+SHOPIFY_STORE_DOMAIN
+  - Used by: server.js, src/services/shopify-sync.js, src/shopify-admin.js
+  - Value: 1rnmax-5z.myshopify.com
+  - Purpose: Shopify store domain for Admin API calls
+
+SHOPIFY_ADMIN_TOKEN
+  - Used by: server.js, src/services/shopify-sync.js, src/shopify-admin.js, src/routes/newsletter.js, src/routes/product-images.js
+  - Value: shpat_***REDACTED*** (stored in Render env vars, do NOT commit to git)
+  - Purpose: Shopify Admin API access token
+
+SHOPIFY_STORE
+  - Used by: src/shopify.js, src/routes/newsletter.js, src/routes/product-images.js
+  - Fallback: 1rnmax-5z.myshopify.com
+  - Purpose: Shopify store identifier (legacy reference)
+
+SHOPIFY_ACCESS_TOKEN
+  - Used by: src/shopify.js, src/routes/newsletter.js, src/routes/product-images.js
+  - Purpose: Alternative name for admin token (legacy)
+
+OPTIONAL ENV VARS:
+------------------
+
+SHOPIFY_THEME_ID
+  - Used by: server.js (theme asset upload endpoints)
+  - Fallback: 157178462339
+  - Purpose: Active theme ID for asset management
+
+SHOPIFY_LOCATION_ID
+  - Used by: src/services/shopify-sync.js
+  - Fallback: 84042121347
+  - Purpose: Shopify inventory location ID
+
+SHOPIFY_CUSTOM_DOMAIN
+  - Used by: src/services/shopify-sync.js
+  - Fallback: stylehubmiami.com
+  - Purpose: Custom domain for product URLs
+
+SHOPIFY_CLIENT_ID
+  - Used by: server.js (OAuth flow)
+  - Purpose: App client ID for OAuth authentication
+
+SHOPIFY_CLIENT_SECRET
+  - Used by: server.js (OAuth flow), src/webhooks.js
+  - Purpose: App client secret for OAuth and webhook HMAC verification
+
+SHOPIFY_WEBHOOK_SECRET
+  - Used by: src/webhooks.js
+  - Fallback: uses SHOPIFY_CLIENT_SECRET
+  - Purpose: Webhook HMAC verification secret
+
+CRM_ADMIN_TOKEN
+  - Used by: src/crm-api.js
+  - Fallback: stylehub-admin-2026
+  - Purpose: Bearer token for CRM admin API endpoints
+
+MARKUP_PERCENT
+  - Used by: src/pricing.js
+  - Fallback: 12
+  - Purpose: Default markup percentage for pricing engine
+
+PORT
+  - Used by: server.js
+  - Fallback: 10000
+  - Purpose: Server port (Render sets this automatically)
+
+LOG_LEVEL
+  - Used by: src/utils/logger.js
+  - Fallback: info
+  - Options: error, warn, info, debug
+  - Purpose: Logging verbosity level
+
+DB_PATH
+  - Used by: src/utils/db.js
+  - Fallback: /tmp
+  - Purpose: Directory path for SQLite database file (stylehub.db)

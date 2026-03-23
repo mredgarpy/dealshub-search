@@ -1,0 +1,72 @@
+{% comment %} Customer Register Page {% endcomment %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-card__logo">
+      {%- if settings.logo != blank -%}
+        <img src="{{ settings.logo | image_url: width: 120 }}" alt="{{ shop.name }}" style="max-width:120px;margin:0 auto;">
+      {%- else -%}
+        <span style="font-family:var(--font-heading);font-weight:800;font-size:1.4rem;color:var(--color-secondary);">{{ settings.logo_text | default: shop.name }}</span>
+      {%- endif -%}
+    </div>
+
+    <h1 class="auth-card__title">Create Account</h1>
+    <p class="auth-card__subtitle">Join DealsHub Miami for exclusive deals & offers</p>
+
+    <!-- Benefits -->
+    <div style="background:rgba(255,107,53,.06);border-radius:10px;padding:14px 18px;margin-bottom:24px;display:flex;flex-direction:column;gap:7px;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:.82rem;"><span>❤️</span><span>Save items to your wishlist</span></div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:.82rem;"><span>📦</span><span>Track your orders</span></div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:.82rem;"><span>⚡</span><span>Get early access to flash deals</span></div>
+    </div>
+
+    {%- form 'create_customer', id: 'register-form' -%}
+      {%- if form.errors -%}
+        <div style="background:rgba(231,76,60,.08);border:1px solid var(--color-danger);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:.875rem;color:var(--color-danger);">
+          {{ form.errors | default_errors }}
+        </div>
+      {%- endif -%}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="FirstName">First Name</label>
+          <input type="text" name="customer[first_name]" id="FirstName" class="form-input"
+            autocomplete="given-name" placeholder="Emma" value="{{ form.first_name }}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="LastName">Last Name</label>
+          <input type="text" name="customer[last_name]" id="LastName" class="form-input"
+            autocomplete="family-name" placeholder="Rodriguez" value="{{ form.last_name }}">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="RegisterEmail">Email Address</label>
+        <input type="email" name="customer[email]" id="RegisterEmail" class="form-input"
+          autocomplete="email" placeholder="you@example.com" value="{{ form.email }}" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="RegisterPassword">Password</label>
+        <input type="password" name="customer[password]" id="RegisterPassword" class="form-input"
+          autocomplete="new-password" placeholder="At least 5 characters" minlength="5" required>
+        <div class="form-hint">Minimum 5 characters</div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:20px;font-size:.82rem;cursor:pointer;">
+        <input type="checkbox" name="customer[accepts_marketing]" id="AcceptsMarketing"
+          style="accent-color:var(--color-primary);margin-top:2px;" checked>
+        <label for="AcceptsMarketing" style="cursor:pointer;line-height:1.4;">
+          Send me exclusive deal alerts and flash sale notifications via email
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--full btn--lg">
+        Create Account
+      </button>
+    {%- endform -%}
+
+    <div class="form-divider"><span>Already have an account?</span></div>
+
+    <a href="{{ routes.account_login_url }}" class="btn btn--ghost btn--full">Sign In</a>
+  </div>
+</div>

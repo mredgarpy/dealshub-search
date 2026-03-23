@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "cart": {
+      "type": "dealshub-cart",
+      "settings": {}
+    }
+  },
+  "order": ["cart"]
+}

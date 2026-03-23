@@ -294,22 +294,31 @@ async function productDetailHandler(req, res) {
 const { calculateShipping } = require('./src/services/shipping-rules');
 
 app.get('/api/shipping', async (req, res) => {
-  const { store, productId, price } = req.query;
-  if (!store || !productId) {
-    return res.status(400).json({ error: 'Missing store or productId' });
+  const { store, productId, price, mode } = req.query;
+  if (!store) {
+    return res.status(400).json({ error: 'Missing store parameter' });
   }
   try {
     const srcLower = store.toLowerCase();
     const sourcePrice = parseFloat(price) || 0;
 
-    // Try to get product data from cache first, then API
-    const cacheKey = `product:${srcLower}:${productId}`;
-    let productData = productCache.get(cacheKey);
+    let productData = {};
 
-    if (!productData) {
-      const adapter = getAdapter(srcLower);
-      if (adapter) {
-        productData = await adapter.getProduct(productId);
+    // "rules" mode: skip product fetch, use store rules only (fast, for cart)
+    // "full" mode or default with productId: fetch product for Amazon delivery parsing
+    if (mode !== 'rules' && productId) {
+      const cacheKey = `product:${srcLower}:${productId}`;
+      productData = productCache.get(cacheKey) || {};
+
+      if (!productData.title) {
+        try {
+          const adapter = getAdapter(srcLower);
+          if (adapter) {
+            productData = await adapter.getProduct(productId);
+          }
+        } catch (fetchErr) {
+          logger.warn('shipping', 'Product fetch failed, using rules only', { error: fetchErr.message, store, productId });
+        }
       }
     }
 

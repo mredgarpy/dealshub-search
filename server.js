@@ -537,7 +537,7 @@ app.get('/api/reviews/:id', async (req, res) => {
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
 app.post('/api/prepare-cart', async (req, res) => {
-  const { source, sourceId, selectedVariant, quantity = 1, forceResync = false } = req.body;
+  const { source, sourceId, selectedVariant, quantity = 1, forceResync = false, productData: clientProductData } = req.body;
 
   if (!source || !sourceId) {
     return res.status(400).json({ error: 'Missing source or sourceId' });
@@ -583,17 +583,29 @@ app.post('/api/prepare-cart', async (req, res) => {
       });
     }
 
-    // 1. Get full product data from source (needed for new product creation)
-    const adapter = getAdapter(srcLower);
-    let productData = await adapter.getProduct(sourceId);
+    // v1.5: Use product data sent by frontend (PDP already fetched it) to skip redundant source API call
+    let productData = null;
 
-    // Fallback: try productCache if source adapter failed (e.g. SHEIN detail API down)
+    if (clientProductData && clientProductData.title && clientProductData.price) {
+      // Frontend sent the product data it already had from the PDP — use it directly
+      productData = clientProductData;
+      logger.info('cart', 'Using client-provided product data (skipping source API)', { source: srcLower, sourceId: srcId, title: (productData.title || '').substring(0, 50) });
+    }
+
     if (!productData) {
+      // Fallback 1: productCache (data from when PDP loaded via /api/product)
       const cachedProduct = productCache.get(`product:${srcLower}:${srcId}`);
       if (cachedProduct) {
-        logger.info('cart', 'Source adapter failed, using productCache fallback', { source: srcLower, sourceId: srcId });
         productData = cachedProduct;
+        logger.info('cart', 'Using productCache (no API call needed)', { source: srcLower, sourceId: srcId });
       }
+    }
+
+    if (!productData) {
+      // Fallback 2: actual source API call (only if nothing else available)
+      logger.info('cart', 'No cached/client data — calling source API', { source: srcLower, sourceId: srcId });
+      const adapter = getAdapter(srcLower);
+      productData = await adapter.getProduct(sourceId);
     }
 
     if (!productData) {

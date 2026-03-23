@@ -1,7 +1,8 @@
-/* DealsHub PDP v1.3 — Self-contained Product Detail Page
+/* DealsHub PDP v1.5 — Self-contained Product Detail Page
    FIX v1.1: Improved Add to Cart retry logic for newly created products
    FIX v1.2: PDP Variant improvements (pre-select, image/price update)
    FIX v1.3: Cart count selector fix (#dh-cart-count), prepare-cart timeout 60s
+   FIX v1.5: Send PDP data with prepare-cart to skip redundant source API call, remove 2s delay
 */
 (function(){
   'use strict';
@@ -12,6 +13,7 @@
   var productId=params.get('id');
   var store=params.get('store')||'amazon';
   var titleHint=params.get('title')||'';
+  var _pdpProductData=null; // v1.5: Store product data for prepare-cart (avoids redundant source API call)
   if(!productId){container.innerHTML='<div style="text-align:center;padding:60px 20px"><h2>Product Not Found</h2><p>No product ID specified.</p><a href="/" style="color:#e53e3e">Back to Home</a></div>';return}
 
   // Show skeleton
@@ -22,6 +24,7 @@
     .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
     .then(function(data){
       var p=data;
+      _pdpProductData=p; // v1.5: Save for Add to Cart
       // Fallback: use URL params if API didn't return title/image
       if(p && !p.title && titleHint) p.title=decodeURIComponent(titleHint);
       if(p && (!p.image && !p.primaryImage) && params.get('image')) p.primaryImage=params.get('image');
@@ -320,9 +323,9 @@
     var stickyBuy=container.querySelector('.dhpdp-sticky-buy');
 
     // Max retries and backoff delays (ms)
-    var MAX_RETRIES = 3;
-    var RETRY_DELAYS = [3000, 5000, 8000]; // escalating delays between retries
-    var CART_ADD_DELAYS = [0, 2000, 3000, 5000]; // delay before cart/add.js (index = attempt number)
+    var MAX_RETRIES = 2; // v1.5: reduced from 3 (propagation is now reliable)
+    var RETRY_DELAYS = [1500, 3000]; // v1.5: reduced from [3000, 5000, 8000]
+    var CART_ADD_DELAYS = [0, 1000, 2000]; // v1.5: reduced from [0, 2000, 3000, 5000]
 
     // FIX v1.1: getSelectedVariant now returns the variant title as the backend expects it
     // The backend matches: mapping.variants.find(v => v.title === selectedVariantId)
@@ -383,6 +386,8 @@
       var body = {source: store, sourceId: productId, quantity: 1};
       if(variant) body.selectedVariant = variant;
       if(retryAttempt > 0) body.forceResync = true;
+      // v1.5: Send PDP product data so backend can skip redundant source API call (~3-5s saved)
+      if(_pdpProductData && retryAttempt === 0) body.productData = _pdpProductData;
 
       var savedVariantId = null;
       var isNewProduct = false;
@@ -391,7 +396,7 @@
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(60000) // v1.3: 60s timeout (backend now waits up to 15s for propagation + inventory)
+        signal: AbortSignal.timeout(30000) // v1.5: 30s timeout (backend no longer has slow inventory loop)
       })
       .then(function(r){
         if(!r.ok) throw new Error('Sync error (' + r.status + ')');
@@ -402,10 +407,9 @@
         savedVariantId = data.shopifyVariantId;
         isNewProduct = !!data.isNewlyCreated;
 
-        // Determine pre-cart-add delay
-        // For newly created products, add extra delay even on first attempt
-        var delay = CART_ADD_DELAYS[retryAttempt] || 0;
-        if(isNewProduct && retryAttempt === 0) delay = Math.max(delay, 2000);
+        // v1.5: No extra delay needed — backend v1.4 confirms propagation before responding
+        // Old code had 2000ms delay for new products, but propagation now confirmed in ~200ms
+        var delay = 0;
 
         var cartFetch = function(){
           return fetch('/cart/add.js', {

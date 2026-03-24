@@ -326,10 +326,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Track order
       </a>
-      <a class="sh-nav-item" href="/pages/wishlist">
+      <button class="sh-nav-item" data-sh-nav="wishlist">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         Wishlist
-      </a>
+      </button>
       <button class="sh-nav-item" data-sh-nav="recently-viewed">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         Recently viewed
@@ -580,10 +580,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
             Track package
           </a>
-          <a class="sh-quick-item" href="/pages/wishlist">
+          <button class="sh-quick-item" onclick="showSection('wishlist');window.location.hash='#wishlist'" style="border:none;background:inherit;cursor:pointer;font:inherit;color:inherit">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             Wishlist
-          </a>
+          </button>
           <a class="sh-quick-item" href="/pages/rewards">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             Rewards
@@ -1018,6 +1018,26 @@
         </div>
         <div style="text-align:center;padding:16px 0;color:var(--text2);font-size:12px">
           Need help? <a href="/pages/help-center" style="color:var(--red)">Visit our Help Center</a> or use the chat widget below.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {%- comment -%} === WISHLIST === {%- endcomment -%}
+  <div class="sh-content-section" data-sh-section="wishlist">
+    <div class="sh-welcome">
+      <div>
+        <h1>My wishlist</h1>
+        <div class="sh-welcome-sub">Products you've saved for later</div>
+      </div>
+    </div>
+    <div class="sh-section">
+      <div class="sh-section-body" data-sh-wishlist-container>
+        <div class="sh-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.5" width="48" height="48"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <h3>Your wishlist is empty</h3>
+          <p>Save products you love by tapping the heart icon while browsing.</p>
+          <a href="/" class="sh-empty-btn">Start browsing &rarr;</a>
         </div>
       </div>
     </div>
@@ -1471,12 +1491,72 @@
     });
   });
 
-  /* Wishlist count from localStorage */
+  /* Wishlist count from localStorage (key: dh_wishlist from PDP/API) */
   try {
-    var wl = JSON.parse(localStorage.getItem('sh_wishlist') || '[]');
+    var wl = JSON.parse(localStorage.getItem('dh_wishlist') || '[]');
     var countEls = document.querySelectorAll('[data-sh-wishlist-count]');
     countEls.forEach(function(el) { el.textContent = wl.length; });
   } catch(e) {}
+
+  /* ---- Recently Viewed from localStorage (key: dh_recently_viewed from PDP) ---- */
+  try {
+    var rvContainer = document.querySelector('[data-sh-recently-viewed]');
+    if (rvContainer) {
+      var rvItems = JSON.parse(localStorage.getItem('dh_recently_viewed') || '[]');
+      if (rvItems.length > 0) {
+        var rvProducts = rvItems.slice(-8).reverse();
+        var rvHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
+        rvProducts.forEach(function(p) {
+          var imgSrc = p.image || p.primaryImage || '';
+          var priceStr = p.price ? '$' + parseFloat(p.price).toFixed(2) : '';
+          var origStr = p.originalPrice ? '<span style="text-decoration:line-through;color:#999;font-size:11px;margin-left:4px">$' + parseFloat(p.originalPrice).toFixed(2) + '</span>' : '';
+          var sourceId = p.sourceId || p.id || '';
+          var source = p.source || p.store || '';
+          var link = '/pages/product?id=' + encodeURIComponent(sourceId) + '&store=' + encodeURIComponent(source);
+          rvHtml += '<a href="' + link + '" style="display:block;background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;text-decoration:none;color:inherit;transition:box-shadow 0.2s">'
+            + '<div style="width:100%;aspect-ratio:1;background:#f5f5f5;overflow:hidden">'
+            + (imgSrc ? '<img src="' + imgSrc + '" alt="" style="width:100%;height:100%;object-fit:cover" loading="lazy">' : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="32" height="32"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>')
+            + '</div>'
+            + '<div style="padding:10px">'
+            + '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (p.title || 'Product') + '</div>'
+            + '<div style="margin-top:4px"><span style="font-weight:700;color:#E53E3E;font-size:14px">' + priceStr + '</span>' + origStr + '</div>'
+            + (source ? '<div style="font-size:10px;color:#888;margin-top:3px;text-transform:capitalize">' + source + '</div>' : '')
+            + '</div></a>';
+        });
+        rvHtml += '</div>';
+        rvContainer.innerHTML = rvHtml;
+      }
+    }
+  } catch(rvErr) { console.error('Recently viewed error:', rvErr); }
+
+  /* ---- Wishlist from localStorage (key: dh_wishlist from search results/PDP) ---- */
+  try {
+    var wlContainer = document.querySelector('[data-sh-wishlist-container]');
+    if (wlContainer && wl.length > 0) {
+      var wlHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
+      wl.forEach(function(p, idx) {
+        var imgSrc = p.image || p.primaryImage || '';
+        var priceStr = p.price ? '$' + parseFloat(p.price).toFixed(2) : '';
+        var origStr = p.originalPrice ? '<span style="text-decoration:line-through;color:#999;font-size:11px;margin-left:4px">$' + parseFloat(p.originalPrice).toFixed(2) + '</span>' : '';
+        var sourceId = p.sourceId || p.id || '';
+        var source = p.source || p.store || '';
+        var link = '/pages/product?id=' + encodeURIComponent(sourceId) + '&store=' + encodeURIComponent(source);
+        wlHtml += '<div style="position:relative;background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden">'
+          + '<button onclick="(function(btn){var w=JSON.parse(localStorage.getItem(\'dh_wishlist\')||\'[]\');w=w.filter(function(x){return!(x.id===\'' + sourceId + '\'&&x.source===\'' + source + '\')});localStorage.setItem(\'dh_wishlist\',JSON.stringify(w));btn.closest(\'div[style]\').remove();document.querySelectorAll(\'[data-sh-wishlist-count]\').forEach(function(el){el.textContent=w.length})})(this)" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.05);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;font-size:14px;color:#E53E3E" title="Remove from wishlist">&times;</button>'
+          + '<a href="' + link + '" style="display:block;text-decoration:none;color:inherit">'
+          + '<div style="width:100%;aspect-ratio:1;background:#f5f5f5;overflow:hidden">'
+          + (imgSrc ? '<img src="' + imgSrc + '" alt="" style="width:100%;height:100%;object-fit:cover" loading="lazy">' : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="32" height="32"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>')
+          + '</div>'
+          + '<div style="padding:10px">'
+          + '<div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (p.title || 'Product') + '</div>'
+          + '<div style="margin-top:4px"><span style="font-weight:700;color:#E53E3E;font-size:14px">' + priceStr + '</span>' + origStr + '</div>'
+          + (source ? '<div style="font-size:10px;color:#888;margin-top:3px;text-transform:capitalize">' + source + '</div>' : '')
+          + '</div></a></div>';
+      });
+      wlHtml += '</div>';
+      wlContainer.innerHTML = wlHtml;
+    }
+  } catch(wlErr) { console.error('Wishlist error:', wlErr); }
 
   /* Profile edit/cancel toggle */
   var profileView = document.getElementById('sh-profile-view');
@@ -2110,7 +2190,7 @@
   /* Hash navigation on load */
   if (window.location.hash) {
     var hashSection = window.location.hash.replace('#', '');
-    var validSections = ['dashboard','orders','addresses','coupons','messages','recently-viewed','settings','returns','reviews'];
+    var validSections = ['dashboard','orders','addresses','coupons','messages','wishlist','recently-viewed','settings','returns','reviews'];
     if (validSections.indexOf(hashSection) !== -1) {
       showSection(hashSection);
     }

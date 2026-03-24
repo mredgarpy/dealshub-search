@@ -1094,6 +1094,36 @@ app.get('/api/customer-orders', async (req, res) => {
       return res.json({ orders: [], total: 0 });
     }
 
+    // Collect unique product IDs to fetch images
+    const productIds = new Set();
+    data.orders.forEach(o => {
+      (o.line_items || []).forEach(item => {
+        if (item.product_id) productIds.add(item.product_id);
+      });
+    });
+
+    // Fetch product images in batch (up to 250 per request)
+    const imageMap = {};
+    if (productIds.size > 0) {
+      try {
+        const idsStr = Array.from(productIds).join(',');
+        const imgUrl = `https://${shopifyDomain}/admin/api/2024-01/products.json?ids=${idsStr}&fields=id,image,images`;
+        const imgResp = await fetch(imgUrl, {
+          headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' }
+        });
+        const imgData = await imgResp.json();
+        (imgData.products || []).forEach(p => {
+          if (p.image && p.image.src) {
+            imageMap[p.id] = p.image.src;
+          } else if (p.images && p.images.length > 0) {
+            imageMap[p.id] = p.images[0].src;
+          }
+        });
+      } catch (imgErr) {
+        logger.error('customer-orders', 'Failed to fetch product images', { error: imgErr.message });
+      }
+    }
+
     const orders = data.orders.map(o => ({
       id: o.id,
       name: o.name,
@@ -1114,7 +1144,7 @@ app.get('/api/customer-orders', async (req, res) => {
         quantity: item.quantity,
         price: item.price,
         sku: item.sku || null,
-        image: item.image ? item.image.src : null
+        image: imageMap[item.product_id] || null
       })),
       tracking_number: o.fulfillments?.[0]?.tracking_number || null,
       tracking_url: o.fulfillments?.[0]?.tracking_url || null,

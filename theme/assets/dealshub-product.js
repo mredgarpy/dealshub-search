@@ -154,7 +154,7 @@
     html+='<button id="dhpdp-buy" style="width:100%;padding:16px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#1a1a1a\'">Buy Now</button>';
     html+='</div>';
 
-    // Shipping info — v2.5: Plus membership integration
+    // Shipping info — v2.6: Real offer data + seller info + Plus integration
     var sc=p.shippingCalc||{};
     var pdpIsPlus=false;
     try{pdpIsPlus=localStorage.getItem('stylehub_plus')==='true';}catch(e){}
@@ -170,6 +170,11 @@
     var delEarliest=del.earliest||del.earliestDate||'';
     var delLatest=del.latest||del.latestDate||'';
     var ret=sc.returnWindow||p.returnPolicy||{};
+    // v2.6: Seller/offer data
+    var shipIsFBA=sc.isFBA||p.shippingData&&p.shippingData.isFBA||false;
+    var shipShipsFrom=sc.shipsFrom||p.shippingData&&p.shippingData.shipsFrom||null;
+    var shipSeller=sc.seller||p.shippingData&&p.shippingData.seller||null;
+    var bestOffer=p.bestOffer||null;
     // Plus members get 60-day returns
     if(pdpIsPlus){
       retSummary='Extended 60-day returns (Plus benefit)';
@@ -217,6 +222,17 @@
       html+='<div style="font-size:12px;color:#6b7280">'+escHTML(shipMethod)+'</div>';
     }else{
       html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="font-size:13px;color:#666">Calculated at checkout</span></div>';
+    }
+    // v2.6: Ships from + seller info (Amazon offers data)
+    if(shipShipsFrom){
+      var sellerLine='Ships from <b>'+escHTML(shipShipsFrom)+'</b>';
+      if(bestOffer&&bestOffer.sellerRating){
+        sellerLine+=' &#11088; '+escHTML(bestOffer.sellerRating);
+      }
+      html+='<div style="font-size:12px;color:#555;margin-top:3px;display:flex;align-items:center;gap:4px">'+sellerLine+'</div>';
+      if(bestOffer&&bestOffer.seller&&bestOffer.seller!==shipShipsFrom){
+        html+='<div style="font-size:11px;color:#888;margin-top:1px">Sold by '+escHTML(bestOffer.seller)+'</div>';
+      }
     }
     // Threshold hint (only for non-Plus)
     if(!pdpIsPlus&&shipThresholdNote&&shipRemaining>0){

@@ -50,34 +50,66 @@ function calculateShipping(store, sourcePrice, apiData, customerIsPlus = false) 
   }
 }
 
-// ---- AMAZON: Parse from rawSourceMeta.delivery (real API data) ----
+// ---- AMAZON: Use real /product-offers data when available, fallback to delivery text ----
 function _amazonShipping(sourcePrice, apiData) {
   const raw = apiData?.rawSourceMeta?.delivery || '';
   const isPrime = apiData?.rawSourceMeta?.isPrime === true;
   const primaryDeliveryTime = apiData?.rawSourceMeta?.primaryDeliveryTime || '';
 
+  // v2.1: Check for real offer data from /product-offers endpoint
+  const bestOfferIsFBA = apiData?.rawSourceMeta?.bestOfferIsFBA === true;
+  const bestOfferDeliveryPrice = apiData?.rawSourceMeta?.bestOfferDeliveryPrice;
+  const bestOfferDeliveryTime = apiData?.rawSourceMeta?.bestOfferDeliveryTime;
+  const bestOfferSeller = apiData?.rawSourceMeta?.bestOfferSeller;
+  const bestOfferShipsFrom = apiData?.rawSourceMeta?.bestOfferShipsFrom;
+  const hasOfferData = apiData?.rawSourceMeta?.offersCount > 0;
+
   let cost = 0;
   let method = 'Standard Shipping';
+  let shipsFrom = null;
+  let seller = null;
+  let isFBA = false;
 
-  if (isPrime || /free\s*delivery/i.test(raw)) {
-    cost = 0;
-    method = isPrime ? 'Prime Shipping' : 'Free Shipping';
-  } else if (raw) {
-    const priceMatch = raw.match(/\$([0-9]+(?:\.[0-9]{1,2})?)/);
-    if (priceMatch) {
-      cost = parseFloat(priceMatch[1]);
-      method = 'Amazon Shipping';
+  if (hasOfferData) {
+    // Use real offer data
+    isFBA = bestOfferIsFBA;
+    shipsFrom = bestOfferShipsFrom || null;
+    seller = bestOfferSeller || null;
+
+    if (isFBA) {
+      cost = 0;
+      method = 'Amazon Prime';
+    } else if (bestOfferDeliveryPrice) {
+      const isFree = bestOfferDeliveryPrice === 'FREE' || bestOfferDeliveryPrice === '$0.00';
+      cost = isFree ? 0 : parseFloat(bestOfferDeliveryPrice.replace('$', '').replace(',', '')) || 0;
+      method = isFree ? 'Free Shipping' : 'Seller Shipping';
+    }
+  } else {
+    // Fallback: parse from delivery text (legacy behavior)
+    if (isPrime || /free\s*delivery/i.test(raw)) {
+      cost = 0;
+      method = isPrime ? 'Prime Shipping' : 'Free Shipping';
+    } else if (raw) {
+      const priceMatch = raw.match(/\$([0-9]+(?:\.[0-9]{1,2})?)/);
+      if (priceMatch) {
+        cost = parseFloat(priceMatch[1]);
+        method = 'Amazon Shipping';
+      }
     }
   }
 
-  // Delivery dates from API
-  const delivery = _parseAmazonDelivery(primaryDeliveryTime, apiData?.deliveryEstimate);
+  // Delivery dates: prefer offer data, then primary_delivery_time, then API estimate
+  const deliverySource = bestOfferDeliveryTime || primaryDeliveryTime;
+  const delivery = _parseAmazonDelivery(deliverySource, apiData?.deliveryEstimate);
 
   return {
     cost,
     label: cost === 0 ? 'FREE' : `$${cost.toFixed(2)}`,
     method,
     isFree: cost === 0,
+    isFBA,
+    shipsFrom,
+    seller,
     delivery,
     threshold: null,
     remaining: null,

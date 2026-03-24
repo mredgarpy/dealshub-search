@@ -7,6 +7,10 @@ const logger = require('../utils/logger');
 
 const API_HOST = 'real-time-amazon-data.p.rapidapi.com';
 
+// ---- Offers cache (1 hour TTL) ----
+const offersCache = new Map();
+const OFFERS_CACHE_TTL = 3600000; // 1 hour
+
 class AmazonAdapter extends BaseAdapter {
   constructor(config) {
     super('amazon', config);
@@ -19,9 +23,87 @@ class AmazonAdapter extends BaseAdapter {
     return data.data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }
 
+  // ---- Product Offers: real shipping/seller data from /product-offers ----
+  async getProductOffers(asin) {
+    const cached = offersCache.get(asin);
+    if (cached && Date.now() - cached.timestamp < OFFERS_CACHE_TTL) {
+      return cached.data;
+    }
+    try {
+      const url = `https://${API_HOST}/product-offers?asin=${encodeURIComponent(asin)}&country=US&limit=10&page=1`;
+      const data = await this.fetchWithRetry(url, { headers: this.rapidHeaders(API_HOST) }, 0, 0);
+      const offers = data?.data?.product_offers || [];
+      offersCache.set(asin, { data: offers, timestamp: Date.now() });
+      logger.info('amazon', `Got ${offers.length} offers for ${asin}`);
+      return offers;
+    } catch (err) {
+      logger.warn('amazon', `Failed to get offers for ${asin}`, { error: err.message });
+      return [];
+    }
+  }
+
+  selectBestOffer(productOffers) {
+    if (!productOffers || productOffers.length === 0) return null;
+
+    // Priority 1: FBA (ships from Amazon.com) with condition New
+    const fbaNew = productOffers.find(o =>
+      o.ships_from === 'Amazon.com' &&
+      (o.product_condition === 'New' || !o.product_condition)
+    );
+    if (fbaNew) return { ...fbaNew, isFBA: true };
+
+    // Priority 2: Any FBA
+    const fba = productOffers.find(o => o.ships_from === 'Amazon.com');
+    if (fba) return { ...fba, isFBA: true };
+
+    // Priority 3: Seller with best rating and FREE delivery
+    const freeShipping = productOffers
+      .filter(o => o.delivery_price === 'FREE' || o.delivery_price === '$0.00')
+      .sort((a, b) => parseFloat(b.seller_star_rating || 0) - parseFloat(a.seller_star_rating || 0));
+    if (freeShipping.length > 0) return { ...freeShipping[0], isFBA: false };
+
+    // Priority 4: Seller with best rating (any shipping)
+    const sorted = [...productOffers]
+      .sort((a, b) => parseFloat(b.seller_star_rating || 0) - parseFloat(a.seller_star_rating || 0));
+    return { ...sorted[0], isFBA: false };
+  }
+
+  extractShippingFromOffer(offer) {
+    if (!offer) return null;
+
+    const deliveryPrice = offer.delivery_price || '';
+    const isFree = deliveryPrice === 'FREE' || deliveryPrice === '$0.00' || deliveryPrice === '';
+    const cost = isFree ? 0 : parseFloat(deliveryPrice.replace('$', '').replace(',', '')) || 0;
+
+    return {
+      cost,
+      isFree,
+      label: isFree ? 'FREE' : deliveryPrice,
+      method: offer.isFBA ? 'Amazon Prime' : 'Seller Shipping',
+      deliveryTime: offer.delivery_time || null,
+      shipsFrom: offer.ships_from || null,
+      isFBA: offer.isFBA || false,
+      seller: {
+        name: offer.seller || null,
+        id: offer.seller_id || null,
+        rating: offer.seller_star_rating || null,
+        ratingInfo: offer.seller_star_rating_info || null,
+        link: offer.seller_link || null
+      },
+      condition: offer.product_condition || 'New'
+    };
+  }
+
   async getProduct(asin) {
-    const url = `https://${API_HOST}/product-details?asin=${encodeURIComponent(asin)}&country=US`;
-    const data = await this.fetchWithRetry(url, { headers: this.rapidHeaders(API_HOST) });
+    // Fetch product details AND offers in parallel (Option B from spec)
+    const detailsPromise = this.fetchWithRetry(
+      `https://${API_HOST}/product-details?asin=${encodeURIComponent(asin)}&country=US`,
+      { headers: this.rapidHeaders(API_HOST) }
+    );
+    const offersPromise = this.getProductOffers(asin);
+
+    const [data, offers] = await Promise.all([detailsPromise, offersPromise]);
+
     if (!data || !data.data) {
       logger.warn('amazon', `Product not found: ${asin}`);
       const searchUrl = `https://${API_HOST}/search?query=${encodeURIComponent(asin)}&page=1&country=US`;
@@ -31,7 +113,117 @@ class AmazonAdapter extends BaseAdapter {
       }
       return null;
     }
-    return this.normalizeProduct(data.data);
+
+    const product = this.normalizeProduct(data.data);
+
+    // Enrich product with real offers data
+    if (product && offers && offers.length > 0) {
+      const bestOffer = this.selectBestOffer(offers);
+      const offerShipping = this.extractShippingFromOffer(bestOffer);
+
+      if (bestOffer) {
+        product.bestOffer = {
+          seller: bestOffer.seller || null,
+          sellerId: bestOffer.seller_id || null,
+          sellerRating: bestOffer.seller_star_rating || null,
+          sellerRatingInfo: bestOffer.seller_star_rating_info || null,
+          shipsFrom: bestOffer.ships_from || null,
+          isFBA: bestOffer.isFBA || false,
+          condition: bestOffer.product_condition || 'New',
+          offerPrice: bestOffer.product_price || null,
+          deliveryPrice: bestOffer.delivery_price || null,
+          deliveryTime: bestOffer.delivery_time || null
+        };
+      }
+
+      if (offerShipping) {
+        // Override shipping data with real offer data
+        product.shippingData.cost = offerShipping.cost;
+        product.shippingData.isFree = offerShipping.isFree;
+        product.shippingData.method = offerShipping.method;
+        product.shippingData.note = offerShipping.isFree
+          ? (offerShipping.isFBA ? 'FREE Prime Shipping' : 'FREE Shipping')
+          : `Shipping: ${offerShipping.label}`;
+        product.shippingData.shipsFrom = offerShipping.shipsFrom;
+        product.shippingData.isFBA = offerShipping.isFBA;
+        product.shippingData.seller = offerShipping.seller;
+
+        // Override delivery time if offer has it
+        if (offerShipping.deliveryTime) {
+          product.deliveryEstimate.label = offerShipping.deliveryTime;
+          // Re-parse delivery dates from offer time
+          this._parseDeliveryDates(product, offerShipping.deliveryTime);
+        }
+      }
+
+      // Store all offers for PDP display
+      product.allOffers = offers.slice(0, 5).map(o => ({
+        seller: o.seller || null,
+        price: o.product_price || null,
+        shipsFrom: o.ships_from || null,
+        deliveryPrice: o.delivery_price || null,
+        deliveryTime: o.delivery_time || null,
+        condition: o.product_condition || 'New',
+        sellerRating: o.seller_star_rating || null,
+        isFBA: o.ships_from === 'Amazon.com'
+      }));
+
+      // Update rawSourceMeta with offer data for shipping-rules.js
+      product.rawSourceMeta.offersCount = offers.length;
+      product.rawSourceMeta.bestOfferShipsFrom = bestOffer?.ships_from || null;
+      product.rawSourceMeta.bestOfferIsFBA = bestOffer?.isFBA || false;
+      product.rawSourceMeta.bestOfferDeliveryPrice = bestOffer?.delivery_price || null;
+      product.rawSourceMeta.bestOfferDeliveryTime = bestOffer?.delivery_time || null;
+      product.rawSourceMeta.bestOfferSeller = bestOffer?.seller || null;
+      product.rawSourceMeta.bestOfferSellerRating = bestOffer?.seller_star_rating || null;
+    }
+
+    return product;
+  }
+
+  // Parse delivery date range from offer delivery_time string
+  _parseDeliveryDates(product, deliveryTimeStr) {
+    if (!deliveryTimeStr) return;
+    const months = { Jan:0,January:0,Feb:1,February:1,Mar:2,March:2,Apr:3,April:3,May:4,Jun:5,June:5,Jul:6,July:6,Aug:7,August:7,Sep:8,September:8,Oct:9,October:9,Nov:10,November:10,Dec:11,December:11 };
+    const now = new Date();
+    const year = now.getFullYear();
+    const msPerDay = 86400000;
+
+    // Pattern: "Month Day - Month Day" (different months)
+    const diffMonthMatch = deliveryTimeStr.match(/([A-Z][a-z]+)\s+(\d{1,2})\s*[-–]\s*([A-Z][a-z]+)\s+(\d{1,2})/);
+    // Pattern: "Month Day - Day" (same month)
+    const sameMonthMatch = deliveryTimeStr.match(/([A-Z][a-z]+)\s+(\d{1,2})\s*[-–]\s*(\d{1,2})/);
+
+    if (diffMonthMatch) {
+      const m1 = months[diffMonthMatch[1]]; const d1 = parseInt(diffMonthMatch[2]);
+      const m2 = months[diffMonthMatch[3]]; const d2 = parseInt(diffMonthMatch[4]);
+      if (m1 != null && m2 != null) {
+        let minDate = new Date(year, m1, d1);
+        let maxDate = new Date(year, m2, d2);
+        if (minDate < now) minDate.setFullYear(year + 1);
+        if (maxDate < now) maxDate.setFullYear(year + 1);
+        product.deliveryEstimate.minDays = Math.max(1, Math.ceil((minDate - now) / msPerDay));
+        product.deliveryEstimate.maxDays = Math.max(product.deliveryEstimate.minDays + 1, Math.ceil((maxDate - now) / msPerDay));
+        const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        product.deliveryEstimate.earliestDate = fmt(minDate);
+        product.deliveryEstimate.latestDate = fmt(maxDate);
+        product.deliveryEstimate.formattedRange = `${fmt(minDate)} – ${fmt(maxDate)}`;
+      }
+    } else if (sameMonthMatch) {
+      const m = months[sameMonthMatch[1]]; const d1 = parseInt(sameMonthMatch[2]); const d2 = parseInt(sameMonthMatch[3]);
+      if (m != null) {
+        let minDate = new Date(year, m, d1);
+        let maxDate = new Date(year, m, d2);
+        if (minDate < now) minDate.setFullYear(year + 1);
+        if (maxDate < now) maxDate.setFullYear(year + 1);
+        product.deliveryEstimate.minDays = Math.max(1, Math.ceil((minDate - now) / msPerDay));
+        product.deliveryEstimate.maxDays = Math.max(product.deliveryEstimate.minDays + 1, Math.ceil((maxDate - now) / msPerDay));
+        const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        product.deliveryEstimate.earliestDate = fmt(minDate);
+        product.deliveryEstimate.latestDate = fmt(maxDate);
+        product.deliveryEstimate.formattedRange = `${fmt(minDate)} – ${fmt(maxDate)}`;
+      }
+    }
   }
 
   normalizeSearchResult(p) {

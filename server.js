@@ -270,7 +270,11 @@ async function productDetailHandler(req, res) {
     product.shippingData = {
       cost: shipResult.cost,
       method: shipResult.method,
-      note: shipResult.label === 'FREE' ? `FREE ${shipResult.method}` : `Shipping: $${shipResult.cost.toFixed(2)}`
+      note: shipResult.label === 'FREE' ? `FREE ${shipResult.method}` : `Shipping: $${shipResult.cost.toFixed(2)}`,
+      isFBA: shipResult.isFBA || false,
+      shipsFrom: shipResult.shipsFrom || null,
+      isFree: shipResult.isFree || false,
+      seller: shipResult.seller || null
     };
     product.deliveryEstimate = shipResult.delivery;
     product.returnPolicy = shipResult.returnWindow;
@@ -336,7 +340,10 @@ app.get('/api/shipping', async (req, res) => {
         label: result.label,
         method: result.method,
         isFree: result.isFree,
-        isPlus: result.isPlus || false
+        isPlus: result.isPlus || false,
+        isFBA: result.isFBA || false,
+        shipsFrom: result.shipsFrom || null,
+        seller: result.seller || null
       },
       delivery: result.delivery,
       threshold: result.threshold,

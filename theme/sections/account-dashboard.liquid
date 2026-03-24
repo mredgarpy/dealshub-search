@@ -1498,13 +1498,13 @@
     countEls.forEach(function(el) { el.textContent = wl.length; });
   } catch(e) {}
 
-  /* ---- Recently Viewed from localStorage (key: dh_recently_viewed from PDP) ---- */
+  /* ---- Recently Viewed from localStorage (key: dh_recent from PDP dealshub-product.js) ---- */
   try {
     var rvContainer = document.querySelector('[data-sh-recently-viewed]');
     if (rvContainer) {
-      var rvItems = JSON.parse(localStorage.getItem('dh_recently_viewed') || '[]');
+      var rvItems = JSON.parse(localStorage.getItem('dh_recent') || '[]');
       if (rvItems.length > 0) {
-        var rvProducts = rvItems.slice(-8).reverse();
+        var rvProducts = rvItems.slice(0, 8);
         var rvHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
         rvProducts.forEach(function(p) {
           var imgSrc = p.image || p.primaryImage || '';

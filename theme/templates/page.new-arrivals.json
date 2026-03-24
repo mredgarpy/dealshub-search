@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "new_arrivals": {
+      "type": "dealshub-new-arrivals",
+      "settings": {}
+    }
+  },
+  "order": ["new_arrivals"]
+}

@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "category": {
+      "type": "dealshub-category",
+      "settings": {}
+    }
+  },
+  "order": ["category"]
+}

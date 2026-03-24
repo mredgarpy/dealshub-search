@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "bestsellers": {
+      "type": "dealshub-bestsellers-page",
+      "settings": {}
+    }
+  },
+  "order": ["bestsellers"]
+}

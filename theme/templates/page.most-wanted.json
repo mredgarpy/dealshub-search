@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "most_wanted": {
+      "type": "dealshub-most-wanted",
+      "settings": {}
+    }
+  },
+  "order": ["most_wanted"]
+}

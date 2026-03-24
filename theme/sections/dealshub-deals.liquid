@@ -1,0 +1,32 @@
+{% comment %}StyleHub Deals Page v1.0 — Sprint 5{% endcomment %}
+<div id="dealshub-deals" style="max-width:1280px;margin:0 auto;padding:0 20px 60px">
+  <!-- Hero -->
+  <div style="background:linear-gradient(135deg,#e53e3e 0%,#c53030 100%);border-radius:16px;padding:40px 32px;color:#fff;text-align:center;margin-bottom:32px">
+    <h1 style="font-size:32px;font-weight:800;margin:0 0 8px">Today's Deals</h1>
+    <p style="font-size:16px;opacity:.9;margin:0">Handpicked savings updated daily — shop before they're gone</p>
+  </div>
+  <!-- Skeleton -->
+  <div id="dh-deals-skeleton">
+    {% for i in (1..4) %}
+    <div style="margin-bottom:32px">
+      <div style="height:22px;width:180px;background:#f0f0f0;border-radius:6px;margin-bottom:16px;animation:dhpulse 1.5s infinite"></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px" class="dh-deals-skel-grid">
+        {% for j in (1..5) %}<div style="background:#f0f0f0;border-radius:12px;aspect-ratio:0.75;animation:dhpulse 1.5s infinite"></div>{% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <!-- Dynamic content -->
+  <div id="dh-deals-lightning"></div>
+  <div id="dh-deals-under5"></div>
+  <div id="dh-deals-under10"></div>
+  <div id="dh-deals-under25"></div>
+  <div id="dh-deals-usa"></div>
+  <div id="dh-deals-top-discount"></div>
+</div>
+<style>
+@keyframes dhpulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media(max-width:768px){.dh-deals-skel-grid{grid-template-columns:repeat(2,1fr)!important}}
+</style>
+<script src="{{ 'dealshub-deals.js' | asset_url }}" defer></script>
+{% schema %}{"name":"StyleHub Deals","tag":"section","settings":[],"presets":[{"name":"StyleHub Deals"}]}{% endschema %}

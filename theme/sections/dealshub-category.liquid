@@ -1,0 +1,42 @@
+{% comment %}StyleHub Category Landing Page v1.0 — Sprint 5
+   Dynamic category page: /pages/category?cat=electronics|fashion|beauty|home|sports|gaming|baby
+{% endcomment %}
+<div id="dealshub-category" style="max-width:1280px;margin:0 auto;padding:0 20px 60px">
+  <!-- Hero (dynamic) -->
+  <div id="dh-cat-hero" style="border-radius:16px;padding:40px 32px;color:#fff;text-align:center;margin-bottom:32px;background:#1a1a2e">
+    <h1 id="dh-cat-title" style="font-size:32px;font-weight:800;margin:0 0 8px">Category</h1>
+    <p id="dh-cat-subtitle" style="font-size:16px;opacity:.9;margin:0">Discover the best products</p>
+  </div>
+  <!-- Filters + Sort bar -->
+  <div id="dh-cat-filters" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:24px">
+    <div style="display:flex;gap:8px" id="dh-cat-origin-filters"></div>
+    <div style="margin-left:auto">
+      <select id="dh-cat-sort" style="padding:8px 16px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;background:#fff;cursor:pointer">
+        <option value="relevance">Sort: Relevance</option>
+        <option value="price-low">Price: Low to High</option>
+        <option value="price-high">Price: High to Low</option>
+        <option value="rating">Highest Rated</option>
+      </select>
+    </div>
+  </div>
+  <!-- Best Sellers Carousel -->
+  <div id="dh-cat-bestsellers" style="margin-bottom:32px"></div>
+  <!-- Skeleton -->
+  <div id="dh-cat-skeleton">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px" class="dh-cat-skel-grid">
+      {% for j in (1..10) %}<div style="background:#f0f0f0;border-radius:12px;aspect-ratio:0.75;animation:dhpulse 1.5s infinite"></div>{% endfor %}
+    </div>
+  </div>
+  <!-- Product grid -->
+  <div id="dh-cat-grid"></div>
+  <!-- Load more -->
+  <div id="dh-cat-loadmore" style="text-align:center;padding:24px;display:none">
+    <button id="dh-cat-loadmore-btn" style="padding:12px 40px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">Load More</button>
+  </div>
+</div>
+<style>
+@keyframes dhpulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media(max-width:768px){.dh-cat-skel-grid{grid-template-columns:repeat(2,1fr)!important}}
+</style>
+<script src="{{ 'dealshub-category.js' | asset_url }}" defer></script>
+{% schema %}{"name":"StyleHub Category","tag":"section","settings":[],"presets":[{"name":"StyleHub Category"}]}{% endschema %}

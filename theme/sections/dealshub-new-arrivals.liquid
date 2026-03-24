@@ -1,0 +1,23 @@
+{% comment %}StyleHub New Arrivals Page v1.0 — Sprint 5{% endcomment %}
+<div id="dealshub-new-arrivals" style="max-width:1280px;margin:0 auto;padding:0 20px 60px">
+  <!-- Hero -->
+  <div style="background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);border-radius:16px;padding:40px 32px;color:#fff;text-align:center;margin-bottom:32px">
+    <h1 style="font-size:32px;font-weight:800;margin:0 0 8px">\ud83c\udd95 New Arrivals</h1>
+    <p style="font-size:16px;opacity:.9;margin:0">Just dropped — the latest products across all categories</p>
+  </div>
+  <!-- Category Tabs -->
+  <div id="dh-na-tabs" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;margin-bottom:24px;-webkit-overflow-scrolling:touch"></div>
+  <!-- Skeleton -->
+  <div id="dh-na-skeleton">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px" class="dh-na-skel-grid">
+      {% for j in (1..10) %}<div style="background:#f0f0f0;border-radius:12px;aspect-ratio:0.75;animation:dhpulse 1.5s infinite"></div>{% endfor %}
+    </div>
+  </div>
+  <div id="dh-na-content"></div>
+</div>
+<style>
+@keyframes dhpulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media(max-width:768px){.dh-na-skel-grid{grid-template-columns:repeat(2,1fr)!important}}
+</style>
+<script src="{{ 'dealshub-new-arrivals.js' | asset_url }}" defer></script>
+{% schema %}{"name":"StyleHub New Arrivals","tag":"section","settings":[],"presets":[{"name":"StyleHub New Arrivals"}]}{% endschema %}

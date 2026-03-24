@@ -171,21 +171,19 @@
 <!-- Category Bar -->
 <div class="dh-catbar">
   <div class="dh-catbar-inner">
-    <a href="/pages/search-results?q=trending" class="dh-catbar-item active">All</a>
-    <a href="/pages/search-results?q=women+fashion" class="dh-catbar-item">Women's fashion</a>
-    <a href="/pages/search-results?q=men+fashion" class="dh-catbar-item">Men's fashion</a>
-    <a href="/pages/search-results?q=beauty" class="dh-catbar-item">Beauty</a>
-    <a href="/pages/search-results?q=skincare" class="dh-catbar-item">Skincare</a>
-    <a href="/pages/search-results?q=electronics" class="dh-catbar-item">Electronics</a>
-    <a href="/pages/search-results?q=phones" class="dh-catbar-item">Phones</a>
-    <a href="/pages/search-results?q=home+garden" class="dh-catbar-item">Home & garden</a>
-    <a href="/pages/search-results?q=sports" class="dh-catbar-item">Sports</a>
-    <a href="/pages/search-results?q=kids" class="dh-catbar-item">Kids</a>
-    <a href="/pages/search-results?q=shoes" class="dh-catbar-item">Shoes</a>
-    <a href="/pages/search-results?q=accessories" class="dh-catbar-item">Accessories</a>
-    <a href="/pages/search-results?q=bags" class="dh-catbar-item">Bags</a>
-    <a href="/pages/search-results?q=jewelry" class="dh-catbar-item">Jewelry</a>
-    <a href="/pages/search-results?q=deals" class="dh-catbar-item flash">Flash deals</a>
+    <a href="/" class="dh-catbar-item active">Home</a>
+    <a href="/pages/deals" class="dh-catbar-item flash">Deals</a>
+    <a href="/pages/best-sellers" class="dh-catbar-item">Best Sellers</a>
+    <a href="/pages/new-arrivals" class="dh-catbar-item">New Arrivals</a>
+    <a href="/pages/most-wanted" class="dh-catbar-item">Most Wanted</a>
+    <a href="/pages/category?cat=electronics" class="dh-catbar-item">Electronics</a>
+    <a href="/pages/category?cat=fashion" class="dh-catbar-item">Fashion</a>
+    <a href="/pages/category?cat=beauty" class="dh-catbar-item">Beauty</a>
+    <a href="/pages/category?cat=home" class="dh-catbar-item">Home</a>
+    <a href="/pages/category?cat=sports" class="dh-catbar-item">Sports</a>
+    <a href="/pages/category?cat=gaming" class="dh-catbar-item">Gaming</a>
+    <a href="/pages/category?cat=baby" class="dh-catbar-item">Baby</a>
+    <a href="/pages/plus" class="dh-catbar-item" style="color:#6b46c1;font-weight:600">⚡ Plus</a>
   </div>
 </div>
 
@@ -267,6 +265,20 @@ function dhSaveZip(){
 }
 </script>
 
+<script>
+/* Highlight active catbar item */
+(function(){
+  var path = window.location.pathname;
+  var search = window.location.search;
+  var items = document.querySelectorAll('.dh-catbar-item');
+  items.forEach(function(el){
+    el.classList.remove('active');
+    var href = el.getAttribute('href');
+    if(href === path + search || href === path) el.classList.add('active');
+    else if(path === '/' && href === '/') el.classList.add('active');
+  });
+})();
+</script>
 <script src="{{ 'header.js' | asset_url }}" defer></script>
 
 {% schema %}

@@ -1529,6 +1529,68 @@ app.get('/api/admin/theme-assets', async (req, res) => {
   }
 });
 
+// ---- ADMIN: Create/Update Shopify Page ----
+app.post('/api/admin/create-page', async (req, res) => {
+  const { title, handle, template_suffix, body_html } = req.body;
+  if (!title) return res.status(400).json({ error: 'Missing title' });
+
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+  if (!shopifyDomain || !shopifyToken) {
+    return res.status(503).json({ error: 'Shopify not configured' });
+  }
+
+  try {
+    const fetch = require('node-fetch');
+    // Check if page with handle already exists
+    const listUrl = `https://${shopifyDomain}/admin/api/2024-01/pages.json?handle=${encodeURIComponent(handle || '')}`;
+    const listResp = await fetch(listUrl, { headers: { 'X-Shopify-Access-Token': shopifyToken } });
+    const listData = await listResp.json();
+    const existing = (listData.pages || []).find(p => p.handle === handle);
+
+    if (existing) {
+      // Update existing page template if needed
+      const updateUrl = `https://${shopifyDomain}/admin/api/2024-01/pages/${existing.id}.json`;
+      const updateResp = await fetch(updateUrl, {
+        method: 'PUT',
+        headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page: { id: existing.id, template_suffix: template_suffix || handle, published: true } })
+      });
+      const updateData = await updateResp.json();
+      logger.info('admin', 'Page updated', { handle, id: existing.id });
+      return res.json({ success: true, action: 'updated', page: updateData.page });
+    }
+
+    // Create new page
+    const createUrl = `https://${shopifyDomain}/admin/api/2024-01/pages.json`;
+    const createResp = await fetch(createUrl, {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        page: {
+          title,
+          handle: handle || title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          template_suffix: template_suffix || handle || '',
+          body_html: body_html || '',
+          published: true
+        }
+      })
+    });
+
+    if (!createResp.ok) {
+      const errText = await createResp.text();
+      return res.status(createResp.status).json({ error: 'Page creation failed', detail: errText.substring(0, 500) });
+    }
+
+    const createData = await createResp.json();
+    logger.info('admin', 'Page created', { handle, id: createData.page.id });
+    res.json({ success: true, action: 'created', page: createData.page });
+  } catch (e) {
+    logger.error('admin', 'Page creation error', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ============================================================
 // HELPERS
 // ============================================================

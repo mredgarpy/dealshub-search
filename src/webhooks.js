@@ -3,7 +3,10 @@
 // ============================================================
 const crypto = require('crypto');
 const { db, save } = require('./data');
+const { shopifyAdmin } = require('./shopify-admin');
 const logger = require('./utils/logger');
+
+const PLUS_PRODUCT_ID = 8982486155395;
 
 function verifyHmac(req) {
   const hmac = req.headers['x-shopify-hmac-sha256'];
@@ -94,6 +97,60 @@ function setupWebhooks(app) {
 
       save('orders');
       logger.info('webhook', `[CRM] Order created: ${db.orders[o.id].number} - $${o.total_price} - ${(o.line_items || []).length} items`);
+
+      // ── AUTO-DETECT PLUS MEMBERSHIP PURCHASE ──
+      const plusItem = (o.line_items || []).find(i =>
+        i.product_id === PLUS_PRODUCT_ID || i.product_id === String(PLUS_PRODUCT_ID)
+      );
+      if (plusItem && o.customer?.id) {
+        const custId = o.customer.id;
+        const custEmail = o.customer.email || o.email || '';
+        logger.info('plus', `[AUTO] Plus membership purchased by ${custEmail} (order ${o.name})`);
+
+        // Tag customer as Plus in Shopify
+        (async () => {
+          try {
+            const resp = await shopifyAdmin('GET', `/customers/${custId}.json`);
+            const currentTags = (resp.customer?.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+            if (!currentTags.includes('plus')) {
+              currentTags.push('plus');
+              await shopifyAdmin('PUT', `/customers/${custId}.json`, {
+                customer: { id: custId, tags: currentTags.join(', ') }
+              });
+            }
+            // Set metafields
+            await shopifyAdmin('POST', `/customers/${custId}/metafields.json`, {
+              metafield: { namespace: 'stylehub', key: 'plus_active', value: 'true', type: 'single_line_text_field' }
+            });
+            await shopifyAdmin('POST', `/customers/${custId}/metafields.json`, {
+              metafield: { namespace: 'stylehub', key: 'plus_since', value: new Date().toISOString(), type: 'single_line_text_field' }
+            });
+
+            // Track in local DB
+            if (!db.plusMembers) db.plusMembers = {};
+            db.plusMembers[custId] = {
+              customerId: custId, email: custEmail, status: 'active',
+              subscribedAt: new Date().toISOString(), cancelledAt: null,
+              plan: '$7.99/mo', source: 'order_webhook'
+            };
+            save('plusMembers');
+
+            if (!db.activity) db.activity = [];
+            db.activity.unshift({
+              type: 'plus_subscribed', customerId: custId, email: custEmail,
+              message: `⚡ ${custEmail} subscribed to Plus (order ${o.name})`,
+              at: new Date().toISOString()
+            });
+            if (db.activity.length > 500) db.activity = db.activity.slice(0, 500);
+            save('activity');
+
+            logger.info('plus', `[AUTO] Customer ${custId} tagged as Plus`);
+          } catch (err) {
+            logger.error('plus', `[AUTO] Failed to tag Plus: ${err.message}`);
+          }
+        })();
+      }
+
       res.sendStatus(200);
     } catch (err) {
       logger.error('webhook', 'Error in order-created', { error: err.message });

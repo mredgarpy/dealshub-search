@@ -1508,8 +1508,10 @@
         var rvHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
         rvProducts.forEach(function(p) {
           var imgSrc = p.image || p.primaryImage || '';
-          var priceStr = p.price ? '$' + parseFloat(p.price).toFixed(2) : '';
-          var origStr = p.originalPrice ? '<span style="text-decoration:line-through;color:#999;font-size:11px;margin-left:4px">$' + parseFloat(p.originalPrice).toFixed(2) + '</span>' : '';
+          var rawPrice = typeof p.price === 'string' ? parseFloat(p.price.replace(/[^0-9.]/g, '')) : parseFloat(p.price);
+          var priceStr = !isNaN(rawPrice) ? '$' + rawPrice.toFixed(2) : (p.price || '');
+          var rawOrig = typeof p.originalPrice === 'string' ? parseFloat(p.originalPrice.replace(/[^0-9.]/g, '')) : parseFloat(p.originalPrice);
+          var origStr = !isNaN(rawOrig) && rawOrig > 0 ? '<span style="text-decoration:line-through;color:#999;font-size:11px;margin-left:4px">$' + rawOrig.toFixed(2) + '</span>' : '';
           var sourceId = p.sourceId || p.id || '';
           var source = p.source || p.store || '';
           var link = '/pages/product?id=' + encodeURIComponent(sourceId) + '&store=' + encodeURIComponent(source);
@@ -1536,8 +1538,10 @@
       var wlHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
       wl.forEach(function(p, idx) {
         var imgSrc = p.image || p.primaryImage || '';
-        var priceStr = p.price ? '$' + parseFloat(p.price).toFixed(2) : '';
-        var origStr = p.originalPrice ? '<span style="text-decoration:line-through;color:#999;font-size:11px;margin-left:4px">$' + parseFloat(p.originalPrice).toFixed(2) + '</span>' : '';
+        var rawPrice = typeof p.price === 'string' ? parseFloat(p.price.replace(/[^0-9.]/g, '')) : parseFloat(p.price);
+        var priceStr = !isNaN(rawPrice) ? '$' + rawPrice.toFixed(2) : (p.price || '');
+        var rawOrig = typeof p.originalPrice === 'string' ? parseFloat(p.originalPrice.replace(/[^0-9.]/g, '')) : parseFloat(p.originalPrice);
+        var origStr = !isNaN(rawOrig) && rawOrig > 0 ? '<span style="text-decoration:line-through;color:#999;font-size:11px;margin-left:4px">$' + rawOrig.toFixed(2) + '</span>' : '';
         var sourceId = p.sourceId || p.id || '';
         var source = p.source || p.store || '';
         var link = '/pages/product?id=' + encodeURIComponent(sourceId) + '&store=' + encodeURIComponent(source);

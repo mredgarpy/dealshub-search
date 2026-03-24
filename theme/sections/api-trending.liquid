@@ -1,0 +1,47 @@
+{% comment %} StyleHub Trending - RapidAPI v3.1 {% endcomment %}
+<section style="padding:40px 24px;max-width:1400px;margin:0 auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+    <div>
+      <h2 style="font-size:24px;font-weight:800;color:#1a1a2e">🔥 Trending Now</h2>
+      <p style="color:#666;font-size:14px;margin-top:4px">The most popular products right now</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="filterTrending('all')" class="dh-store-filter active" data-store="all" style="padding:6px 14px;border-radius:20px;border:1px solid #e0e0e0;background:#1a1a2e;color:#fff;font-size:12px;cursor:pointer;font-weight:500">All</button>
+      <button onclick="filterTrending('usa')" class="dh-store-filter" data-store="usa" style="padding:6px 14px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#333;font-size:12px;cursor:pointer;font-weight:500">🇺🇸 USA</button>
+      <button onclick="filterTrending('intl')" class="dh-store-filter" data-store="intl" style="padding:6px 14px;border-radius:20px;border:1px solid #e0e0e0;background:#fff;color:#333;font-size:12px;cursor:pointer;font-weight:500">🌍 International</button>
+    </div>
+  </div>
+  <div class="dh-grid" id="dh-trending-grid"></div>
+</section>
+
+<script>
+  var _trendingAll = [];
+  document.addEventListener('DOMContentLoaded', function() {
+    if (window.StyleHub) {
+      StyleHub.loadSection('/trending', 'dh-trending-grid', { count: 12 });
+      StyleHub.trending().then(function(data) { _trendingAll = data.results || []; });
+    }
+  });
+  function filterTrending(origin) {
+    document.querySelectorAll('.dh-store-filter').forEach(function(b) {
+      b.style.background = b.dataset.store === origin ? '#1a1a2e' : '#fff';
+      b.style.color = b.dataset.store === origin ? '#fff' : '#333';
+    });
+    var filtered = origin === 'all' ? _trendingAll : _trendingAll.filter(function(p) {
+      var src = (p.source || '').toLowerCase();
+      var isUSA = src === 'amazon' || p.originType === 'USA';
+      if (origin === 'usa') return isUSA;
+      if (origin === 'intl') return !isUSA;
+      return true;
+    });
+    if (filtered.length > 0) StyleHub.buildGrid(filtered, 'dh-trending-grid');
+    else document.getElementById('dh-trending-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#999">No trending products for this origin</div>';
+  }
+</script>
+
+{% schema %}
+{
+  "name": "API Trending",
+  "settings": []
+}
+{% endschema %}

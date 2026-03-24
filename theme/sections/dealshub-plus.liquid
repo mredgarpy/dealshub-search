@@ -183,28 +183,93 @@
 
 <script>
 function activatePlusTrial(){
-  try{localStorage.setItem('stylehub_plus','true');localStorage.setItem('stylehub_plus_since',new Date().toISOString())}catch(e){}
   var btns=document.querySelectorAll('.dh-plus-cta-hero');
   btns.forEach(function(b){
-    b.textContent='✓ Plus Activated!';
+    b.textContent='Adding to cart...';
+    b.style.opacity='0.7';
+    b.style.pointerEvents='none';
+  });
+
+  /* ── Real Shopify cart add with selling_plan for Seal Subscriptions ── */
+  /* First fetch the product to get the live selling_plan_id dynamically */
+  fetch('/products/stylehub-plus-membership.js')
+    .then(function(r){ return r.json(); })
+    .then(function(product){
+      var variant = product.variants[0];
+      var sellingPlanId = null;
+      if(variant.selling_plan_allocations && variant.selling_plan_allocations.length > 0){
+        sellingPlanId = variant.selling_plan_allocations[0].selling_plan_id;
+      }
+      var payload = {
+        items: [{
+          id: variant.id,
+          quantity: 1
+        }]
+      };
+      /* Attach selling_plan so Shopify creates a subscription order */
+      if(sellingPlanId){
+        payload.items[0].selling_plan = sellingPlanId;
+      }
+      return fetch('/cart/add.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data.items || data.id){
+        /* Set localStorage flags for immediate UI updates */
+        try{
+          localStorage.setItem('stylehub_plus','true');
+          localStorage.setItem('stylehub_plus_since',new Date().toISOString());
+        }catch(e){}
+        btns.forEach(function(b){
+          b.textContent='✓ Added! Redirecting to checkout...';
+          b.style.background='#38a169';
+          b.style.opacity='1';
+        });
+        /* Go straight to checkout */
+        setTimeout(function(){ window.location.href='/checkout'; }, 800);
+      } else {
+        /* Cart add failed — show error */
+        btns.forEach(function(b){
+          b.textContent='Error — Try again';
+          b.style.background='#e53e3e';
+          b.style.opacity='1';
+          b.style.pointerEvents='auto';
+        });
+        console.error('Plus cart add failed:', data);
+      }
+    })
+    .catch(function(err){
+      btns.forEach(function(b){
+        b.textContent='Error — Try again';
+        b.style.background='#e53e3e';
+        b.style.opacity='1';
+        b.style.pointerEvents='auto';
+      });
+      console.error('Plus subscription error:', err);
+    });
+}
+
+/* If already Plus member (by Shopify customer tag), update buttons */
+{%- assign is_plus_page = false -%}
+{%- if customer -%}
+  {%- for tag in customer.tags -%}
+    {%- if tag == 'plus' -%}{%- assign is_plus_page = true -%}{%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- if is_plus_page -%}
+(function(){
+  var btns=document.querySelectorAll('.dh-plus-cta-hero');
+  btns.forEach(function(b){
+    b.textContent='✓ You\'re a Plus Member';
     b.style.background='#38a169';
     b.style.pointerEvents='none';
   });
-  setTimeout(function(){window.location.href='/'},1500);
-}
-// If already Plus, update buttons
-(function(){
-  try{
-    if(localStorage.getItem('stylehub_plus')==='true'){
-      var btns=document.querySelectorAll('.dh-plus-cta-hero');
-      btns.forEach(function(b){
-        b.textContent='✓ You\'re a Plus Member';
-        b.style.background='#38a169';
-        b.style.pointerEvents='none';
-      });
-    }
-  }catch(e){}
 })();
+{%- endif -%}
 </script>
 
 {% schema %}

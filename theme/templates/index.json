@@ -1,56 +1,13 @@
 {
   "sections": {
-    "hero": {
-      "type": "dealshub-hero",
+    "dealshub_home": {
+      "type": "dealshub-home",
       "settings": {
-        "badge": "🔥 Miami's #1 Marketplace",
-        "heading": "StyleHub Miami",
-        "subheading": "Encuentra las mejores ofertas de Amazon, SHEIN, Sephora, Macy's y AliExpress en un solo lugar.",
-        "search_placeholder": "¿Qué estás buscando hoy?",
-        "trending_tags": "Sneakers, Perfumes, iPhone Cases, Skincare, Dresses"
+        "api_url": "https://dealshub-search.onrender.com"
       }
-    },
-    "categories": {
-      "type": "dealshub-categories",
-      "settings": {
-        "title": "Categorías Populares"
-      },
-      "blocks": {
-        "cat_1": { "type": "category", "settings": { "name": "Moda", "emoji": "👗", "search_query": "fashion dresses", "bg_color": "#fff0f5" } },
-        "cat_2": { "type": "category", "settings": { "name": "Belleza", "emoji": "💄", "search_query": "beauty skincare", "bg_color": "#f5f0ff" } },
-        "cat_3": { "type": "category", "settings": { "name": "Electrónica", "emoji": "📱", "search_query": "electronics phone", "bg_color": "#f0f7ff" } },
-        "cat_4": { "type": "category", "settings": { "name": "Hogar", "emoji": "🏠", "search_query": "home decor", "bg_color": "#f0fff5" } },
-        "cat_5": { "type": "category", "settings": { "name": "Zapatillas", "emoji": "👟", "search_query": "sneakers shoes", "bg_color": "#fff5f0" } },
-        "cat_6": { "type": "category", "settings": { "name": "Accesorios", "emoji": "💍", "search_query": "jewelry accessories", "bg_color": "#f5f5f0" } }
-      },
-      "block_order": ["cat_1", "cat_2", "cat_3", "cat_4", "cat_5", "cat_6"]
-    },
-    "trending": {
-      "type": "dealshub-featured-products",
-      "settings": {
-        "title": "🔥 Trending Ahora",
-        "subtitle": "Los productos más buscados del momento",
-        "endpoint": "trending",
-        "limit": 12,
-        "show_source_tabs": true,
-        "show_view_all": true
-      }
-    },
-    "flash_deals": {
-      "type": "dealshub-featured-products",
-      "settings": {
-        "title": "⚡ Flash Deals",
-        "subtitle": "Ofertas por tiempo limitado",
-        "endpoint": "flash-deals",
-        "limit": 8,
-        "show_source_tabs": false,
-        "show_view_all": true
-      }
-    },
-    "trust": {
-      "type": "dealshub-trust-section",
-      "settings": {}
     }
   },
-  "order": ["hero", "categories", "trending", "flash_deals", "trust"]
+  "order": [
+    "dealshub_home"
+  ]
 }

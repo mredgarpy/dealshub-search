@@ -72,6 +72,7 @@ const { setupCRMApi } = require('./src/crm-api');
 const { setupSubscriptionWebhooks } = require('./src/subscription-webhooks');
 const newsletterRouter = require('./src/routes/newsletter');
 const productImagesRouter = require('./src/routes/product-images');
+const { STORES, getActiveStores, isStoreActive, classifyOrigin } = require('./src/config/stores');
 
 // Initialize adapters
 initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
@@ -139,10 +140,20 @@ app.use(productImagesRouter);
 
 // ---- UNIFIED SEARCH ----
 app.get('/api/search', async (req, res) => {
-  const { q, store, limit = 20, page = 1 } = req.query;
+  const { q, store, limit = 20, page = 1, origin } = req.query;
   if (!q) return res.status(400).json({ error: 'Missing query parameter q' });
 
-  const sources = store ? [store.toLowerCase()] : VALID_SOURCES;
+  // Only search active stores; if specific store requested, verify it's active
+  let sources;
+  if (store) {
+    const s = store.toLowerCase();
+    if (!isStoreActive(s)) {
+      return res.status(400).json({ error: `Store ${s} is currently paused` });
+    }
+    sources = [s];
+  } else {
+    sources = getActiveStores();
+  }
   const limitNum = Math.min(parseInt(limit) || 20, 50);
   const cacheKey = `search:${q}:${sources.join(',')}:${page}:${limitNum}`;
 
@@ -168,6 +179,26 @@ app.get('/api/search', async (req, res) => {
         logger.warn('search', `Source ${sources[i]} failed`, { reason: r.reason?.message });
       }
     });
+
+    // Add origin classification to each result
+    allResults = allResults.map(p => {
+      const o = classifyOrigin(p);
+      p.originBadge = o.badge;
+      p.originFlag = o.flag;
+      p.originDelivery = o.deliveryEstimate;
+      p.originType = o.origin; // 'USA' or 'INTL'
+      return p;
+    });
+
+    // Filter by origin if requested (usa, intl, all)
+    if (origin && origin !== 'all') {
+      const oFilter = origin.toLowerCase();
+      allResults = allResults.filter(p => {
+        if (oFilter === 'usa') return p.originType === 'USA';
+        if (oFilter === 'intl') return p.originType === 'INTL';
+        return true;
+      });
+    }
 
     // Interleave results from different sources for variety
     if (sources.length > 1) {
@@ -282,6 +313,13 @@ async function productDetailHandler(req, res) {
     }
     product.deliveryEstimate = shipResult.delivery;
     product.returnPolicy = shipResult.returnWindow;
+
+    // v3.0: Add origin classification (USA vs International)
+    const originInfo = classifyOrigin(product);
+    product.originType = originInfo.origin;
+    product.originBadge = originInfo.badge;
+    product.originFlag = originInfo.flag;
+    product.originDelivery = originInfo.deliveryEstimate;
 
     // Only cache if returned product matches requested ID (prevent stale fallback pollution)
     const returnedId = String(product.sourceId || '');
@@ -442,7 +480,7 @@ app.get('/api/trending', async (req, res) => {
   try {
     const queries = { amazon: 'trending deals', aliexpress: 'hot products', sephora: 'trending beauty', macys: 'trending now', shein: 'trending' };
     const results = await Promise.allSettled(
-      Object.entries(queries).map(([source, q]) => {
+      Object.entries(queries).filter(([source]) => isStoreActive(source)).map(([source, q]) => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(q, 6) : Promise.resolve([]);
       })
@@ -465,7 +503,7 @@ app.get('/api/bestsellers', async (req, res) => {
   try {
     const queries = { amazon: 'best sellers', aliexpress: 'best selling products', sephora: 'best sellers beauty', macys: 'top rated', shein: 'best sellers' };
     const results = await Promise.allSettled(
-      Object.entries(queries).map(([source, q]) => {
+      Object.entries(queries).filter(([source]) => isStoreActive(source)).map(([source, q]) => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(q, 6) : Promise.resolve([]);
       })
@@ -494,7 +532,7 @@ app.get('/api/new-arrivals', async (req, res) => {
   try {
     const queries = { amazon: 'new arrivals', aliexpress: 'new arrivals 2024', shein: 'new in', sephora: 'new arrivals', macys: 'new arrivals' };
     const results = await Promise.allSettled(
-      Object.entries(queries).map(([source, q]) => {
+      Object.entries(queries).filter(([source]) => isStoreActive(source)).map(([source, q]) => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(q, 5) : Promise.resolve([]);
       })
@@ -526,7 +564,7 @@ app.get('/api/featured', async (req, res) => {
 
   try {
     const results = await Promise.allSettled(
-      ['amazon', 'aliexpress', 'sephora', 'macys', 'shein'].map(source => {
+      getActiveStores().map(source => {
         const adapter = getAdapter(source);
         return adapter ? adapter.search(query, 4) : Promise.resolve([]);
       })
@@ -548,7 +586,7 @@ app.get('/api/flash-deals', async (req, res) => {
 
   try {
     const results = await Promise.allSettled(
-      ['amazon', 'aliexpress', 'sephora', 'macys', 'shein'].map(source => {
+      getActiveStores().map(source => {
         const adapter = getAdapter(source);
         const q = source === 'amazon' ? 'deals best price'
           : source === 'aliexpress' ? 'sale hot products discount'
@@ -608,6 +646,11 @@ app.get('/api/source-health', async (req, res) => {
   const adapters = getAllAdapters();
   await Promise.allSettled(
     Object.entries(adapters).map(async ([name, adapter]) => {
+      // If store is paused, skip health check and report as paused
+      if (!isStoreActive(name)) {
+        health[name] = { status: 'paused', latencyMs: 0, note: 'Temporarily paused' };
+        return;
+      }
       const start = Date.now();
       try {
         const results = await adapter.search('test', 1);
@@ -617,7 +660,7 @@ app.get('/api/source-health', async (req, res) => {
       }
     })
   );
-  res.json({ sources: health, timestamp: new Date().toISOString() });
+  res.json({ sources: health, activeStores: getActiveStores(), timestamp: new Date().toISOString() });
 });
 
 

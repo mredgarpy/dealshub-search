@@ -2,10 +2,10 @@
   DealsHub — Hero Banner Section
 {% endcomment %}
 
-<div class="dh-hero" style="background: {{ section.settings.bg_color | default: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' }};">
+<div class="dh-hero" style="background: {% if section.settings.bg_color != blank %}{{ section.settings.bg_color }}{% else %}linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%){% endif %};">
   <div class="dh-hero__inner page-width">
     <div class="dh-hero__content">
-      <span class="dh-hero__badge">{{ section.settings.badge | default: '🔥 Miami\'s #1 Marketplace' }}</span>
+      <span class="dh-hero__badge">{% if section.settings.badge != blank %}{{ section.settings.badge }}{% else %}🔥 Top Deals Marketplace{% endif %}</span>
       <h1 class="dh-hero__title">{{ section.settings.heading | default: 'StyleHub Miami' }}</h1>
       <p class="dh-hero__sub">{{ section.settings.subheading | default: 'Discover incredible deals on fashion, beauty, electronics & more — shipped to your door.' }}</p>
       <form class="dh-hero__search" action="/pages/search" method="get">

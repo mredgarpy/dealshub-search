@@ -1,0 +1,9 @@
+{
+  "sections": {
+    "plus-landing": {
+      "type": "dealshub-plus-landing",
+      "settings": {}
+    }
+  },
+  "order": ["plus-landing"]
+}

@@ -1,0 +1,267 @@
+{% comment %}
+  StyleHub Plus Membership — Premium Landing Page
+  Used on product.plus-membership.json template
+{% endcomment %}
+
+{%- assign is_plus = false -%}
+{%- if customer -%}
+  {%- for tag in customer.tags -%}
+    {%- if tag == 'plus' -%}{%- assign is_plus = true -%}{%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+
+<style>
+.sh-plus-landing{--plus-primary:#7c3aed;--plus-dark:#1a1025;--plus-gradient:linear-gradient(135deg,#7c3aed 0%,#a855f7 50%,#6d28d9 100%);font-family:system-ui,-apple-system,sans-serif;color:#fff}
+.sh-plus-hero{background:var(--plus-dark);padding:60px 20px 50px;text-align:center;position:relative;overflow:hidden}
+.sh-plus-hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 50%,rgba(124,58,237,0.15) 0%,transparent 50%),radial-gradient(circle at 70% 30%,rgba(168,85,247,0.1) 0%,transparent 40%);pointer-events:none}
+.sh-plus-hero-inner{max-width:700px;margin:0 auto;position:relative;z-index:1}
+.sh-plus-badge{display:inline-flex;align-items:center;gap:6px;background:var(--plus-gradient);color:#fff;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;letter-spacing:.5px;margin-bottom:24px}
+.sh-plus-hero h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;margin:0 0 16px;line-height:1.15}
+.sh-plus-hero h1 span{background:var(--plus-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sh-plus-hero p{font-size:1.15rem;color:#a3a3b3;margin:0 0 32px;line-height:1.6}
+.sh-plus-price-block{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-bottom:8px}
+.sh-plus-price{font-size:3rem;font-weight:800;background:var(--plus-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sh-plus-period{font-size:1.1rem;color:#a3a3b3}
+.sh-plus-trial{color:#a78bfa;font-size:.95rem;margin-bottom:28px}
+.sh-plus-cta{display:inline-flex;align-items:center;gap:8px;background:var(--plus-gradient);color:#fff;border:none;padding:16px 40px;border-radius:12px;font-size:1.1rem;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 20px rgba(124,58,237,0.4);text-decoration:none}
+.sh-plus-cta:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(124,58,237,0.5)}
+.sh-plus-cta-sub{font-size:.85rem;color:#a3a3b3;margin-top:10px}
+.sh-plus-benefits{background:#0f0a18;padding:60px 20px}
+.sh-plus-benefits-inner{max-width:900px;margin:0 auto}
+.sh-plus-benefits h2{text-align:center;font-size:1.8rem;font-weight:700;margin:0 0 40px}
+.sh-plus-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px}
+.sh-plus-card{background:linear-gradient(145deg,#1e1530 0%,#15101f 100%);border:1px solid rgba(124,58,237,0.2);border-radius:16px;padding:28px 24px;transition:border-color .2s,transform .2s}
+.sh-plus-card:hover{border-color:rgba(124,58,237,0.5);transform:translateY(-2px)}
+.sh-plus-card-icon{width:48px;height:48px;border-radius:12px;background:rgba(124,58,237,0.15);display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:16px}
+.sh-plus-card h3{font-size:1.1rem;font-weight:700;margin:0 0 8px;color:#fff}
+.sh-plus-card p{font-size:.9rem;color:#9ca3af;margin:0;line-height:1.5}
+.sh-plus-compare{background:var(--plus-dark);padding:60px 20px}
+.sh-plus-compare-inner{max-width:700px;margin:0 auto}
+.sh-plus-compare h2{text-align:center;font-size:1.8rem;font-weight:700;margin:0 0 32px}
+.sh-plus-table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden}
+.sh-plus-table th,.sh-plus-table td{padding:14px 20px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sh-plus-table thead th{background:rgba(124,58,237,0.15);font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.5px;color:#a78bfa}
+.sh-plus-table tbody td{font-size:.95rem;color:#d1d5db}
+.sh-plus-table .sh-check{color:#22c55e;font-weight:700;font-size:1.1rem}
+.sh-plus-table .sh-cross{color:#6b7280;font-size:1.1rem}
+.sh-plus-table .sh-plus-col{background:rgba(124,58,237,0.05)}
+.sh-plus-faq{background:#0f0a18;padding:60px 20px}
+.sh-plus-faq-inner{max-width:700px;margin:0 auto}
+.sh-plus-faq h2{text-align:center;font-size:1.8rem;font-weight:700;margin:0 0 32px}
+.sh-plus-faq-item{border:1px solid rgba(255,255,255,0.08);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.sh-plus-faq-q{padding:16px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:.95rem;background:rgba(255,255,255,0.02)}
+.sh-plus-faq-q:hover{background:rgba(124,58,237,0.05)}
+.sh-plus-faq-a{padding:0 20px 16px;font-size:.9rem;color:#9ca3af;line-height:1.6;display:none}
+.sh-plus-faq-item.open .sh-plus-faq-a{display:block}
+.sh-plus-faq-item.open .sh-plus-faq-arrow{transform:rotate(180deg)}
+.sh-plus-faq-arrow{transition:transform .2s;color:#7c3aed}
+.sh-plus-bottom-cta{background:var(--plus-dark);padding:50px 20px 60px;text-align:center}
+.sh-plus-bottom-cta h2{font-size:1.6rem;font-weight:700;margin:0 0 8px}
+.sh-plus-bottom-cta p{color:#9ca3af;margin:0 0 24px}
+.sh-plus-member-notice{background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(168,85,247,0.1));border:1px solid rgba(124,58,237,0.3);border-radius:16px;padding:32px;text-align:center;max-width:500px;margin:0 auto}
+.sh-plus-member-notice h3{color:#a78bfa;margin:0 0 8px;font-size:1.2rem}
+.sh-plus-member-notice p{color:#d1d5db;margin:0 0 16px;font-size:.95rem}
+.sh-plus-member-link{color:#a78bfa;text-decoration:underline;font-weight:600}
+@media(max-width:600px){
+  .sh-plus-hero{padding:40px 16px 36px}
+  .sh-plus-benefits,.sh-plus-compare,.sh-plus-faq,.sh-plus-bottom-cta{padding:40px 16px}
+  .sh-plus-grid{grid-template-columns:1fr}
+  .sh-plus-table th,.sh-plus-table td{padding:10px 12px;font-size:.85rem}
+}
+</style>
+
+<div class="sh-plus-landing">
+  <!-- HERO -->
+  <div class="sh-plus-hero">
+    <div class="sh-plus-hero-inner">
+      <div class="sh-plus-badge">⚡ STYLEHUB PLUS</div>
+      <h1>The <span>smartest way</span> to shop online</h1>
+      <p>Get FREE shipping on every order, extended returns, double loyalty points, and exclusive member-only deals — all for less than a cup of coffee.</p>
+
+      {%- if is_plus -%}
+        <div class="sh-plus-member-notice">
+          <h3>⚡ You're a Plus Member!</h3>
+          <p>You're already enjoying all Plus benefits on every order.</p>
+          <a href="/pages/my-account" class="sh-plus-member-link">Go to your account →</a>
+        </div>
+      {%- else -%}
+        <div class="sh-plus-price-block">
+          <span class="sh-plus-price">${{ product.price | money_without_currency }}</span>
+          <span class="sh-plus-period">/month</span>
+        </div>
+        <div class="sh-plus-trial">✨ 7-day free trial included — Cancel anytime</div>
+        <form id="sh-plus-form" action="/cart/add" method="post">
+          <input type="hidden" name="id" value="{{ product.variants.first.id }}">
+          <input type="hidden" name="quantity" value="1">
+          {%- if product.selling_plan_groups.size > 0 -%}
+            <input type="hidden" name="selling_plan" value="{{ product.selling_plan_groups.first.selling_plans.first.id }}">
+          {%- endif -%}
+          <button type="submit" class="sh-plus-cta">
+            ⚡ Start your free trial
+          </button>
+        </form>
+        <div class="sh-plus-cta-sub">No commitment — Cancel in 2 clicks from your account</div>
+      {%- endif -%}
+    </div>
+  </div>
+
+  <!-- BENEFITS GRID -->
+  <div class="sh-plus-benefits">
+    <div class="sh-plus-benefits-inner">
+      <h2>Everything included with Plus</h2>
+      <div class="sh-plus-grid">
+        <div class="sh-plus-card">
+          <div class="sh-plus-card-icon">🚚</div>
+          <h3>FREE Shipping</h3>
+          <p>Every order, every store, every time. No minimums, no exceptions. Save an average of $8-15 per order.</p>
+        </div>
+        <div class="sh-plus-card">
+          <div class="sh-plus-card-icon">↩️</div>
+          <h3>60-Day Returns</h3>
+          <p>Extended return window on all purchases. Double the standard 30-day policy for peace of mind.</p>
+        </div>
+        <div class="sh-plus-card">
+          <div class="sh-plus-card-icon">⭐</div>
+          <h3>2x Loyalty Points</h3>
+          <p>Earn double points on every purchase. Redeem for discounts, free products, and exclusive perks.</p>
+        </div>
+        <div class="sh-plus-card">
+          <div class="sh-plus-card-icon">🏷️</div>
+          <h3>Exclusive Deals</h3>
+          <p>Member-only prices, early access to flash deals, and special promotions not available to regular shoppers.</p>
+        </div>
+        <div class="sh-plus-card">
+          <div class="sh-plus-card-icon">🎯</div>
+          <h3>Priority Support</h3>
+          <p>Jump the queue with dedicated Plus support. Faster responses, priority resolution, and a dedicated team.</p>
+        </div>
+        <div class="sh-plus-card">
+          <div class="sh-plus-card-icon">🔔</div>
+          <h3>Early Access</h3>
+          <p>Be first to know about new arrivals, restocks, and limited drops. Get notified before everyone else.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARISON TABLE -->
+  <div class="sh-plus-compare">
+    <div class="sh-plus-compare-inner">
+      <h2>Free vs Plus</h2>
+      <table class="sh-plus-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Free</th>
+            <th class="sh-plus-col">⚡ Plus</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Shipping</td>
+            <td>Calculated at checkout</td>
+            <td class="sh-plus-col"><span class="sh-check">✓</span> FREE always</td>
+          </tr>
+          <tr>
+            <td>Return window</td>
+            <td>30 days</td>
+            <td class="sh-plus-col"><span class="sh-check">✓</span> 60 days</td>
+          </tr>
+          <tr>
+            <td>Loyalty points</td>
+            <td>1x standard</td>
+            <td class="sh-plus-col"><span class="sh-check">✓</span> 2x double</td>
+          </tr>
+          <tr>
+            <td>Exclusive deals</td>
+            <td><span class="sh-cross">—</span></td>
+            <td class="sh-plus-col"><span class="sh-check">✓</span> Members only</td>
+          </tr>
+          <tr>
+            <td>Early access</td>
+            <td><span class="sh-cross">—</span></td>
+            <td class="sh-plus-col"><span class="sh-check">✓</span> First in line</td>
+          </tr>
+          <tr>
+            <td>Priority support</td>
+            <td><span class="sh-cross">—</span></td>
+            <td class="sh-plus-col"><span class="sh-check">✓</span> Dedicated team</td>
+          </tr>
+          <tr>
+            <td>Price</td>
+            <td>Free</td>
+            <td class="sh-plus-col"><strong style="color:#a78bfa">$7.99/mo</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="sh-plus-faq">
+    <div class="sh-plus-faq-inner">
+      <h2>Frequently asked questions</h2>
+
+      <div class="sh-plus-faq-item open">
+        <div class="sh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">
+          How does the free trial work?
+          <span class="sh-plus-faq-arrow">▾</span>
+        </div>
+        <div class="sh-plus-faq-a">You get full Plus benefits for 7 days at no charge. After the trial, you'll be billed $7.99/month. You can cancel anytime before the trial ends and you won't be charged.</div>
+      </div>
+
+      <div class="sh-plus-faq-item">
+        <div class="sh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">
+          Can I cancel anytime?
+          <span class="sh-plus-faq-arrow">▾</span>
+        </div>
+        <div class="sh-plus-faq-a">Absolutely. Cancel in 2 clicks from your account page. No fees, no penalties, no questions asked. Your benefits remain active until the end of your current billing cycle.</div>
+      </div>
+
+      <div class="sh-plus-faq-item">
+        <div class="sh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">
+          How much can I save with Plus?
+          <span class="sh-plus-faq-arrow">▾</span>
+        </div>
+        <div class="sh-plus-faq-a">Most members save $20-50+ per month on shipping alone. With just 1-2 orders per month, Plus pays for itself. Add in exclusive deals and double points, and the value goes even further.</div>
+      </div>
+
+      <div class="sh-plus-faq-item">
+        <div class="sh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">
+          Does free shipping apply to all stores?
+          <span class="sh-plus-faq-arrow">▾</span>
+        </div>
+        <div class="sh-plus-faq-a">Yes — free shipping applies to every order regardless of which store the product comes from. Amazon, AliExpress, Sephora, Macy's, SHEIN — all free shipping with Plus.</div>
+      </div>
+
+      <div class="sh-plus-faq-item">
+        <div class="sh-plus-faq-q" onclick="this.parentElement.classList.toggle('open')">
+          What happens to my existing orders?
+          <span class="sh-plus-faq-arrow">▾</span>
+        </div>
+        <div class="sh-plus-faq-a">Plus benefits apply to all new orders placed after subscribing. Existing orders keep their original shipping terms. The 60-day return window applies to orders placed while your membership is active.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM CTA -->
+  {%- unless is_plus -%}
+  <div class="sh-plus-bottom-cta">
+    <h2>Ready to shop smarter?</h2>
+    <p>Join thousands of Plus members saving on every order.</p>
+    <button class="sh-plus-cta" onclick="document.getElementById('sh-plus-form').scrollIntoView({behavior:'smooth'})">
+      ⚡ Start your free trial — $7.99/mo
+    </button>
+    <div class="sh-plus-cta-sub">7-day free trial • Cancel anytime • No commitment</div>
+  </div>
+  {%- endunless -%}
+</div>
+
+{% schema %}
+{
+  "name": "Plus Landing Page",
+  "tag": "section",
+  "class": "sh-plus-landing-section",
+  "settings": []
+}
+{% endschema %}

@@ -45,15 +45,18 @@ class AmazonAdapter extends BaseAdapter {
   selectBestOffer(productOffers) {
     if (!productOffers || productOffers.length === 0) return null;
 
+    // Helper: check if ships_from starts with "Amazon.com" (may contain newlines)
+    const isFBAOffer = o => (o.ships_from || '').split('\n')[0].trim() === 'Amazon.com';
+
     // Priority 1: FBA (ships from Amazon.com) with condition New
     const fbaNew = productOffers.find(o =>
-      o.ships_from === 'Amazon.com' &&
+      isFBAOffer(o) &&
       (o.product_condition === 'New' || !o.product_condition)
     );
     if (fbaNew) return { ...fbaNew, isFBA: true };
 
     // Priority 2: Any FBA
-    const fba = productOffers.find(o => o.ships_from === 'Amazon.com');
+    const fba = productOffers.find(o => isFBAOffer(o));
     if (fba) return { ...fba, isFBA: true };
 
     // Priority 3: Seller with best rating and FREE delivery
@@ -75,13 +78,19 @@ class AmazonAdapter extends BaseAdapter {
     const isFree = deliveryPrice === 'FREE' || deliveryPrice === '$0.00' || deliveryPrice === '';
     const cost = isFree ? 0 : parseFloat(deliveryPrice.replace('$', '').replace(',', '')) || 0;
 
+    // Clean ships_from: API may return "bjkrTrf\nShips from China." — extract name only
+    const rawShipsFrom = offer.ships_from || '';
+    const shipsFromClean = rawShipsFrom.split('\n')[0].trim() || null;
+    const shipsFromOrigin = rawShipsFrom.includes('\n') ? rawShipsFrom.split('\n').slice(1).join(' ').trim() : null;
+
     return {
       cost,
       isFree,
       label: isFree ? 'FREE' : deliveryPrice,
       method: offer.isFBA ? 'Amazon Prime' : 'Seller Shipping',
       deliveryTime: offer.delivery_time || null,
-      shipsFrom: offer.ships_from || null,
+      shipsFrom: shipsFromClean,
+      shipsFromOrigin,
       isFBA: offer.isFBA || false,
       seller: {
         name: offer.seller || null,
@@ -127,7 +136,7 @@ class AmazonAdapter extends BaseAdapter {
           sellerId: bestOffer.seller_id || null,
           sellerRating: bestOffer.seller_star_rating || null,
           sellerRatingInfo: bestOffer.seller_star_rating_info || null,
-          shipsFrom: bestOffer.ships_from || null,
+          shipsFrom: (bestOffer.ships_from || '').split('\n')[0].trim() || null,
           isFBA: bestOffer.isFBA || false,
           condition: bestOffer.product_condition || 'New',
           offerPrice: bestOffer.product_price || null,
@@ -160,17 +169,17 @@ class AmazonAdapter extends BaseAdapter {
       product.allOffers = offers.slice(0, 5).map(o => ({
         seller: o.seller || null,
         price: o.product_price || null,
-        shipsFrom: o.ships_from || null,
+        shipsFrom: (o.ships_from || '').split('\n')[0].trim() || null,
         deliveryPrice: o.delivery_price || null,
         deliveryTime: o.delivery_time || null,
         condition: o.product_condition || 'New',
         sellerRating: o.seller_star_rating || null,
-        isFBA: o.ships_from === 'Amazon.com'
+        isFBA: (o.ships_from || '').split('\n')[0].trim() === 'Amazon.com'
       }));
 
       // Update rawSourceMeta with offer data for shipping-rules.js
       product.rawSourceMeta.offersCount = offers.length;
-      product.rawSourceMeta.bestOfferShipsFrom = bestOffer?.ships_from || null;
+      product.rawSourceMeta.bestOfferShipsFrom = (bestOffer?.ships_from || '').split('\n')[0].trim() || null;
       product.rawSourceMeta.bestOfferIsFBA = bestOffer?.isFBA || false;
       product.rawSourceMeta.bestOfferDeliveryPrice = bestOffer?.delivery_price || null;
       product.rawSourceMeta.bestOfferDeliveryTime = bestOffer?.delivery_time || null;

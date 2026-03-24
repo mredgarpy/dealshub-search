@@ -234,6 +234,39 @@
         html+='<div style="font-size:11px;color:#888;margin-top:1px">Sold by '+escHTML(bestOffer.seller)+'</div>';
       }
     }
+    // v2.7: AliExpress shipping options (carrier-level data)
+    var shipOpts=p.shippingOptions||[];
+    if(shipOpts.length>1&&p.source==='aliexpress'){
+      html+='<div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:6px">';
+      html+='<div style="font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Shipping options</div>';
+      var maxShow=Math.min(shipOpts.length,4);
+      for(var si=0;si<maxShow;si++){
+        var sopt=shipOpts[si];
+        var soptFee=sopt.fee===0?'<span style="color:#16a34a;font-weight:600">FREE</span>':'<span style="color:#333;font-weight:600">$'+sopt.fee.toFixed(2)+'</span>';
+        var soptTime=sopt.time?sopt.time+' days':'';
+        var soptTrack=sopt.tracking?'<span style="color:#16a34a;font-size:10px">✓ Track</span>':'';
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px">';
+        html+='<span style="color:#555;min-width:70px;font-weight:500">'+escHTML(sopt.company||'Standard')+'</span>';
+        html+=soptFee;
+        if(soptTime)html+='<span style="color:#888">· '+escHTML(soptTime)+'</span>';
+        if(sopt.estimateDeliveryDate)html+='<span style="color:#888">· Est. '+escHTML(sopt.estimateDeliveryDate.split('T')[0].replace(/^(\d{4})-(\d{2})-(\d{2})$/,function(m,y,mo,d){var mos=["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return mos[parseInt(mo)]+' '+parseInt(d)}))+'</span>';
+        html+=soptTrack;
+        html+='</div>';
+      }
+      if(shipOpts.length>maxShow)html+='<div style="font-size:11px;color:#888;margin-top:2px">+'+(shipOpts.length-maxShow)+' more options</div>';
+      html+='</div>';
+    }
+    // AliExpress seller info (when no bestOffer/Amazon data but sellerData exists)
+    if(!shipShipsFrom&&p.sellerData&&p.sellerData.name&&p.source==='aliexpress'){
+      html+='<div style="font-size:12px;color:#555;margin-top:3px">Sold by <b>'+escHTML(p.sellerData.name)+'</b></div>';
+      if(p.shippingData&&p.shippingData.shipsFrom){
+        var fromFlag='';
+        var sf=p.shippingData.shipsFrom.toLowerCase();
+        if(sf.indexOf('united states')>=0||sf.indexOf('us')>=0)fromFlag=' &#127482;&#127480;';
+        else if(sf.indexOf('china')>=0)fromFlag=' &#127464;&#127475;';
+        html+='<div style="font-size:11px;color:#888;margin-top:1px">Ships from '+escHTML(p.shippingData.shipsFrom)+fromFlag+'</div>';
+      }
+    }
     // Threshold hint (only for non-Plus)
     if(!pdpIsPlus&&shipThresholdNote&&shipRemaining>0){
       html+='<div style="font-size:12px;color:#d97706;margin-top:4px">&#128161; Add $'+shipRemaining.toFixed(2)+' more for FREE shipping</div>';

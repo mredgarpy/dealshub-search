@@ -145,14 +145,44 @@ function _parseAmazonDelivery(primaryDeliveryTime, deliveryEstimate) {
 
 // ---- ALIEXPRESS: FREE (included in price) ----
 function _aliexpressShipping(sourcePrice, apiData) {
-  const shipsFromUS = (apiData?.options || []).some(o =>
-    /ships?\s*from/i.test(o.name || '') &&
-    o.values?.some(v => /united\s*states|US\s*warehouse/i.test(v.value || ''))
-  );
+  // Check for real shipping data from item_detail_2 shippingList
+  const hasRealShipping = apiData?.shippingOptions?.length > 0;
+  const realShipsFrom = apiData?.shippingData?.shipsFrom || apiData?.rawSourceMeta?.shipsFrom || null;
 
-  const delivery = shipsFromUS
-    ? { label: '3-7 business days', minDays: 3, maxDays: 7, earliest: null, latest: null, formattedRange: null }
-    : (apiData?.deliveryEstimate || { label: '15-25 business days', minDays: 15, maxDays: 25, earliest: null, latest: null, formattedRange: null });
+  // Detect US warehouse from real shipping data or from product options
+  const shipsFromUS = (realShipsFrom && /united\s*states|US/i.test(realShipsFrom)) ||
+    (apiData?.options || []).some(o =>
+      /ships?\s*from/i.test(o.name || '') &&
+      o.values?.some(v => /united\s*states|US\s*warehouse/i.test(v.value || ''))
+    );
+
+  let cost = 0;
+  let method = shipsFromUS ? 'US Warehouse' : 'AliExpress Standard';
+  let isFree = true;
+
+  if (hasRealShipping) {
+    // Use real shipping cost from adapter
+    const bestOption = apiData.shippingOptions[0]; // Already sorted by adapter (cheapest/free first)
+    // Find cheapest free, or cheapest overall
+    const freeOpts = apiData.shippingOptions.filter(o => o.fee === 0);
+    const best = freeOpts.length > 0
+      ? freeOpts.reduce((a, b) => parseInt(a.time || 999) < parseInt(b.time || 999) ? a : b)
+      : apiData.shippingOptions.reduce((a, b) => a.fee < b.fee ? a : b);
+
+    cost = best.fee || 0;
+    isFree = cost === 0;
+    method = best.company || method;
+  }
+
+  // Delivery estimate: prefer real data from adapter, fallback to static rules
+  let delivery;
+  if (apiData?.deliveryEstimate?.minDays && apiData?.deliveryEstimate?.formattedRange) {
+    delivery = apiData.deliveryEstimate;
+  } else if (shipsFromUS) {
+    delivery = { label: '3-7 business days', minDays: 3, maxDays: 7, earliest: null, latest: null, formattedRange: null };
+  } else {
+    delivery = { label: '15-25 business days', minDays: 15, maxDays: 25, earliest: null, latest: null, formattedRange: null };
+  }
 
   // Calculate formatted dates if not already present
   if (!delivery.formattedRange && delivery.minDays && delivery.maxDays) {
@@ -165,17 +195,22 @@ function _aliexpressShipping(sourcePrice, apiData) {
     delivery.formattedRange = `${fmt(min)} – ${fmt(max)}`;
   }
 
+  const sellerName = apiData?.sellerData?.name || null;
+
   return {
-    cost: 0,
-    label: 'FREE',
-    method: shipsFromUS ? 'US Warehouse' : 'AliExpress Standard',
-    isFree: true,
+    cost,
+    label: isFree ? 'FREE' : `$${cost.toFixed(2)}`,
+    method,
+    isFree,
     delivery,
-    shipsFrom: shipsFromUS ? 'United States' : (apiData?.rawSourceMeta?.originCountry || 'China'),
+    shipsFrom: realShipsFrom || (shipsFromUS ? 'United States' : (apiData?.rawSourceMeta?.originCountry || 'China')),
+    seller: sellerName,
+    shippingOptions: apiData?.shippingOptions || [],
     threshold: null,
     remaining: null,
     thresholdNote: null,
-    plusSaves: 0,
+    plusSaves: isFree ? 0 : cost,
+    plusNote: isFree ? null : 'FREE with StyleHub Plus',
     returnWindow: _getReturnWindow('aliexpress', false)
   };
 }

@@ -539,17 +539,74 @@ class AliExpressAdapter extends BaseAdapter {
       }));
     }
 
-    // Shipping
-    if (shippingData && Object.keys(shippingData).length) {
+    // Shipping — item_detail_2 returns delivery.shippingList[] with per-carrier data
+    const deliveryData = d.delivery || shippingData || {};
+    const shippingList = deliveryData.shippingList || [];
+
+    if (shippingList.length > 0) {
+      // Real carrier-level shipping data from item_detail_2
+      p.shippingOptions = shippingList.map(opt => ({
+        company: opt.shippingCompany || opt.company || 'Standard',
+        fee: parseFloat(opt.shippingFee || opt.freightAmount || 0) || 0,
+        feeLabel: parseFloat(opt.shippingFee || 0) === 0 ? 'FREE' : `$${parseFloat(opt.shippingFee).toFixed(2)}`,
+        time: opt.shippingTime || null,
+        estimateDelivery: opt.estimateDelivery || null,
+        estimateDeliveryDate: opt.estimateDeliveryDate || null,
+        tracking: opt.trackingAvailable || false,
+        from: opt.shippingFrom || deliveryData.shippingFrom || null,
+        fromCode: opt.shippingFromCode || deliveryData.shippingFromCode || null
+      }));
+
+      // Best option: cheapest free, or cheapest overall, with fastest delivery
+      const freeOpts = p.shippingOptions.filter(o => o.fee === 0);
+      const bestOpt = freeOpts.length > 0
+        ? freeOpts.reduce((a, b) => parseInt(a.time || 999) < parseInt(b.time || 999) ? a : b)
+        : p.shippingOptions.reduce((a, b) => a.fee < b.fee ? a : b);
+
+      p.shippingData.cost = bestOpt.fee;
+      p.shippingData.method = bestOpt.company;
+      p.shippingData.isFree = bestOpt.fee === 0;
+      p.shippingData.shipsFrom = bestOpt.from || deliveryData.shippingFrom || null;
+      p.shippingData.note = bestOpt.fee === 0 ? `FREE ${bestOpt.company}` : `Shipping: $${bestOpt.fee.toFixed(2)}`;
+
+      // Parse delivery time from best option
+      const timeStr = bestOpt.time; // e.g. "2-6" or "10-25"
+      if (timeStr && timeStr.includes('-')) {
+        const parts = timeStr.split('-');
+        p.deliveryEstimate.minDays = parseInt(parts[0]) || 7;
+        p.deliveryEstimate.maxDays = parseInt(parts[1]) || 21;
+      } else if (timeStr) {
+        p.deliveryEstimate.minDays = parseInt(timeStr) || 7;
+        p.deliveryEstimate.maxDays = p.deliveryEstimate.minDays + 5;
+      } else {
+        p.deliveryEstimate.minDays = 7;
+        p.deliveryEstimate.maxDays = 21;
+      }
+      p.deliveryEstimate.label = `${p.deliveryEstimate.minDays}-${p.deliveryEstimate.maxDays} business days`;
+
+      // Use estimateDeliveryDate if available
+      if (bestOpt.estimateDeliveryDate) {
+        p.deliveryEstimate.estimateDeliveryDate = bestOpt.estimateDeliveryDate;
+      }
+
+      logger.info('aliexpress', 'Extracted real shipping from shippingList', {
+        productId: p.sourceId,
+        optionsCount: p.shippingOptions.length,
+        bestCompany: bestOpt.company,
+        bestFee: bestOpt.fee,
+        shipsFrom: p.shippingData.shipsFrom
+      });
+    } else if (shippingData && Object.keys(shippingData).length) {
+      // Legacy shipping data (no shippingList but has basic fields)
       p.shippingData.cost = shippingData.freightAmount != null ? parseFloat(shippingData.freightAmount) :
                             shippingData.shippingFee != null ? parseFloat(shippingData.shippingFee) : null;
       p.shippingData.method = shippingData.deliveryProviderName || shippingData.company || 'Standard';
       p.shippingData.note = (p.shippingData.cost === 0 || shippingData.isFreeShipping || shippingData.freeShipping)
         ? 'FREE Shipping' : 'Shipping calculated at checkout';
+      p.shippingData.shipsFrom = deliveryData.shippingFrom || null;
       p.deliveryEstimate.minDays = shippingData.deliveryMinDay || shippingData.deliveryDayMin || 7;
       p.deliveryEstimate.maxDays = shippingData.deliveryMaxDay || shippingData.deliveryDayMax || 21;
       p.deliveryEstimate.label = `${p.deliveryEstimate.minDays}-${p.deliveryEstimate.maxDays} business days`;
-      // Also try explicit shipping cost field
       if (p.shippingData.cost == null && shippingData.shippingPrice != null) {
         p.shippingData.cost = parseFloat(shippingData.shippingPrice);
       }
@@ -574,8 +631,15 @@ class AliExpressAdapter extends BaseAdapter {
       p.returnPolicy.summary = 'Free returns within 15 days';
     }
 
-    // Seller
-    if (sellerData && (sellerData.name || sellerData.storeName)) {
+    // Seller — item_detail_2 has seller object with storeTitle, sellerId, storeId, storeUrl, storeImage
+    if (sellerData && (sellerData.storeTitle || sellerData.storeName || sellerData.name)) {
+      p.sellerData.name = sellerData.storeTitle || sellerData.storeName || sellerData.name || null;
+      p.sellerData.rating = sellerData.positiveRate ? parseFloat(sellerData.positiveRate) :
+                            sellerData.positiveNum ? parseFloat(sellerData.positiveNum) : null;
+      p.sellerData.id = sellerData.sellerId ? String(sellerData.sellerId) : null;
+      p.sellerData.storeId = sellerData.storeId ? String(sellerData.storeId) : null;
+      p.sellerData.storeUrl = sellerData.storeUrl ? (sellerData.storeUrl.startsWith('//') ? 'https:' + sellerData.storeUrl : sellerData.storeUrl) : null;
+    } else if (sellerData && (sellerData.name || sellerData.storeName)) {
       p.sellerData.name = sellerData.storeName || sellerData.name || null;
       p.sellerData.rating = sellerData.positiveRate ? parseFloat(sellerData.positiveRate) :
                             sellerData.positiveNum ? parseFloat(sellerData.positiveNum) : null;
@@ -600,7 +664,10 @@ class AliExpressAdapter extends BaseAdapter {
       descriptionUrl: d.descriptionModule?.descriptionUrl || null,
       categoryId: item.catId || d.categoryId || null,
       wishlistCount: d.wishListModule?.itemWishCount || d.wishCount || null,
-      originCountry: d.originModule?.originCountry || null,
+      originCountry: d.originModule?.originCountry || deliveryData.shippingFrom || null,
+      shipsFrom: deliveryData.shippingFrom || null,
+      shipsFromCode: deliveryData.shippingFromCode || null,
+      shippingOptionsCount: p.shippingOptions.length,
       hasVideo: !!(item.video || d.imageModule?.videoUrl || d.videoModule),
       videoUrl: item.video || d.imageModule?.videoUrl || d.videoModule?.videoUrl || null,
       skuCount: (skuData.base?.length || d.skuModule?.skuPriceList?.length || 0),

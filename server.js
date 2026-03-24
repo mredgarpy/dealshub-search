@@ -276,6 +276,10 @@ async function productDetailHandler(req, res) {
       isFree: shipResult.isFree || false,
       seller: shipResult.seller || null
     };
+    // Pass through shipping options for AliExpress (carrier-level data)
+    if (shipResult.shippingOptions?.length > 0) {
+      product.shippingOptions = shipResult.shippingOptions;
+    }
     product.deliveryEstimate = shipResult.delivery;
     product.returnPolicy = shipResult.returnWindow;
 
@@ -331,7 +335,7 @@ app.get('/api/shipping', async (req, res) => {
 
     const result = calculateShipping(srcLower, sourcePrice, productData || {}, isPlus);
 
-    res.json({
+    const response = {
       store: srcLower,
       productId,
       isPlus,
@@ -352,7 +356,12 @@ app.get('/api/shipping', async (req, res) => {
       plusSaves: result.plusSaves,
       plusNote: isPlus ? null : (result.plusSaves > 0 ? 'FREE with StyleHub Plus' : null),
       returnWindow: result.returnWindow
-    });
+    };
+    // Include carrier-level shipping options for AliExpress
+    if (result.shippingOptions?.length > 0) {
+      response.shippingOptions = result.shippingOptions;
+    }
+    res.json(response);
   } catch (e) {
     logger.error('shipping', 'Shipping calculation failed', { error: e.message, store, productId });
     res.status(500).json({ error: 'Failed to calculate shipping' });

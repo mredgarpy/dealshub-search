@@ -171,6 +171,7 @@ function emptyProduct() {
     availability: null, stockSignal: 'unknown',
     options: [], selectedVariant: null, variants: [],
     shippingData: { cost: null, method: null, note: 'Standard shipping', shipsFrom: null, isFBA: false, isFree: false, seller: null },
+    shippingOptions: [],
     bestOffer: null, allOffers: [],
     returnPolicy: { window: null, summary: '30-day returns' },
     deliveryEstimate: { minDays: null, maxDays: null, label: null },

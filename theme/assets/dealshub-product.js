@@ -92,6 +92,17 @@
     // Brand
     if(p.brand)html+='<div style="font-size:13px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">'+escHTML(p.brand)+'</div>';
 
+    // Origin badge (USA / International)
+    if(p.originBadge||p.originType){
+      var obType=(p.originType||'UNKNOWN').toUpperCase();
+      var obIsUSA=obType==='USA';
+      html+='<div style="display:inline-flex;align-items:center;gap:6px;background:'+(obIsUSA?'#ecfdf5':'#fffbeb')+';border:1px solid '+(obIsUSA?'#d1fae5':'#fef3c7')+';padding:5px 12px;border-radius:6px;font-size:13px;font-weight:600;color:'+(obIsUSA?'#059669':'#d97706')+';margin-bottom:10px">';
+      html+='<span style="font-size:15px">'+(p.originFlag||'🌍')+'</span>';
+      html+=escHTML(p.originBadge||obType)+' Origin';
+      if(p.originDelivery)html+=' <span style="font-weight:400;margin-left:4px">· '+escHTML(p.originDelivery)+'</span>';
+      html+='</div>';
+    }
+
     // Title
     html+='<h1 style="font-size:24px;font-weight:700;color:#1a1a1a;line-height:1.3;margin:0 0 12px">'+escHTML(p.title)+'</h1>';
 

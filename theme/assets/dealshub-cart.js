@@ -63,8 +63,8 @@
   }
 
   function storeLabel(src){
-    var map={amazon:'Amazon',aliexpress:'AliExpress',shein:'SHEIN',macys:"Macy's",sephora:'Sephora',_subscription:'Subscriptions',unknown:'StyleHub'};
-    return map[src]||src.charAt(0).toUpperCase()+src.slice(1);
+    var map={amazon:'🇺🇸 USA Fulfillment',aliexpress:'📦 Multi-Origin',shein:'StyleHub',macys:'StyleHub',sephora:'StyleHub',_subscription:'Subscriptions',unknown:'StyleHub'};
+    return map[src]||'StyleHub';
   }
 
   function fetchShippingForStores(items){
@@ -113,7 +113,7 @@
     var storeCount=storeKeys.length;
 
     var html='<div class="dh-cart-header">'+
-      '<h1>Shopping Cart <span class="dh-cart-header-count">('+totalItems+' item'+(totalItems!==1?'s':'')+' from '+storeCount+' store'+(storeCount!==1?'s':'')+')</span></h1>';
+      '<h1>Shopping Cart <span class="dh-cart-header-count">('+totalItems+' item'+(totalItems!==1?'s':'')+')</span></h1>';
     // ZIP location bar
     html+='<div class="dh-cart-location" id="dh-cart-location">';
     if(zip){

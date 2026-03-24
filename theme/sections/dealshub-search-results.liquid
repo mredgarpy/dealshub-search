@@ -28,14 +28,11 @@
   <div class="dh-toolbar page-width">
     <div class="dh-toolbar__left">
       <div class="dh-filter-group">
-        <label class="dh-filter-label">Store:</label>
-        <div class="dh-filter-chips" id="dh-source-filters">
-          <button class="dh-chip dh-chip--active" data-source="all">All</button>
-          <button class="dh-chip" data-source="amazon">Amazon</button>
-          <button class="dh-chip" data-source="aliexpress">AliExpress</button>
-          <button class="dh-chip" data-source="sephora">Sephora</button>
-          <button class="dh-chip" data-source="macys">Macy's</button>
-          <button class="dh-chip" data-source="shein">SHEIN</button>
+        <label class="dh-filter-label">Ships from:</label>
+        <div class="dh-filter-chips" id="dh-origin-filters">
+          <button class="dh-chip dh-chip--active" data-origin="all">All</button>
+          <button class="dh-chip" data-origin="usa">🇺🇸 USA</button>
+          <button class="dh-chip" data-origin="intl">🌍 International</button>
         </div>
       </div>
     </div>
@@ -115,7 +112,7 @@
   let filteredResults = [];
   let displayedCount = 0;
   let currentQuery = '';
-  let currentSource = 'all';
+  let currentOrigin = 'all';
   const PAGE_SIZE = 24;
   try{window.__dhIsPlus=localStorage.getItem('stylehub_plus')==='true'}catch(e){window.__dhIsPlus=false}
 
@@ -123,19 +120,19 @@
   function init() {
     const params = new URLSearchParams(window.location.search);
     const q = params.get('q') || params.get('query') || '';
-    const source = params.get('source') || 'all';
+    const origin = params.get('origin') || 'all';
 
     if (q) {
       input.value = q;
       currentQuery = q;
-      currentSource = source;
-      setActiveChip(source);
-      doSearch(q, source);
+      currentOrigin = origin;
+      setActiveChip(origin);
+      doSearch(q, origin);
     }
   }
 
-  // Search
-  async function doSearch(query, source) {
+  // Search — always queries all active stores, filters by origin client-side
+  async function doSearch(query, origin) {
     if (!query.trim()) return;
 
     showSkeleton();
@@ -144,12 +141,10 @@
     hideLoadMore();
 
     try {
-      const sources = source === 'all'
-        ? ['amazon', 'aliexpress', 'sephora', 'macys', 'shein']
-        : [source];
+      // Always search both active stores (backend already filters paused ones)
+      const sources = ['amazon', 'aliexpress'];
 
-      // Parallel search across sources
-      // StyleHub.search(q, store, limit) returns { results: [...] }
+      // Parallel search across active sources
       const promises = sources.map(s =>
         API.search(query, s, 20)
           .then(resp => (resp && resp.results) ? resp.results : (Array.isArray(resp) ? resp : []))
@@ -162,11 +157,13 @@
       // Update URL
       const url = new URL(window.location);
       url.searchParams.set('q', query);
-      if (source !== 'all') url.searchParams.set('source', source);
-      else url.searchParams.delete('source');
+      if (origin !== 'all') url.searchParams.set('origin', origin);
+      else url.searchParams.delete('origin');
+      url.searchParams.delete('source'); // clean up legacy param
       history.replaceState(null, '', url);
 
       applySort();
+      applyOriginFilter(origin);
       displayedCount = 0;
       showResults();
     } catch (err) {
@@ -175,6 +172,17 @@
     } finally {
       hideSkeleton();
     }
+  }
+
+  // Filter results by origin type (USA / INTL)
+  function applyOriginFilter(origin) {
+    if (!origin || origin === 'all') return;
+    const oFilter = origin.toLowerCase();
+    filteredResults = filteredResults.filter(p => {
+      if (oFilter === 'usa') return p.originType === 'USA';
+      if (oFilter === 'intl') return p.originType === 'INTL';
+      return true;
+    });
   }
 
   // Sort
@@ -258,7 +266,7 @@
               ${p.price ? `<span class="dh-card__price">${p.price}</span>` : ''}
               ${origHTML}
             </div>
-            <span class="dh-card__source">${esc(p.sourceName || p.source)}</span>
+            <span class="dh-card__origin dh-card__origin--${(p.originType || 'unknown').toLowerCase()}">${p.originFlag || '🌍'} ${esc(p.originBadge || 'Shop')} ${p.originDelivery ? '· ' + esc(p.originDelivery) : ''}</span>
             <span class="dh-card__plus-ship">${window.__dhIsPlus ? '⚡ FREE shipping' : '🚚 FREE ship with Plus'}</span>
           </div>
         </a>
@@ -317,24 +325,25 @@
     } catch (ex) {}
   }
 
-  // Source filter chips
-  $$('#dh-source-filters .dh-chip').forEach(chip => {
+  // Origin filter chips
+  $$('#dh-origin-filters .dh-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      currentSource = chip.dataset.source;
-      setActiveChip(currentSource);
-      if (currentQuery) doSearch(currentQuery, currentSource);
+      currentOrigin = chip.dataset.origin;
+      setActiveChip(currentOrigin);
+      if (currentQuery) doSearch(currentQuery, currentOrigin);
     });
   });
 
-  function setActiveChip(source) {
-    $$('#dh-source-filters .dh-chip').forEach(c => {
-      c.classList.toggle('dh-chip--active', c.dataset.source === source);
+  function setActiveChip(origin) {
+    $$('#dh-origin-filters .dh-chip').forEach(c => {
+      c.classList.toggle('dh-chip--active', c.dataset.origin === origin);
     });
   }
 
   // Sort change
   sortSelect.addEventListener('change', () => {
     applySort();
+    applyOriginFilter(currentOrigin);
     displayedCount = 0;
     showResults();
   });
@@ -343,7 +352,7 @@
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     currentQuery = input.value.trim();
-    if (currentQuery) doSearch(currentQuery, currentSource);
+    if (currentQuery) doSearch(currentQuery, currentOrigin);
   });
 
   // Load more
@@ -673,11 +682,21 @@
     color: #999;
     text-decoration: line-through;
   }
-  .dh-card__source {
+  .dh-card__origin {
     font-size: 11px;
-    color: #aaa;
     display: block;
     margin-top: 2px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .dh-card__origin--usa {
+    color: #16a34a;
+  }
+  .dh-card__origin--intl {
+    color: #d97706;
+  }
+  .dh-card__origin--unknown {
+    color: #aaa;
   }
   .dh-card__plus-ship {
     display: block;
@@ -736,7 +755,7 @@
       "type": "text",
       "id": "placeholder",
       "label": "Search Placeholder",
-      "default": "Search all stores..."
+      "default": "Search for anything..."
     }
   ],
   "presets": [

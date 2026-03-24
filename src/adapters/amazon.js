@@ -489,6 +489,90 @@ class AmazonAdapter extends BaseAdapter {
 
     p.sourceUrl = d.product_url || `https://www.amazon.com/dp/${p.sourceId}`;
     p.normalizedHandle = this._makeHandle(p.title);
+    // Sprint 3: Rich PDP fields
+    // A+ Content images (manufacturer description images)
+    p.aplusImages = Array.isArray(d.aplus_images) ? d.aplus_images.filter(Boolean) : [];
+    if (!p.aplusImages.length && Array.isArray(d.aplus_content)) {
+      p.aplusImages = d.aplus_content.filter(Boolean);
+    }
+
+    // Product specifications as structured data (keep separate from description)
+    p.specifications = [];
+    if (d.product_information && typeof d.product_information === 'object') {
+      p.specifications = Object.entries(d.product_information)
+        .filter(([k, v]) => v && typeof v === 'string' && v.trim().length > 0)
+        .map(([k, v]) => ({ name: k.trim(), value: v.trim() }));
+    }
+
+    // Quick specs (product_details) as structured data
+    p.quickSpecs = [];
+    if (d.product_details && typeof d.product_details === 'object') {
+      p.quickSpecs = Object.entries(d.product_details)
+        .filter(([k, v]) => v && typeof v === 'string' && v.trim().length > 0)
+        .map(([k, v]) => ({ name: k.trim(), value: v.trim() }));
+    }
+
+    // Rating distribution (bar chart data)
+    p.ratingDistribution = null;
+    if (d.rating_distribution && typeof d.rating_distribution === 'object') {
+      p.ratingDistribution = {};
+      for (let i = 1; i <= 5; i++) {
+        const val = d.rating_distribution[String(i)] || d.rating_distribution[i] || 0;
+        p.ratingDistribution[i] = typeof val === 'string' ? parseInt(val) : val;
+      }
+    }
+
+    // Top reviews
+    p.topReviews = [];
+    const reviewSource = d.top_reviews || d.top_reviews_global || [];
+    if (Array.isArray(reviewSource)) {
+      p.topReviews = reviewSource.slice(0, 8).map(r => ({
+        title: r.review_title || '',
+        comment: r.review_comment || '',
+        rating: r.review_star_rating ? parseFloat(r.review_star_rating) : 0,
+        date: r.review_date || '',
+        author: r.review_author || '',
+        avatar: r.review_author_avatar || null,
+        images: Array.isArray(r.review_images) ? r.review_images : [],
+        isVerified: r.is_verified_purchase || false,
+        helpfulVotes: r.helpful_vote_statement || '',
+        variant: r.reviewed_product_variant || null
+      })).filter(r => r.comment || r.title);
+    }
+
+    // Frequently bought together
+    p.frequentlyBoughtTogether = [];
+    if (Array.isArray(d.frequently_bought_together)) {
+      p.frequentlyBoughtTogether = d.frequently_bought_together.slice(0, 6).map(item => ({
+        id: item.asin || '',
+        title: item.product_title || item.title || '',
+        price: parsePrice(item.product_price || item.price),
+        image: item.product_photo || item.image || '',
+        url: item.product_url || ''
+      })).filter(item => item.id && item.title);
+    }
+
+    // Sales volume ("200+ bought in past month")
+    p.salesVolume = d.sales_volume || null;
+
+    // Product condition
+    p.productCondition = d.product_condition || null;
+
+    // Videos
+    p.videos = [];
+    if (Array.isArray(d.product_videos)) {
+      p.videos = d.product_videos.filter(Boolean);
+    }
+    p.hasVideo = d.has_video || p.videos.length > 0;
+
+    // Product slug for SEO
+    p.productSlug = d.product_slug || null;
+
+    // UPC/EAN for schema.org
+    p.upc = null;
+    if (d.product_information && d.product_information['UPC']) p.upc = d.product_information['UPC'];
+    if (!p.upc && d.product_details && d.product_details['UPC']) p.upc = d.product_details['UPC'];
+
     p.rawSourceMeta = {
       asin: d.asin,
       isPrime: d.is_prime || false,
@@ -506,7 +590,11 @@ class AmazonAdapter extends BaseAdapter {
       delivery: d.delivery || null,
       deliveryInfo: d.delivery_info || null,
       primaryDeliveryTime: d.primary_delivery_time || null,
-      shippingCharge: d.shipping_charge || d.shipping_cost || null
+      shippingCharge: d.shipping_charge || d.shipping_cost || null,
+      parentAsin: d.parent_asin || null,
+      offersCount: d.product_num_offers || null,
+      hasAplus: d.has_aplus || p.aplusImages.length > 0,
+      hasBrandStory: d.has_brandstory || false
     };
     return p;
   }

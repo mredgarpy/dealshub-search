@@ -650,6 +650,91 @@ class AliExpressAdapter extends BaseAdapter {
                   `https://www.aliexpress.com/item/${p.sourceId}.html`;
     p.normalizedHandle = this._makeHandle(p.title);
 
+    // Sprint 3: Rich PDP fields for AliExpress
+    // A+ Content / Description images (from descriptionModule or item_description endpoint)
+    p.aplusImages = [];
+    if (d.descriptionModule?.descriptionUrl) {
+      // Store the URL for lazy loading description content
+      p.descriptionUrl = d.descriptionModule.descriptionUrl;
+    }
+    if (d.descriptionImages && Array.isArray(d.descriptionImages)) {
+      p.aplusImages = d.descriptionImages.filter(Boolean);
+    }
+
+    // Specifications as structured data
+    p.specifications = [];
+    const props = d.productPropModule?.props || d.properties || item.properties || [];
+    if (Array.isArray(props)) {
+      p.specifications = props
+        .filter(prop => prop && (prop.attrName || prop.name) && (prop.attrValue || prop.value))
+        .map(prop => ({
+          name: (prop.attrName || prop.name || '').trim(),
+          value: (prop.attrValue || prop.value || '').trim()
+        }));
+    }
+    p.quickSpecs = p.specifications.slice(0, 10);
+
+    // Rating distribution (AliExpress may not always provide this)
+    p.ratingDistribution = null;
+    if (d.feedbackModule?.ratingDistribution || d.ratingDistribution) {
+      const rd = d.feedbackModule?.ratingDistribution || d.ratingDistribution;
+      p.ratingDistribution = {};
+      for (let i = 1; i <= 5; i++) {
+        p.ratingDistribution[i] = rd[i] || rd[String(i)] || 0;
+      }
+    }
+
+    // Top reviews (from item_review if available)
+    p.topReviews = [];
+    const reviews = d.reviews || d.feedbackModule?.reviews || [];
+    if (Array.isArray(reviews)) {
+      p.topReviews = reviews.slice(0, 8).map(r => ({
+        title: '',
+        comment: r.reviewContent || r.content || r.buyerFeedback || '',
+        rating: r.reviewStar || r.buyerEval || 0,
+        date: r.reviewDate || r.evalDate || '',
+        author: r.buyerName || r.anonymous ? 'Buyer' : '',
+        avatar: r.buyerHeadPortrait || null,
+        images: Array.isArray(r.reviewImages || r.images) ? (r.reviewImages || r.images) : [],
+        isVerified: true,
+        helpfulVotes: '',
+        variant: r.skuInfo || null,
+        country: r.buyerCountry || null
+      })).filter(r => r.comment);
+    }
+
+    // Frequently bought together (AliExpress typically doesn't provide this directly)
+    p.frequentlyBoughtTogether = [];
+
+    // Sales volume
+    p.salesVolume = salesNum > 0 ? `${salesNum}+ sold` : null;
+
+    // Product condition (AliExpress items are generally new)
+    p.productCondition = 'New';
+
+    // Videos
+    p.videos = [];
+    const videoUrl = item.video || d.imageModule?.videoUrl || d.videoModule?.videoUrl || null;
+    if (videoUrl) {
+      p.videos.push(videoUrl.startsWith('//') ? 'https:' + videoUrl : videoUrl);
+    }
+    p.hasVideo = p.videos.length > 0;
+
+    // Buyer protection details
+    if (d.buyerProtectionModule) {
+      const bpm = d.buyerProtectionModule;
+      if (bpm.returnDays) {
+        p.returnPolicy.window = parseInt(bpm.returnDays) || 15;
+        p.returnPolicy.summary = `Returns accepted within ${p.returnPolicy.window} days`;
+      }
+      if (bpm.freightCommitment) {
+        p.returnPolicy.summary = `Free returns within ${p.returnPolicy.window} days`;
+      }
+    }
+
+    p.upc = null;
+    p.productSlug = null;
+
     // Raw source meta
     p.rawSourceMeta = {
       itemId: p.sourceId,

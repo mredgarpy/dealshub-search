@@ -1,19 +1,51 @@
 // ============================================================
 // StyleHub Plus — Subscription Webhooks (Seal Subscriptions)
 // ============================================================
-// Handles: subscription-created, subscription-cancelled, subscription-failed
+// Handles: subscription-created, subscription-cancelled,
+//          subscription-failed, subscription-renewed
 // Updates Shopify customer tags + metafields for Plus status
+// Seal webhook topics registered via Merchant API:
+//   - subscription/created  → /webhooks/subscription-created
+//   - subscription/cancelled → /webhooks/subscription-cancelled
+//   - billing_attempt/failed → /webhooks/subscription-failed
+//   - billing_attempt/succeeded → /webhooks/subscription-renewed
 // ============================================================
 
+const crypto = require('crypto');
 const { shopifyAdmin } = require('./shopify-admin');
 const { db, save } = require('./data');
 const logger = require('./utils/logger');
+
+// Seal API credentials
+const SEAL_API_TOKEN = process.env.SEAL_API_TOKEN || '';
+const SEAL_API_SECRET = process.env.SEAL_API_SECRET || '';
+
+/**
+ * Verify Seal webhook HMAC signature
+ * Seal sends X-Seal-Hmac-Sha256 header for webhook verification
+ */
+function verifySealHmac(req) {
+  const hmac = req.headers['x-seal-hmac-sha256'];
+  if (!hmac || !SEAL_API_SECRET || !req.rawBody) return true; // Skip if not configured
+  try {
+    const hash = crypto.createHmac('sha256', SEAL_API_SECRET)
+      .update(req.rawBody, 'utf8').digest('base64');
+    return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash));
+  } catch (e) {
+    logger.warn('plus', `Seal HMAC verification error: ${e.message}`);
+    return false;
+  }
+}
 
 function setupSubscriptionWebhooks(app) {
 
   // ── SUBSCRIPTION CREATED (customer subscribes to Plus) ──
   app.post('/webhooks/subscription-created', async (req, res) => {
     try {
+      if (!verifySealHmac(req)) {
+        logger.warn('plus', 'Seal HMAC verification failed for subscription-created');
+      }
+
       const data = req.body;
       const customerId = data.customer?.id || data.customer_id;
       const email = data.customer?.email || data.email;
@@ -86,6 +118,10 @@ function setupSubscriptionWebhooks(app) {
   // ── SUBSCRIPTION CANCELLED ──
   app.post('/webhooks/subscription-cancelled', async (req, res) => {
     try {
+      if (!verifySealHmac(req)) {
+        logger.warn('plus', 'Seal HMAC verification failed for subscription-cancelled');
+      }
+
       const data = req.body;
       const customerId = data.customer?.id || data.customer_id;
       const email = data.customer?.email || data.email;
@@ -142,6 +178,10 @@ function setupSubscriptionWebhooks(app) {
   // ── PAYMENT FAILED ──
   app.post('/webhooks/subscription-failed', async (req, res) => {
     try {
+      if (!verifySealHmac(req)) {
+        logger.warn('plus', 'Seal HMAC verification failed for subscription-failed');
+      }
+
       const data = req.body;
       const customerId = data.customer?.id || data.customer_id;
       const email = data.customer?.email || data.email;
@@ -162,6 +202,47 @@ function setupSubscriptionWebhooks(app) {
       res.status(200).json({ ok: true });
     } catch (err) {
       logger.error('plus', `Error processing subscription-failed: ${err.message}`);
+      res.status(200).json({ ok: false });
+    }
+  });
+
+  // ── SUBSCRIPTION RENEWED (billing succeeded) ──
+  app.post('/webhooks/subscription-renewed', async (req, res) => {
+    try {
+      if (!verifySealHmac(req)) {
+        logger.warn('plus', 'Seal HMAC verification failed for subscription-renewed');
+      }
+
+      const data = req.body;
+      const customerId = data.customer?.id || data.customer_id;
+      const email = data.customer?.email || data.email;
+
+      logger.info('plus', `Subscription renewed for customer ${customerId} (${email})`);
+
+      // Update local DB — ensure status is active after successful renewal
+      if (!db.plusMembers) db.plusMembers = {};
+      const key = customerId || email;
+      if (db.plusMembers[key]) {
+        db.plusMembers[key].status = 'active';
+        db.plusMembers[key].lastRenewedAt = new Date().toISOString();
+      }
+      save('plusMembers');
+
+      // Log activity
+      if (!db.activity) db.activity = [];
+      db.activity.unshift({
+        type: 'plus_renewed',
+        customerId,
+        email,
+        message: `🔄 Plus renewed for ${email || customerId}`,
+        at: new Date().toISOString()
+      });
+      if (db.activity.length > 500) db.activity = db.activity.slice(0, 500);
+      save('activity');
+
+      res.status(200).json({ ok: true });
+    } catch (err) {
+      logger.error('plus', `Error processing subscription-renewed: ${err.message}`);
       res.status(200).json({ ok: false });
     }
   });

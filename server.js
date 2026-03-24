@@ -1255,6 +1255,82 @@ app.get('/api/admin/stats', (req, res) => {
 });
 
 // ---- ADMIN: Push Theme Asset (server-side Shopify API call) ----
+// ---- THEME MANAGEMENT (list + duplicate) ----
+app.get('/api/admin/themes', async (req, res) => {
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+  if (!shopifyDomain || !shopifyToken) return res.status(503).json({ error: 'Shopify not configured' });
+  try {
+    const fetch = require('node-fetch');
+    const response = await fetch(`https://${shopifyDomain}/admin/api/2024-01/themes.json`, {
+      headers: { 'X-Shopify-Access-Token': shopifyToken }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/theme-duplicate', express.json(), async (req, res) => {
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+  const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+  const sourceThemeId = req.body.source_theme_id || process.env.SHOPIFY_THEME_ID || '157178462339';
+  const newName = req.body.name || 'BACKUP v2.0 - PRE REBRAND - NO TOCAR';
+  if (!shopifyDomain || !shopifyToken) return res.status(503).json({ error: 'Shopify not configured' });
+
+  try {
+    const fetch = require('node-fetch');
+    // Step 1: Get all assets from source theme
+    const assetsUrl = `https://${shopifyDomain}/admin/api/2024-01/themes/${sourceThemeId}/assets.json`;
+    const assetsResp = await fetch(assetsUrl, { headers: { 'X-Shopify-Access-Token': shopifyToken } });
+    const assetsData = await assetsResp.json();
+    if (!assetsResp.ok) return res.status(assetsResp.status).json({ error: 'Failed to list source assets', detail: assetsData });
+
+    // Step 2: Create new empty theme
+    const createUrl = `https://${shopifyDomain}/admin/api/2024-01/themes.json`;
+    const createResp = await fetch(createUrl, {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: { name: newName, role: 'unpublished' } })
+    });
+    const createData = await createResp.json();
+    if (!createResp.ok) return res.status(createResp.status).json({ error: 'Failed to create theme', detail: createData });
+
+    const newThemeId = createData.theme.id;
+
+    // Step 3: Copy each asset from source to new theme
+    let copied = 0, failed = 0;
+    const assetKeys = assetsData.assets.map(a => a.key);
+    for (const key of assetKeys) {
+      try {
+        // Get asset content
+        const getUrl = `https://${shopifyDomain}/admin/api/2024-01/themes/${sourceThemeId}/assets.json?asset[key]=${encodeURIComponent(key)}`;
+        const getResp = await fetch(getUrl, { headers: { 'X-Shopify-Access-Token': shopifyToken } });
+        if (!getResp.ok) { failed++; continue; }
+        const assetData = await getResp.json();
+        const asset = assetData.asset;
+        // Put asset to new theme
+        const putUrl = `https://${shopifyDomain}/admin/api/2024-01/themes/${newThemeId}/assets.json`;
+        const putBody = asset.value != null
+          ? { asset: { key: asset.key, value: asset.value } }
+          : asset.attachment != null
+            ? { asset: { key: asset.key, attachment: asset.attachment } }
+            : null;
+        if (!putBody) { failed++; continue; }
+        const putResp = await fetch(putUrl, {
+          method: 'PUT',
+          headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify(putBody)
+        });
+        if (putResp.ok) copied++; else failed++;
+        // Rate limit: small delay
+        await new Promise(r => setTimeout(r, 250));
+      } catch (e) { failed++; }
+    }
+
+    res.json({ success: true, newThemeId, name: newName, totalAssets: assetKeys.length, copied, failed });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.put('/api/admin/theme-asset', async (req, res) => {
   const { key, value } = req.body;
   if (!key || !value) return res.status(400).json({ error: 'Missing key or value' });

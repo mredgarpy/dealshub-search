@@ -523,6 +523,59 @@ app.get('/api/bestsellers', async (req, res) => {
   }
 });
 
+// ---- AMAZON BEST SELLERS (real /best-sellers endpoint) ----
+// Types: BEST_SELLERS, NEW_RELEASES, MOST_WISHED_FOR, GIFT_IDEAS
+// Categories: aps, electronics, beauty, fashion, garden, sporting, videogames, baby-products
+app.get('/api/amazon-bestsellers', async (req, res) => {
+  const type = req.query.type || 'BEST_SELLERS';
+  const category = req.query.category || 'aps';
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+  const cacheKey = `amazon-bs:${type}:${category}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const amazon = getAdapter('amazon');
+    if (!amazon) throw new Error('Amazon adapter not available');
+    const results = await amazon.getBestSellers(type, category, limit);
+    const enriched = applySearchPricing(results);
+    const response = { results: enriched, section: type.toLowerCase().replace(/_/g, '-'), category };
+    searchCache.set(cacheKey, response, type === 'BEST_SELLERS' ? 21600000 : 43200000); // 6h or 12h
+    res.json(response);
+  } catch (e) {
+    logger.error('api', `amazon-bestsellers error: ${e.message}`);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- BEST VALUE INTERNATIONAL (AliExpress popular cheap items) ----
+app.get('/api/best-value-intl', async (req, res) => {
+  const maxPrice = parseFloat(req.query.maxPrice) || 15;
+  const limit = Math.min(parseInt(req.query.limit) || 20, 30);
+  const cacheKey = `best-value-intl:${maxPrice}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const aliexpress = getAdapter('aliexpress');
+    if (!aliexpress) throw new Error('AliExpress adapter not available');
+    const results = await aliexpress.search('trending popular', 30);
+    const filtered = results
+      .filter(p => {
+        const price = parseFloat(String(p.price || '0').replace(/[^0-9.]/g, ''));
+        return price > 0 && price <= maxPrice;
+      })
+      .slice(0, limit);
+    const enriched = applySearchPricing(filtered);
+    const response = { results: enriched, section: 'best-value-intl' };
+    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    res.json(response);
+  } catch (e) {
+    logger.error('api', `best-value-intl error: ${e.message}`);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ---- NEW ARRIVALS ----
 app.get('/api/new-arrivals', async (req, res) => {
   const cacheKey = 'new-arrivals';

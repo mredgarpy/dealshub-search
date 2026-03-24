@@ -1,0 +1,20 @@
+{% comment %}StyleHub Home v3.0 — Sprint 4: 13 sections{% endcomment %}
+<div id="dealshub-home" style="max-width:1280px;margin:0 auto;padding:20px 0">
+  <div id="dh-home-skeleton" style="padding:0 20px">
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:32px" class="dh-hero-grid"><div style="aspect-ratio:2.2;background:#f0f0f0;border-radius:12px;animation:dhpulse 1.5s infinite"></div><div style="display:flex;flex-direction:column;gap:12px"><div style="flex:1;background:#f0f0f0;border-radius:12px;animation:dhpulse 1.5s infinite"></div><div style="flex:1;background:#f0f0f0;border-radius:12px;animation:dhpulse 1.5s infinite"></div></div></div>
+    {% for i in (1..3) %}<div style="margin-bottom:32px"><div style="height:20px;width:140px;background:#f0f0f0;border-radius:6px;margin-bottom:16px;animation:dhpulse 1.5s infinite"></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px" class="dh-grid">{% for j in (1..5) %}<div style="background:#f0f0f0;border-radius:12px;aspect-ratio:0.75;animation:dhpulse 1.5s infinite"></div>{% endfor %}</div></div>{% endfor %}
+  </div>
+</div>
+{% comment %}New Sprint 4 sections — injected after the main home container{% endcomment %}
+<div style="max-width:1280px;margin:0 auto;padding:0 20px">
+  <div id="dh-extra-categories"></div>
+  <div id="dh-extra-best-value"></div>
+  <div id="dh-extra-most-wished"></div>
+  <div id="dh-extra-gift-ideas"></div>
+  <div id="dh-extra-plus-banner"></div>
+</div>
+<style>@keyframes dhpulse{0%,100%{opacity:1}50%{opacity:.5}}@media(max-width:768px){#dh-home-skeleton .dh-grid{grid-template-columns:repeat(2,1fr)!important}#dh-home-skeleton .dh-hero-grid{grid-template-columns:1fr!important}}</style>
+<script>(function(){var o=new MutationObserver(function(m){m.forEach(function(x){if(x.addedNodes.length>0){var s=document.getElementById("dh-home-skeleton");if(s)s.remove();o.disconnect()}})});var r=document.getElementById("dealshub-home");if(r)o.observe(r,{childList:true})})();</script>
+<script src="{{ 'dealshub-home.js' | asset_url }}" defer></script>
+<script src="{{ 'dealshub-home-extra.js' | asset_url }}" defer></script>
+{% schema %}{"name":"StyleHub Home","tag":"section","settings":[],"presets":[{"name":"StyleHub Home"}]}{% endschema %}

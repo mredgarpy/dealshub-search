@@ -23,6 +23,45 @@ class AmazonAdapter extends BaseAdapter {
     return data.data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);
   }
 
+  // ---- Best Sellers (Amazon /best-sellers endpoint) ----
+  // Types: BEST_SELLERS, NEW_RELEASES, MOST_WISHED_FOR, GIFT_IDEAS
+  // Categories: aps, electronics, beauty, fashion, garden, sporting, videogames, baby-products, etc.
+  async getBestSellers(type = 'BEST_SELLERS', category = 'aps', limit = 20) {
+    try {
+      const url = `https://${API_HOST}/best-sellers?type=${encodeURIComponent(type)}&category=${encodeURIComponent(category)}&page=1&country=US`;
+      const data = await this.fetchWithRetry(url, { headers: this.rapidHeaders(API_HOST) }, 1, 5000);
+      if (!data || !data.data?.best_sellers) {
+        logger.warn('amazon', `getBestSellers returned no data for type=${type}, category=${category}`);
+        return [];
+      }
+      return data.data.best_sellers.slice(0, limit).map(p => this.normalizeBestSeller(p, type)).filter(Boolean);
+    } catch (e) {
+      logger.error('amazon', `getBestSellers error: ${e.message}`);
+      return [];
+    }
+  }
+
+  normalizeBestSeller(p, type) {
+    if (!p || !p.asin) return null;
+    return {
+      id: p.asin,
+      title: p.product_title || '',
+      price: parsePrice(p.product_price),
+      originalPrice: parsePrice(p.product_original_price),
+      image: p.product_photo || '',
+      url: p.product_url || '',
+      rating: p.product_star_rating ? parseFloat(p.product_star_rating) : null,
+      reviews: p.product_num_ratings || 0,
+      badge: type === 'BEST_SELLERS' ? 'Best Seller' : (type === 'MOST_WISHED_FOR' ? 'Most Wished' : (type === 'GIFT_IDEAS' ? 'Gift Idea' : 'New')),
+      source: 'amazon',
+      sourceName: 'Amazon',
+      rank: p.rank || null,
+      salesVolume: p.sales_volume || null,
+      isPrime: p.is_prime || false,
+      bestSellerType: type
+    };
+  }
+
   // ---- Product Offers: real shipping/seller data from /product-offers ----
   async getProductOffers(asin) {
     const cached = offersCache.get(asin);

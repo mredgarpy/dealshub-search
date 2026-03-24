@@ -504,9 +504,13 @@
 
       const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
 
+      const [plusStats, setPlusStats] = useState(null);
       useEffect(() => {
         if (!authed) return;
-        const load = () => api('/api/crm/dashboard').then(d => { if (!d.error) setDash(d); });
+        const load = () => {
+          api('/api/crm/dashboard').then(d => { if (!d.error) setDash(d); });
+          api('/api/crm/plus-stats').then(d => { if (!d.error) setPlusStats(d); });
+        };
         load();
         const interval = setInterval(load, 30000);
         return () => clearInterval(interval);
@@ -540,6 +544,7 @@
               <MetricCard icon="📦" label="Orders" value={o.totalOrders || 0} sub={`${o.todayOrders || 0} today`} />
               <MetricCard icon="⏳" label="Pending" value={c.pending || 0} sub="need action" color={c.pending ? 'text-amber-400' : 'text-gray-100'} />
               <MetricCard icon="⚠️" label="Manual" value={c.manual || 0} sub={c.manual ? 'ALERT' : 'none'} color={c.manual ? 'text-red-400' : 'text-gray-100'} />
+              <MetricCard icon="⚡" label="Plus" value={plusStats?.totalActive || 0} sub={`$${(plusStats?.monthlyRevenue || 0).toFixed(2)}/mo`} color="text-purple-400" />
             </div>
 
             {/* Tabs */}

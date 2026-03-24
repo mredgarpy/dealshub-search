@@ -366,6 +366,45 @@ function setupCRMApi(app) {
       res.status(400).json({ error: e.message });
     }
   });
+  // ═══════════════════════════════════════════
+  // PLUS MEMBERS STATS
+  // ═══════════════════════════════════════════
+  app.get('/api/crm/plus-stats', auth, async (req, res) => {
+    try {
+      const plusMembers = db.plusMembers || {};
+      const active = Object.values(plusMembers).filter(m => m.status === 'active');
+      const cancelled = Object.values(plusMembers).filter(m => m.status === 'cancelled');
+
+      // Calculate monthly revenue
+      const monthlyRevenue = active.length * 7.99;
+
+      // Calculate churn
+      const total = Object.values(plusMembers).length;
+      const churnRate = total > 0 ? Math.round((cancelled.length / total) * 100) : 0;
+
+      // Recent activity
+      const plusActivity = (db.activity || [])
+        .filter(a => a.type && a.type.startsWith('plus_'))
+        .slice(0, 50);
+
+      res.json({
+        totalActive: active.length,
+        totalCancelled: cancelled.length,
+        monthlyRevenue: Math.round(monthlyRevenue * 100) / 100,
+        annualProjected: Math.round(monthlyRevenue * 12 * 100) / 100,
+        churnRate,
+        members: active.map(m => ({
+          customerId: m.customerId,
+          email: m.email,
+          since: m.subscribedAt,
+          plan: m.plan
+        })),
+        recentActivity: plusActivity
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
 
 module.exports = { setupCRMApi };

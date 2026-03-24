@@ -69,6 +69,7 @@ const { invalidatePricingCache } = require('./src/utils/pricing');
 const adminRouter = require('./src/routes/admin');
 const { setupWebhooks } = require('./src/webhooks');
 const { setupCRMApi } = require('./src/crm-api');
+const { setupSubscriptionWebhooks } = require('./src/subscription-webhooks');
 const newsletterRouter = require('./src/routes/newsletter');
 const productImagesRouter = require('./src/routes/product-images');
 
@@ -114,6 +115,7 @@ app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')));
 // ---- CRM MODULES ----
 setupWebhooks(app);
 setupCRMApi(app);
+setupSubscriptionWebhooks(app);
 
 // ---- HEALTH ----
 app.get('/health', (req, res) => {

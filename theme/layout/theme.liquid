@@ -48,6 +48,26 @@
     @media(max-width:480px){.dh-grid{grid-template-columns:repeat(2,1fr);gap:8px}.dh-api-card h3{font-size:11px!important}}
   </style>
   {{ 'stylehub-api.js' | asset_url | script_tag }}
+
+  {%- comment -%} StyleHub Plus — Server-side detection via customer tags {%- endcomment -%}
+  {%- assign is_plus = false -%}
+  {%- if customer -%}
+    {%- for tag in customer.tags -%}
+      {%- if tag == 'plus' -%}
+        {%- assign is_plus = true -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+  <script>
+    window.STYLEHUB_PLUS = {{ is_plus | json }};
+    window.STYLEHUB_CUSTOMER = {{ customer.id | default: 'null' }};
+    window.STYLEHUB_CUSTOMER_EMAIL = {{ customer.email | default: 'null' | json }};
+    {% if is_plus %}
+      try { localStorage.setItem('stylehub_plus', 'true'); } catch(e) {}
+    {% elsif customer %}
+      try { localStorage.removeItem('stylehub_plus'); } catch(e) {}
+    {% endif %}
+  </script>
 </head>
 <body>
   {% section 'header' %}

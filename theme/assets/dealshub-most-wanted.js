@@ -5,7 +5,6 @@
   'use strict';
   var API = 'https://dealshub-search.onrender.com';
   var categories = [
-    {id: 'aps', name: 'All', icon: '\u2b50'},
     {id: 'electronics', name: 'Electronics', icon: '\ud83c\udfa7'},
     {id: 'fashion', name: 'Fashion', icon: '\ud83d\udc57'},
     {id: 'beauty', name: 'Beauty', icon: '\ud83d\udc84'},
@@ -14,7 +13,7 @@
     {id: 'videogames', name: 'Gaming', icon: '\ud83c\udfae'},
     {id: 'baby-products', name: 'Baby', icon: '\ud83d\udc76'}
   ];
-  var activeCategory = 'aps';
+  var activeCategory = 'electronics';
   var cache = {};
 
   function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}

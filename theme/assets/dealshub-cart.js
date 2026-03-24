@@ -42,6 +42,8 @@
 
   function getSource(item){
     var props=item.properties||{};
+    // Subscription / digital products (no shipping) get their own group
+    if(!item.requires_shipping&&item.product_type==='subscription') return '_subscription';
     return props._source||props._source_store||'unknown';
   }
 
@@ -61,13 +63,20 @@
   }
 
   function storeLabel(src){
-    var map={amazon:'Amazon',aliexpress:'AliExpress',shein:'SHEIN',macys:"Macy's",sephora:'Sephora'};
+    var map={amazon:'Amazon',aliexpress:'AliExpress',shein:'SHEIN',macys:"Macy's",sephora:'Sephora',_subscription:'Subscriptions',unknown:'StyleHub'};
     return map[src]||src.charAt(0).toUpperCase()+src.slice(1);
   }
 
   function fetchShippingForStores(items){
     var groups=groupByStore(items);
     var stores=Object.keys(groups);
+    // Skip shipping fetch for subscription/digital groups
+    stores.forEach(function(src){
+      if(src==='_subscription'){
+        shippingByStore[src]={shipping:{cost:0,isFree:true,isDigital:true,label:'No shipping required'},delivery:{label:'Digital product'}};
+      }
+    });
+    stores=stores.filter(function(src){return src!=='_subscription'});
     var promises=stores.map(function(src){
       // Calculate total source price per store for threshold logic
       var storeTotal=groups[src].reduce(function(sum,item){
@@ -121,7 +130,9 @@
     storeKeys.forEach(function(src){
       var items=groups[src];
       html+='<div class="dh-cart-store-group" data-store="'+escHTML(src)+'">';
-      html+='<div class="dh-cart-store-header"><span class="dh-cart-store-name">'+storeLabel(src)+'</span> <span class="dh-cart-store-count">('+items.length+' item'+(items.length!==1?'s':'')+')</span></div>';
+      var storeName=storeLabel(src);
+      var storeIcon=src==='_subscription'?'⚡ ':'';
+      html+='<div class="dh-cart-store-header"><span class="dh-cart-store-name">'+storeIcon+storeName+'</span> <span class="dh-cart-store-count">('+items.length+' item'+(items.length!==1?'s':'')+')</span></div>';
       // Items
       items.forEach(function(item){
         html+=renderCartItem(item,src);
@@ -211,8 +222,12 @@
         html+='<strong style="color:#38a169">FREE Shipping</strong>';
         if(method)html+=' · '+escHTML(method);
       } else {
+        if(ship.isDigital){
+        html+='<strong style="color:#6b46c1">No shipping required</strong> · <span style="color:#718096">Digital subscription</span>';
+      } else {
         html+='<strong>Shipping '+escHTML(label||'$'+cost.toFixed(2))+'</strong>';
         if(method)html+=' · '+escHTML(method);
+      }
       }
       var dLabel=delivery.formattedRange||delivery.label||'';
       if(dLabel)html+=' · <span style="color:#2b6cb0">'+escHTML(dLabel)+'</span>';

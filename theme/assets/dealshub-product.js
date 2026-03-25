@@ -38,6 +38,7 @@
     });
 
   function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+  function unesc(s){if(!s||typeof s!=='string')return s||'';var d=document.createElement('textarea');d.innerHTML=s;return d.value}
 
   function skeletonHTML(){
     return '<div style="max-width:1200px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:40px" class="dhpdp-skel">'+
@@ -1283,7 +1284,7 @@
     var discount=origPrice&&origPrice>price?Math.round((1-price/origPrice)*100):0;
     var link='/pages/product?id='+encodeURIComponent(p.sourceId||p.asin||p.id)+'&store='+(p.source||'amazon');
     var img=p.primaryImage||p.image||p.product_photo||'';
-    var title=p.title||p.product_title||'';
+    var title=unesc(p.title||p.product_title||'');
 
     var h='<a href="'+link+'" class="sh-mini-card">';
     h+='<div class="sh-mini-img"><img src="'+esc(img)+'" alt="" loading="lazy" onerror="this.parentElement.style.background=\'#f0f0f0\'"></div>';

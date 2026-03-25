@@ -61,7 +61,7 @@ class AmazonAdapter extends BaseAdapter {
       source: 'amazon',
       sourceName: 'Amazon',
       rank: p.rank || null,
-      salesVolume: p.sales_volume || null,
+      salesVolume: (p.sales_volume || '').replace(/on Amazon\s*/gi, '').replace(/New\s+in past month/i, 'New this month').trim() || null,
       isPrime: p.is_prime || false,
       bestSellerType: type
     };
@@ -302,11 +302,12 @@ class AmazonAdapter extends BaseAdapter {
       url: p.product_url || '',
       rating: p.product_star_rating || null,
       reviews: p.product_num_ratings || 0,
-      badge: p.is_best_seller ? 'Best Seller' : (p.is_amazon_choice ? "Amazon's Choice" : null),
+      badge: p.is_best_seller ? 'Best Seller' : (p.is_amazon_choice ? "Popular Choice" : null),
       source: 'amazon',
       sourceName: 'Amazon',
       brand: p.product_brand || null,
       isPrime: p.is_prime || false,
+      salesVolume: (p.sales_volume || '').replace(/on Amazon\s*/gi, '').replace(/New\s+in past month/i, 'New this month').trim() || null,
       deliveryInfo: {
         isFree: delivery.isFree,
         cost: delivery.cost,
@@ -423,7 +424,7 @@ class AmazonAdapter extends BaseAdapter {
     p.reviews = d.product_num_ratings || d.product_num_reviews || 0;
 
     // Badge
-    p.badge = d.is_best_seller ? 'Best Seller' : (d.is_amazon_choice ? "Amazon's Choice" : null);
+    p.badge = d.is_best_seller ? 'Best Seller' : (d.is_amazon_choice ? "Popular Choice" : null);
     if (!p.badge && d.climate_pledge_friendly) p.badge = 'Climate Pledge';
 
     // Availability
@@ -675,7 +676,7 @@ class AmazonAdapter extends BaseAdapter {
     }
 
     // Sales volume ("200+ bought in past month")
-    p.salesVolume = d.sales_volume || null;
+    p.salesVolume = (d.sales_volume || '').replace(/on Amazon\s*/gi, '').replace(/New\s+in past month/i, 'New this month').trim() || null;
 
     // Product condition
     p.productCondition = d.product_condition || null;
@@ -734,7 +735,7 @@ class AmazonAdapter extends BaseAdapter {
     product.originalPrice = parsePrice(p.product_original_price);
     product.rating = p.product_star_rating ? parseFloat(p.product_star_rating) : null;
     product.reviews = p.product_num_ratings || 0;
-    product.badge = p.is_best_seller ? 'Best Seller' : (p.is_amazon_choice ? "Amazon's Choice" : null);
+    product.badge = p.is_best_seller ? 'Best Seller' : (p.is_amazon_choice ? "Popular Choice" : null);
     product.availability = 'In Stock';
     product.stockSignal = 'in_stock';
     product.description = p.product_description || '';

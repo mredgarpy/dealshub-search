@@ -100,6 +100,7 @@
   /* ─── Constants & Config ─── */
   var BACKEND = 'https://dealshub-search.onrender.com';
   var PAGE_SIZE = 24;
+  var MAX_API_PAGES = 8;
   var API_LIMIT = 40;
   var SOURCES = ['amazon', 'aliexpress'];
   try{window.__dhIsPlus=localStorage.getItem('stylehub_plus')==='true'}catch(e){window.__dhIsPlus=false}
@@ -1048,22 +1049,47 @@
   }
 
   /* ─── Card rendering ─── */
+  function cleanBadge(b) { return (b || '').replace(/Amazon'?s?\s*Choice/gi, 'Popular Choice'); }
   function renderCard(p, idx) {
-    var badgeHTML = p.badge ? '<span class="dh-card__badge dh-card__badge--' + (p.badge || '').toLowerCase().replace(/\s/g,'-') + '">' + esc(p.badge) + '</span>' : '';
+    var badge = cleanBadge(p.badge);
+    var badgeHTML = badge ? '<span class="dh-card__badge dh-card__badge--' + badge.toLowerCase().replace(/\s/g,'-') + '">' + esc(badge) + '</span>' : '';
+    var discountHTML = (p.discount && p.discount > 0) ? '<span class="dh-card__discount">-' + p.discount + '%</span>' : '';
     var ratingHTML = p.rating ? '<div class="dh-card__rating"><span class="dh-card__stars" style="--rating:' + p.rating + '"></span>' + (p.reviews ? '<span class="dh-card__reviews">(' + formatNum(p.reviews) + ')</span>' : '') + '</div>' : '';
     var priceVal = typeof p.price === 'number' ? p.price.toFixed(2) : p.price;
     var origVal = p.originalPrice ? (typeof p.originalPrice === 'number' ? p.originalPrice.toFixed(2) : p.originalPrice) : '';
     var origHTML = origVal ? '<span class="dh-card__price-orig">' + origVal + '</span>' : '';
+    var savingsHTML = (p.discount && p.discount > 0 && p.savingsAmount) ? '<span class="dh-card__savings">-' + p.discount + '%</span>' : '';
+
+    /* salesVolume: "100+ bought in past month" — clean "on Amazon" */
+    var salesVol = (p.salesVolume || p.sales_volume || '').replace(/on Amazon\s*/gi, '').replace(/New\s+in past month/i, 'New this month').trim();
+    var salesHTML = salesVol ? '<div class="dh-card__sales">' + esc(salesVol) + '</div>' : '';
+
+    /* Color dots — only if data exists (no extra API calls) */
+    var colorDotsHTML = '';
+    var vColors = p.variantColors || p.variant_colors || [];
+    if (vColors.length) {
+      var dots = '';
+      var maxDots = 6;
+      for (var ci = 0; ci < Math.min(vColors.length, maxDots); ci++) {
+        var cName = vColors[ci];
+        var cInfo = COLOR_MAP[cName] || null;
+        var bg = cInfo ? cInfo.hex : cName;
+        var bdr = (cInfo && cInfo.border) ? cInfo.border : 'rgba(0,0,0,.12)';
+        dots += '<span class="dh-card__color-dot" style="background:' + bg + ';border-color:' + bdr + '" title="' + escAttr(cName) + '"></span>';
+      }
+      if (vColors.length > maxDots) dots += '<span style="font-size:10px;color:#888;line-height:14px">+' + (vColors.length - maxDots) + '</span>';
+      colorDotsHTML = '<div class="dh-card__colors">' + dots + '</div>';
+    }
 
     return '<div class="dh-card" data-product-id="' + p.id + '" data-source="' + p.source + '">'
       + badgeHTML
       + '<a href="/pages/product?id=' + p.id + '&store=' + p.source + '" class="dh-card__link">'
-      + '<div class="dh-card__img-wrap"><img src="' + (p.image || '') + '" alt="' + escAttr(p.title) + '" loading="' + (idx < 8 ? 'eager' : 'lazy') + '" width="300" height="300" class="dh-card__img" onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22300%22 height=%22300%22/%3E%3C/svg%3E\'"></div>'
+      + '<div class="dh-card__img-wrap">' + discountHTML + '<img src="' + (p.image || '') + '" alt="' + escAttr(p.title) + '" loading="' + (idx < 8 ? 'eager' : 'lazy') + '" width="300" height="300" class="dh-card__img" onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22%3E%3Crect fill=%22%23f0f0f0%22 width=%22300%22 height=%22300%22/%3E%3C/svg%3E\'">' + colorDotsHTML + '</div>'
       + '<div class="dh-card__body">'
       + (p.brand ? '<span class="dh-card__brand">' + esc(p.brand) + '</span>' : '')
       + '<h3 class="dh-card__title">' + esc(p.title) + '</h3>'
-      + ratingHTML
-      + '<div class="dh-card__price-row"><span class="dh-card__price">' + priceVal + '</span>' + origHTML + '</div>'
+      + ratingHTML + salesHTML
+      + '<div class="dh-card__price-row"><span class="dh-card__price">' + priceVal + '</span>' + origHTML + savingsHTML + '</div>'
       + renderCardShipping(p)
       + '</div></a>'
       + '<div class="dh-card__actions">'
@@ -1091,33 +1117,52 @@
   function renderCardShipping(p) {
     var del = p.deliveryInfo || {};
     var isPlus = window.__dhIsPlus || false;
-    var oType = (p.originType || 'unknown').toLowerCase();
-    var oFlag = p.originFlag || '🌍';
     var h = '';
 
-    /* Line 1: origin + real delivery date */
-    h += '<span class="dh-card__origin dh-card__origin--' + oType + '">';
-    h += oFlag + ' ' + esc(p.originBadge || 'Shop');
-    if (del.date) {
-      h += ' · Arrives ' + shortDate(del.date);
-    } else if (del.dateRange) {
-      h += ' · ' + shortDate(del.dateRange);
-    } else if (p.originDelivery) {
-      h += ' · ' + esc(p.originDelivery);
-    }
-    h += '</span>';
-
-    /* Line 2: shipping cost */
     if (isPlus) {
-      h += '<span class="dh-card__plus-ship">⚡ FREE shipping</span>';
-    } else if (del.isFree && !del.threshold) {
-      h += '<span class="dh-card__ship-free">🚚 FREE shipping' + (p.isPrime ? ' ⚡' : '') + '</span>';
-    } else if (del.isFree && del.threshold) {
-      h += '<span class="dh-card__ship-free">🚚 FREE on $' + del.threshold + '+</span>';
-    } else if (del.cost > 0) {
-      h += '<span class="dh-card__ship-cost">🚚 $' + del.cost.toFixed(2) + ' shipping · <span class="dh-card__plus-link">FREE with Plus</span></span>';
+      /* ═══ PLUS MEMBER VIEW ═══ */
+      if (del.fastest) {
+        h += '<div class="dh-card__ship-plus-fast">⚡ FREE delivery ' + shortDate(del.fastest) + ' <span class="dh-card__plus-tag">PLUS</span></div>';
+      } else if (del.date) {
+        h += '<div class="dh-card__ship-free">🚚 FREE delivery ' + shortDate(del.date) + '</div>';
+      } else if (del.dateRange) {
+        h += '<div class="dh-card__ship-free">🚚 FREE delivery ' + shortDate(del.dateRange) + '</div>';
+      } else if (p.originDelivery) {
+        h += '<div class="dh-card__ship-free">🚚 FREE delivery · ' + esc(p.originDelivery) + '</div>';
+      } else {
+        h += '<div class="dh-card__ship-free">🚚 FREE shipping <span class="dh-card__plus-tag">PLUS</span></div>';
+      }
     } else {
-      h += '<span class="dh-card__plus-ship">🚚 FREE ship with Plus</span>';
+      /* ═══ NON-PLUS VIEW ═══ */
+      /* Line 1: delivery date + cost */
+      if (del.isFree && del.date) {
+        h += '<div class="dh-card__ship-free">🚚 FREE delivery ' + shortDate(del.date) + '</div>';
+      } else if (del.isFree && del.dateRange) {
+        h += '<div class="dh-card__ship-free">🚚 FREE delivery ' + shortDate(del.dateRange) + '</div>';
+      } else if (del.cost > 0 && del.date) {
+        h += '<div class="dh-card__ship-cost">🚚 $' + del.cost.toFixed(2) + ' delivery ' + shortDate(del.date) + '</div>';
+      } else if (del.isFree && del.threshold && del.date) {
+        h += '<div class="dh-card__ship-free">🚚 FREE delivery ' + shortDate(del.date) + '</div>';
+      } else if (del.date) {
+        h += '<div class="dh-card__ship-free">🚚 FREE delivery ' + shortDate(del.date) + '</div>';
+      } else if (del.dateRange) {
+        h += '<div class="dh-card__ship-free">🚚 FREE delivery ' + shortDate(del.dateRange) + '</div>';
+      } else if (del.isFree) {
+        h += '<div class="dh-card__ship-free">🚚 FREE shipping</div>';
+      } else if (del.cost > 0) {
+        h += '<div class="dh-card__ship-cost">🚚 $' + del.cost.toFixed(2) + ' shipping</div>';
+      } else if (p.originDelivery) {
+        h += '<div class="dh-card__ship-cost">🚚 ' + esc(p.originDelivery) + '</div>';
+      }
+
+      /* Line 2: Plus upsell CTA */
+      if (del.fastest) {
+        h += '<div class="dh-card__plus-cta">⚡ ' + shortDate(del.fastest) + ' with <span class="dh-card__plus-link">Plus</span></div>';
+      } else if (del.cost > 0) {
+        h += '<div class="dh-card__plus-cta">⚡ FREE ship with <span class="dh-card__plus-link">Plus</span></div>';
+      } else if (del.threshold) {
+        h += '<div class="dh-card__plus-cta">⚡ No minimum with <span class="dh-card__plus-link">Plus</span></div>';
+      }
     }
 
     return h;
@@ -1157,30 +1202,73 @@
     } catch (ex) {}
   }
 
-  /* ─── Infinite scroll ─── */
+  /* ─── Infinite scroll (batch-based, no runaway loops) ─── */
+  var _scrollFetchTimeout = null;
   function loadMoreIfNeeded() {
     if (isLoadingMore) return;
+    /* Case 1: we have filtered results not yet rendered — show one batch */
     if (displayedCount < filteredResults.length) {
       isLoadingMore = true;
       showResults();
-      requestAnimationFrame(loadMoreIfNeeded);
-    } else if (!noMoreResults && !isFetchingPage) {
+      /* Do NOT self-call — IntersectionObserver re-triggers on next scroll */
+      return;
+    }
+    /* Case 2: need to fetch next API page */
+    if (!noMoreResults && !isFetchingPage && apiPage < MAX_API_PAGES) {
       isLoadingMore = true;
+      /* Safety timeout: if fetch takes >18s, hide spinner and show retry */
+      clearTimeout(_scrollFetchTimeout);
+      _scrollFetchTimeout = setTimeout(function() {
+        if (isLoadingMore) {
+          console.warn('Infinite scroll: fetch timeout, showing retry');
+          hideSentinel();
+          showRetryBtn();
+          isLoadingMore = false;
+          isFetchingPage = false;
+        }
+      }, 18000);
       fetchNextPage().then(function(gotMore) {
+        clearTimeout(_scrollFetchTimeout);
         if (gotMore) {
           showResults();
-          requestAnimationFrame(loadMoreIfNeeded);
+          /* Stop here — observer re-fires on next scroll */
         } else {
           hideSentinel();
           if (displayedCount > PAGE_SIZE) showEndMsg();
           isLoadingMore = false;
         }
       }).catch(function(err) {
+        clearTimeout(_scrollFetchTimeout);
         console.error('Infinite scroll fetch error:', err);
+        hideSentinel();
+        showRetryBtn();
         isLoadingMore = false;
         isFetchingPage = false;
       });
+      return;
     }
+    /* Case 3: hit max pages or no more results */
+    if (apiPage >= MAX_API_PAGES || noMoreResults) {
+      hideSentinel();
+      if (displayedCount > PAGE_SIZE) showEndMsg();
+    }
+  }
+
+  /* Retry button for failed/timed-out loads */
+  function showRetryBtn() {
+    hideEndMsg();
+    var existing = document.getElementById('dh-retry-btn');
+    if (existing) { existing.style.display = ''; return; }
+    var btn = document.createElement('div');
+    btn.id = 'dh-retry-btn';
+    btn.style.cssText = 'text-align:center;padding:20px 0 40px';
+    btn.innerHTML = '<button style="padding:10px 28px;background:#e53e3e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer" onclick="this.parentElement.style.display=\'none\'">Load More Products</button>';
+    btn.querySelector('button').addEventListener('click', function() {
+      btn.style.display = 'none';
+      showSentinel();
+      loadMoreIfNeeded();
+    });
+    scrollSentinel.parentNode.insertBefore(btn, scrollSentinel.nextSibling);
   }
 
   var scrollObserver = new IntersectionObserver(function(entries) {
@@ -1188,7 +1276,7 @@
       if (!entry.isIntersecting) return;
       loadMoreIfNeeded();
     });
-  }, { rootMargin: '400px' });
+  }, { rootMargin: '200px' });
   if (scrollSentinel) scrollObserver.observe(scrollSentinel);
 
   /* ─── Sort change ─── */
@@ -1649,8 +1737,12 @@
   .dh-card__badge--sale, .dh-card__badge--deal { background: #e53e3e; }
   .dh-card__badge--new { background: #16a34a; }
   .dh-card__badge--top-rated { background: #e53e3e; }
+  .dh-card__badge--popular-choice { background: #f59e0b; color: #fff; }
+  .dh-card__sales { font-size: 11px; color: #c2410c; font-weight: 600; margin-bottom: 4px; }
+  .dh-card__colors { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .dh-card__color-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,.12); flex-shrink: 0; }
   .dh-card__link { text-decoration: none; color: inherit; display: block; }
-  .dh-card__img-wrap { aspect-ratio: 1; overflow: hidden; background: #fafafa; }
+  .dh-card__img-wrap { aspect-ratio: 1; overflow: hidden; background: #fafafa; position: relative; }
   .dh-card__img { width: 100%; height: 100%; object-fit: contain; transition: transform .3s; }
   .dh-card:hover .dh-card__img { transform: scale(1.05); }
   .dh-card__body { padding: 12px; }
@@ -1672,10 +1764,14 @@
   .dh-card__origin--usa { color: #16a34a; }
   .dh-card__origin--intl { color: #d97706; }
   .dh-card__origin--unknown { color: #aaa; }
-  .dh-card__plus-ship { display: block; font-size: 10px; font-weight: 600; margin-top: 4px; color: #7c3aed; }
-  .dh-card__ship-free { display: block; font-size: 10px; font-weight: 600; margin-top: 4px; color: #16a34a; }
-  .dh-card__ship-cost { display: block; font-size: 10px; font-weight: 500; margin-top: 4px; color: #6b7280; }
-  .dh-card__plus-link { color: #7c3aed; font-weight: 600; }
+  .dh-card__discount { position: absolute; top: 8px; left: 8px; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; z-index: 2; }
+  .dh-card__savings { font-size: 11px; font-weight: 600; color: #16a34a; margin-left: 4px; }
+  .dh-card__ship-free { display: block; font-size: 11px; font-weight: 600; margin-top: 6px; color: #16a34a; }
+  .dh-card__ship-cost { display: block; font-size: 11px; font-weight: 500; margin-top: 6px; color: #6b7280; }
+  .dh-card__ship-plus-fast { display: block; font-size: 11px; font-weight: 600; margin-top: 6px; color: #7c3aed; }
+  .dh-card__plus-tag { background: #7c3aed; color: #fff; font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-left: 3px; vertical-align: middle; }
+  .dh-card__plus-cta { display: block; font-size: 10px; margin-top: 2px; color: #7c3aed; }
+  .dh-card__plus-link { font-weight: 700; text-decoration: underline; }
   .dh-card__actions { display: flex; gap: 6px; padding: 0 12px 12px; }
   .dh-card__btn-cart, .dh-card__btn-wish { padding: 8px 12px; border: 1px solid #eee; border-radius: 8px; background: #fff; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; color: #555; }
   .dh-card__btn-cart:hover { background: #e53e3e; color: #fff; border-color: #e53e3e; }

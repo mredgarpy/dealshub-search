@@ -25,6 +25,9 @@
       if(p&&!p.title&&titleHint)p.title=decodeURIComponent(titleHint);
       if(p&&(!p.image&&!p.primaryImage)&&params.get('image'))p.primaryImage=params.get('image');
       if(!p||!p.title)throw new Error('No product data');
+      /* Frontend safety: clean badge + salesVolume */
+      if(p.badge)p.badge=(p.badge||'').replace(/Amazon'?s?\s*Choice/gi,'Popular Choice');
+      if(p.salesVolume)p.salesVolume=(p.salesVolume||'').replace(/on Amazon\s*/gi,'').replace(/New\s+in past month/i,'New this month').trim();
       renderProduct(p);
       addToRecentlyViewed(p);
     })
@@ -206,7 +209,7 @@
       h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
       h+='<span style="color:#f59e0b;font-size:16px">'+renderStars(rating)+'</span>';
       h+='<span style="font-size:14px;color:#666">'+rating.toFixed(1)+'</span>';
-      if(reviews)h+='<a href="#dhpdp-reviews" style="font-size:13px;color:#2563eb;text-decoration:none">('+fmtNum(reviews)+' ratings)</a>';
+      var revNum=parseInt(reviews);if(revNum&&revNum>0)h+='<a href="#dhpdp-reviews" style="font-size:13px;color:#2563eb;text-decoration:none">('+fmtNum(revNum)+' ratings)</a>';
       if(p.salesVolume)h+='<span style="font-size:12px;color:#6b7280;border-left:1px solid #e5e7eb;padding-left:8px;margin-left:4px">'+esc(p.salesVolume)+'</span>';
       h+='</div>';
     }
@@ -215,7 +218,10 @@
     h+='<div style="margin-bottom:16px">';
     h+='<span style="font-size:32px;font-weight:700;color:#e53e3e" id="dhpdp-price">$'+price.toFixed(2)+'</span>';
     if(origPrice>price)h+=' <span style="font-size:18px;color:#999;text-decoration:line-through;margin-left:8px">$'+origPrice.toFixed(2)+'</span>';
-    if(discount>0)h+=' <span style="background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600;margin-left:8px">Save '+discount+'%</span>';
+    if(discount>0){
+      var saved=(origPrice-price).toFixed(2);
+      h+=' <span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600;margin-left:4px">-'+discount+'% Save $'+saved+'</span>';
+    }
     h+='</div>';
 
     // Availability / stock
@@ -276,70 +282,108 @@
 
   // ═══ SECTION 6: SHIPPING & DELIVERY ═══
   function renderShipping(p){
-    var sc=p.shippingCalc||{};
     var pdpIsPlus=false;
     try{pdpIsPlus=localStorage.getItem('stylehub_plus')==='true';}catch(e){}
-    var shipCost=pdpIsPlus?0:(sc.cost!=null?sc.cost:(p.shippingData&&p.shippingData.cost!=null?p.shippingData.cost:null));
-    var shipMethod=pdpIsPlus?'StyleHub Plus':(sc.method||(p.shippingData&&p.shippingData.method)||'Standard');
-    var shipIsFree=pdpIsPlus||sc.isFree||(shipCost===0);
-    var shipThreshold=sc.threshold||null;
-    var shipRemaining=sc.remaining||null;
-    var shipThresholdNote=sc.thresholdNote||null;
-    var plusSaves=pdpIsPlus?0:(sc.plusSaves||0);
+
+    // Use deliveryParsed from backend (real dates from API), fallback to shippingCalc/deliveryEstimate
+    var dp=p.deliveryParsed||{};
+    var sc=p.shippingCalc||{};
     var del=sc.delivery||p.deliveryEstimate||{};
-    var delFormatted=del.formattedRange||del.label||'5-10 business days';
+    var delFormatted=del.formattedRange||del.label||'3-7 business days';
     var delEarliest=del.earliest||del.earliestDate||'';
     var delLatest=del.latest||del.latestDate||'';
-    var ret=sc.returnWindow||p.returnPolicy||{};
+
+    // Resolve delivery dates — prefer parsed real dates, then calculated
+    var standardDate=dp.standard||null;
+    var fastestDate=dp.fastest||null;
+    var shipCost=dp.cost||0;
+    var shipIsFree=dp.isFree!==undefined?dp.isFree:(sc.isFree||shipCost===0);
+    var shipThreshold=dp.threshold||sc.threshold||null;
+    var orderWithin=dp.orderWithin||null;
+
+    // For AliExpress or non-Amazon: use existing flow
+    if(p.source!=='amazon'){
+      shipCost=pdpIsPlus?0:(sc.cost!=null?sc.cost:(p.shippingData&&p.shippingData.cost!=null?p.shippingData.cost:null));
+      shipIsFree=pdpIsPlus||sc.isFree||(shipCost===0);
+    }
+
     var shipShipsFrom=sc.shipsFrom||(p.shippingData&&p.shippingData.shipsFrom)||null;
     var bestOffer=p.bestOffer||null;
+    var ret=sc.returnWindow||p.returnPolicy||{};
+    var retDays=pdpIsPlus?60:30;
     var retSummary;
-    if(pdpIsPlus){retSummary='Extended 60-day returns (Plus benefit)';}else{retSummary=ret.summary||(ret.days?'Returns accepted within '+ret.days+' days':'30-day returns');if(typeof ret==='string')retSummary=ret;}
+    if(pdpIsPlus){retSummary=retDays+'-day returns (Plus benefit)';}else{retSummary=ret.summary||(ret.days?'Returns accepted within '+ret.days+' days':retDays+'-day returns');if(typeof ret==='string')retSummary=ret;}
 
     var savedZip=null;try{savedZip=localStorage.getItem('stylehub_zip');}catch(e){}
 
     var h='<div style="border:1px solid '+(pdpIsPlus?'#c4b5fd':'#e2e8f0')+';border-radius:10px;overflow:hidden;margin-bottom:20px">';
 
-    if(pdpIsPlus){h+='<div style="padding:8px 16px;background:linear-gradient(90deg,#6b46c1,#805ad5);color:#fff;font-size:13px;font-weight:700;text-align:center">&#9889; StyleHub Plus Member — FREE Shipping & Extended Returns</div>';}
+    // Plus member banner
+    if(pdpIsPlus){h+='<div style="padding:8px 16px;background:linear-gradient(90deg,#6b46c1,#805ad5);color:#fff;font-size:13px;font-weight:700;text-align:center">&#9889; StyleHub Plus Member</div>';}
 
-    // Location
-    h+='<div style="padding:12px 16px;background:#f8fafc;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2e8f0">';
-    h+='<svg width="16" height="16" fill="none" stroke="#6b7280" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
-    if(savedZip){
-      h+='<span style="font-size:13px;color:#374151">Deliver to <b>'+esc(savedZip)+'</b></span>';
-      h+='<a href="#" onclick="event.preventDefault();document.getElementById(\'dh-zip-input\').style.display=\'flex\'" style="font-size:12px;color:#2563eb;margin-left:auto;text-decoration:none">Change</a>';
-    }
-    h+='<div id="dh-zip-input" style="display:'+(savedZip?'none':'flex')+';align-items:center;gap:6px;'+(savedZip?'':'flex:1;')+'">';
-    h+='<input type="text" placeholder="Enter ZIP code" maxlength="5" pattern="[0-9]*" style="width:90px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none" id="dh-zip-val"'+(savedZip?' value="'+esc(savedZip)+'"':'')+'/>';
-    h+='<button onclick="var z=document.getElementById(\'dh-zip-val\').value.trim();if(z.length>=5){try{localStorage.setItem(\'stylehub_zip\',z)}catch(e){}location.reload()}" style="padding:5px 10px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">Check</button>';
-    h+='</div></div>';
+    // === DELIVERY ROW (primary — per spec) ===
+    h+='<div style="padding:14px 16px;border-bottom:1px solid #f0f0f0">';
 
-    // Shipping cost
-    h+='<div style="padding:14px 16px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid #f0f0f0">';
-    h+='<div style="flex-shrink:0;width:36px;height:36px;background:'+(pdpIsPlus?'#f5f3ff':'#f0fdf4')+';border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="'+(pdpIsPlus?'#7c3aed':'#16a34a')+'" stroke-width="1.5" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>';
-    h+='<div style="flex:1">';
-    if(pdpIsPlus){
-      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="color:#6b46c1;font-weight:700;font-size:15px">FREE</span><span style="background:#6b46c1;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px">PLUS</span></div>';
-      h+='<div style="font-size:12px;color:#6b7280">StyleHub Plus &middot; All orders ship free</div>';
-    }else if(shipIsFree){
-      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="color:#16a34a;font-weight:700;font-size:15px">FREE</span></div>';
-      h+='<div style="font-size:12px;color:#6b7280">'+esc(shipMethod)+'</div>';
-    }else if(shipCost!=null&&shipCost>0){
-      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="font-weight:700;font-size:15px;color:#333">$'+shipCost.toFixed(2)+'</span></div>';
-      h+='<div style="font-size:12px;color:#6b7280">'+esc(shipMethod)+'</div>';
+    if(pdpIsPlus&&fastestDate){
+      // PLUS + fastest: show fastest as primary
+      h+='<div style="font-size:16px;font-weight:700;color:#7c3aed">';
+      h+='&#128197; FREE delivery '+esc(fastestDate);
+      h+=' <span style="background:#7c3aed;color:#fff;font-size:10px;padding:2px 6px;border-radius:10px">PLUS</span>';
+      h+='</div>';
+      if(orderWithin){h+='<div style="font-size:12px;color:#d97706;margin-top:4px">&#9200; Order within '+esc(orderWithin)+'</div>';}
+      if(standardDate){h+='<div style="font-size:12px;color:#888;margin-top:4px">Standard delivery: '+esc(standardDate)+'</div>';}
+      if(shipCost>0){h+='<div style="font-size:12px;color:#16a34a;margin-top:2px">&#10003; You save $'+shipCost.toFixed(2)+' on shipping</div>';}
+    }else if(pdpIsPlus&&!fastestDate){
+      // PLUS but no fastest
+      h+='<div style="font-size:16px;font-weight:700;color:#16a34a">';
+      h+='&#128197; FREE delivery '+(standardDate?esc(standardDate):(delEarliest&&delLatest?esc(delEarliest)+' &ndash; '+esc(delLatest):esc(delFormatted)));
+      h+='</div>';
     }else{
-      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px"><span style="font-size:14px;font-weight:600;color:#333">Shipping</span><span style="font-size:13px;color:#666">Calculated at checkout</span></div>';
+      // NO PLUS: standard delivery
+      if(shipIsFree){
+        h+='<div style="font-size:16px;font-weight:700;color:#16a34a">';
+        h+='&#128197; FREE delivery '+(standardDate?esc(standardDate):(delEarliest&&delLatest?esc(delEarliest)+' &ndash; '+esc(delLatest):esc(delFormatted)));
+        h+='</div>';
+      }else if(shipCost>0){
+        h+='<div style="font-size:16px;font-weight:600;color:#374151">';
+        h+='&#128197; $'+shipCost.toFixed(2)+' delivery '+(standardDate?esc(standardDate):'');
+        h+='</div>';
+      }else{
+        h+='<div style="font-size:16px;font-weight:600;color:#374151">';
+        h+='&#128197; Delivery '+(standardDate?esc(standardDate):(delEarliest&&delLatest?esc(delEarliest)+' &ndash; '+esc(delLatest):esc(delFormatted)));
+        h+='</div>';
+      }
+
+      // Plus upsell CTA
+      if(fastestDate){
+        h+='<div style="margin-top:10px;padding:10px 14px;background:#f5f3ff;border:1px solid #e9d5ff;border-radius:8px">';
+        h+='<div style="font-size:13px;font-weight:700;color:#7c3aed">&#9889; Want it '+esc(fastestDate)+'?</div>';
+        h+='<div style="font-size:12px;color:#6b7280;margin-top:2px">Get faster delivery'+(shipCost>0?' + FREE shipping':'')+' with StyleHub Plus</div>';
+        h+='<a href="/pages/plus" style="display:inline-block;margin-top:6px;padding:6px 14px;background:#7c3aed;color:#fff;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none">Try 7 days free &rarr;</a>';
+        h+='</div>';
+      }else if(shipCost>0){
+        h+='<div style="margin-top:10px;padding:10px 14px;background:#f5f3ff;border:1px solid #e9d5ff;border-radius:8px">';
+        h+='<div style="font-size:13px;font-weight:700;color:#7c3aed">&#9889; FREE shipping with StyleHub Plus</div>';
+        h+='<div style="font-size:12px;color:#6b7280;margin-top:2px">Save $'+shipCost.toFixed(2)+' on this order</div>';
+        h+='<a href="/pages/plus" style="display:inline-block;margin-top:6px;padding:6px 14px;background:#7c3aed;color:#fff;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none">Try 7 days free &rarr;</a>';
+        h+='</div>';
+      }
     }
-    if(shipShipsFrom){
-      var sellerLine='Ships from <b>'+esc(shipShipsFrom)+'</b>';
-      if(bestOffer&&bestOffer.sellerRating)sellerLine+=' &#11088; '+esc(bestOffer.sellerRating);
-      h+='<div style="font-size:12px;color:#555;margin-top:3px">'+sellerLine+'</div>';
-      if(bestOffer&&bestOffer.seller&&bestOffer.seller!==shipShipsFrom)h+='<div style="font-size:11px;color:#888;margin-top:1px">Sold by '+esc(bestOffer.seller)+'</div>';
+    h+='</div>';
+
+    // === SELLER + ORIGIN ===
+    if(shipShipsFrom||bestOffer){
+      h+='<div style="padding:10px 16px;font-size:12px;color:#555;border-bottom:1px solid #f0f0f0">';
+      if(shipShipsFrom)h+='Ships from <b>'+esc(shipShipsFrom)+'</b>';
+      if(bestOffer&&bestOffer.seller&&bestOffer.seller!==shipShipsFrom)h+=' &middot; Sold by <b>'+esc(bestOffer.seller)+'</b>';
+      if(bestOffer&&bestOffer.sellerRating)h+=' &#11088; '+esc(bestOffer.sellerRating);
+      h+='</div>';
     }
+
     // AliExpress shipping options
     var shipOpts=p.shippingOptions||[];
     if(shipOpts.length>1&&p.source==='aliexpress'){
-      h+='<div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:6px">';
+      h+='<div style="padding:10px 16px;border-bottom:1px solid #f0f0f0">';
       h+='<div style="font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Shipping options</div>';
       var maxShow=Math.min(shipOpts.length,4);
       for(var si=0;si<maxShow;si++){
@@ -358,30 +402,22 @@
       h+='</div>';
     }
     if(!shipShipsFrom&&p.sellerData&&p.sellerData.name&&p.source==='aliexpress'){
-      h+='<div style="font-size:12px;color:#555;margin-top:3px">Sold by <b>'+esc(p.sellerData.name)+'</b></div>';
+      h+='<div style="padding:10px 16px;font-size:12px;color:#555;border-bottom:1px solid #f0f0f0">';
+      h+='Sold by <b>'+esc(p.sellerData.name)+'</b>';
       if(p.shippingData&&p.shippingData.shipsFrom){
         var sf=p.shippingData.shipsFrom.toLowerCase();
         var fromFlag=sf.indexOf('united states')>=0||sf==='us'?' &#127482;&#127480;':(sf.indexOf('china')>=0?' &#127464;&#127475;':'');
-        h+='<div style="font-size:11px;color:#888;margin-top:1px">Ships from '+esc(p.shippingData.shipsFrom)+fromFlag+'</div>';
+        h+=' &middot; Ships from '+esc(p.shippingData.shipsFrom)+fromFlag;
       }
+      h+='</div>';
     }
-    if(!pdpIsPlus&&shipThresholdNote&&shipRemaining>0)h+='<div style="font-size:12px;color:#d97706;margin-top:4px">&#128161; Add $'+shipRemaining.toFixed(2)+' more for FREE shipping</div>';
-    if(!pdpIsPlus&&plusSaves>0)h+='<div style="font-size:12px;color:#7c3aed;margin-top:4px">&#9889; <b>FREE</b> with StyleHub Plus ($7.99/mo) <a href="/pages/plus" style="color:#7c3aed;text-decoration:underline;font-size:11px;margin-left:4px">Try free</a></div>';
-    h+='</div></div>';
 
-    // Delivery date
-    h+='<div style="padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f0f0f0">';
-    h+='<div style="flex-shrink:0;width:36px;height:36px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#2563eb" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>';
-    h+='<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#333">Estimated Delivery</div>';
-    if(delEarliest&&delLatest)h+='<div style="font-size:15px;font-weight:700;color:#2563eb;margin-top:2px">'+esc(delEarliest)+' &ndash; '+esc(delLatest)+'</div>';
-    else h+='<div style="font-size:13px;color:#555">'+esc(delFormatted)+'</div>';
-    h+='</div></div>';
+    // === RETURNS ===
+    h+='<div style="padding:10px 16px;font-size:13px;color:#555">';
+    h+='&#8617;&#65039; '+retDays+'-day returns';
+    if(pdpIsPlus)h+=' <span style="background:#7c3aed;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px">PLUS</span>';
+    h+='</div>';
 
-    // Returns
-    h+='<div style="padding:14px 16px;display:flex;align-items:center;gap:12px">';
-    h+='<div style="flex-shrink:0;width:36px;height:36px;background:#faf5ff;border-radius:8px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" fill="none" stroke="#7c3aed" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 12h18M3 12l6-6M3 12l6 6"/></svg></div>';
-    h+='<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#333">Easy Returns'+(pdpIsPlus?' <span style="background:#6b46c1;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:6px">PLUS</span>':'')+'</div>';
-    h+='<div style="font-size:13px;color:'+(pdpIsPlus?'#6b46c1':'#555')+'">'+esc(retSummary)+'</div></div></div>';
     h+='</div>';
     return h;
   }
@@ -815,7 +851,7 @@
   }
 
   function renderStars(r){var s='';for(var i=1;i<=5;i++){if(i<=Math.floor(r))s+='\u2605';else if(i-r<1)s+='\u2605';else s+='\u2606'}return s}
-  function fmtNum(n){if(!n)return '0';n=parseInt(n);if(n>=1000000)return(n/1000000).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return String(n)}
+  function fmtNum(n){if(!n)return '0';n=parseInt(n);if(isNaN(n)||n<=0)return '0';if(n>=1000000)return(n/1000000).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return String(n)}
 
   function addToRecentlyViewed(p){
     try{

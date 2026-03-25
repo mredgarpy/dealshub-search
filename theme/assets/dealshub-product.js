@@ -129,6 +129,9 @@
     html+='.dhpdp-fbt-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;text-align:center;transition:box-shadow .2s}.dhpdp-fbt-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08)}';
     html+='.dhpdp-section{margin-top:40px;border-top:1px solid #eee;padding-top:32px}';
     html+='.dhpdp-section-title{font-size:20px;font-weight:700;color:#1a1a2e;margin-bottom:20px}';
+    html+='@keyframes dhpdp-spin{to{transform:rotate(360deg)}}';
+    html+='.dhpdp-opt-unavail{position:relative}';
+    html+='.sh-size-pill{transition:border-color .15s,background .15s}';
     html+='</style>';
 
     container.innerHTML=html;
@@ -239,25 +242,154 @@
     return h;
   }
 
-  // ═══ SECTION 4: VARIANTS ═══
+  // ═══ SECTION 4: VARIANTS (v4 — ASIN-based switching, color photos, size pills, qty, specs, size chart) ═══
+
+  /* Helper: detect size chart category from product title + breadcrumbs */
+  function detectSizeChartCategory(p){
+    var title=(p.title||'').toLowerCase();
+    var bc=(p.breadcrumbs||[]).map(function(b){return(typeof b==='object'?(b.name||b.title||''):b).toLowerCase()}).join(' ');
+    var cat=(p.category||'').toLowerCase();
+    var all=title+' '+bc+' '+cat;
+    if(/shoe|sneaker|boot|sandal|slipper|loafer|heel|flat|trainer|running shoe|clog/i.test(all))return 'shoes';
+    if(/t-?shirt|tee|polo|tank.?top|blouse|top /i.test(all))return 'tops';
+    if(/dress|gown|jumpsuit|romper/i.test(all))return 'dresses';
+    if(/pant|jean|trouser|short|legging|jogger|sweatpant/i.test(all))return 'bottoms';
+    if(/jacket|coat|hoodie|sweater|cardigan|vest|blazer/i.test(all))return 'outerwear';
+    if(/bra|underwear|lingerie|panty|boxers|brief/i.test(all))return 'underwear';
+    if(/ring|bracelet|necklace|watch.?band/i.test(all))return 'jewelry';
+    if(/hat|cap|beanie|glove|belt/i.test(all))return 'accessories';
+    if(/kid|boy|girl|infant|toddler|baby|children/i.test(all))return 'kids';
+    return null;
+  }
+
   function renderVariants(p){
-    if(!p.options||!p.options.length)return '';
+    if(!p.options||!p.options.length)return renderQuantitySelector(p)+renderProductSpecs(p);
     var h='<div class="dhpdp-variants" style="margin-bottom:20px">';
+
     for(var oi=0;oi<p.options.length;oi++){
       var opt=p.options[oi];
-      h+='<div style="margin-bottom:12px"><label style="font-size:14px;font-weight:600;color:#333;display:block;margin-bottom:6px">'+esc(opt.name)+': <span class="dhpdp-opt-label" data-option="'+oi+'" style="color:#e53e3e;font-weight:700"></span></label>';
-      h+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
-      for(var vi=0;vi<(opt.values||[]).length;vi++){
-        var val=opt.values[vi];
-        var isSelected=val.selected||(!opt.values.some(function(v){return v.selected})&&vi===0);
-        var sel=isSelected?' dhpdp-opt-sel':'';
-        if(val.image){
-          h+='<button class="dhpdp-opt'+sel+'" data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+esc(val.value)+'" style="width:44px;height:44px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';padding:2px;cursor:pointer;background:#fff"><img src="'+esc(val.image)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px"></button>';
-        }else{
-          h+='<button class="dhpdp-opt'+sel+'" data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+esc(val.value)+'" style="padding:8px 16px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';cursor:pointer;background:'+(isSelected?'#fef2f2':'#fff')+';font-size:13px;color:#333">'+esc(val.value)+'</button>';
+      var isColor=opt.name==='Color';
+      var isSize=opt.name==='Size';
+      var selectedVal='';
+      for(var sv=0;sv<(opt.values||[]).length;sv++){if(opt.values[sv].selected){selectedVal=opt.values[sv].value;break;}}
+      if(!selectedVal&&opt.values&&opt.values.length)selectedVal=opt.values[0].value;
+
+      h+='<div class="dhpdp-opt-group" data-group="'+esc(opt.name)+'" style="margin-bottom:16px">';
+      h+='<label style="font-size:14px;font-weight:600;color:#333;display:block;margin-bottom:8px">'+esc(opt.name)+': <span class="dhpdp-opt-label" data-option="'+oi+'" style="color:#e53e3e;font-weight:700">'+esc(selectedVal)+'</span></label>';
+
+      if(isColor){
+        /* COLOR — thumbnail photos */
+        h+='<div class="sh-color-options" style="display:flex;flex-wrap:wrap;gap:8px">';
+        for(var ci=0;ci<(opt.values||[]).length;ci++){
+          var cv=opt.values[ci];
+          var isSel=cv.value===selectedVal;
+          var isAvail=cv.is_available!==false;
+          var cls='dhpdp-opt'+(isSel?' dhpdp-opt-sel':'')+(isAvail?'':' dhpdp-opt-unavail');
+          h+='<button class="'+cls+'" data-option="'+oi+'" data-value="'+ci+'" data-valtitle="'+esc(cv.value)+'" data-asin="'+(cv.asin||'')+'" data-dim="Color" '+(isAvail?'':'disabled ')+' title="'+esc(cv.value)+(isAvail?'':' - Unavailable')+'" style="width:48px;height:48px;border-radius:8px;border:2px solid '+(isSel?'#e53e3e':(isAvail?'#ddd':'#eee'))+';padding:2px;cursor:'+(isAvail?'pointer':'not-allowed')+';background:#fff;position:relative;opacity:'+(isAvail?'1':'0.5')+'">';
+          if(cv.image){
+            h+='<img src="'+esc(cv.image)+'" alt="'+esc(cv.value)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px">';
+          }else{
+            h+='<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:10px;color:#666;text-align:center;line-height:1.1">'+esc(cv.value.substring(0,8))+'</span>';
+          }
+          if(!isAvail)h+='<span style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center"><span style="width:120%;height:2px;background:#999;transform:rotate(-45deg)"></span></span>';
+          h+='</button>';
         }
+        h+='</div>';
+
+      }else if(isSize){
+        /* SIZE — pills */
+        h+='<div class="sh-size-options" style="display:flex;flex-wrap:wrap;gap:6px">';
+        for(var si=0;si<(opt.values||[]).length;si++){
+          var sv2=opt.values[si];
+          var isSel2=sv2.value===selectedVal;
+          var isAvail2=sv2.is_available!==false;
+          var cls2='dhpdp-opt sh-size-pill'+(isSel2?' dhpdp-opt-sel':'')+(isAvail2?'':' dhpdp-opt-unavail');
+          h+='<button class="'+cls2+'" data-option="'+oi+'" data-value="'+si+'" data-valtitle="'+esc(sv2.value)+'" data-asin="'+(sv2.asin||'')+'" data-dim="Size" '+(isAvail2?'':'disabled ')+' title="'+esc(sv2.value)+(isAvail2?'':' - Unavailable')+'" style="min-width:44px;padding:8px 14px;border-radius:8px;border:2px solid '+(isSel2?'#e53e3e':(isAvail2?'#ddd':'#eee'))+';cursor:'+(isAvail2?'pointer':'not-allowed')+';background:'+(isSel2?'#fef2f2':'#fff')+';font-size:13px;font-weight:'+(isSel2?'600':'400')+';color:'+(isAvail2?'#333':'#bbb')+';text-align:center;opacity:'+(isAvail2?'1':'0.6')+';text-decoration:'+(isAvail2?'none':'line-through')+'">';
+          h+=esc(sv2.value);
+          h+='</button>';
+        }
+        h+='</div>';
+        /* Size chart link */
+        var sizeChartCat=detectSizeChartCategory(p);
+        if(sizeChartCat){
+          h+='<a href="#" class="sh-size-chart-link" data-category="'+sizeChartCat+'" style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:13px;color:#2563eb;text-decoration:none;font-weight:500">&#128207; Size Chart</a>';
+        }
+
+      }else{
+        /* GENERIC — pill buttons */
+        h+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+        for(var gi=0;gi<(opt.values||[]).length;gi++){
+          var gv=opt.values[gi];
+          var isSel3=gv.value===selectedVal;
+          var isAvail3=gv.is_available!==false;
+          h+='<button class="dhpdp-opt'+(isSel3?' dhpdp-opt-sel':'')+(isAvail3?'':' dhpdp-opt-unavail')+'" data-option="'+oi+'" data-value="'+gi+'" data-valtitle="'+esc(gv.value)+'" data-asin="'+(gv.asin||'')+'" data-dim="'+esc(opt.name)+'" '+(isAvail3?'':'disabled ')+' style="padding:8px 16px;border-radius:8px;border:2px solid '+(isSel3?'#e53e3e':(isAvail3?'#ddd':'#eee'))+';cursor:'+(isAvail3?'pointer':'not-allowed')+';background:'+(isSel3?'#fef2f2':'#fff')+';font-size:13px;color:'+(isAvail3?'#333':'#bbb')+'">'+esc(gv.value)+'</button>';
+        }
+        h+='</div>';
       }
-      h+='</div></div>';
+
+      h+='</div>'; // end group
+    }
+
+    h+='</div>'; // end dhpdp-variants
+
+    /* Variant loading overlay (hidden by default) */
+    h+='<div id="dhpdp-variant-loading" style="display:none;padding:8px 0;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px"><div style="width:16px;height:16px;border:2px solid #e53e3e;border-top-color:transparent;border-radius:50%;animation:dhpdp-spin .6s linear infinite"></div><span style="font-size:13px;color:#666">Loading variant...</span></div></div>';
+
+    /* Quantity selector */
+    h+=renderQuantitySelector(p);
+
+    /* Quick product specs (weight, material) */
+    h+=renderProductSpecs(p);
+
+    return h;
+  }
+
+  /* ═══ QUANTITY SELECTOR ═══ */
+  function renderQuantitySelector(p){
+    var avail=p.availability||'';
+    var maxQty=10;
+    var match=avail.match(/Only (\d+) left/i);
+    if(match)maxQty=parseInt(match[1]);
+    else if(/out of stock/i.test(avail))maxQty=0;
+
+    var h='<div class="sh-qty-group" style="margin-bottom:16px">';
+    h+='<label style="font-size:14px;font-weight:600;color:#333;display:block;margin-bottom:8px">Quantity:</label>';
+    if(maxQty>0){
+      h+='<div style="display:flex;align-items:center;gap:0">';
+      h+='<button id="sh-qty-minus" style="width:36px;height:36px;border:1px solid #ddd;border-right:none;border-radius:6px 0 0 6px;background:#f9fafb;cursor:pointer;font-size:18px;color:#333;display:flex;align-items:center;justify-content:center" disabled>−</button>';
+      h+='<input type="number" id="sh-qty" value="1" min="1" max="'+maxQty+'" style="width:48px;height:36px;border:1px solid #ddd;text-align:center;font-size:14px;font-weight:600;-moz-appearance:textfield;-webkit-appearance:none" readonly>';
+      h+='<button id="sh-qty-plus" style="width:36px;height:36px;border:1px solid #ddd;border-left:none;border-radius:0 6px 6px 0;background:#f9fafb;cursor:pointer;font-size:18px;color:#333;display:flex;align-items:center;justify-content:center">+</button>';
+      h+='</div>';
+    }
+    /* Stock indicator */
+    if(maxQty===0){
+      h+='<span style="font-size:13px;color:#dc2626;font-weight:600">Out of Stock</span>';
+    }else if(maxQty<=5){
+      h+='<span style="font-size:13px;color:#d97706;font-weight:600;margin-top:4px;display:block">Only '+maxQty+' left in stock — order soon</span>';
+    }
+    h+='</div>';
+    return h;
+  }
+
+  /* ═══ PRODUCT SPECS (weight, material, dimensions) ═══ */
+  function renderProductSpecs(p){
+    var pi=p.productInformation||{};
+    var specs=[];
+    if(pi['Item Weight'])specs.push(['Weight',pi['Item Weight']]);
+    if(pi['Package Dimensions'])specs.push(['Dimensions',pi['Package Dimensions'].split(';')[0]]);
+    if(pi['Product Dimensions'])specs.push(['Dimensions',pi['Product Dimensions'].split(';')[0]]);
+    if(pi['Material']||pi['Material Type'])specs.push(['Material',pi['Material']||pi['Material Type']]);
+    if(pi['Sole Material'])specs.push(['Sole',pi['Sole Material']]);
+    if(pi['Closure Type'])specs.push(['Closure',pi['Closure Type']]);
+    if(pi['Fabric Type'])specs.push(['Fabric',pi['Fabric Type']]);
+    if(!specs.length)return '';
+
+    var h='<div class="sh-quick-specs" style="margin-bottom:16px;padding:10px 14px;background:#f8fafc;border-radius:8px;border:1px solid #f0f0f0">';
+    for(var i=0;i<specs.length;i++){
+      h+='<div style="display:flex;gap:8px;font-size:13px;'+(i>0?'margin-top:4px':'')+'">';
+      h+='<span style="color:#6b7280;min-width:80px">'+specs[i][0]+':</span>';
+      h+='<span style="color:#333;font-weight:500">'+esc(specs[i][1])+'</span>';
+      h+='</div>';
     }
     h+='</div>';
     return h;
@@ -677,37 +809,9 @@
       });
     });
 
-    // Variant option clicks
-    function findVariantBySelection(){
-      var parts=[];
-      container.querySelectorAll('.dhpdp-variants > div').forEach(function(group){
-        var sel=group.querySelector('.dhpdp-opt-sel');
-        if(sel){
-          var optIdx=parseInt(sel.dataset.option);
-          var valIdx=parseInt(sel.dataset.value);
-          if(p.options&&p.options[optIdx]&&p.options[optIdx].values&&p.options[optIdx].values[valIdx])parts.push(p.options[optIdx].values[valIdx]);
-        }
-      });
-      if(parts.length>0&&p.variants&&p.variants.length>0){
-        var selectedTitle=parts.map(function(v){return v.value}).join(' / ');
-        return p.variants.find(function(v){return v.title===selectedTitle||v.title==='Option: '+selectedTitle||v.title.indexOf(selectedTitle)>=0})||null;
-      }
-      return null;
-    }
-
-    function updatePriceDisplay(variant){
-      if(!variant)return;
-      var vPrice=variant.price?(typeof variant.price==='number'?variant.price:parseFloat(String(variant.price).replace(/[^0-9.]/g,''))):0;
-      if(vPrice<=0)return;
-      var priceEl=document.getElementById('dhpdp-price');
-      if(priceEl)priceEl.textContent='$'+vPrice.toFixed(2);
-    }
-
-    function updateMainImage(variant){
-      if(!variant||!variant.image)return;
-      var mainImg=document.getElementById('dhpdp-main-img');
-      if(mainImg)mainImg.src=variant.image;
-    }
+    // ═══ VARIANT OPTION CLICKS — ASIN-based switching ═══
+    var _currentAsin=productId; /* Active ASIN for Add to Cart */
+    var _variantLoading=false;
 
     function updateOptionLabels(){
       container.querySelectorAll('.dhpdp-opt-label').forEach(function(label){
@@ -716,23 +820,146 @@
         if(sel)label.textContent=sel.dataset.valtitle||'';
       });
     }
-
     updateOptionLabels();
 
-    container.querySelectorAll('.dhpdp-opt').forEach(function(btn){
-      btn.addEventListener('click',function(){
-        var optIdx=this.dataset.option;
-        container.querySelectorAll('.dhpdp-opt[data-option="'+optIdx+'"]').forEach(function(b){
-          b.style.borderColor='#ddd';b.style.background='#fff';b.classList.remove('dhpdp-opt-sel');
+    function showVariantLoading(){
+      var el=document.getElementById('dhpdp-variant-loading');
+      if(el)el.style.display='block';
+    }
+    function hideVariantLoading(){
+      var el=document.getElementById('dhpdp-variant-loading');
+      if(el)el.style.display='none';
+    }
+
+    /* Select a variant by calling API with new ASIN */
+    function selectVariant(newAsin,dimName,value,btnEl){
+      if(!newAsin||_variantLoading)return;
+      _variantLoading=true;
+      showVariantLoading();
+      fetch(API+'/api/product/'+encodeURIComponent(newAsin)+'?store=amazon',{signal:AbortSignal.timeout(15000)})
+        .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
+        .then(function(data){
+          var np=data;
+          if(!np||!np.title)throw new Error('No variant data');
+          /* Update price */
+          var vPrice=typeof np.price==='number'?np.price:parseFloat(String(np.price||'0').replace(/[^0-9.]/g,''));
+          var vOrig=typeof np.originalPrice==='number'?np.originalPrice:parseFloat(String(np.originalPrice||'0').replace(/[^0-9.]/g,''));
+          var priceEl=document.getElementById('dhpdp-price');
+          if(priceEl&&vPrice>0)priceEl.textContent='$'+vPrice.toFixed(2);
+          /* Update image for Color changes */
+          if(dimName==='Color'&&np.primaryImage){
+            var mainImg=document.getElementById('dhpdp-main-img');
+            if(mainImg)mainImg.src=np.primaryImage;
+            /* Also update gallery thumbnails */
+            var newImgs=np.images&&np.images.length?np.images:(np.primaryImage?[np.primaryImage]:[]);
+            var thumbsContainer=container.querySelector('.dhpdp-thumbs');
+            if(thumbsContainer&&newImgs.length>1){
+              var th='';
+              for(var ti=0;ti<Math.min(newImgs.length,10);ti++){
+                th+='<img src="'+esc(newImgs[ti])+'" class="dhpdp-thumb" data-idx="'+ti+'" style="width:64px;height:64px;object-fit:contain;border-radius:8px;border:2px solid '+(ti===0?'#e53e3e':'#eee')+';cursor:pointer;flex-shrink:0;background:#fafafa" onerror="this.style.display=\'none\'">';
+              }
+              thumbsContainer.innerHTML=th;
+              imgs=newImgs;
+              /* Rebind thumb clicks */
+              thumbsContainer.querySelectorAll('.dhpdp-thumb').forEach(function(t2){
+                t2.addEventListener('click',function(){
+                  var idx2=parseInt(this.dataset.idx);
+                  if(mainImg&&imgs[idx2])mainImg.src=imgs[idx2];
+                  thumbsContainer.querySelectorAll('.dhpdp-thumb').forEach(function(t3){t3.style.borderColor='#eee'});
+                  this.style.borderColor='#e53e3e';
+                });
+              });
+            }
+            /* If color changed, update size options with new availability */
+            if(np.options){
+              var sizeOpt=np.options.find(function(o){return o.name==='Size'});
+              if(sizeOpt){
+                var sizeGroup=container.querySelector('.dhpdp-opt-group[data-group="Size"] .sh-size-options');
+                if(sizeGroup){
+                  var sh='';
+                  for(var si=0;si<sizeOpt.values.length;si++){
+                    var sv=sizeOpt.values[si];
+                    var isAvail=sv.is_available!==false;
+                    sh+='<button class="dhpdp-opt sh-size-pill'+(isAvail?'':' dhpdp-opt-unavail')+'" data-option="'+container.querySelector('.dhpdp-opt-group[data-group="Size"]').querySelector('[data-option]').dataset.option+'" data-value="'+si+'" data-valtitle="'+esc(sv.value)+'" data-asin="'+(sv.asin||'')+'" data-dim="Size" '+(isAvail?'':'disabled ')+' title="'+esc(sv.value)+(isAvail?'':' - Unavailable')+'" style="min-width:44px;padding:8px 14px;border-radius:8px;border:2px solid '+(isAvail?'#ddd':'#eee')+';cursor:'+(isAvail?'pointer':'not-allowed')+';background:#fff;font-size:13px;font-weight:400;color:'+(isAvail?'#333':'#bbb')+';text-align:center;opacity:'+(isAvail?'1':'0.6')+';text-decoration:'+(isAvail?'none':'line-through')+'">'+esc(sv.value)+'</button>';
+                  }
+                  sizeGroup.innerHTML=sh;
+                  /* Rebind size click handlers */
+                  sizeGroup.querySelectorAll('.dhpdp-opt').forEach(function(sb){
+                    sb.addEventListener('click',variantClickHandler);
+                  });
+                }
+              }
+            }
+          }
+          /* Update availability */
+          if(np.availability)p.availability=np.availability;
+          /* Update active ASIN */
+          _currentAsin=newAsin;
+          _pdpProductData=np;
+          /* Update URL without reload */
+          history.replaceState(null,'','/pages/product?id='+encodeURIComponent(newAsin)+'&store=amazon');
+        })
+        .catch(function(err){
+          console.error('Variant load error:',err);
+        })
+        .finally(function(){
+          _variantLoading=false;
+          hideVariantLoading();
         });
-        this.style.borderColor='#e53e3e';this.style.background='#fef2f2';this.classList.add('dhpdp-opt-sel');
-        updateOptionLabels();
-        var variant=findVariantBySelection();
-        if(variant){updatePriceDisplay(variant);updateMainImage(variant);}
-        if(!variant||!variant.image){
-          var btnImg=this.querySelector('img');
-          if(btnImg&&btnImg.src){var mainImg=document.getElementById('dhpdp-main-img');if(mainImg)mainImg.src=btnImg.src;}
-        }
+    }
+
+    function variantClickHandler(){
+      var optIdx=this.dataset.option;
+      var asin=this.dataset.asin;
+      var dim=this.dataset.dim;
+      var val=this.dataset.valtitle;
+      /* Mark selected */
+      container.querySelectorAll('.dhpdp-opt[data-option="'+optIdx+'"]').forEach(function(b){
+        b.style.borderColor='#ddd';b.style.background='#fff';b.style.fontWeight='400';b.classList.remove('dhpdp-opt-sel');
+      });
+      this.style.borderColor='#e53e3e';this.style.background='#fef2f2';this.style.fontWeight='600';this.classList.add('dhpdp-opt-sel');
+      updateOptionLabels();
+      /* If ASIN available, call API */
+      if(asin&&asin!==_currentAsin){
+        selectVariant(asin,dim,val,this);
+      }else if(!asin){
+        /* Fallback: update image from button photo */
+        var btnImg=this.querySelector('img');
+        if(btnImg&&btnImg.src){var mainImg=document.getElementById('dhpdp-main-img');if(mainImg)mainImg.src=btnImg.src;}
+      }
+    }
+
+    container.querySelectorAll('.dhpdp-opt').forEach(function(btn){
+      btn.addEventListener('click',variantClickHandler);
+    });
+
+    /* ═══ QUANTITY SELECTOR ═══ */
+    var qtyInput=document.getElementById('sh-qty');
+    var qtyMinus=document.getElementById('sh-qty-minus');
+    var qtyPlus=document.getElementById('sh-qty-plus');
+    function updateQtyBtns(){
+      if(!qtyInput)return;
+      var v=parseInt(qtyInput.value)||1;
+      var max=parseInt(qtyInput.max)||10;
+      if(qtyMinus)qtyMinus.disabled=v<=1;
+      if(qtyPlus)qtyPlus.disabled=v>=max;
+    }
+    if(qtyMinus)qtyMinus.addEventListener('click',function(){
+      var v=parseInt(qtyInput.value)||1;
+      if(v>1){qtyInput.value=v-1;updateQtyBtns()}
+    });
+    if(qtyPlus)qtyPlus.addEventListener('click',function(){
+      var v=parseInt(qtyInput.value)||1;
+      var max=parseInt(qtyInput.max)||10;
+      if(v<max){qtyInput.value=v+1;updateQtyBtns()}
+    });
+    updateQtyBtns();
+
+    /* ═══ SIZE CHART LINK ═══ */
+    container.querySelectorAll('.sh-size-chart-link').forEach(function(link){
+      link.addEventListener('click',function(e){
+        e.preventDefault();
+        showSizeChart(this.dataset.category);
       });
     });
 
@@ -746,13 +973,9 @@
 
     function getSelectedVariant(){
       var parts=[];
-      container.querySelectorAll('.dhpdp-variants > div').forEach(function(group){
+      container.querySelectorAll('.dhpdp-opt-group').forEach(function(group){
         var sel=group.querySelector('.dhpdp-opt-sel');
-        if(sel){
-          var optIdx=parseInt(sel.dataset.option);
-          var valIdx=parseInt(sel.dataset.value);
-          if(p.options&&p.options[optIdx]&&p.options[optIdx].values&&p.options[optIdx].values[valIdx])parts.push(p.options[optIdx].values[valIdx].value);
-        }
+        if(sel)parts.push(sel.dataset.valtitle||'');
       });
       if(parts.length===0)return null;
       var selectedTitle=parts.join(' / ');
@@ -772,7 +995,9 @@
       else btn.textContent='Syncing... (attempt '+(retryAttempt+1)+')';
 
       var variant=getSelectedVariant();
-      var body={source:store,sourceId:productId,quantity:1};
+      var qty=parseInt((document.getElementById('sh-qty')||{}).value)||1;
+      var activeId=_currentAsin||productId;
+      var body={source:store,sourceId:activeId,quantity:qty};
       if(variant)body.selectedVariant=variant;
       if(retryAttempt>0)body.forceResync=true;
       if(_pdpProductData&&retryAttempt===0)body.productData=_pdpProductData;
@@ -785,7 +1010,7 @@
       .then(function(data){
         if(!data.shopifyVariantId)throw new Error(data.error||'Sync failed — no variant ID');
         return fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({items:[{id:data.shopifyVariantId,quantity:1,properties:{_source:store,_source_id:productId}}]})
+          body:JSON.stringify({items:[{id:data.shopifyVariantId,quantity:qty,properties:{_source:store,_source_id:activeId}}]})
         });
       })
       .then(function(r){
@@ -852,6 +1077,101 @@
 
   function renderStars(r){var s='';for(var i=1;i<=5;i++){if(i<=Math.floor(r))s+='\u2605';else if(i-r<1)s+='\u2605';else s+='\u2606'}return s}
   function fmtNum(n){if(!n)return '0';n=parseInt(n);if(isNaN(n)||n<=0)return '0';if(n>=1000000)return(n/1000000).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return String(n)}
+
+  /* ═══ SIZE CHARTS DATA & MODAL ═══ */
+  var SIZE_CHARTS={
+    shoes:{title:'Shoe Size Chart',tabs:[
+      {label:"Men's",headers:['US','EU','UK','CM','Inches'],rows:[['6','39','5.5','24','9.4'],['6.5','39.5','6','24.5','9.6'],['7','40','6.5','25','9.8'],['7.5','40.5','7','25.5','10'],['8','41','7.5','26','10.2'],['8.5','42','8','26.5','10.4'],['9','42.5','8.5','27','10.6'],['9.5','43','9','27.5','10.8'],['10','44','9.5','28','11'],['10.5','44.5','10','28.5','11.2'],['11','45','10.5','29','11.4'],['12','46','11.5','30','11.8'],['13','47.5','12.5','31','12.2'],['14','48.5','13.5','32','12.6']]},
+      {label:"Women's",headers:['US','EU','UK','CM','Inches'],rows:[['5','35.5','2.5','22','8.7'],['5.5','36','3','22.5','8.9'],['6','36.5','3.5','23','9.1'],['6.5','37','4','23.5','9.3'],['7','37.5','4.5','24','9.4'],['7.5','38','5','24.5','9.6'],['8','39','5.5','25','9.8'],['8.5','39.5','6','25.5','10'],['9','40','6.5','26','10.2'],['9.5','41','7','26.5','10.4'],['10','41.5','7.5','27','10.6'],['11','42.5','8.5','28','11'],['12','44','9.5','29','11.4']]}
+    ],howToMeasure:'Stand on a piece of paper and trace your foot. Measure from the heel to the longest toe in cm or inches.'},
+    tops:{title:'Tops Size Chart',tabs:[
+      {label:"Men's",headers:['Size','US','Chest (in)','Chest (cm)','Length (in)'],rows:[['XS','34','34-36','86-91','27'],['S','36','36-38','91-97','28'],['M','38-40','38-40','97-102','29'],['L','42-44','42-44','107-112','30'],['XL','46','46-48','117-122','31'],['XXL','48-50','48-50','122-127','32']]},
+      {label:"Women's",headers:['Size','US','Bust (in)','Bust (cm)','Waist (in)'],rows:[['XS','0-2','31-33','79-84','24-26'],['S','4-6','33-35','84-89','26-28'],['M','8-10','35-37','89-94','28-30'],['L','12-14','38-40','97-102','31-33'],['XL','16-18','41-43','104-109','34-36'],['XXL','20-22','44-46','112-117','37-39']]}
+    ],howToMeasure:'Chest/Bust: Measure around the fullest part. Waist: Measure around your natural waistline.'},
+    dresses:{title:'Dress Size Chart',tabs:[
+      {label:"Women's",headers:['Size','US','Bust (in)','Waist (in)','Hips (in)'],rows:[['XS','0-2','31-33','24-26','34-36'],['S','4-6','33-35','26-28','36-38'],['M','8-10','35-37','28-30','38-40'],['L','12-14','38-40','31-33','41-43'],['XL','16-18','41-43','34-36','44-46'],['XXL','20-22','44-46','37-39','47-49']]}
+    ],howToMeasure:'Bust: Measure around the fullest part. Waist: Measure around your natural waistline. Hips: Measure around the fullest part of your hips.'},
+    bottoms:{title:'Pants & Jeans Size Chart',tabs:[
+      {label:"Men's",headers:['Size','Waist (in)','Waist (cm)','Hips (in)','Inseam (in)'],rows:[['28','28-29','71-74','35-36','30-32'],['30','30-31','76-79','37-38','30-32'],['32','32-33','81-84','39-40','30-32'],['34','34-35','86-89','41-42','30-32'],['36','36-37','91-94','43-44','30-32'],['38','38-39','97-99','45-46','30-32'],['40','40-41','102-104','47-48','30-32']]},
+      {label:"Women's",headers:['Size','US','Waist (in)','Hips (in)','Inseam (in)'],rows:[['XS','0-2','24-26','34-36','28-30'],['S','4-6','26-28','36-38','28-30'],['M','8-10','28-30','38-40','29-31'],['L','12-14','31-33','41-43','29-31'],['XL','16-18','34-36','44-46','30-32']]}
+    ],howToMeasure:'Waist: Measure around your natural waistline. Hips: Measure around the fullest part. Inseam: Measure from crotch seam to bottom of leg.'},
+    outerwear:{title:'Outerwear Size Chart',tabs:[
+      {label:"Men's",headers:['Size','Chest (in)','Chest (cm)','Shoulder (in)'],rows:[['S','36-38','91-97','17-17.5'],['M','38-40','97-102','17.5-18'],['L','42-44','107-112','18-18.5'],['XL','46-48','117-122','18.5-19'],['XXL','50-52','127-132','19-19.5']]},
+      {label:"Women's",headers:['Size','Bust (in)','Bust (cm)','Shoulder (in)'],rows:[['XS','31-33','79-84','14-14.5'],['S','33-35','84-89','14.5-15'],['M','35-37','89-94','15-15.5'],['L','38-40','97-102','15.5-16'],['XL','41-43','104-109','16-16.5']]}
+    ],howToMeasure:'Chest/Bust: Measure around the fullest part over a thin layer of clothing.'},
+    underwear:{title:'Underwear Size Chart',tabs:[
+      {label:"Men's",headers:['Size','Waist (in)','Waist (cm)'],rows:[['S','28-30','71-76'],['M','32-34','81-86'],['L','36-38','91-97'],['XL','40-42','102-107'],['XXL','44-46','112-117']]},
+      {label:"Women's",headers:['Size','US','Waist (in)','Hips (in)'],rows:[['XS','0-2','24-25','34-35'],['S','4-6','26-27','36-37'],['M','8-10','28-29','38-39'],['L','12-14','30-32','40-42'],['XL','16-18','33-35','43-45']]}
+    ],howToMeasure:'Waist: Measure around your natural waistline. Hips: Measure around the fullest part.'},
+    kids:{title:'Kids Size Chart',tabs:[
+      {label:'Toddler (2-6)',headers:['Size','Age','Height (in)','Weight (lbs)','Chest (in)'],rows:[['2T','2','33-35','27-30','21'],['3T','3','35-38','30-33','22'],['4T','4','38-41','33-37','23'],['5','5','41-44','37-42','24'],['6','6','44-47','42-47','25']]},
+      {label:'Kids (7-14)',headers:['Size','Age','Height (in)','Weight (lbs)','Chest (in)'],rows:[['S (6-7)','6-7','47-50','47-55','25-26'],['M (8-10)','8-10','50-55','55-70','27-28.5'],['L (10-12)','10-12','55-59','70-85','28.5-30'],['XL (14-16)','14-16','59-63','85-105','31-32.5']]},
+      {label:'Kids Shoes',headers:['US','EU','UK','Age','Foot (in)'],rows:[['10C','27','9','4-5','6.5'],['11C','28','10','4-5','6.8'],['12C','30','11','5-6','7.1'],['13C','31','12','6-7','7.4'],['1Y','32','13','7-8','7.8'],['2Y','33','1','8-9','8.1'],['3Y','35','2','9-10','8.5'],['4Y','36','3','10-11','8.8'],['5Y','37','4','11-12','9.1'],['6Y','38.5','5','12-13','9.5'],['7Y','40','6','13+','9.8']]}
+    ],howToMeasure:'Height: Measure standing straight against a wall. For shoes, trace the foot on paper and measure heel to toe.'},
+    jewelry:{title:'Ring Size Chart',headers:['US','UK','EU','Diameter (mm)','Circumference (mm)'],rows:[['5','J½','49','15.7','49.3'],['6','L½','51.5','16.5','51.8'],['7','N½','54','17.3','54.4'],['8','P½','57','18.1','57'],['9','R½','59','19','59.5'],['10','T½','62','19.8','62.1'],['11','V½','64','20.6','64.6'],['12','Y','67','21.4','67.2']],howToMeasure:'Wrap a thin strip of paper around your finger. Mark where it overlaps. Measure the length in mm.'},
+    accessories:{title:'Belt Size Chart',headers:['Size','Waist (in)','Belt Length (in)'],rows:[['S','28-30','32-34'],['M','32-34','36-38'],['L','36-38','40-42'],['XL','40-42','44-46'],['XXL','44-46','48-50']],howToMeasure:'Measure around where you normally wear your belt. Order a belt 2 inches larger than your waist measurement.'}
+  };
+
+  function showSizeChart(category){
+    var chart=SIZE_CHARTS[category];
+    if(!chart)return;
+    var h='<div id="sh-size-chart-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px">';
+    h+='<div style="background:#fff;border-radius:12px;max-width:680px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
+    h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #eee">';
+    h+='<h3 style="margin:0;font-size:18px;font-weight:700;color:#1a1a1a">'+esc(chart.title)+'</h3>';
+    h+='<button id="sh-size-chart-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:#666;padding:4px 8px">\u2715</button>';
+    h+='</div>';
+    /* Tabs */
+    var tabs=chart.tabs||[chart];
+    if(chart.tabs&&chart.tabs.length>1){
+      h+='<div style="display:flex;gap:0;border-bottom:1px solid #eee;padding:0 20px" class="sh-chart-tabs">';
+      tabs.forEach(function(tab,i){
+        h+='<button class="sh-chart-tab'+(i===0?' sh-chart-tab-active':'')+'" data-tab="'+i+'" style="padding:10px 16px;font-size:14px;font-weight:'+(i===0?'600':'400')+';color:'+(i===0?'#e53e3e':'#666')+';border:none;background:none;cursor:pointer;border-bottom:2px solid '+(i===0?'#e53e3e':'transparent')+';margin-bottom:-1px">'+esc(tab.label)+'</button>';
+      });
+      h+='</div>';
+    }
+    /* Table container */
+    h+='<div id="sh-chart-body" style="padding:16px 20px;overflow-x:auto">';
+    h+=renderSizeTable(tabs[0]);
+    h+='</div>';
+    if(chart.howToMeasure){
+      h+='<div style="padding:12px 20px;background:#f8fafc;border-top:1px solid #eee;border-radius:0 0 12px 12px;font-size:13px;color:#666"><b>How to measure:</b> '+esc(chart.howToMeasure)+'</div>';
+    }
+    h+='</div></div>';
+    document.body.insertAdjacentHTML('beforeend',h);
+    document.body.style.overflow='hidden';
+    /* Close handlers */
+    document.getElementById('sh-size-chart-close').addEventListener('click',closeSizeChart);
+    document.getElementById('sh-size-chart-overlay').addEventListener('click',function(e){if(e.target===this)closeSizeChart()});
+    /* Tab handlers */
+    document.querySelectorAll('.sh-chart-tab').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var idx=parseInt(this.dataset.tab);
+        document.querySelectorAll('.sh-chart-tab').forEach(function(t){t.style.fontWeight='400';t.style.color='#666';t.style.borderBottomColor='transparent';t.classList.remove('sh-chart-tab-active')});
+        this.style.fontWeight='600';this.style.color='#e53e3e';this.style.borderBottomColor='#e53e3e';this.classList.add('sh-chart-tab-active');
+        var body=document.getElementById('sh-chart-body');
+        if(body&&tabs[idx])body.innerHTML=renderSizeTable(tabs[idx]);
+      });
+    });
+    document.addEventListener('keydown',function esc_handler(e){if(e.key==='Escape'){closeSizeChart();document.removeEventListener('keydown',esc_handler)}});
+  }
+  function closeSizeChart(){
+    var ov=document.getElementById('sh-size-chart-overlay');
+    if(ov)ov.remove();
+    document.body.style.overflow='';
+  }
+  function renderSizeTable(data){
+    var h='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>';
+    (data.headers||[]).forEach(function(hdr){h+='<th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;background:#f9fafb;border-bottom:2px solid #e5e7eb">'+esc(hdr)+'</th>'});
+    h+='</tr></thead><tbody>';
+    (data.rows||[]).forEach(function(row,ri){
+      h+='<tr style="background:'+(ri%2===0?'#fff':'#f9fafb')+'">';
+      row.forEach(function(cell,ci){h+='<td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;'+(ci===0?'font-weight:600;color:#1a1a1a':'color:#4b5563')+'">'+esc(cell)+'</td>'});
+      h+='</tr>';
+    });
+    h+='</tbody></table>';
+    return h;
+  }
 
   function addToRecentlyViewed(p){
     try{

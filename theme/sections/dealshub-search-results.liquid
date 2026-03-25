@@ -730,11 +730,15 @@
 
     // Re-render
     displayedCount = 0;
+    isLoadingMore = false;
+    _scrollEnabled = true;
     grid.innerHTML = '';
     showResults();
     renderFilterPanels();
     renderActiveChips();
     updateURL();
+    /* Re-enable scroll loading for filtered results */
+    _scrollEnabled = true;
   }
 
   function applySort() {
@@ -1006,10 +1010,14 @@
       filteredResults = allResults.filter(function(p) { return passesFilters(p); });
       applySort();
       displayedCount = 0;
+      isLoadingMore = false;
+      _scrollEnabled = true;
       renderFilterPanels();
       renderActiveChips();
       showResults();
       updateURL();
+      /* Re-enable scroll loading for new result set */
+      _scrollEnabled = true;
     } catch (err) {
       console.error('Search error:', err);
       showEmpty();
@@ -1045,7 +1053,7 @@
       if (displayedCount > PAGE_SIZE) showEndMsg();
     }
     bindCardActions();
-    isLoadingMore = false;
+    /* NOTE: isLoadingMore is now managed by callers (loadMoreIfNeeded) — not here */
   }
 
   /* ─── Card rendering ─── */
@@ -1202,40 +1210,68 @@
     } catch (ex) {}
   }
 
-  /* ─── Infinite scroll (batch-based, no runaway loops) ─── */
+  /* ─── Infinite scroll (scroll-event based — no IntersectionObserver) ─── *
+   * Why scroll events instead of IntersectionObserver?
+   * IO re-fires immediately when the sentinel is already in view after
+   * reconnection, creating runaway fetch loops even with cooldowns.
+   * Scroll events only fire on ACTUAL user scroll — no phantom triggers.
+   */
   var _scrollFetchTimeout = null;
-  function loadMoreIfNeeded() {
-    if (isLoadingMore) return;
-    /* Case 1: we have filtered results not yet rendered — show one batch */
+  var _scrollEnabled = true;            /* Master switch */
+  var _scrollThrottleId = null;
+
+  function isNearBottom() {
+    if (!scrollSentinel) return false;
+    var rect = scrollSentinel.getBoundingClientRect();
+    return rect.top < window.innerHeight + 300;  /* 300px before sentinel */
+  }
+
+  function onScrollCheck() {
+    if (!_scrollEnabled || isLoadingMore) return;
+    if (!isNearBottom()) return;
+
+    /* Case 1: buffered results not yet rendered */
     if (displayedCount < filteredResults.length) {
       isLoadingMore = true;
+      _scrollEnabled = false;
       showResults();
-      /* Do NOT self-call — IntersectionObserver re-triggers on next scroll */
+      isLoadingMore = false;
+      /* Re-enable after brief pause so user must scroll again */
+      setTimeout(function() { _scrollEnabled = true; }, 800);
       return;
     }
-    /* Case 2: need to fetch next API page */
+
+    /* Case 2: fetch next API page */
     if (!noMoreResults && !isFetchingPage && apiPage < MAX_API_PAGES) {
       isLoadingMore = true;
-      /* Safety timeout: if fetch takes >18s, hide spinner and show retry */
+      _scrollEnabled = false;
+
       clearTimeout(_scrollFetchTimeout);
       _scrollFetchTimeout = setTimeout(function() {
         if (isLoadingMore) {
-          console.warn('Infinite scroll: fetch timeout, showing retry');
+          console.warn('Infinite scroll: fetch timeout');
           hideSentinel();
           showRetryBtn();
           isLoadingMore = false;
           isFetchingPage = false;
+          /* Do NOT re-enable scroll — retry button handles it */
         }
       }, 18000);
+
       fetchNextPage().then(function(gotMore) {
         clearTimeout(_scrollFetchTimeout);
         if (gotMore) {
           showResults();
-          /* Stop here — observer re-fires on next scroll */
+          /* Re-enable scroll listener after pause */
+          setTimeout(function() {
+            isLoadingMore = false;
+            _scrollEnabled = true;
+          }, 800);
         } else {
           hideSentinel();
           if (displayedCount > PAGE_SIZE) showEndMsg();
           isLoadingMore = false;
+          /* Don't re-enable — we're done */
         }
       }).catch(function(err) {
         clearTimeout(_scrollFetchTimeout);
@@ -1247,12 +1283,23 @@
       });
       return;
     }
-    /* Case 3: hit max pages or no more results */
+
+    /* Case 3: done */
     if (apiPage >= MAX_API_PAGES || noMoreResults) {
       hideSentinel();
       if (displayedCount > PAGE_SIZE) showEndMsg();
+      _scrollEnabled = false;  /* Permanently stop */
     }
   }
+
+  /* Throttled scroll handler — fires at most every 250ms */
+  window.addEventListener('scroll', function() {
+    if (_scrollThrottleId) return;
+    _scrollThrottleId = setTimeout(function() {
+      _scrollThrottleId = null;
+      onScrollCheck();
+    }, 250);
+  }, { passive: true });
 
   /* Retry button for failed/timed-out loads */
   function showRetryBtn() {
@@ -1262,22 +1309,16 @@
     var btn = document.createElement('div');
     btn.id = 'dh-retry-btn';
     btn.style.cssText = 'text-align:center;padding:20px 0 40px';
-    btn.innerHTML = '<button style="padding:10px 28px;background:#e53e3e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer" onclick="this.parentElement.style.display=\'none\'">Load More Products</button>';
+    btn.innerHTML = '<button style="padding:10px 28px;background:#e53e3e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Load More Products</button>';
     btn.querySelector('button').addEventListener('click', function() {
       btn.style.display = 'none';
       showSentinel();
-      loadMoreIfNeeded();
+      _scrollEnabled = true;
+      isLoadingMore = false;
+      onScrollCheck();
     });
     scrollSentinel.parentNode.insertBefore(btn, scrollSentinel.nextSibling);
   }
-
-  var scrollObserver = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (!entry.isIntersecting) return;
-      loadMoreIfNeeded();
-    });
-  }, { rootMargin: '200px' });
-  if (scrollSentinel) scrollObserver.observe(scrollSentinel);
 
   /* ─── Sort change ─── */
   if (sortSelect) sortSelect.addEventListener('change', function() {

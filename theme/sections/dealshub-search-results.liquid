@@ -4,26 +4,6 @@
 {% endcomment %}
 
 <div id="dh-search-page" class="dh-search-page">
-  <!-- Search Bar -->
-  <div class="dh-search-hero">
-    <div class="dh-search-hero__inner page-width">
-      <h1 class="dh-search-hero__title">{{ section.settings.title | default: 'Search Products' }}</h1>
-      <form class="dh-search-bar" id="dh-search-form" autocomplete="off">
-        <div class="dh-search-bar__wrap">
-          <svg class="dh-search-bar__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input
-            type="search"
-            id="dh-search-input"
-            class="dh-search-bar__input"
-            placeholder="{{ section.settings.placeholder | default: 'Search all stores...' }}"
-            aria-label="Search products"
-          >
-          <button type="submit" class="dh-search-bar__btn">Search</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- Toolbar: Filters & Sort -->
   <div class="dh-toolbar page-width">
     <div class="dh-toolbar__left">
@@ -74,10 +54,12 @@
     <!-- Product Grid -->
     <div id="dh-product-grid" class="dh-grid dh-grid--hidden"></div>
 
-    <!-- Load More -->
-    <div id="dh-load-more-wrap" class="dh-load-more dh-load-more--hidden">
-      <button id="dh-load-more" class="dh-load-more__btn">Load More Products</button>
+    <!-- Infinite scroll sentinel + loading spinner -->
+    <div id="dh-scroll-sentinel" class="dh-scroll-sentinel dh-scroll-sentinel--hidden">
+      <div class="dh-scroll-spinner"><div class="dh-spinner-sm"></div> Loading more products...</div>
     </div>
+    <!-- End of results message -->
+    <div id="dh-end-msg" class="dh-end-msg dh-end-msg--hidden">You've seen all results</div>
   </div>
 
   <!-- Recently Viewed -->
@@ -98,13 +80,11 @@
   const $$ = s => document.querySelectorAll(s);
 
   // DOM refs
-  const form = $('#dh-search-form');
-  const input = $('#dh-search-input');
   const grid = $('#dh-product-grid');
   const skeleton = $('#dh-skeleton');
   const empty = $('#dh-empty');
-  const loadMoreWrap = $('#dh-load-more-wrap');
-  const loadMoreBtn = $('#dh-load-more');
+  const scrollSentinel = $('#dh-scroll-sentinel');
+  const endMsg = $('#dh-end-msg');
   const resultCount = $('#dh-result-count');
   const sortSelect = $('#dh-sort');
 
@@ -127,7 +107,6 @@
     currentCategory = cat;
 
     if (q) {
-      input.value = q;
       currentQuery = q;
       currentOrigin = origin;
       setActiveChip(origin);
@@ -142,7 +121,8 @@
     showSkeleton();
     hideEmpty();
     hideGrid();
-    hideLoadMore();
+    hideSentinel();
+    hideEndMsg();
 
     try {
       // Always search both active stores (backend already filters paused ones)
@@ -150,7 +130,7 @@
 
       // Parallel search across active sources, passing category if set
       const promises = sources.map(s => {
-        var opts = { store: s, limit: 20 };
+        var opts = { store: s, limit: 40 };
         if (currentCategory) opts.category = currentCategory;
         return API.search(query, opts)
           .then(resp => (resp && resp.results) ? resp.results : (Array.isArray(resp) ? resp : []))
@@ -213,10 +193,14 @@
   }
 
   // Display results
+  let isLoadingMore = false;
+
   function showResults() {
     if (filteredResults.length === 0) {
       showEmpty();
       resultCount.textContent = '';
+      hideSentinel();
+      hideEndMsg();
       return;
     }
 
@@ -235,12 +219,15 @@
     showGrid();
 
     if (displayedCount < filteredResults.length) {
-      showLoadMore();
+      showSentinel();
+      hideEndMsg();
     } else {
-      hideLoadMore();
+      hideSentinel();
+      if (displayedCount > PAGE_SIZE) showEndMsg();
     }
 
     bindCardActions();
+    isLoadingMore = false;
   }
 
   // Render a single card
@@ -356,15 +343,17 @@
     showResults();
   });
 
-  // Form submit
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    currentQuery = input.value.trim();
-    if (currentQuery) doSearch(currentQuery, currentOrigin);
-  });
+  // Infinite scroll via IntersectionObserver
+  const scrollObserver = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting && !isLoadingMore && displayedCount < filteredResults.length) {
+        isLoadingMore = true;
+        showResults();
+      }
+    });
+  }, { rootMargin: '400px' });
 
-  // Load more
-  loadMoreBtn.addEventListener('click', () => showResults());
+  if (scrollSentinel) scrollObserver.observe(scrollSentinel);
 
   // Show/hide helpers
   function showSkeleton() { skeleton.classList.remove('dh-grid--hidden'); }
@@ -373,64 +362,16 @@
   function hideGrid() { grid.classList.add('dh-grid--hidden'); grid.innerHTML = ''; }
   function showEmpty() { empty.classList.remove('dh-empty--hidden'); }
   function hideEmpty() { empty.classList.add('dh-empty--hidden'); }
-  function showLoadMore() { loadMoreWrap.classList.remove('dh-load-more--hidden'); }
-  function hideLoadMore() { loadMoreWrap.classList.add('dh-load-more--hidden'); }
+  function showSentinel() { scrollSentinel.classList.remove('dh-scroll-sentinel--hidden'); }
+  function hideSentinel() { scrollSentinel.classList.add('dh-scroll-sentinel--hidden'); }
+  function showEndMsg() { endMsg.classList.remove('dh-end-msg--hidden'); }
+  function hideEndMsg() { endMsg.classList.add('dh-end-msg--hidden'); }
 
   init();
 })();
 </script>
 
 <style>
-  /* Search Hero */
-  .dh-search-hero {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    padding: 40px 0 32px;
-  }
-  .dh-search-hero__title {
-    color: #fff;
-    font-size: 28px;
-    font-weight: 700;
-    margin: 0 0 20px;
-    text-align: center;
-  }
-  .dh-search-bar__wrap {
-    display: flex;
-    max-width: 680px;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0,0,0,.15);
-  }
-  .dh-search-bar__icon {
-    margin: 14px 0 14px 16px;
-    color: #999;
-    flex-shrink: 0;
-  }
-  .dh-search-bar__input {
-    flex: 1;
-    border: none;
-    padding: 14px 12px;
-    font-size: 16px;
-    outline: none;
-    background: transparent;
-    color: #1a1a2e;
-  }
-  .dh-search-bar__input::placeholder {
-    color: #999;
-  }
-  .dh-search-bar__btn {
-    padding: 14px 28px;
-    background: #e53e3e;
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    transition: background .2s;
-  }
-  .dh-search-bar__btn:hover { background: #c53030; }
-
   /* Toolbar */
   .dh-toolbar {
     display: flex;
@@ -535,24 +476,26 @@
     font-size: 14px;
   }
 
-  /* Load More */
-  .dh-load-more {
+  /* Infinite scroll sentinel */
+  .dh-scroll-sentinel {
     text-align: center;
-    padding: 20px 0 40px;
+    padding: 24px 0 40px;
   }
-  .dh-load-more--hidden { display: none; }
-  .dh-load-more__btn {
-    padding: 12px 40px;
-    background: #1a1a2e;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background .2s;
+  .dh-scroll-sentinel--hidden { display: none; }
+  .dh-scroll-spinner {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #888;
   }
-  .dh-load-more__btn:hover { background: #2a2a4e; }
+  .dh-end-msg {
+    text-align: center;
+    padding: 16px 0 40px;
+    font-size: 13px;
+    color: #aaa;
+  }
+  .dh-end-msg--hidden { display: none; }
 
   /* Section */
   .dh-section { padding: 32px 0; }

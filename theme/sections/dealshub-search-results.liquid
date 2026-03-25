@@ -1183,7 +1183,7 @@
     display: grid;
     grid-template-columns: 260px 1fr;
     gap: 24px;
-    padding-bottom: 32px;
+    padding: 0 20px 32px;
   }
 
   /* ─── Active Chips Bar ─── */
@@ -1191,7 +1191,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 0;
+    padding: 12px 20px;
     flex-wrap: wrap;
   }
   .dh-active-filters__list {
@@ -1231,7 +1231,7 @@
     top: 80px;
     max-height: calc(100vh - 100px);
     overflow-y: auto;
-    padding-right: 8px;
+    padding: 0 12px 0 4px;
   }
   .dh-sidebar::-webkit-scrollbar { width: 4px; }
   .dh-sidebar::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
@@ -1637,18 +1637,21 @@
 
   /* ─── Mobile ─── */
   @media (max-width: 900px) {
-    .dh-layout { display: block; }
+    .dh-layout { display: block; padding: 0 16px 32px; }
     .dh-sidebar { display: none; }
     .dh-mobile-filter-btn { display: inline-flex; }
     .dh-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+    .dh-active-filters { padding: 12px 16px; }
   }
   @media (max-width: 480px) {
+    .dh-layout { padding: 0 12px 24px; }
     .dh-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .dh-card__body { padding: 8px; }
     .dh-card__title { font-size: 12px; }
     .dh-card__price { font-size: 14px; }
     .dh-card__actions { padding: 0 8px 8px; }
     .dh-active-chip { font-size: 11px; padding: 4px 8px; }
+    .dh-active-filters { padding: 12px 12px; }
   }
 </style>
 

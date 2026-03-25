@@ -17,11 +17,14 @@ const SEARCH_ENDPOINTS = [
   '/item_search_4',  // Alternate
 ];
 
-const DETAIL_ENDPOINTS = [
-  '/item_detail_2',  // Confirmed working 2026-03-17
-  '/item_detail_3',  // Alternate
-  '/item_detail_6',  // Alternate
-];
+// Primary detail endpoints — item_detail_2 for shipping/origin/seller, item_detail_6 for description/specs/reviews/video
+const DETAIL_PRIMARY = '/item_detail_2';
+const DETAIL_ENRICHMENT = '/item_detail_6';
+const DETAIL_FALLBACK = '/item_detail_3';
+const STORE_INFO_ENDPOINT = '/store_info';
+
+// In-memory cache for store_info (24h TTL)
+const storeInfoCache = new Map();
 
 class AliExpressAdapter extends BaseAdapter {
   constructor(config) {
@@ -132,107 +135,224 @@ class AliExpressAdapter extends BaseAdapter {
 
   _delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-  async getProduct(productId, opts = {}) {
-    // ---- OPTIMIZED: Run all 3 detail endpoints in PARALLEL ----
-    // Old: sequential (up to 60s if all timeout). New: parallel (max ~20s)
-    const tryDetailEndpoint = async (endpoint) => {
-      try {
-        const url = `https://${SEARCH_HOST}${endpoint}?itemId=${encodeURIComponent(productId)}`;
-        const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
-        if (!data) {
-          logger.warn('aliexpress', `${endpoint} returned null/empty`, { productId });
-          return null;
-        }
-        if (!data.result) {
-          logger.warn('aliexpress', `${endpoint} no result key`, { productId, keys: Object.keys(data).join(',') });
-          return null;
-        }
-
-        const statusData = data.result.status?.data;
-        const statusCode = data.result.status?.code;
-        if (statusData === 'error' || (statusCode && statusCode >= 5000)) {
-          logger.warn('aliexpress', `${endpoint} API error`, { productId, statusCode });
-          return null;
-        }
-
-        logger.info('aliexpress', `${endpoint} response`, { productId, keys: Object.keys(data.result).join(','), hasItem: !!data.result.item });
-
-        if (data.result.item) {
-          logger.info('aliexpress', `Detail success via ${endpoint}`, { productId });
-          const product = this.normalizeProduct(data.result);
-          if (product && product.price) return product;
-          if (product) {
-            const priceProduct = await this._fillPriceFromSearch(product, productId);
-            if (priceProduct.price) return priceProduct;
-          }
-          return null;
-        }
-
-        if (data.result.itemId || data.result.title) {
-          const product = this.normalizeProduct(data.result);
-          if (product && product.price) return product;
-          if (product) {
-            const priceProduct = await this._fillPriceFromSearch(product, productId);
-            if (priceProduct.price) return priceProduct;
-          }
-          return null;
-        }
-        return null;
-      } catch (e) {
-        logger.warn('aliexpress', `${endpoint} failed`, { error: e.message, productId });
+  // Fetch a single detail endpoint, return raw result or null
+  async _fetchDetailEndpoint(endpoint, productId) {
+    try {
+      const url = `https://${SEARCH_HOST}${endpoint}?itemId=${encodeURIComponent(productId)}`;
+      const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
+      if (!data || !data.result) {
+        logger.warn('aliexpress', `${endpoint} returned null/no result`, { productId });
         return null;
       }
-    };
+      const statusData = data.result.status?.data;
+      const statusCode = data.result.status?.code;
+      if (statusData === 'error' || (statusCode && statusCode >= 5000)) {
+        logger.warn('aliexpress', `${endpoint} API error`, { productId, statusCode });
+        return null;
+      }
+      logger.info('aliexpress', `${endpoint} response OK`, { productId, keys: Object.keys(data.result).join(',') });
+      return data.result;
+    } catch (e) {
+      logger.warn('aliexpress', `${endpoint} failed`, { error: e.message, productId });
+      return null;
+    }
+  }
 
-    // Fire all detail endpoints at once — first valid result wins
-    const detailResults = await Promise.allSettled(
-      DETAIL_ENDPOINTS.map(ep => tryDetailEndpoint(ep))
-    );
-    for (const r of detailResults) {
-      if (r.status === 'fulfilled' && r.value) return r.value;
+  // Fetch store_info for seller rating (cached 24h)
+  async _fetchStoreInfo(sellerId) {
+    if (!sellerId) return null;
+    const cacheKey = String(sellerId);
+    const cached = storeInfoCache.get(cacheKey);
+    if (cached && (Date.now() - cached.ts < 86400000)) return cached.data;
+    try {
+      const url = `https://${SEARCH_HOST}${STORE_INFO_ENDPOINT}?sellerId=${encodeURIComponent(sellerId)}`;
+      const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
+      const info = data?.result || null;
+      if (info) {
+        storeInfoCache.set(cacheKey, { data: info, ts: Date.now() });
+        logger.info('aliexpress', 'store_info fetched', { sellerId, positiveRate: info.positiveRate });
+      }
+      return info;
+    } catch (e) {
+      logger.warn('aliexpress', 'store_info failed', { sellerId, error: e.message });
+      return null;
+    }
+  }
+
+  async getProduct(productId, opts = {}) {
+    // ==== STRATEGY: Call item_detail_2 + item_detail_6 in PARALLEL ====
+    // item_detail_2: shipping, origin, seller, sku, images, title
+    // item_detail_6: description HTML, description images, specs, reviews, video
+    // Merge both for a complete PDP
+
+    const [res2, res6] = await Promise.allSettled([
+      this._fetchDetailEndpoint(DETAIL_PRIMARY, productId),
+      this._fetchDetailEndpoint(DETAIL_ENRICHMENT, productId)
+    ]);
+
+    const data2 = res2.status === 'fulfilled' ? res2.value : null;
+    const data6 = res6.status === 'fulfilled' ? res6.value : null;
+
+    // If item_detail_2 failed, try fallback endpoint
+    let primaryData = data2;
+    if (!primaryData || (!primaryData.item && !primaryData.itemId)) {
+      logger.warn('aliexpress', 'item_detail_2 failed, trying fallback', { productId });
+      primaryData = await this._fetchDetailEndpoint(DETAIL_FALLBACK, productId);
+    }
+
+    // If we have primary data, normalize and enrich with item_detail_6
+    if (primaryData && (primaryData.item || primaryData.itemId || primaryData.title)) {
+      const product = this.normalizeProduct(primaryData);
+      if (product) {
+        // Enrich with item_detail_6 data
+        this._enrichFromDetail6(product, data6);
+
+        // Fetch seller rating from store_info (async, non-blocking)
+        const sellerId = primaryData.seller?.sellerId || product.sellerData?.id;
+        if (sellerId) {
+          try {
+            const storeInfo = await this._fetchStoreInfo(sellerId);
+            if (storeInfo) {
+              if (storeInfo.positiveRate) product.sellerData.rating = parseFloat(storeInfo.positiveRate);
+              if (storeInfo.sellerScore) product.sellerData.score = storeInfo.sellerScore;
+              if (storeInfo.sellerLevel) product.sellerData.level = storeInfo.sellerLevel;
+              if (storeInfo.followingNumber || storeInfo.storeFollowers) {
+                product.rawSourceMeta.storeFollowers = storeInfo.followingNumber || storeInfo.storeFollowers;
+              }
+            }
+          } catch (e) { /* non-critical */ }
+        }
+
+        if (product.price) return product;
+        const priceProduct = await this._fillPriceFromSearch(product, productId);
+        if (priceProduct.price) return priceProduct;
+      }
+    }
+
+    // If only item_detail_6 succeeded, try to normalize from it
+    if (data6 && (data6.item || data6.itemId || data6.title)) {
+      logger.info('aliexpress', 'Using item_detail_6 as primary (item_detail_2 failed)', { productId });
+      const product = this.normalizeProduct(data6);
+      if (product) {
+        this._enrichFromDetail6(product, data6);
+        if (product.price) return product;
+        const priceProduct = await this._fillPriceFromSearch(product, productId);
+        if (priceProduct.price) return priceProduct;
+      }
     }
 
     // Final fallback: search by productId
     logger.warn('aliexpress', `All detail endpoints failed for ${productId}, trying search fallback`);
     const searchResults = await this.search(productId, 5);
     if (searchResults.length > 0) {
-      // Best case: exact ID match
       const exact = searchResults.find(r => String(r.id) === String(productId));
       if (exact) {
         logger.info('aliexpress', `Search fallback found exact match for ${productId}`);
         return this._searchResultToProduct(exact);
       }
-      logger.info('aliexpress', `Search fallback found ${searchResults.length} results but no exact ID match for ${productId}`);
     }
 
-    // Title-based search fallback (like SHEIN adapter)
+    // Title-based search fallback
     if (opts.title) {
-      logger.info('aliexpress', `Trying title-based search fallback for ${productId}`, { title: opts.title });
       const titleResults = await this.search(opts.title, 5);
       if (titleResults.length > 0) {
-        // Check for exact ID match within title results
         const exactById = titleResults.find(r => String(r.id) === String(productId));
-        if (exactById) {
-          logger.info('aliexpress', `Title search found exact ID match for ${productId}`);
-          return this._searchResultToProduct(exactById);
-        }
-        // Use the first result — user came from a search result page so title matches well
-        logger.info('aliexpress', `Title search returning first result for ${productId} (no exact ID match)`);
+        if (exactById) return this._searchResultToProduct(exactById);
         const result = this._searchResultToProduct(titleResults[0]);
-        if (result) result.sourceId = String(productId); // Preserve original ID
+        if (result) result.sourceId = String(productId);
         return result;
       }
     }
 
-    // Last resort: if ID-search had results, use the first one (better than showing error)
+    // Last resort
     if (searchResults && searchResults.length > 0) {
-      logger.info('aliexpress', `Using first search result as last resort for ${productId}`);
       const result = this._searchResultToProduct(searchResults[0]);
       if (result) result.sourceId = String(productId);
       return result;
     }
 
     return null;
+  }
+
+  // Enrich a normalized product with data from item_detail_6
+  _enrichFromDetail6(product, data6) {
+    if (!data6) return;
+    const item6 = data6.item || data6;
+
+    // === Description HTML from item_detail_6 ===
+    const desc6 = item6.description;
+    if (desc6 && typeof desc6 === 'object') {
+      // description.images = array of descriptive image URLs (like A+ content)
+      const descImages = (desc6.images || [])
+        .filter(img => typeof img === 'string' && img.length > 5)
+        .map(img => img.startsWith('//') ? 'https:' + img : img);
+      if (descImages.length > 0) {
+        product.aplusImages = descImages;
+        logger.info('aliexpress', 'Enriched with description images from item_detail_6', {
+          productId: product.sourceId, imageCount: descImages.length
+        });
+      }
+      // description.html = full HTML description
+      if (desc6.html && typeof desc6.html === 'string' && desc6.html.length > 10) {
+        product.description = desc6.html;
+      }
+    } else if (typeof desc6 === 'string' && desc6.length > 20) {
+      // Plain string description from item_detail_6
+      if (!product.description || product.description.length < desc6.length) {
+        product.description = desc6;
+      }
+    }
+
+    // Fix: if description is still an object (from item_detail_2), clear it
+    if (product.description && typeof product.description === 'object') {
+      product.description = '';
+    }
+    // Safety: prevent "[object Object]"
+    if (product.description === '[object Object]') {
+      product.description = '';
+    }
+
+    // === Specifications from item_detail_6 properties.list ===
+    const props6 = item6.properties;
+    if (props6 && typeof props6 === 'object') {
+      const specList = props6.list || [];
+      if (Array.isArray(specList) && specList.length > 0) {
+        const specs = specList
+          .filter(s => s && typeof s === 'object' && s.name && s.value)
+          .map(s => ({ name: String(s.name).trim(), value: String(s.value).trim() }));
+        if (specs.length > product.specifications.length) {
+          product.specifications = specs;
+          product.quickSpecs = specs.slice(0, 10);
+          logger.info('aliexpress', 'Enriched specs from item_detail_6', {
+            productId: product.sourceId, specCount: specs.length
+          });
+        }
+      }
+    }
+
+    // === Reviews from item_detail_6 ===
+    const reviews6 = data6.reviews;
+    if (reviews6 && typeof reviews6 === 'object') {
+      if (reviews6.count && (!product.reviews || reviews6.count > product.reviews)) {
+        product.reviews = reviews6.count;
+      }
+      if (reviews6.averageStar && (!product.rating || reviews6.averageStar > 0)) {
+        product.rating = parseFloat(reviews6.averageStar);
+      }
+      logger.info('aliexpress', 'Enriched reviews from item_detail_6', {
+        productId: product.sourceId, count: reviews6.count, avg: reviews6.averageStar
+      });
+    }
+
+    // === Video from item_detail_6 ===
+    if (item6.video && typeof item6.video === 'object' && item6.video.url) {
+      const videoUrl = item6.video.url.startsWith('//') ? 'https:' + item6.video.url : item6.video.url;
+      if (!product.videos.length || !product.videos.includes(videoUrl)) {
+        product.videos = [videoUrl];
+        product.hasVideo = true;
+        logger.info('aliexpress', 'Enriched video from item_detail_6', { productId: product.sourceId });
+      }
+    }
   }
 
   // Normalize search result item — handles both new (item_search_3) and legacy shapes
@@ -322,10 +442,10 @@ class AliExpressAdapter extends BaseAdapter {
     // Category — prefer readable name from breadcrumbs, fall back to API fields
     p.category = d.categoryName || (p.breadcrumbs.length ? p.breadcrumbs[p.breadcrumbs.length - 1] : null);
 
-    // Description
+    // Description — only use string values (item_detail_6 returns {html, images} object — handled by _enrichFromDetail6)
     const descParts = [];
-    if (d.description) descParts.push(d.description);
-    if (item.description) descParts.push(item.description);
+    if (d.description && typeof d.description === 'string' && d.description !== '[object Object]') descParts.push(d.description);
+    if (item.description && typeof item.description === 'string' && item.description !== '[object Object]') descParts.push(item.description);
     if (d.descriptionModule?.description) descParts.push(d.descriptionModule.description);
     if (d.descriptionModule?.descriptionUrl) descParts.push('[Full description available]');
     // Properties/specs
@@ -497,6 +617,24 @@ class AliExpressAdapter extends BaseAdapter {
           })
         };
         p.options.push(option);
+      });
+    }
+
+    // Filter "Ships From" / "Shipped From" out of visible options — use it for origin classification instead
+    const shipsFromOption = p.options.find(o => /ships?\s*from/i.test(o.name));
+    if (shipsFromOption) {
+      // Extract the US warehouse info for origin classification
+      const usValue = shipsFromOption.values.find(v => /united\s*states|US\b/i.test(v.value));
+      if (usValue) {
+        // Store this info so classifyOrigin can pick it up
+        p.rawSourceMeta = p.rawSourceMeta || {};
+        p.rawSourceMeta.shipsFrom = usValue.value;
+        if (!p.shippingData.shipsFrom) p.shippingData.shipsFrom = usValue.value;
+      }
+      // Remove "Ships From" from customer-visible options
+      p.options = p.options.filter(o => !/ships?\s*from/i.test(o.name));
+      logger.info('aliexpress', 'Filtered "Ships From" from variant options', {
+        productId: p.sourceId, hadUSValue: !!usValue
       });
     }
 

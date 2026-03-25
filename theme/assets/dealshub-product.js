@@ -417,20 +417,40 @@
   // ═══ SECTION 9: PRODUCT DESCRIPTION ═══
   function renderDescription(p){
     var desc=p.description||'';
-    if(!desc)return '';
+    // Safety: reject [object Object] or trivially short descriptions
+    if(!desc||desc==='[object Object]'||desc==='undefined'||desc.length<10)return '';
+    // Detect key:value spec dumps (not useful as description)
+    var plainLines=desc.split('\n').filter(function(l){return l.trim()});
+    var kvCount=plainLines.filter(function(l){return /^[A-Za-z][^:]{2,30}:\s/.test(l)}).length;
+    if(kvCount>plainLines.length*0.5&&plainLines.length>3)return '';
     var h='<div class="dhpdp-section">';
     h+='<h2 class="dhpdp-section-title">Product Description</h2>';
-    h+='<div style="font-size:15px;line-height:1.8;color:#444;max-width:800px">';
-    // Truncate very long descriptions with expand
-    var lines=desc.split('\n').filter(function(l){return l.trim()});
-    if(lines.length>8){
-      h+='<div id="dhpdp-desc-short">'+lines.slice(0,6).map(function(l){return '<p style="margin:0 0 12px">'+esc(l)+'</p>'}).join('')+'</div>';
-      h+='<div id="dhpdp-desc-full" style="display:none">'+lines.map(function(l){return '<p style="margin:0 0 12px">'+esc(l)+'</p>'}).join('')+'</div>';
-      h+='<button id="dhpdp-desc-toggle" onclick="document.getElementById(\'dhpdp-desc-short\').style.display=\'none\';document.getElementById(\'dhpdp-desc-full\').style.display=\'block\';this.style.display=\'none\'" style="color:#2563eb;background:none;border:none;cursor:pointer;font-size:14px;font-weight:500;padding:0">Read more &#8250;</button>';
+    // Detect HTML content (from AliExpress item_detail_6) vs plain text
+    if(/<(img|p|br|div|table|span|ul|ol|li|h[1-6])\b/i.test(desc)){
+      // HTML description — sanitize and render
+      var clean=desc
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi,'')
+        .replace(/on\w+="[^"]*"/gi,'')
+        .replace(/on\w+='[^']*'/gi,'')
+        .replace(/style="[^"]*position\s*:\s*fixed[^"]*"/gi,'')
+        .replace(/style="[^"]*position\s*:\s*absolute[^"]*"/gi,'');
+      // Fix protocol-relative image URLs
+      clean=clean.replace(/src="\/\//g,'src="https://');
+      clean=clean.replace(/src='\/\//g,"src='https://");
+      h+='<div style="font-size:14px;line-height:1.6;color:#444;max-width:900px;overflow:hidden">'+clean+'</div>';
     }else{
-      h+=lines.map(function(l){return '<p style="margin:0 0 12px">'+esc(l)+'</p>'}).join('');
+      // Plain text — escape and render with expand/collapse
+      h+='<div style="font-size:15px;line-height:1.8;color:#444;max-width:800px">';
+      if(plainLines.length>8){
+        h+='<div id="dhpdp-desc-short">'+plainLines.slice(0,6).map(function(l){return '<p style="margin:0 0 12px">'+esc(l)+'</p>'}).join('')+'</div>';
+        h+='<div id="dhpdp-desc-full" style="display:none">'+plainLines.map(function(l){return '<p style="margin:0 0 12px">'+esc(l)+'</p>'}).join('')+'</div>';
+        h+='<button id="dhpdp-desc-toggle" onclick="document.getElementById(\'dhpdp-desc-short\').style.display=\'none\';document.getElementById(\'dhpdp-desc-full\').style.display=\'block\';this.style.display=\'none\'" style="color:#2563eb;background:none;border:none;cursor:pointer;font-size:14px;font-weight:500;padding:0">Read more &#8250;</button>';
+      }else{
+        h+=plainLines.map(function(l){return '<p style="margin:0 0 12px">'+esc(l)+'</p>'}).join('');
+      }
+      h+='</div>';
     }
-    h+='</div></div>';
+    h+='</div>';
     return h;
   }
 

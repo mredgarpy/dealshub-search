@@ -321,6 +321,13 @@ async function productDetailHandler(req, res) {
     product.originFlag = originInfo.flag;
     product.originDelivery = originInfo.deliveryEstimate;
 
+    // Fix return policy based on origin: USA warehouse = 30 days, International = 15 days
+    if (originInfo.origin === 'USA' && product.source === 'aliexpress') {
+      if (!product.returnPolicy || product.returnPolicy.window < 30) {
+        product.returnPolicy = { window: 30, summary: 'Returns accepted within 30 days' };
+      }
+    }
+
     // Only cache if returned product matches requested ID (prevent stale fallback pollution)
     const returnedId = String(product.sourceId || '');
     const requestedId = String(id);

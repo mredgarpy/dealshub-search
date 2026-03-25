@@ -750,6 +750,152 @@ app.get('/api/flash-deals', async (req, res) => {
   }
 });
 
+// ---- AUTO BANNERS (event-driven hero carousel) ----
+const BANNER_CALENDAR = [
+  { event:'Big Spring Sale', start:'Mar 20', end:'Mar 31', gradient:'linear-gradient(135deg,#667eea 0%,#764ba2 100%)', emoji:'\uD83C\uDF38', heading:'Big Spring Sale', subheading:'Up to 50% off spring favorites', cta:'Shop Spring Deals', ctaLink:'/pages/search-results?q=spring+deals', queries:['spring fashion deals','spring home decor','outdoor furniture'], type:'sale' },
+  { event:'Easter', start:'Mar 25', end:'Apr 05', gradient:'linear-gradient(135deg,#a18cd1 0%,#fbc2eb 100%)', emoji:'\uD83D\uDC23', heading:'Easter Essentials', subheading:'Everything for the perfect Easter', cta:'Shop Easter', ctaLink:'/pages/search-results?q=easter', queries:['easter gifts','easter decoration','spring clothing'], type:'holiday' },
+  { event:"Mother's Day", start:'Apr 25', end:'May 10', gradient:'linear-gradient(135deg,#f093fb 0%,#f5576c 100%)', emoji:'\uD83D\uDC90', heading:"Mother's Day Gifts", subheading:'Show her you care \u2014 curated gift ideas', cta:'Shop Gifts for Mom', ctaLink:'/pages/search-results?q=gifts+for+mom', queries:['gifts for mom','jewelry women','skincare gift set','perfume women'], type:'holiday' },
+  { event:'Memorial Day', start:'May 18', end:'May 25', gradient:'linear-gradient(135deg,#0c3483 0%,#a2b6df 100%)', emoji:'\uD83C\uDDFA\uD83C\uDDF8', heading:'Memorial Day Deals', subheading:'Huge savings across all categories', cta:'Shop the Sale', ctaLink:'/pages/search-results?q=memorial+day+deals', queries:['outdoor grill','patio furniture','american flag'], type:'sale' },
+  { event:"Father's Day", start:'Jun 10', end:'Jun 21', gradient:'linear-gradient(135deg,#434343 0%,#000000 100%)', emoji:'\uD83D\uDC54', heading:"Father's Day", subheading:"Top gifts Dad will actually use", cta:'Shop Gifts for Dad', ctaLink:'/pages/search-results?q=gifts+for+dad', queries:['gifts for dad','mens watch','tools set','grill accessories'], type:'holiday' },
+  { event:'4th of July', start:'Jun 27', end:'Jul 04', gradient:'linear-gradient(135deg,#c31432 0%,#240b36 100%)', emoji:'\uD83C\uDF86', heading:'4th of July Sale', subheading:'Celebrate with huge savings', cta:'Shop the Sale', ctaLink:'/pages/search-results?q=summer+deals', queries:['4th of july','outdoor party','summer deals'], type:'sale' },
+  { event:'Plus Day', start:'Jul 10', end:'Jul 16', gradient:'linear-gradient(135deg,#6b46c1 0%,#9333ea 100%)', emoji:'\u26A1', heading:'Plus Day \u2014 Biggest Deals', subheading:'Exclusive deals for Plus members', cta:'Shop Plus Deals', ctaLink:'/pages/search-results?q=best+deals', queries:['best deals','electronics deals','fashion deals'], type:'sale' },
+  { event:'Back to School', start:'Jul 20', end:'Aug 15', gradient:'linear-gradient(135deg,#11998e 0%,#38ef7d 100%)', emoji:'\uD83D\uDCDA', heading:'Back to School', subheading:'Gear up for the new school year', cta:'Shop School Supplies', ctaLink:'/pages/search-results?q=back+to+school', queries:['backpack','laptop deals','school supplies','kids clothing'], type:'sale' },
+  { event:'Halloween', start:'Oct 10', end:'Oct 31', gradient:'linear-gradient(135deg,#fc4a1a 0%,#f7b733 100%)', emoji:'\uD83C\uDF83', heading:'Halloween Deals', subheading:'Costumes, candy & creepy decor', cta:'Shop Halloween', ctaLink:'/pages/search-results?q=halloween', queries:['halloween costume','halloween decoration','candy'], type:'holiday' },
+  { event:'Black Friday', start:'Nov 20', end:'Nov 28', gradient:'linear-gradient(135deg,#000000 0%,#434343 100%)', emoji:'\uD83C\uDFF7\uFE0F', heading:'BLACK FRIDAY', subheading:'The biggest deals of the year are HERE', cta:'Shop Black Friday', ctaLink:'/pages/search-results?q=black+friday', queries:['black friday deals','electronics sale','fashion sale'], type:'sale' },
+  { event:'Cyber Monday', start:'Nov 29', end:'Dec 02', gradient:'linear-gradient(135deg,#00c6ff 0%,#0072ff 100%)', emoji:'\uD83D\uDCBB', heading:'CYBER MONDAY', subheading:'Online-only deals \u2014 save up to 70%', cta:'Shop Cyber Monday', ctaLink:'/pages/search-results?q=cyber+monday', queries:['cyber monday deals','tech deals','gadgets'], type:'sale' },
+  { event:'Christmas', start:'Dec 01', end:'Dec 25', gradient:'linear-gradient(135deg,#c31432 0%,#2c3e50 100%)', emoji:'\uD83C\uDF84', heading:'Holiday Gift Guide', subheading:'Perfect gifts for everyone on your list', cta:'Shop Gifts', ctaLink:'/pages/search-results?q=christmas+gifts', queries:['christmas gifts','gift ideas','holiday deals'], type:'holiday' },
+  { event:"Valentine's Day", start:'Feb 01', end:'Feb 14', gradient:'linear-gradient(135deg,#ee0979 0%,#ff6a00 100%)', emoji:'\u2764\uFE0F', heading:"Valentine's Day", subheading:'Gifts they will love', cta:"Shop Valentine's", ctaLink:'/pages/search-results?q=valentines+gifts', queries:['valentines gifts','jewelry','chocolate gift','perfume'], type:'holiday' }
+];
+
+const CATEGORY_BANNERS = [
+  { heading:'Top picks in Fashion', subheading:"Today's best sellers in fashion", gradient:'linear-gradient(135deg,#1a1a2e 0%,#e94560 100%)', query:'trending fashion', cta:'Shop Fashion', ctaLink:'/pages/search-results?q=fashion', type:'category' },
+  { heading:'Tech Deals', subheading:'Latest gadgets at best prices', gradient:'linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%)', query:'electronics deals', cta:'Shop Electronics', ctaLink:'/pages/search-results?q=electronics', type:'category' },
+  { heading:'Beauty Favorites', subheading:'Skincare & makeup top picks', gradient:'linear-gradient(135deg,#f093fb 0%,#f5576c 100%)', query:'beauty skincare trending', cta:'Shop Beauty', ctaLink:'/pages/search-results?q=beauty', type:'category' },
+  { heading:'Home Refresh', subheading:'Upgrade your space for less', gradient:'linear-gradient(135deg,#11998e 0%,#38ef7d 100%)', query:'home decor trending', cta:'Shop Home', ctaLink:'/pages/search-results?q=home+decor', type:'category' },
+  { heading:'Sports & Outdoors', subheading:'Gear up for your next adventure', gradient:'linear-gradient(135deg,#fc4a1a 0%,#f7b733 100%)', query:'sports outdoors', cta:'Shop Sports', ctaLink:'/pages/search-results?q=sports', type:'category' }
+];
+
+function getActiveEvents() {
+  const now = new Date();
+  const month = now.getMonth();
+  const day = now.getDate();
+  const mmdd = (month + 1) * 100 + day;
+  const months = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+  return BANNER_CALENDAR.filter(e => {
+    const sp = e.start.split(' '), ep = e.end.split(' ');
+    const s = months[sp[0]] * 100 + parseInt(sp[1]);
+    const en = months[ep[0]] * 100 + parseInt(ep[1]);
+    return mmdd >= s && mmdd <= en;
+  });
+}
+
+function getDailyCategoryBanners() {
+  const day = Math.floor(Date.now() / 86400000);
+  const selected = [];
+  for (let i = 0; i < 3; i++) {
+    selected.push(CATEGORY_BANNERS[(day + i) % CATEGORY_BANNERS.length]);
+  }
+  return selected;
+}
+
+app.get('/api/banners', async (req, res) => {
+  const cacheKey = 'hero-banners';
+  const cached = searchCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const activeEvents = getActiveEvents();
+    const catBanners = getDailyCategoryBanners();
+    const dayNum = Math.floor(Date.now() / 86400000);
+    const banners = [];
+    const amazonAdapter = getAdapter('amazon');
+
+    // Build banner list: events first, then fill with categories
+    const sources = [];
+    activeEvents.slice(0, 2).forEach(ev => sources.push({ ...ev, _isEvent: true }));
+    // Plus promo banner (always)
+    sources.push({ heading:'Get it Tomorrow', subheading:'FREE fast delivery + exclusive deals with StyleHub Plus', gradient:'linear-gradient(135deg,#6b46c1 0%,#9333ea 100%)', emoji:'\u26A1', cta:'Try Plus Free for 7 Days', ctaLink:'/pages/plus', type:'plus', queries:['best deals electronics'], _isPlus: true });
+    // Fill remaining with category banners
+    catBanners.forEach(cb => { if (sources.length < 5) sources.push(cb); });
+
+    for (const src of sources.slice(0, 5)) {
+      try {
+        let products = [];
+        const query = src.queries
+          ? src.queries[dayNum % src.queries.length]
+          : (src.query || 'best deals');
+
+        if (amazonAdapter) {
+          const results = await amazonAdapter.search(query, 8);
+          products = (results || []).slice(0, 8);
+        }
+
+        // Fallback: try any active adapter
+        if (products.length < 3) {
+          const activeStores = ['aliexpress', 'sephora', 'shein', 'macys'];
+          for (const store of activeStores) {
+            if (products.length >= 3) break;
+            const ad = getAdapter(store);
+            if (!ad) continue;
+            try {
+              const r = await ad.search(query, 5);
+              products = products.concat(r || []);
+            } catch (_) {}
+          }
+        }
+
+        const priced = applySearchPricing(products);
+        const featured = priced.slice(0, 5).map(p => {
+          const price = typeof p.price === 'number' ? p.price : parseFloat(String(p.price || '0').replace(/[^0-9.]/g, ''));
+          const orig = typeof p.originalPrice === 'number' ? p.originalPrice : parseFloat(String(p.originalPrice || '0').replace(/[^0-9.]/g, ''));
+          const disc = orig > price && price > 0 ? Math.round((1 - price / orig) * 100) : 0;
+          return {
+            image: p.image || p.primaryImage || '',
+            title: (p.title || '').substring(0, 50),
+            price: price > 0 ? price.toFixed(2) : '',
+            originalPrice: orig > price ? orig.toFixed(2) : '',
+            discount: disc,
+            link: '/pages/product?id=' + encodeURIComponent(p.id || p.sourceId || '') + '&store=' + encodeURIComponent(p.source || p.sourceName || 'amazon')
+          };
+        });
+
+        banners.push({
+          event: src.event || src.heading || 'Deals',
+          heading: src.heading || "Today's Top Deals",
+          subheading: src.subheading || 'Fresh deals updated daily',
+          cta: src.cta || 'Shop Now',
+          ctaLink: src.ctaLink || '/pages/search-results?q=deals',
+          gradient: src.gradient || 'linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)',
+          emoji: src.emoji || '',
+          type: src.type || 'sale',
+          featuredProducts: featured,
+          heroImage: featured[0] ? featured[0].image : ''
+        });
+      } catch (err) {
+        console.error('Banner build error for', src.event || src.heading, err.message);
+      }
+    }
+
+    // Always have at least 1 banner
+    if (!banners.length) {
+      banners.push({
+        event: 'default', heading: "Today's Top Deals", subheading: 'Fresh deals updated daily',
+        cta: 'Shop Now', ctaLink: '/pages/search-results?q=deals',
+        gradient: 'linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)',
+        type: 'sale', featuredProducts: [], heroImage: '', emoji: '\uD83D\uDD25'
+      });
+    }
+
+    const response = { banners };
+    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    res.set('Cache-Control', 'public, max-age=21600');
+    res.json(response);
+  } catch (e) {
+    console.error('Banners endpoint error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ---- RELATED PRODUCTS ----
 app.get('/api/related', async (req, res) => {
   const { source, id, title, limit = 6 } = req.query;

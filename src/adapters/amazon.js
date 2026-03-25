@@ -450,7 +450,8 @@ class AmazonAdapter extends BaseAdapter {
             value: v.value || '',
             image: v.photo || v.image || null,
             asin: v.asin || null,
-            selected: v.is_selected || false
+            selected: v.is_selected || false,
+            is_available: v.is_available !== false
           });
           allVariants.push({ ...v, _groupName: cleanName });
         });
@@ -465,7 +466,8 @@ class AmazonAdapter extends BaseAdapter {
           value: v.value || '',
           image: v.photo || v.image || null,
           asin: v.asin || null,
-          selected: v.is_selected || false
+          selected: v.is_selected || false,
+          is_available: v.is_available !== false
         });
         allVariants.push({ ...v, _groupName: name });
       });
@@ -488,7 +490,7 @@ class AmazonAdapter extends BaseAdapter {
         title: `${v._groupName}: ${v.value || ''}`,
         price: parsePrice(v.price) || p.price,
         image: v.photo || v.image || null,
-        available: true
+        available: v.is_available !== false
       }));
     }
 
@@ -625,6 +627,12 @@ class AmazonAdapter extends BaseAdapter {
       p.specifications = Object.entries(d.product_information)
         .filter(([k, v]) => v && typeof v === 'string' && v.trim().length > 0)
         .map(([k, v]) => ({ name: k.trim(), value: v.trim() }));
+    }
+
+    // Raw product_information object for frontend (weight, material, dimensions etc.)
+    p.productInformation = {};
+    if (d.product_information && typeof d.product_information === 'object') {
+      p.productInformation = { ...d.product_information };
     }
 
     // Quick specs (product_details) as structured data
@@ -765,24 +773,32 @@ class AmazonAdapter extends BaseAdapter {
   _formatGroupName(name) {
     if (!name) return null;
     const mappings = {
-      'size': 'Storage',
+      'size': 'Size',
+      'size_name': 'Size',
+      'shoe_size': 'Size',
       'color': 'Color',
+      'color_name': 'Color',
       'colour': 'Color',
+      'colour_name': 'Color',
       'service_provider': 'Carrier',
       'carrier': 'Carrier',
       'product_grade': 'Condition',
       'condition': 'Condition',
       'style': 'Style',
+      'style_name': 'Style',
       'pattern': 'Pattern',
+      'pattern_name': 'Pattern',
       'material': 'Material',
       'configuration': 'Configuration',
       'flavor': 'Flavor',
+      'flavour': 'Flavor',
       'scent': 'Scent',
       'count': 'Count',
       'wattage': 'Wattage',
       'voltage': 'Voltage',
       'length': 'Length',
-      'width': 'Width'
+      'width': 'Width',
+      'storage': 'Storage'
     };
     const lower = name.toLowerCase();
     if (mappings[lower]) return mappings[lower];

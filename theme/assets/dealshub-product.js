@@ -69,10 +69,8 @@
 
     // LEFT COLUMN
     html+='<div class="dhpdp-left-col">';
-    // ═══ SECTION 2: IMAGE GALLERY (left, sticky on desktop) ═══
+    // ═══ SECTION 2: IMAGE GALLERY (left) ═══
     html+=renderGallery(p, imgs, mainImg, discount);
-    // Customer photos from reviews (fills space below sticky gallery)
-    html+=renderCustomerPhotos(p);
     html+='</div>'; // end left col
 
     // RIGHT COLUMN
@@ -93,8 +91,9 @@
     html+='</div>'; // end info
     html+='</div>'; // end grid
 
-    // ═══ SECTION 7: RATING BREAKDOWN + REVIEWS (below gallery, SHEIN-style) ═══
+    // ═══ SECTION 7: RATING BREAKDOWN + CUSTOMER PHOTOS + REVIEWS ═══
     html+=renderRatingBreakdown(p, rating, reviews);
+    html+=renderCustomerPhotos(p);
     html+=renderReviews(p);
 
     // ═══ SECTION 8: BULLET POINTS ═══
@@ -129,7 +128,7 @@
     html+='.dhpdp-grid{grid-template-columns:1fr 1fr;gap:40px}';
     html+='@media(max-width:768px){.dhpdp-grid{grid-template-columns:1fr!important;gap:20px!important}.dhpdp h1{font-size:20px!important}#dhpdp-sticky{display:flex!important}}';
     html+='.dhpdp-spec-table{width:100%;border-collapse:collapse}.dhpdp-spec-table tr:nth-child(even){background:#f8fafc}.dhpdp-spec-table td{padding:10px 14px;font-size:14px;border-bottom:1px solid #f0f0f0}.dhpdp-spec-table td:first-child{font-weight:600;color:#374151;width:40%}';
-    html+='.dhpdp-thumbs::-webkit-scrollbar{display:none}';
+    html+='.dhpdp-thumbs::-webkit-scrollbar{display:none}.dhpdp-cust-photos::-webkit-scrollbar{display:none}';
     html+='.dhpdp-review{border-bottom:1px solid #f0f0f0;padding:20px 0}.dhpdp-review:last-child{border-bottom:none}';
     html+='.dhpdp-rating-bar{height:8px;background:#e5e7eb;border-radius:4px;flex:1;overflow:hidden}.dhpdp-rating-fill{height:100%;background:#f59e0b;border-radius:4px;transition:width .6s ease}';
     html+='.dhpdp-fbt-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;text-align:center;transition:box-shadow .2s}.dhpdp-fbt-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08)}';
@@ -205,24 +204,30 @@
     return h;
   }
 
-  // ═══ CUSTOMER PHOTOS (below gallery in left column) ═══
+  // ═══ CUSTOMER PHOTOS (Amazon-style, inside reviews section) ═══
   function renderCustomerPhotos(p){
     var reviewImgs=[];
     (p.topReviews||[]).forEach(function(r){
-      if(r.images&&r.images.length)r.images.forEach(function(img){reviewImgs.push(img)});
+      if(r.images&&r.images.length){
+        r.images.forEach(function(img){
+          var u=typeof img==='string'?img:(img.url||img.image||'');
+          if(u)reviewImgs.push(u);
+        });
+      }
     });
     if(!reviewImgs.length)return '';
-    var shown=reviewImgs.slice(0,6);
-    var h='<div style="margin-top:24px">';
-    h+='<h3 style="font-size:14px;font-weight:600;color:#333;margin:0 0 10px">Customer photos</h3>';
-    h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">';
-    shown.forEach(function(img,idx){
-      h+='<div class="sh-lb-trigger" data-lb-imgs="'+esc(JSON.stringify(reviewImgs))+'" data-lb-idx="'+idx+'" style="aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;background:#f5f5f5">';
-      h+='<img src="'+esc(img)+'" alt="Customer photo" loading="lazy" style="width:100%;height:100%;object-fit:cover">';
+    var h='<div style="margin-bottom:20px;border-bottom:1px solid #f0f0f0;padding-bottom:20px">';
+    h+='<h3 style="font-size:16px;font-weight:700;color:#1a1a2e;margin:0 0 12px">Reviews with images</h3>';
+    h+='<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch" class="dhpdp-cust-photos">';
+    for(var i=0;i<Math.min(reviewImgs.length,12);i++){
+      h+='<div class="sh-lb-trigger" data-lb-imgs="'+esc(JSON.stringify(reviewImgs))+'" data-lb-idx="'+i+'" style="width:100px;height:100px;flex-shrink:0;border-radius:8px;overflow:hidden;cursor:pointer;background:#f5f5f5;border:1px solid #e5e7eb">';
+      h+='<img src="'+esc(reviewImgs[i])+'" alt="Customer photo" loading="lazy" style="width:100%;height:100%;object-fit:cover">';
       h+='</div>';
-    });
+    }
+    if(reviewImgs.length>12){
+      h+='<div style="width:100px;height:100px;flex-shrink:0;border-radius:8px;background:#f8fafc;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:#2563eb;font-weight:600;text-align:center;padding:8px">See all photos</div>';
+    }
     h+='</div>';
-    if(reviewImgs.length>6)h+='<div style="text-align:center;margin-top:8px;font-size:12px;color:#666">+'+(reviewImgs.length-6)+' more photos</div>';
     h+='</div>';
     return h;
   }

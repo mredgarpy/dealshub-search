@@ -67,8 +67,13 @@
 
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px" class="dhpdp-grid">';
 
-    // ═══ SECTION 2: IMAGE GALLERY (left) ═══
+    // LEFT COLUMN
+    html+='<div class="dhpdp-left-col">';
+    // ═══ SECTION 2: IMAGE GALLERY (left, sticky on desktop) ═══
     html+=renderGallery(p, imgs, mainImg, discount);
+    // Customer photos from reviews (fills space below sticky gallery)
+    html+=renderCustomerPhotos(p);
+    html+='</div>'; // end left col
 
     // RIGHT COLUMN
     html+='<div class="dhpdp-info">';
@@ -121,8 +126,9 @@
 
     // Responsive CSS
     html+='<style>';
-    html+='.dhpdp-grid{grid-template-columns:1fr 1fr;gap:40px}';
-    html+='@media(max-width:768px){.dhpdp-grid{grid-template-columns:1fr!important;gap:20px!important}.dhpdp h1{font-size:20px!important}#dhpdp-sticky{display:flex!important}}';
+    html+='.dhpdp-grid{grid-template-columns:1fr 1fr;gap:40px;align-items:start}';
+    html+='.dhpdp-gallery{position:sticky;top:20px}';
+    html+='@media(max-width:768px){.dhpdp-grid{grid-template-columns:1fr!important;gap:20px!important}.dhpdp h1{font-size:20px!important}#dhpdp-sticky{display:flex!important}.dhpdp-gallery{position:static!important}}';
     html+='.dhpdp-spec-table{width:100%;border-collapse:collapse}.dhpdp-spec-table tr:nth-child(even){background:#f8fafc}.dhpdp-spec-table td{padding:10px 14px;font-size:14px;border-bottom:1px solid #f0f0f0}.dhpdp-spec-table td:first-child{font-weight:600;color:#374151;width:40%}';
     html+='.dhpdp-review{border-bottom:1px solid #f0f0f0;padding:20px 0}.dhpdp-review:last-child{border-bottom:none}';
     html+='.dhpdp-rating-bar{height:8px;background:#e5e7eb;border-radius:4px;flex:1;overflow:hidden}.dhpdp-rating-fill{height:100%;background:#f59e0b;border-radius:4px;transition:width .6s ease}';
@@ -195,6 +201,28 @@
     if(p.hasVideo&&p.videos&&p.videos.length){
       h+='<div style="margin-top:8px"><button class="dhpdp-video-btn" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">&#9654; Watch Video</button></div>';
     }
+    h+='</div>';
+    return h;
+  }
+
+  // ═══ CUSTOMER PHOTOS (below gallery in left column) ═══
+  function renderCustomerPhotos(p){
+    var reviewImgs=[];
+    (p.topReviews||[]).forEach(function(r){
+      if(r.images&&r.images.length)r.images.forEach(function(img){reviewImgs.push(img)});
+    });
+    if(!reviewImgs.length)return '';
+    var shown=reviewImgs.slice(0,6);
+    var h='<div style="margin-top:24px">';
+    h+='<h3 style="font-size:14px;font-weight:600;color:#333;margin:0 0 10px">Customer photos</h3>';
+    h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">';
+    shown.forEach(function(img,idx){
+      h+='<div class="sh-lb-trigger" data-lb-imgs="'+esc(JSON.stringify(reviewImgs))+'" data-lb-idx="'+idx+'" style="aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;background:#f5f5f5">';
+      h+='<img src="'+esc(img)+'" alt="Customer photo" loading="lazy" style="width:100%;height:100%;object-fit:cover">';
+      h+='</div>';
+    });
+    h+='</div>';
+    if(reviewImgs.length>6)h+='<div style="text-align:center;margin-top:8px;font-size:12px;color:#666">+'+(reviewImgs.length-6)+' more photos</div>';
     h+='</div>';
     return h;
   }
@@ -1311,34 +1339,17 @@
       var items=JSON.parse(localStorage.getItem('dh_recent')||'[]');
       items=items.filter(function(i){return i.id!==currentId});
       if(items.length<1)return;
-      items=items.slice(0,15);
-      var cid='sh-rv-strip';
-      var h='<div class="sh-rec-section">';
-      h+='<div class="sh-rec-header"><h3 style="font-size:15px;font-weight:600;color:#333;margin:0">Recently Viewed</h3>';
-      if(items.length>4){
-        h+='<div class="sh-rec-nav">';
-        h+='<button class="sh-rec-arrow" data-target="'+cid+'" data-dir="-1">&lsaquo;</button>';
-        h+='<button class="sh-rec-arrow" data-target="'+cid+'" data-dir="1">&rsaquo;</button>';
-        h+='</div>';
-      }
-      h+='</div>';
-      h+='<div id="'+cid+'" class="sh-rec-carousel">';
-      items.forEach(function(item){
-        var link='/pages/product?id='+encodeURIComponent(item.id)+'&store='+encodeURIComponent(item.store);
-        var prc=typeof item.price==='number'?item.price:parseFloat(String(item.price||'0').replace(/[^0-9.]/g,''));
-        h+='<a href="'+link+'" style="flex:0 0 110px;text-decoration:none;background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;transition:border-color .2s,box-shadow .2s" onmouseover="this.style.borderColor=\'#ccc\';this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.06)\'" onmouseout="this.style.borderColor=\'#eee\';this.style.boxShadow=\'none\'">';
-        h+='<div style="width:110px;height:90px;background:#f9fafb;overflow:hidden;display:flex;align-items:center;justify-content:center">';
-        h+='<img src="'+esc(item.image||'')+'" alt="" loading="lazy" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.parentElement.style.background=\'#f0f0f0\'">';
-        h+='</div>';
-        h+='<div style="padding:6px 8px">';
-        h+='<div style="font-size:11px;color:#555;line-height:1.3;height:28px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">'+esc(unesc((item.title||'').substring(0,45)))+'</div>';
-        if(prc>0)h+='<div style="font-size:12px;font-weight:700;color:#e53e3e;margin-top:3px">$'+prc.toFixed(2)+'</div>';
-        h+='</div></a>';
+      items=items.slice(0,12);
+      /* Convert localStorage items to renderMiniCard-compatible objects */
+      var products=items.map(function(item){
+        return {sourceId:item.id,source:item.store||'amazon',title:item.title||'',price:item.price||0,primaryImage:item.image||''};
       });
-      h+='</div></div>';
-      container.insertAdjacentHTML('beforeend',h);
-      var rvEl=container.querySelector('.sh-rec-section:last-child');
-      if(rvEl)rvEl.addEventListener('click',function(e){var a=e.target.closest('.sh-rec-arrow');if(a)scrollCarousel(a.dataset.target,parseInt(a.dataset.dir)||1)});
+      var html=renderRecommendationCarousel('Recently Viewed',products);
+      if(html){
+        container.insertAdjacentHTML('beforeend',html);
+        var rvEl=container.querySelector('.sh-rec-section:last-child');
+        if(rvEl)rvEl.addEventListener('click',function(e){var a=e.target.closest('.sh-rec-arrow');if(a)scrollCarousel(a.dataset.target,parseInt(a.dataset.dir)||1)});
+      }
     }catch(e){}
   }
 })();

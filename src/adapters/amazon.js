@@ -283,6 +283,11 @@ class AmazonAdapter extends BaseAdapter {
     if (!p) return null;
     const price = parsePrice(p.product_price);
     const origPrice = parsePrice(p.product_original_price);
+
+    // Parse delivery text for real dates/costs
+    const deliveryRaw = p.delivery || '';
+    const delivery = this._parseDeliverySearchText(deliveryRaw);
+
     return {
       id: p.asin || '',
       title: p.product_title || '',
@@ -295,8 +300,52 @@ class AmazonAdapter extends BaseAdapter {
       badge: p.is_best_seller ? 'Best Seller' : (p.is_amazon_choice ? "Amazon's Choice" : null),
       source: 'amazon',
       sourceName: 'Amazon',
-      brand: p.product_brand || null
+      brand: p.product_brand || null,
+      isPrime: p.is_prime || false,
+      deliveryInfo: {
+        isFree: delivery.isFree,
+        cost: delivery.cost,
+        date: delivery.standardDate || null,
+        dateRange: delivery.dateRange || null,
+        fastest: delivery.fastestDate || null,
+        threshold: delivery.threshold || null,
+        isPrimeDelivery: delivery.isPrimeDelivery,
+        raw: deliveryRaw || null
+      }
     };
+  }
+
+  // Parse Amazon search delivery text like:
+  // "FREE delivery Mon, Mar 30Or fastest delivery Tomorrow, Mar 26"
+  // "FREE delivery Mar 30 - Apr 1 on $35 of items shipped by Amazon"
+  // "$6.41 delivery Wednesday, April 1"
+  _parseDeliverySearchText(text) {
+    if (!text) return { isFree: false, cost: 0 };
+    const result = {
+      isFree: /FREE\s*delivery/i.test(text),
+      cost: 0,
+      standardDate: null,
+      dateRange: null,
+      fastestDate: null,
+      threshold: null,
+      isPrimeDelivery: /Prime/i.test(text)
+    };
+    // Extract cost: "$6.41 delivery"
+    const costMatch = text.match(/\$([\d.]+)\s*delivery/);
+    if (costMatch) result.cost = parseFloat(costMatch[1]);
+    // Extract standard date: "delivery Mon, Mar 30" or "delivery Wednesday, April 1"
+    const dateMatch = text.match(/delivery\s+((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?,?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d+)/i);
+    if (dateMatch) result.standardDate = dateMatch[1].trim();
+    // Extract date range: "Mar 30 - Apr 1"
+    const rangeMatch = text.match(/delivery\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d+)\s*[-–]\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d+)/i);
+    if (rangeMatch) result.dateRange = rangeMatch[1] + ' – ' + rangeMatch[2];
+    // Extract fastest: "fastest delivery Tomorrow, Mar 26"
+    const fastMatch = text.match(/fastest\s+delivery\s+((?:Tomorrow|Today|(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?,?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d+)[^O]*)/i);
+    if (fastMatch) result.fastestDate = fastMatch[1].trim();
+    // Extract threshold: "on $35 of items"
+    const threshMatch = text.match(/on\s+\$([\d.]+)\s+of\s+items/i);
+    if (threshMatch) result.threshold = parseFloat(threshMatch[1]);
+    return result;
   }
 
   normalizeProduct(d) {

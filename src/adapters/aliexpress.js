@@ -394,6 +394,11 @@ class AliExpressAdapter extends BaseAdapter {
 
     const itemId = String(p.itemId || p.productId || '');
 
+    // Extract delivery info from search result
+    const deliv = p.delivery || {};
+    const shipFee = deliv.shippingFee ? parseFloat(deliv.shippingFee) : null;
+    const isFreeShip = deliv.freeShipping === true || shipFee === 0;
+
     return {
       id: itemId,
       title: p.title || p.displayTitle || '',
@@ -406,10 +411,21 @@ class AliExpressAdapter extends BaseAdapter {
       reviews: p.evaluation?.totalCount || p.trade?.reviewCount || 0,
       badge: tradeNum > 1000 ? 'Popular' :
              (rating && rating >= 4.5 ? 'Top Rated' :
-             (p.delivery?.freeShipping ? 'Free Shipping' : null)),
+             (isFreeShip ? 'Free Shipping' : null)),
       source: 'aliexpress',
       sourceName: 'AliExpress',
-      brand: p.store?.name || p.storeName || null
+      brand: p.store?.name || p.storeName || null,
+      isPrime: false,
+      deliveryInfo: {
+        isFree: isFreeShip,
+        cost: shipFee || 0,
+        date: deliv.estimateDelivery || null,
+        dateRange: null,
+        fastest: null,
+        threshold: null,
+        isPrimeDelivery: false,
+        raw: null
+      }
     };
   }
 

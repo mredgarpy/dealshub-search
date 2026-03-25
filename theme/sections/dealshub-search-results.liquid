@@ -1064,8 +1064,7 @@
       + '<h3 class="dh-card__title">' + esc(p.title) + '</h3>'
       + ratingHTML
       + '<div class="dh-card__price-row"><span class="dh-card__price">' + priceVal + '</span>' + origHTML + '</div>'
-      + '<span class="dh-card__origin dh-card__origin--' + (p.originType || 'unknown').toLowerCase() + '">' + (p.originFlag || '🌍') + ' ' + esc(p.originBadge || 'Shop') + (p.originDelivery ? ' · ' + esc(p.originDelivery) : '') + '</span>'
-      + '<span class="dh-card__plus-ship">' + (window.__dhIsPlus ? '⚡ FREE shipping' : '🚚 FREE ship with Plus') + '</span>'
+      + renderCardShipping(p)
       + '</div></a>'
       + '<div class="dh-card__actions">'
       + '<button class="dh-card__btn-cart" data-id="' + p.id + '" data-src="' + p.source + '" aria-label="Add to cart"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg></button>'
@@ -1078,6 +1077,51 @@
   function escAttr(s) { return (unesc(s || '')).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function formatNum(n) { return n >= 1000 ? (n/1000).toFixed(1) + 'k' : n; }
   function parseNum(s) { if (!s) return 0; return parseFloat(String(s).replace(/[^0-9.]/g, '')) || 0; }
+
+  /* ─── Shipping display helpers ─── */
+  function shortDate(d) {
+    if (!d) return '';
+    return d.replace(/Monday/i,'Mon').replace(/Tuesday/i,'Tue').replace(/Wednesday/i,'Wed')
+      .replace(/Thursday/i,'Thu').replace(/Friday/i,'Fri').replace(/Saturday/i,'Sat').replace(/Sunday/i,'Sun')
+      .replace(/January/i,'Jan').replace(/February/i,'Feb').replace(/March/i,'Mar').replace(/April/i,'Apr')
+      .replace(/June/i,'Jun').replace(/July/i,'Jul').replace(/August/i,'Aug').replace(/September/i,'Sep')
+      .replace(/October/i,'Oct').replace(/November/i,'Nov').replace(/December/i,'Dec');
+  }
+
+  function renderCardShipping(p) {
+    var del = p.deliveryInfo || {};
+    var isPlus = window.__dhIsPlus || false;
+    var oType = (p.originType || 'unknown').toLowerCase();
+    var oFlag = p.originFlag || '🌍';
+    var h = '';
+
+    /* Line 1: origin + real delivery date */
+    h += '<span class="dh-card__origin dh-card__origin--' + oType + '">';
+    h += oFlag + ' ' + esc(p.originBadge || 'Shop');
+    if (del.date) {
+      h += ' · Arrives ' + shortDate(del.date);
+    } else if (del.dateRange) {
+      h += ' · ' + shortDate(del.dateRange);
+    } else if (p.originDelivery) {
+      h += ' · ' + esc(p.originDelivery);
+    }
+    h += '</span>';
+
+    /* Line 2: shipping cost */
+    if (isPlus) {
+      h += '<span class="dh-card__plus-ship">⚡ FREE shipping</span>';
+    } else if (del.isFree && !del.threshold) {
+      h += '<span class="dh-card__ship-free">🚚 FREE shipping' + (p.isPrime ? ' ⚡' : '') + '</span>';
+    } else if (del.isFree && del.threshold) {
+      h += '<span class="dh-card__ship-free">🚚 FREE on $' + del.threshold + '+</span>';
+    } else if (del.cost > 0) {
+      h += '<span class="dh-card__ship-cost">🚚 $' + del.cost.toFixed(2) + ' shipping · <span class="dh-card__plus-link">FREE with Plus</span></span>';
+    } else {
+      h += '<span class="dh-card__plus-ship">🚚 FREE ship with Plus</span>';
+    }
+
+    return h;
+  }
 
   /* ─── Card actions ─── */
   function bindCardActions() {
@@ -1629,6 +1673,9 @@
   .dh-card__origin--intl { color: #d97706; }
   .dh-card__origin--unknown { color: #aaa; }
   .dh-card__plus-ship { display: block; font-size: 10px; font-weight: 600; margin-top: 4px; color: #7c3aed; }
+  .dh-card__ship-free { display: block; font-size: 10px; font-weight: 600; margin-top: 4px; color: #16a34a; }
+  .dh-card__ship-cost { display: block; font-size: 10px; font-weight: 500; margin-top: 4px; color: #6b7280; }
+  .dh-card__plus-link { color: #7c3aed; font-weight: 600; }
   .dh-card__actions { display: flex; gap: 6px; padding: 0 12px 12px; }
   .dh-card__btn-cart, .dh-card__btn-wish { padding: 8px 12px; border: 1px solid #eee; border-radius: 8px; background: #fff; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; color: #555; }
   .dh-card__btn-cart:hover { background: #e53e3e; color: #fff; border-color: #e53e3e; }

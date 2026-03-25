@@ -1313,18 +1313,16 @@
       if(items.length<1)return;
       items=items.slice(0,15);
       var cid='sh-rv-strip';
-      var h='<div style="margin-top:32px;border-top:1px solid #eee;padding-top:24px">';
-      h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-      h+='<h3 style="font-size:15px;font-weight:600;color:#333;margin:0">Recently Viewed</h3>';
+      var h='<div class="sh-rec-section">';
+      h+='<div class="sh-rec-header"><h3 style="font-size:15px;font-weight:600;color:#333;margin:0">Recently Viewed</h3>';
       if(items.length>4){
-        h+='<div style="display:flex;gap:6px">';
-        h+='<button onclick="(function(){var e=document.getElementById(\''+cid+'\');if(e)e.scrollBy({left:-280,behavior:\'smooth\'})})()" style="width:28px;height:28px;border-radius:50%;border:1px solid #ddd;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:#666">&lsaquo;</button>';
-        h+='<button onclick="(function(){var e=document.getElementById(\''+cid+'\');if(e)e.scrollBy({left:280,behavior:\'smooth\'})})()" style="width:28px;height:28px;border-radius:50%;border:1px solid #ddd;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:#666">&rsaquo;</button>';
+        h+='<div class="sh-rec-nav">';
+        h+='<button class="sh-rec-arrow" data-target="'+cid+'" data-dir="-1">&lsaquo;</button>';
+        h+='<button class="sh-rec-arrow" data-target="'+cid+'" data-dir="1">&rsaquo;</button>';
         h+='</div>';
       }
       h+='</div>';
-      h+='<div id="'+cid+'" style="display:flex;gap:10px;overflow-x:auto;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px">';
-      h+='<style>#'+cid+'::-webkit-scrollbar{display:none}</style>';
+      h+='<div id="'+cid+'" class="sh-rec-carousel">';
       items.forEach(function(item){
         var link='/pages/product?id='+encodeURIComponent(item.id)+'&store='+encodeURIComponent(item.store);
         var prc=typeof item.price==='number'?item.price:parseFloat(String(item.price||'0').replace(/[^0-9.]/g,''));
@@ -1339,6 +1337,8 @@
       });
       h+='</div></div>';
       container.insertAdjacentHTML('beforeend',h);
+      var rvEl=container.querySelector('.sh-rec-section:last-child');
+      if(rvEl)rvEl.addEventListener('click',function(e){var a=e.target.closest('.sh-rec-arrow');if(a)scrollCarousel(a.dataset.target,parseInt(a.dataset.dir)||1)});
     }catch(e){}
   }
 })();

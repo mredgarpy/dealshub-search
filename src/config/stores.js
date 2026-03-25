@@ -98,7 +98,17 @@ function classifyOrigin(product) {
       || product.rawSourceMeta?.shipsFromCode
       || null;
 
-    if (fromCode === 'US') {
+    // Also check the shipsFrom text field (e.g. "United States")
+    const fromText = product.shippingData?.shipsFrom
+      || product.rawSourceMeta?.shipsFrom
+      || product.shipping?.shipsFrom
+      || '';
+
+    const isUS = fromCode === 'US'
+      || /united\s*states/i.test(fromText)
+      || /^US$/i.test(fromText.trim());
+
+    if (isUS) {
       return {
         origin: 'USA',
         badge: 'USA',

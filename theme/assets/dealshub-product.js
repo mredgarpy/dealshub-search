@@ -126,9 +126,8 @@
 
     // Responsive CSS
     html+='<style>';
-    html+='.dhpdp-grid{grid-template-columns:1fr 1fr;gap:40px;align-items:start}';
-    html+='.dhpdp-gallery{position:sticky;top:20px}';
-    html+='@media(max-width:768px){.dhpdp-grid{grid-template-columns:1fr!important;gap:20px!important}.dhpdp h1{font-size:20px!important}#dhpdp-sticky{display:flex!important}.dhpdp-gallery{position:static!important}}';
+    html+='.dhpdp-grid{grid-template-columns:1fr 1fr;gap:40px}';
+    html+='@media(max-width:768px){.dhpdp-grid{grid-template-columns:1fr!important;gap:20px!important}.dhpdp h1{font-size:20px!important}#dhpdp-sticky{display:flex!important}}';
     html+='.dhpdp-spec-table{width:100%;border-collapse:collapse}.dhpdp-spec-table tr:nth-child(even){background:#f8fafc}.dhpdp-spec-table td{padding:10px 14px;font-size:14px;border-bottom:1px solid #f0f0f0}.dhpdp-spec-table td:first-child{font-weight:600;color:#374151;width:40%}';
     html+='.dhpdp-thumbs::-webkit-scrollbar{display:none}';
     html+='.dhpdp-review{border-bottom:1px solid #f0f0f0;padding:20px 0}.dhpdp-review:last-child{border-bottom:none}';
@@ -181,15 +180,15 @@
   // ═══ SECTION 2: IMAGE GALLERY ═══
   function renderGallery(p,imgs,mainImg,discount){
     var h='<div class="dhpdp-gallery">';
-    // Main image
-    h+='<div style="position:relative;border-radius:12px;overflow:hidden;background:#fafafa;border:1px solid #eee">';
+
+    // Main image (sticky on desktop)
+    h+='<div class="dhpdp-main-img-wrap" style="position:relative;border-radius:12px;overflow:hidden;background:#fafafa;border:1px solid #eee">';
     if(p.badge)h+='<span style="position:absolute;top:12px;left:12px;background:#e53e3e;color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;z-index:2">'+esc(p.badge)+'</span>';
     if(discount>0)h+='<span style="position:absolute;top:12px;right:12px;background:#E53E3E;color:#fff;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;z-index:2">-'+discount+'%</span>';
-    // Sales volume badge
     if(p.salesVolume)h+='<span style="position:absolute;bottom:12px;left:12px;background:rgba(0,0,0,.7);color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;z-index:2">'+esc(p.salesVolume)+'</span>';
     h+='<img id="dhpdp-main-img" src="'+esc(mainImg)+'" alt="'+esc(p.title)+'" style="width:100%;aspect-ratio:1;object-fit:contain;display:block;cursor:zoom-in" onerror="this.src=\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 400%22><rect fill=%22%23f5f5f5%22 width=%22400%22 height=%22400%22/><text x=%22200%22 y=%22200%22 text-anchor=%22middle%22 fill=%22%23ccc%22 font-size=%2220%22>No Image</text></svg>\'"></div>';
 
-    // Thumbnails
+    // Thumbnails (below main image, scroll horizontal)
     if(imgs.length>1){
       h+='<div style="display:flex;gap:8px;margin-top:12px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch" class="dhpdp-thumbs">';
       for(var i=0;i<Math.min(imgs.length,10);i++){
@@ -198,11 +197,11 @@
       h+='</div>';
     }
 
-    // Video button if available
+    // Video button (separate row below thumbs)
     if(p.hasVideo&&p.videos&&p.videos.length){
-      h+='<div style="margin-top:8px"><button class="dhpdp-video-btn" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">&#9654; Watch Video</button></div>';
+      h+='<div style="margin-top:10px;clear:both"><button class="dhpdp-video-btn" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">&#9654; Watch Video</button></div>';
     }
-    h+='</div>';
+    h+='</div>'; // end dhpdp-gallery
     return h;
   }
 

@@ -288,11 +288,16 @@ class AmazonAdapter extends BaseAdapter {
     const deliveryRaw = p.delivery || '';
     const delivery = this._parseDeliverySearchText(deliveryRaw);
 
+    const discount = origPrice && origPrice > price ? Math.round((1 - price / origPrice) * 100) : 0;
+    const savingsAmount = origPrice && origPrice > price ? (origPrice - price).toFixed(2) : null;
+
     return {
       id: p.asin || '',
       title: p.product_title || '',
       price: price ? `$${price.toFixed(2)}` : null,
       originalPrice: origPrice && origPrice > price ? `$${origPrice.toFixed(2)}` : null,
+      discount: discount || null,
+      savingsAmount: savingsAmount,
       image: p.product_photo || '',
       url: p.product_url || '',
       rating: p.product_star_rating || null,
@@ -310,6 +315,7 @@ class AmazonAdapter extends BaseAdapter {
         fastest: delivery.fastestDate || null,
         threshold: delivery.threshold || null,
         isPrimeDelivery: delivery.isPrimeDelivery,
+        orderWithin: delivery.orderWithin || null,
         raw: deliveryRaw || null
       }
     };
@@ -328,13 +334,17 @@ class AmazonAdapter extends BaseAdapter {
       dateRange: null,
       fastestDate: null,
       threshold: null,
-      isPrimeDelivery: /Prime/i.test(text)
+      isPrimeDelivery: /Prime/i.test(text),
+      orderWithin: null
     };
-    // Extract cost: "$6.41 delivery"
+    // Extract cost: "$6.41 delivery" (but not when preceded by FREE)
     const costMatch = text.match(/\$([\d.]+)\s*delivery/);
-    if (costMatch) result.cost = parseFloat(costMatch[1]);
+    if (costMatch && !/FREE/i.test(text.substring(0, text.indexOf(costMatch[0])))) {
+      result.cost = parseFloat(costMatch[1]);
+      result.isFree = false;
+    }
     // Extract standard date: "delivery Mon, Mar 30" or "delivery Wednesday, April 1"
-    const dateMatch = text.match(/delivery\s+((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?,?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d+)/i);
+    const dateMatch = text.match(/(?:FREE\s+)?delivery\s+((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?,?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d+)/i);
     if (dateMatch) result.standardDate = dateMatch[1].trim();
     // Extract date range: "Mar 30 - Apr 1"
     const rangeMatch = text.match(/delivery\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d+)\s*[-–]\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d+)/i);
@@ -342,9 +352,15 @@ class AmazonAdapter extends BaseAdapter {
     // Extract fastest: "fastest delivery Tomorrow, Mar 26"
     const fastMatch = text.match(/fastest\s+delivery\s+((?:Tomorrow|Today|(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?,?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d+)[^O]*)/i);
     if (fastMatch) result.fastestDate = fastMatch[1].trim();
-    // Extract threshold: "on $35 of items"
-    const threshMatch = text.match(/on\s+\$([\d.]+)\s+of\s+items/i);
+    // Extract "Prime members get FREE delivery Tomorrow, March 26"
+    const primeMatch = text.match(/Prime members?\s+get\s+FREE delivery\s+(.+?)(?:\.|Order|$)/i);
+    if (primeMatch && !result.fastestDate) result.fastestDate = primeMatch[1].trim();
+    // Extract threshold: "on $35 of items" or "over $35"
+    const threshMatch = text.match(/(?:over|on)\s+\$([\d.]+)/i);
     if (threshMatch) result.threshold = parseFloat(threshMatch[1]);
+    // Extract "Order within 9 hrs 49 mins"
+    const withinMatch = text.match(/Order within\s+(.+?)(?:\.|$)/i);
+    if (withinMatch) result.orderWithin = withinMatch[1].trim();
     return result;
   }
 
@@ -571,6 +587,19 @@ class AmazonAdapter extends BaseAdapter {
     p.deliveryEstimate.earliestDate = _fmt(_minDel);
     p.deliveryEstimate.latestDate = _fmt(_maxDel);
     p.deliveryEstimate.formattedRange = `${_fmt(_minDel)} – ${_fmt(_maxDel)}`;
+
+    // Parsed delivery for PDP (same parser as search, applied to product detail delivery text)
+    const pdpDeliveryParsed = this._parseDeliverySearchText(deliveryText);
+    p.deliveryParsed = {
+      standard: pdpDeliveryParsed.standardDate || (p.deliveryEstimate.formattedRange || null),
+      fastest: pdpDeliveryParsed.fastestDate || null,
+      cost: pdpDeliveryParsed.cost || (p.shippingData.cost || 0),
+      isFree: pdpDeliveryParsed.isFree || p.shippingData.cost === 0,
+      threshold: pdpDeliveryParsed.threshold || null,
+      isPrime: d.is_prime || false,
+      orderWithin: pdpDeliveryParsed.orderWithin || null,
+      raw: deliveryText || null
+    };
 
     // Return policy
     p.returnPolicy.summary = 'Free returns within 30 days';

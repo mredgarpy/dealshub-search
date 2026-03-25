@@ -399,11 +399,16 @@ class AliExpressAdapter extends BaseAdapter {
     const shipFee = deliv.shippingFee ? parseFloat(deliv.shippingFee) : null;
     const isFreeShip = deliv.freeShipping === true || shipFee === 0;
 
+    const discount = finalOrigPrice && price ? Math.round((1 - price / finalOrigPrice) * 100) : 0;
+    const savingsAmount = finalOrigPrice && price ? (finalOrigPrice - price).toFixed(2) : null;
+
     return {
       id: itemId,
       title: p.title || p.displayTitle || '',
       price: price ? `$${price.toFixed(2)}` : null,
       originalPrice: finalOrigPrice ? `$${finalOrigPrice.toFixed(2)}` : null,
+      discount: discount || null,
+      savingsAmount: savingsAmount,
       image: imageUrl,
       url: p.itemUrl ? (p.itemUrl.startsWith('//') ? 'https:' + p.itemUrl : p.itemUrl) :
            `https://www.aliexpress.com/item/${itemId}.html`,

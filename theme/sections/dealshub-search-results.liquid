@@ -129,10 +129,10 @@
       const sources = ['amazon', 'aliexpress'];
 
       // Parallel search across active sources, passing category if set
+      // Build per-source search query: augment with category for relevance
       const promises = sources.map(s => {
-        var opts = { store: s, limit: 40 };
-        if (currentCategory) opts.category = currentCategory;
-        return API.search(query, opts)
+        var searchQ = currentCategory ? (query + ' ' + currentCategory) : query;
+        return API.search(searchQ, s, 40)
           .then(resp => (resp && resp.results) ? resp.results : (Array.isArray(resp) ? resp : []))
           .catch(() => []);
       });

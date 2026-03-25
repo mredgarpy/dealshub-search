@@ -182,19 +182,20 @@ app.get('/api/search', async (req, res) => {
   const cached = searchCache.get(cacheKey);
   if (cached) return res.json(cached);
 
+  const pageNum = parseInt(page) || 1;
   try {
     const results = await Promise.allSettled(
       sources.map(s => {
         const adapter = getAdapter(s);
         if (!adapter) return Promise.resolve([]);
-        // Pass category-specific params per source
+        // Pass category-specific params and page per source
         if (s === 'amazon' && catConfig) {
-          return adapter.search(q, limitNum, { categoryId: catConfig.amazonCatId });
+          return adapter.search(q, limitNum, { categoryId: catConfig.amazonCatId, page: pageNum });
         }
         if (s === 'aliexpress' && catConfig && catConfig.aliQuery) {
-          return adapter.search(q + ' ' + catConfig.aliQuery, limitNum);
+          return adapter.search(q + ' ' + catConfig.aliQuery, limitNum, { page: pageNum });
         }
-        return adapter.search(q, limitNum);
+        return adapter.search(q, limitNum, { page: pageNum });
       })
     );
 
@@ -234,13 +235,15 @@ app.get('/api/search', async (req, res) => {
       allResults = interleaveResults(allResults, sources);
     }
 
+    const pricedResults = applySearchPricing(allResults.slice(0, limitNum));
     const response = {
       query: q,
       store: store || 'all',
-      page: parseInt(page),
+      page: pageNum,
       limit: limitNum,
-      total: allResults.length,
-      results: applySearchPricing(allResults.slice(0, limitNum))
+      total: pricedResults.length,
+      hasMore: pricedResults.length >= Math.floor(limitNum * 0.5),
+      results: pricedResults
     };
 
     searchCache.set(cacheKey, response);

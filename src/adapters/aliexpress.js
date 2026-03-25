@@ -31,12 +31,13 @@ class AliExpressAdapter extends BaseAdapter {
     super('aliexpress', { ...config, timeout: 20000 });
   }
 
-  async search(query, limit = 12) {
+  async search(query, limit = 12, options = {}) {
+    const pageNum = (options && options.page) || 1;
     // Try each search endpoint with retry logic
     for (const endpoint of SEARCH_ENDPOINTS) {
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const url = `https://${SEARCH_HOST}${endpoint}?q=${encodeURIComponent(query)}&page=1&sort=default`;
+          const url = `https://${SEARCH_HOST}${endpoint}?q=${encodeURIComponent(query)}&page=${pageNum}&sort=default`;
           logger.info('aliexpress', `Search attempt ${attempt} via ${endpoint}`, { query });
           const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
 

@@ -95,7 +95,55 @@
   let currentOrigin = 'all';
   let currentCategory = '';
   const PAGE_SIZE = 24;
+  const API_LIMIT = 40;
+  let apiPage = 1;
+  let isFetchingPage = false;
+  let noMoreResults = false;
+  const BACKEND = 'https://dealshub-search.onrender.com';
   try{window.__dhIsPlus=localStorage.getItem('stylehub_plus')==='true'}catch(e){window.__dhIsPlus=false}
+
+  // Fetch a page of results from backend for a single store
+  async function fetchStorePage(query, store, page) {
+    var searchQ = currentCategory ? (query + ' ' + currentCategory) : query;
+    var url = BACKEND + '/api/search?q=' + encodeURIComponent(searchQ) + '&store=' + encodeURIComponent(store) + '&limit=' + API_LIMIT + '&page=' + page;
+    try {
+      var resp = await fetch(url).then(function(r) { return r.json(); });
+      var items = (resp && resp.results) ? resp.results : (Array.isArray(resp) ? resp : []);
+      return { items: items, hasMore: resp.hasMore !== false && items.length >= Math.floor(API_LIMIT * 0.3) };
+    } catch (e) {
+      return { items: [], hasMore: false };
+    }
+  }
+
+  // Fetch next page from all sources and append to allResults
+  async function fetchNextPage() {
+    if (isFetchingPage || noMoreResults) return false;
+    isFetchingPage = true;
+    apiPage++;
+
+    var sources = ['amazon', 'aliexpress'];
+    var results = await Promise.all(sources.map(function(s) { return fetchStorePage(currentQuery, s, apiPage); }));
+
+    var newItems = [];
+    var anyHasMore = false;
+    results.forEach(function(r) {
+      newItems = newItems.concat(r.items);
+      if (r.hasMore) anyHasMore = true;
+    });
+
+    if (newItems.length === 0) {
+      noMoreResults = true;
+      isFetchingPage = false;
+      return false;
+    }
+
+    noMoreResults = !anyHasMore;
+    allResults = allResults.concat(newItems);
+    applySort();
+    applyOriginFilter(currentOrigin);
+    isFetchingPage = false;
+    return true;
+  }
 
   // Init from URL params
   function init() {
@@ -114,7 +162,7 @@
     }
   }
 
-  // Search — always queries all active stores, filters by origin client-side
+  // Search — initial page load, fetches page 1 from all stores
   async function doSearch(query, origin) {
     if (!query.trim()) return;
 
@@ -124,21 +172,22 @@
     hideSentinel();
     hideEndMsg();
 
+    // Reset pagination state
+    apiPage = 1;
+    noMoreResults = false;
+    isFetchingPage = false;
+
     try {
-      // Always search both active stores (backend already filters paused ones)
-      const sources = ['amazon', 'aliexpress'];
+      var sources = ['amazon', 'aliexpress'];
+      var results = await Promise.all(sources.map(function(s) { return fetchStorePage(query, s, 1); }));
 
-      // Parallel search across active sources, passing category if set
-      // Build per-source search query: augment with category for relevance
-      const promises = sources.map(s => {
-        var searchQ = currentCategory ? (query + ' ' + currentCategory) : query;
-        return API.search(searchQ, s, 40)
-          .then(resp => (resp && resp.results) ? resp.results : (Array.isArray(resp) ? resp : []))
-          .catch(() => []);
+      allResults = [];
+      var anyHasMore = false;
+      results.forEach(function(r) {
+        allResults = allResults.concat(r.items);
+        if (r.hasMore) anyHasMore = true;
       });
-
-      const arrays = await Promise.all(promises);
-      allResults = arrays.flat();
+      noMoreResults = !anyHasMore;
 
       // Update URL
       const url = new URL(window.location);
@@ -147,7 +196,7 @@
       else url.searchParams.delete('origin');
       if (currentCategory) url.searchParams.set('category', currentCategory);
       else url.searchParams.delete('category');
-      url.searchParams.delete('source'); // clean up legacy param
+      url.searchParams.delete('source');
       history.replaceState(null, '', url);
 
       applySort();
@@ -219,9 +268,15 @@
     showGrid();
 
     if (displayedCount < filteredResults.length) {
+      // More client-side results to reveal
+      showSentinel();
+      hideEndMsg();
+    } else if (!noMoreResults) {
+      // All client-side results shown but server has more pages — show sentinel to trigger next fetch
       showSentinel();
       hideEndMsg();
     } else {
+      // Truly done
       hideSentinel();
       if (displayedCount > PAGE_SIZE) showEndMsg();
     }
@@ -343,12 +398,28 @@
     showResults();
   });
 
-  // Infinite scroll via IntersectionObserver
+  // Infinite scroll via IntersectionObserver — supports server-side pagination
   const scrollObserver = new IntersectionObserver(function(entries) {
     entries.forEach(function(entry) {
-      if (entry.isIntersecting && !isLoadingMore && displayedCount < filteredResults.length) {
+      if (!entry.isIntersecting || isLoadingMore) return;
+
+      if (displayedCount < filteredResults.length) {
+        // Still have client-side results to show
         isLoadingMore = true;
         showResults();
+      } else if (!noMoreResults && !isFetchingPage) {
+        // Need to fetch next page from server
+        isLoadingMore = true;
+        fetchNextPage().then(function(gotMore) {
+          if (gotMore) {
+            showResults();
+          } else {
+            // No more results from server
+            hideSentinel();
+            if (displayedCount > PAGE_SIZE) showEndMsg();
+            isLoadingMore = false;
+          }
+        });
       }
     });
   }, { rootMargin: '400px' });

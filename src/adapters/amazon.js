@@ -17,7 +17,8 @@ class AmazonAdapter extends BaseAdapter {
   }
 
   async search(query, limit = 12, options = {}) {
-    let url = `https://${API_HOST}/search?query=${encodeURIComponent(query)}&page=1&country=US&sort_by=RELEVANCE`;
+    const pageNum = options.page || 1;
+    let url = `https://${API_HOST}/search?query=${encodeURIComponent(query)}&page=${pageNum}&country=US&sort_by=RELEVANCE`;
     // Add category_id if provided (e.g. 'electronics', 'fashion-womens', 'shoes')
     if (options.categoryId && options.categoryId !== 'aps') {
       url += `&category_id=${encodeURIComponent(options.categoryId)}`;

@@ -246,20 +246,39 @@
 
   /* Helper: detect size chart category from product title + breadcrumbs */
   function detectSizeChartCategory(p){
+    var pi=p.productInformation||p.product_information||{};
+    var catPath=(p.categoryPath||p.category_path||[]).map(function(c){return(typeof c==='string'?c:(c.name||'')).toLowerCase()}).join(' ');
     var title=(p.title||'').toLowerCase();
     var bc=(p.breadcrumbs||[]).map(function(b){return(typeof b==='object'?(b.name||b.title||''):b).toLowerCase()}).join(' ');
     var cat=(p.category||'').toLowerCase();
-    var all=title+' '+bc+' '+cat;
-    if(/shoe|sneaker|boot|sandal|slipper|loafer|heel|flat|trainer|running shoe|clog/i.test(all))return 'shoes';
-    if(/t-?shirt|tee|polo|tank.?top|blouse|top /i.test(all))return 'tops';
-    if(/dress|gown|jumpsuit|romper/i.test(all))return 'dresses';
-    if(/pant|jean|trouser|short|legging|jogger|sweatpant/i.test(all))return 'bottoms';
-    if(/jacket|coat|hoodie|sweater|cardigan|vest|blazer/i.test(all))return 'outerwear';
-    if(/bra|underwear|lingerie|panty|boxers|brief/i.test(all))return 'underwear';
-    if(/ring|bracelet|necklace|watch.?band/i.test(all))return 'jewelry';
-    if(/hat|cap|beanie|glove|belt/i.test(all))return 'accessories';
-    if(/kid|boy|girl|infant|toddler|baby|children/i.test(all))return 'kids';
-    return null;
+    var allText=title+' '+bc+' '+cat+' '+catPath;
+
+    /* 1. MOST PRECISE: product_information fields from API */
+    var shirtType=(pi['Shirt Form Type']||'').toLowerCase();
+    var neckStyle=(pi['Neck Style']||pi['collar-type']||'').toLowerCase();
+    if(shirtType)return 'tops';
+    if(neckStyle&&!/dress|gown/i.test(allText))return 'tops';
+
+    /* 2. SECOND: category_path (more reliable than title alone) */
+    if(/active shirts|t-?shirts?|tees?|polo|tank|blouse|tops?/i.test(catPath))return 'tops';
+    if(/dress|gown|jumpsuit|romper/i.test(catPath))return 'dresses';
+    if(/jeans|pants|trouser|shorts|legging|jogger|sweatpant|bottoms/i.test(catPath))return 'bottoms';
+    if(/jacket|coat|hoodie|sweater|cardigan|vest|blazer|outerwear/i.test(catPath))return 'outerwear';
+    if(/shoe|sneaker|boot|sandal|slipper|loafer|heel|flat|trainer|running/i.test(catPath))return 'shoes';
+    if(/underwear|lingerie|bra|panty|boxer|brief|sock/i.test(catPath))return 'underwear';
+    if(/kid|boy|girl|infant|toddler|baby|children/i.test(catPath))return 'kids';
+    if(/ring|bracelet|necklace|watch band|jewelry/i.test(catPath))return 'jewelry';
+    if(/hat|cap|beanie|glove|belt|accessories/i.test(catPath))return 'accessories';
+
+    /* 3. FALLBACK: title + breadcrumbs + category (less reliable) */
+    if(/t-?shirt|tee |polo|tank top|blouse|crop top/i.test(title))return 'tops';
+    if(/shoe|sneaker|boot|sandal|slipper|loafer|clog/i.test(allText))return 'shoes';
+    if(/dress|gown/i.test(title))return 'dresses';
+    if(/pant|jean|trouser|short[^s]|legging|jogger|sweatpant/i.test(title))return 'bottoms';
+    if(/jacket|coat|hoodie|sweater|cardigan/i.test(title))return 'outerwear';
+    if(/kid|boy |girl |infant|toddler|baby/i.test(title))return 'kids';
+
+    return null; /* no chart if category unknown */
   }
 
   function renderVariants(p){

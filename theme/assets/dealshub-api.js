@@ -34,10 +34,18 @@ window.DealsHub = window.DealsHub || {};
 
   // ---- SEARCH ----
   async function search(query, options = {}) {
+    // Support both search(query, options) and legacy search(query, store, limit)
+    if (typeof options === 'string') {
+      const store = options;
+      const limit = arguments[2];
+      options = { store: store };
+      if (limit) options.limit = limit;
+    }
     const params = new URLSearchParams({ q: query });
     if (options.store) params.set('store', options.store);
     if (options.limit) params.set('limit', options.limit);
     if (options.page) params.set('page', options.page);
+    if (options.category) params.set('category', options.category);
     return apiFetch(`/api/search?${params}`);
   }
 

@@ -138,10 +138,31 @@ app.use(productImagesRouter);
 // CAPA A â LIVE DISCOVERY LAYER
 // ============================================================
 
+// ---- CATEGORY MAP: dropdown values → API parameters per source ----
+const CATEGORY_MAP = {
+  'women fashion':  { amazonCatId: 'fashion-womens', aliQuery: 'women clothing fashion' },
+  'men fashion':    { amazonCatId: 'fashion-mens',   aliQuery: 'men clothing fashion' },
+  'beauty':         { amazonCatId: 'beauty',         aliQuery: 'beauty makeup cosmetics' },
+  'skincare':       { amazonCatId: 'beauty',         aliQuery: 'skincare face cream serum' },
+  'electronics':    { amazonCatId: 'electronics',    aliQuery: 'electronics gadgets' },
+  'phones':         { amazonCatId: 'mobile-apps',    aliQuery: 'phone accessories smartphone' },
+  'home garden':    { amazonCatId: 'garden',         aliQuery: 'home decor kitchen garden' },
+  'sports':         { amazonCatId: 'sporting',       aliQuery: 'sports fitness outdoor' },
+  'kids':           { amazonCatId: 'baby-products',  aliQuery: 'kids toys children' },
+  'shoes':          { amazonCatId: 'shoes',          aliQuery: 'shoes sneakers boots' },
+  'accessories':    { amazonCatId: 'fashion',        aliQuery: 'accessories watch sunglasses' },
+  'bags':           { amazonCatId: 'fashion',        aliQuery: 'bags purses backpack' },
+  'jewelry':        { amazonCatId: 'jewelry',        aliQuery: 'jewelry necklace ring bracelet' },
+};
+
 // ---- UNIFIED SEARCH ----
 app.get('/api/search', async (req, res) => {
-  const { q, store, limit = 20, page = 1, origin } = req.query;
+  const { q, store, limit = 20, page = 1, origin, category } = req.query;
   if (!q) return res.status(400).json({ error: 'Missing query parameter q' });
+
+  // Resolve category config
+  const catKey = (category || '').toLowerCase().trim();
+  const catConfig = CATEGORY_MAP[catKey] || null;
 
   // Only search active stores; if specific store requested, verify it's active
   let sources;
@@ -155,7 +176,7 @@ app.get('/api/search', async (req, res) => {
     sources = getActiveStores();
   }
   const limitNum = Math.min(parseInt(limit) || 20, 50);
-  const cacheKey = `search:${q}:${sources.join(',')}:${page}:${limitNum}`;
+  const cacheKey = `search:${q}:${sources.join(',')}:${page}:${limitNum}:${catKey || 'all'}`;
 
   // Check cache
   const cached = searchCache.get(cacheKey);
@@ -165,7 +186,15 @@ app.get('/api/search', async (req, res) => {
     const results = await Promise.allSettled(
       sources.map(s => {
         const adapter = getAdapter(s);
-        return adapter ? adapter.search(q, limitNum) : Promise.resolve([]);
+        if (!adapter) return Promise.resolve([]);
+        // Pass category-specific params per source
+        if (s === 'amazon' && catConfig) {
+          return adapter.search(q, limitNum, { categoryId: catConfig.amazonCatId });
+        }
+        if (s === 'aliexpress' && catConfig && catConfig.aliQuery) {
+          return adapter.search(q + ' ' + catConfig.aliQuery, limitNum);
+        }
+        return adapter.search(q, limitNum);
       })
     );
 

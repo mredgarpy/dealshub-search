@@ -113,6 +113,7 @@
   let displayedCount = 0;
   let currentQuery = '';
   let currentOrigin = 'all';
+  let currentCategory = '';
   const PAGE_SIZE = 24;
   try{window.__dhIsPlus=localStorage.getItem('stylehub_plus')==='true'}catch(e){window.__dhIsPlus=false}
 
@@ -121,6 +122,9 @@
     const params = new URLSearchParams(window.location.search);
     const q = params.get('q') || params.get('query') || '';
     const origin = params.get('origin') || 'all';
+    const cat = params.get('category') || '';
+
+    currentCategory = cat;
 
     if (q) {
       input.value = q;
@@ -144,12 +148,14 @@
       // Always search both active stores (backend already filters paused ones)
       const sources = ['amazon', 'aliexpress'];
 
-      // Parallel search across active sources
-      const promises = sources.map(s =>
-        API.search(query, s, 20)
+      // Parallel search across active sources, passing category if set
+      const promises = sources.map(s => {
+        var opts = { store: s, limit: 20 };
+        if (currentCategory) opts.category = currentCategory;
+        return API.search(query, opts)
           .then(resp => (resp && resp.results) ? resp.results : (Array.isArray(resp) ? resp : []))
-          .catch(() => [])
-      );
+          .catch(() => []);
+      });
 
       const arrays = await Promise.all(promises);
       allResults = arrays.flat();
@@ -159,6 +165,8 @@
       url.searchParams.set('q', query);
       if (origin !== 'all') url.searchParams.set('origin', origin);
       else url.searchParams.delete('origin');
+      if (currentCategory) url.searchParams.set('category', currentCategory);
+      else url.searchParams.delete('category');
       url.searchParams.delete('source'); // clean up legacy param
       history.replaceState(null, '', url);
 

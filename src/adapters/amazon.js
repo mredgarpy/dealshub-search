@@ -16,8 +16,12 @@ class AmazonAdapter extends BaseAdapter {
     super('amazon', config);
   }
 
-  async search(query, limit = 12) {
-    const url = `https://${API_HOST}/search?query=${encodeURIComponent(query)}&page=1&country=US&sort_by=RELEVANCE`;
+  async search(query, limit = 12, options = {}) {
+    let url = `https://${API_HOST}/search?query=${encodeURIComponent(query)}&page=1&country=US&sort_by=RELEVANCE`;
+    // Add category_id if provided (e.g. 'electronics', 'fashion-womens', 'shoes')
+    if (options.categoryId && options.categoryId !== 'aps') {
+      url += `&category_id=${encodeURIComponent(options.categoryId)}`;
+    }
     const data = await this.fetchWithRetry(url, { headers: this.rapidHeaders(API_HOST) }, 1, 2000);
     if (!data || !data.data?.products) return [];
     return data.data.products.slice(0, limit).map(p => this.normalizeSearchResult(p)).filter(Boolean);

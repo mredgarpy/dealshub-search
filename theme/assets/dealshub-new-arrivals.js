@@ -1,23 +1,35 @@
-/* StyleHub New Arrivals Page v1.0 — Sprint 5
+/* StyleHub New Arrivals Page v2.0 — Infinite Scroll
    Uses Amazon NEW_RELEASES best-sellers type with category tabs
+   After curated results, continues with search-based infinite scroll
 */
 (function(){
   'use strict';
   var API = 'https://dealshub-search.onrender.com';
+  var PAGE_SIZE = 20;
   var categories = [
-    {id: 'electronics', name: 'Electronics', icon: '\ud83c\udfa7'},
-    {id: 'fashion', name: 'Fashion', icon: '\ud83d\udc57'},
-    {id: 'beauty', name: 'Beauty', icon: '\ud83d\udc84'},
-    {id: 'garden', name: 'Home', icon: '\ud83c\udfe0'},
-    {id: 'sporting', name: 'Sports', icon: '\u26bd'},
-    {id: 'videogames', name: 'Gaming', icon: '\ud83c\udfae'},
-    {id: 'baby-products', name: 'Baby', icon: '\ud83d\udc76'}
+    {id: 'electronics', name: 'Electronics', icon: '🎧', searchTerms: 'new electronics gadgets 2024'},
+    {id: 'fashion', name: 'Fashion', icon: '👗', searchTerms: 'new fashion clothing 2024'},
+    {id: 'beauty', name: 'Beauty', icon: '💄', searchTerms: 'new beauty skincare 2024'},
+    {id: 'garden', name: 'Home', icon: '🏠', searchTerms: 'new home garden decor 2024'},
+    {id: 'sporting', name: 'Sports', icon: '⚽', searchTerms: 'new sports fitness gear'},
+    {id: 'videogames', name: 'Gaming', icon: '🎮', searchTerms: 'new gaming accessories 2024'},
+    {id: 'baby-products', name: 'Baby', icon: '👶', searchTerms: 'new baby kids products'}
   ];
   var activeCategory = 'electronics';
   var cache = {};
 
+  var allProducts = [];
+  var displayedCount = 0;
+  var seenKeys = {};
+  var apiPage = 0;
+  var isFetchingPage = false;
+  var noMoreResults = false;
+  var isLoadingMore = false;
+  var scrollObserver = null;
+
   function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
   function fmtPrice(n){return n?'$'+parseFloat(n).toFixed(2):''}
+  function getActiveCat(){ for(var i=0;i<categories.length;i++){ if(categories[i].id===activeCategory) return categories[i]; } return categories[0]; }
 
   function productCard(p){
     var source = (p.source||'').toLowerCase();
@@ -32,20 +44,17 @@
     var h = '<a href="' + link + '" style="text-decoration:none;display:block;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;transition:box-shadow .2s,transform .2s" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.1)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.boxShadow=\'none\';this.style.transform=\'none\'">';
     h += '<div style="position:relative;aspect-ratio:1;background:#f8f9fa;overflow:hidden">';
     h += '<img src="' + esc(p.image || p.primaryImage || '') + '" alt="" style="width:100%;height:100%;object-fit:contain" loading="lazy">';
-    // NEW badge
     h += '<span style="position:absolute;top:8px;left:8px;background:#3b82f6;color:#fff;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px">NEW</span>';
-    // Origin badge
     var badgeBg = isUSA ? '#16a34a' : '#d97706';
-    var badgeLabel = isUSA ? '\ud83c\uddfa\ud83c\uddf8 USA' : '\ud83c\udf0d Int\'l';
+    var badgeLabel = isUSA ? '🇺🇸 USA' : '🌍 Int\'l';
     h += '<span style="position:absolute;top:8px;right:8px;background:' + badgeBg + ';color:#fff;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700">' + badgeLabel + '</span>';
     if(discount > 0) h += '<span style="position:absolute;bottom:8px;left:8px;background:#e53e3e;color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">-' + discount + '%</span>';
     h += '</div>';
     h += '<div style="padding:12px">';
     h += '<div style="font-size:13px;color:#4a5568;line-height:1.3;height:36px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">' + esc((p.title||'').substring(0,80)) + '</div>';
     if(rating > 0){
-      h += '<div style="display:flex;align-items:center;gap:4px;margin-top:6px">';
-      h += '<span style="color:#f59e0b;font-size:12px">';
-      for(var i=1;i<=5;i++) h += i <= Math.round(rating) ? '\u2605' : '\u2606';
+      h += '<div style="display:flex;align-items:center;gap:4px;margin-top:6px"><span style="color:#f59e0b;font-size:12px">';
+      for(var i=1;i<=5;i++) h += i <= Math.round(rating) ? '★' : '☆';
       h += '</span>';
       if(p.reviews) h += '<span style="font-size:11px;color:#9ca3af">(' + (p.reviews >= 1000 ? (p.reviews/1000).toFixed(1)+'K' : p.reviews) + ')</span>';
       h += '</div>';
@@ -53,8 +62,7 @@
     h += '<div style="margin-top:6px;display:flex;align-items:baseline;gap:6px">';
     if(price > 0) h += '<span style="font-size:16px;font-weight:700;color:#1a1a2e">' + fmtPrice(price) + '</span>';
     if(origPrice > price) h += '<span style="font-size:12px;color:#9ca3af;text-decoration:line-through">' + fmtPrice(origPrice) + '</span>';
-    h += '</div>';
-    h += '</div></a>';
+    h += '</div></div></a>';
     return h;
   }
 
@@ -68,63 +76,153 @@
       var color = isActive ? '#fff' : '#374151';
       var border = isActive ? '#3b82f6' : '#e2e8f0';
       h += '<button data-cat="' + c.id + '" style="display:flex;align-items:center;gap:6px;padding:10px 20px;background:' + bg + ';border:1px solid ' + border + ';border-radius:50px;font-size:14px;font-weight:500;color:' + color + ';cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .2s">';
-      h += '<span style="font-size:16px">' + c.icon + '</span> ' + c.name;
-      h += '</button>';
+      h += '<span style="font-size:16px">' + c.icon + '</span> ' + c.name + '</button>';
     });
     tabsEl.innerHTML = h;
     tabsEl.querySelectorAll('button').forEach(function(btn){
       btn.addEventListener('click', function(){
         activeCategory = this.getAttribute('data-cat');
         renderTabs();
-        loadCategory(activeCategory);
+        resetAndLoad(activeCategory);
       });
     });
+  }
+
+  function resetScrollState(){
+    allProducts=[]; displayedCount=0; seenKeys={}; apiPage=0;
+    isFetchingPage=false; noMoreResults=false; isLoadingMore=false;
+  }
+
+  function addUniqueProducts(items){
+    var count=0;
+    items.forEach(function(p){
+      var key=(p.id||p.sourceId||'')+'_'+(p.source||'');
+      if(!seenKeys[key]){seenKeys[key]=true;allProducts.push(p);count++;}
+    });
+    return count;
+  }
+
+  function resetAndLoad(catId){
+    resetScrollState();
+    var spinner=document.getElementById('dh-na-spinner'); if(spinner) spinner.style.display='none';
+    loadCategory(catId);
   }
 
   function loadCategory(catId){
     var contentEl = document.getElementById('dh-na-content');
     var skelEl = document.getElementById('dh-na-skeleton');
     if(!contentEl) return;
-    if(cache[catId]){ renderProducts(cache[catId]); return; }
     contentEl.innerHTML = '';
     if(skelEl) skelEl.style.display = '';
+
+    var doRender = function(items){
+      addUniqueProducts(items);
+      if(skelEl) skelEl.style.display = 'none';
+      renderProducts();
+      setupInfiniteScroll();
+    };
+
+    if(cache[catId]){ doRender(cache[catId]); return; }
 
     fetch(API + '/api/amazon-bestsellers?type=NEW_RELEASES&category=' + encodeURIComponent(catId) + '&limit=30', {signal: AbortSignal.timeout(15000)})
       .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
       .then(function(data){
         var items = data.results || [];
         cache[catId] = items;
-        renderProducts(items);
+        doRender(items);
       })
       .catch(function(){
         if(skelEl) skelEl.style.display = 'none';
-        contentEl.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280"><p style="font-size:16px">Unable to load new arrivals</p><p style="font-size:13px">Please try again later</p></div>';
+        setupInfiniteScroll();
+        fetchNextPage();
       });
   }
 
-  function renderProducts(items){
+  function renderProducts(){
     var contentEl = document.getElementById('dh-na-content');
-    var skelEl = document.getElementById('dh-na-skeleton');
-    if(skelEl) skelEl.style.display = 'none';
     if(!contentEl) return;
-    if(!items.length){
-      contentEl.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280"><p>No new arrivals found in this category</p></div>';
+    if(!allProducts.length){
+      contentEl.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280"><p>No new arrivals found</p></div>';
       return;
     }
-    var h = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px" class="dh-na-grid">';
-    items.forEach(function(p){ h += productCard(p); });
-    h += '</div>';
-    contentEl.innerHTML = h;
+    var nextBatch = allProducts.slice(displayedCount, displayedCount + PAGE_SIZE);
+    if(!nextBatch.length){isLoadingMore=false;return;}
+    var container = contentEl.querySelector('.dh-na-grid');
+    if(!container){
+      var end = Math.min(PAGE_SIZE, allProducts.length);
+      var h = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px" class="dh-na-grid">';
+      allProducts.slice(0, end).forEach(function(p){ h += productCard(p); });
+      h += '</div>';
+      contentEl.innerHTML = h;
+      displayedCount = end;
+    } else {
+      nextBatch.forEach(function(p){ container.insertAdjacentHTML('beforeend', productCard(p)); });
+      displayedCount += nextBatch.length;
+    }
+    isLoadingMore = false;
+    updateSentinel();
   }
 
-  function init(){
-    renderTabs();
-    loadCategory(activeCategory);
+  function fetchNextPage(){
+    if(isFetchingPage || noMoreResults) return Promise.resolve(false);
+    isFetchingPage = true;
+    showSpinner();
+    apiPage++;
+    var activeCat = getActiveCat();
+    return Promise.all([
+      fetch(API + '/api/search?q=' + encodeURIComponent(activeCat.searchTerms) + '&store=amazon&limit=30&page=' + apiPage, {signal: AbortSignal.timeout(15000)}).then(function(r){return r.ok?r.json():{results:[]}}).catch(function(){return {results:[]}}),
+      fetch(API + '/api/search?q=' + encodeURIComponent(activeCat.searchTerms) + '&store=aliexpress&limit=20&page=' + apiPage, {signal: AbortSignal.timeout(15000)}).then(function(r){return r.ok?r.json():{results:[]}}).catch(function(){return {results:[]}})
+    ]).then(function(results){
+      var newItems=[];var anyHasMore=false;
+      results.forEach(function(data){var items=data.results||[];newItems=newItems.concat(items);if(data.hasMore!==false&&items.length>=5)anyHasMore=true;});
+      var added=addUniqueProducts(newItems);
+      hideSpinner();
+      if(added===0){noMoreResults=true;isFetchingPage=false;return false;}
+      noMoreResults=!anyHasMore;
+      renderProducts();
+      isFetchingPage=false;
+      return true;
+    }).catch(function(){hideSpinner();isFetchingPage=false;return false;});
   }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
 
-  var style = document.createElement('style');
-  style.textContent = '@media(max-width:768px){.dh-na-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}}';
+  function getSentinel(){
+    var s=document.getElementById('dh-na-sentinel');
+    if(!s){s=document.createElement('div');s.id='dh-na-sentinel';s.style.cssText='height:1px;width:100%';var c=document.getElementById('dh-na-content');if(c)c.parentNode.insertBefore(s,c.nextSibling);}
+    return s;
+  }
+  function hideSentinel(){var s=document.getElementById('dh-na-sentinel');if(s)s.style.display='none';}
+  function updateSentinel(){var s=getSentinel();if(s)s.style.display='';}
+  function showSpinner(){
+    var el=document.getElementById('dh-na-spinner');
+    if(!el){el=document.createElement('div');el.id='dh-na-spinner';var c=document.getElementById('dh-na-content');if(c)c.parentNode.insertBefore(el,c.nextSibling);}
+    el.style.display='';
+    el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:20px"><div style="width:20px;height:20px;border:3px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:dhspin 0.8s linear infinite"></div><span style="color:#6b7280;font-size:14px">Loading more products...</span></div>';
+  }
+  function hideSpinner(){var el=document.getElementById('dh-na-spinner');if(el)el.style.display='none';}
+  function showEndMsg(){
+    var el=document.getElementById('dh-na-spinner');
+    if(!el){el=document.createElement('div');el.id='dh-na-spinner';var c=document.getElementById('dh-na-content');if(c)c.parentNode.insertBefore(el,c.nextSibling);}
+    if(displayedCount>PAGE_SIZE){el.style.display='';el.innerHTML='<div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px">You\'ve explored all new arrivals</div>';}
+  }
+
+  function setupInfiniteScroll(){
+    if(scrollObserver) scrollObserver.disconnect();
+    var sentinel=getSentinel();
+    scrollObserver=new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(!entry.isIntersecting||isLoadingMore) return;
+        if(displayedCount<allProducts.length){isLoadingMore=true;renderProducts();}
+        else if(!noMoreResults&&!isFetchingPage){isLoadingMore=true;fetchNextPage().then(function(got){if(!got){hideSentinel();showEndMsg();}isLoadingMore=false;});}
+        else if(noMoreResults){hideSentinel();showEndMsg();}
+      });
+    },{rootMargin:'400px'});
+    scrollObserver.observe(sentinel);
+  }
+
+  function init(){ renderTabs(); resetAndLoad(activeCategory); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+
+  var style=document.createElement('style');
+  style.textContent='@media(max-width:768px){.dh-na-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}}@keyframes dhspin{to{transform:rotate(360deg)}}';
   document.head.appendChild(style);
 })();

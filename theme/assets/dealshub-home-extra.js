@@ -168,6 +168,204 @@
       '</div>';
   }
 
+  // === SECTION: Discover More — Infinite Scroll Override ===
+  // Patches the Discover More section (from minified dealshub-home.js) to use infinite scroll
+  var dmAllProducts = [];
+  var dmDisplayed = 0;
+  var dmSeenKeys = {};
+  var dmApiPage = 0;
+  var dmFetching = false;
+  var dmNoMore = false;
+  var dmLoadingMore = false;
+  var dmObserver = null;
+  var DM_PAGE_SIZE = 20;
+  var dmSearchQueries = ['trending products', 'popular deals', 'top rated items', 'best value', 'new arrivals trending', 'fashion accessories', 'electronics gadgets', 'home decor'];
+
+  function patchDiscoverMore(){
+    /* Wait for the Discover More section to appear in the DOM */
+    var attempts = 0;
+    var maxAttempts = 30; /* 15 seconds max */
+
+    function tryPatch(){
+      attempts++;
+      /* Find the "Load more products" or "Show more" button inside #dealshub-home */
+      var homeEl = document.getElementById('dealshub-home');
+      if(!homeEl){ if(attempts < maxAttempts) setTimeout(tryPatch, 500); return; }
+
+      var buttons = homeEl.querySelectorAll('button');
+      var loadMoreBtn = null;
+      var discoverSection = null;
+
+      for(var i = 0; i < buttons.length; i++){
+        var txt = (buttons[i].textContent || '').toLowerCase();
+        if(txt.indexOf('load more') !== -1 || txt.indexOf('show more') !== -1 || txt.indexOf('discover') !== -1){
+          loadMoreBtn = buttons[i];
+          break;
+        }
+      }
+
+      /* Also check for discover grid */
+      var grids = homeEl.querySelectorAll('[style*="grid-template-columns"]');
+      var lastGrid = grids.length ? grids[grids.length - 1] : null;
+
+      if(!loadMoreBtn && !lastGrid){
+        if(attempts < maxAttempts) setTimeout(tryPatch, 500);
+        return;
+      }
+
+      /* Seed with existing products from the minified code */
+      if(window._discoverAll && Array.isArray(window._discoverAll)){
+        window._discoverAll.forEach(function(p){
+          var key = (p.id || p.sourceId || '') + '_' + (p.source || '');
+          if(!dmSeenKeys[key]){
+            dmSeenKeys[key] = true;
+            dmAllProducts.push(p);
+          }
+        });
+        dmDisplayed = window._discoverShown || dmAllProducts.length;
+      }
+
+      /* Hide the old button */
+      if(loadMoreBtn){
+        var btnParent = loadMoreBtn.parentElement;
+        if(btnParent) btnParent.style.display = 'none';
+        loadMoreBtn.style.display = 'none';
+      }
+
+      /* Find the grid container for discover more */
+      var discoverGrid = null;
+      if(lastGrid && lastGrid.closest){
+        var parent = lastGrid.parentElement;
+        /* Walk up to find the section wrapper */
+        while(parent && parent !== homeEl){
+          var headings = parent.querySelectorAll('h2, h3');
+          for(var j = 0; j < headings.length; j++){
+            var hText = (headings[j].textContent || '').toLowerCase();
+            if(hText.indexOf('discover') !== -1 || hText.indexOf('more') !== -1){
+              discoverGrid = lastGrid;
+              discoverSection = parent;
+              break;
+            }
+          }
+          if(discoverGrid) break;
+          parent = parent.parentElement;
+        }
+      }
+
+      /* If we couldn't find the discover section, use the last grid */
+      if(!discoverGrid && lastGrid) discoverGrid = lastGrid;
+
+      /* Create sentinel after the discover section or grid */
+      var anchor = discoverSection || (discoverGrid ? discoverGrid.parentElement : null) || homeEl;
+      var sentinel = document.createElement('div');
+      sentinel.id = 'dh-home-discover-sentinel';
+      sentinel.style.cssText = 'height:1px;width:100%';
+      anchor.appendChild(sentinel);
+
+      /* Create spinner element */
+      var spinner = document.createElement('div');
+      spinner.id = 'dh-home-discover-spinner';
+      spinner.style.display = 'none';
+      anchor.insertBefore(spinner, sentinel);
+
+      /* Create overflow grid for new products */
+      var overflowGrid = document.createElement('div');
+      overflowGrid.id = 'dh-home-discover-overflow';
+      overflowGrid.style.cssText = 'display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:16px';
+      overflowGrid.className = 'dh-extra-grid';
+      anchor.insertBefore(overflowGrid, spinner);
+
+      /* Setup IntersectionObserver */
+      dmObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(entry){
+          if(!entry.isIntersecting || dmLoadingMore) return;
+          if(!dmNoMore && !dmFetching){
+            dmLoadingMore = true;
+            fetchDiscoverPage().then(function(got){
+              if(!got){
+                sentinel.style.display = 'none';
+                if(dmDisplayed > DM_PAGE_SIZE){
+                  spinner.style.display = '';
+                  spinner.innerHTML = '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px">You\'ve explored all products</div>';
+                }
+              }
+              dmLoadingMore = false;
+            });
+          }
+        });
+      }, {rootMargin: '400px'});
+      dmObserver.observe(sentinel);
+    }
+
+    tryPatch();
+  }
+
+  function fetchDiscoverPage(){
+    if(dmFetching || dmNoMore) return Promise.resolve(false);
+    dmFetching = true;
+
+    var spinner = document.getElementById('dh-home-discover-spinner');
+    if(spinner){
+      spinner.style.display = '';
+      spinner.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:20px"><div style="width:20px;height:20px;border:3px solid #e2e8f0;border-top-color:#1a1a2e;border-radius:50%;animation:dhspin 0.8s linear infinite"></div><span style="color:#6b7280;font-size:14px">Loading more products...</span></div>';
+    }
+
+    dmApiPage++;
+    var q = dmSearchQueries[(dmApiPage - 1) % dmSearchQueries.length];
+    var pageNum = Math.ceil(dmApiPage / dmSearchQueries.length);
+
+    return Promise.all([
+      fetch(API + '/api/search?q=' + encodeURIComponent(q) + '&store=amazon&limit=30&page=' + pageNum, {signal: AbortSignal.timeout(15000)}).then(function(r){return r.ok?r.json():{results:[]}}).catch(function(){return {results:[]}}),
+      fetch(API + '/api/search?q=' + encodeURIComponent(q) + '&store=aliexpress&limit=20&page=' + pageNum, {signal: AbortSignal.timeout(15000)}).then(function(r){return r.ok?r.json():{results:[]}}).catch(function(){return {results:[]}})
+    ]).then(function(results){
+      var newItems = [];
+      var anyHasMore = false;
+      results.forEach(function(data){
+        var items = data.results || [];
+        newItems = newItems.concat(items);
+        if(data.hasMore !== false && items.length >= 5) anyHasMore = true;
+      });
+
+      var added = 0;
+      newItems.forEach(function(p){
+        var key = (p.id || p.sourceId || '') + '_' + (p.source || '');
+        if(!dmSeenKeys[key]){
+          dmSeenKeys[key] = true;
+          dmAllProducts.push(p);
+          added++;
+        }
+      });
+
+      if(spinner) spinner.style.display = 'none';
+
+      if(added === 0){
+        dmNoMore = true;
+        dmFetching = false;
+        return false;
+      }
+
+      dmNoMore = !anyHasMore;
+
+      /* Render new products into overflow grid */
+      var overflowGrid = document.getElementById('dh-home-discover-overflow');
+      if(overflowGrid){
+        var startIdx = dmDisplayed;
+        var batch = dmAllProducts.slice(startIdx, startIdx + DM_PAGE_SIZE + added);
+        batch.forEach(function(p){
+          overflowGrid.insertAdjacentHTML('beforeend', productCard(p));
+        });
+        dmDisplayed = startIdx + batch.length;
+      }
+
+      dmFetching = false;
+      return true;
+    }).catch(function(){
+      if(spinner) spinner.style.display = 'none';
+      dmFetching = false;
+      return false;
+    });
+  }
+
   // === Initialize ===
   function init(){
     buildCategoryNav();
@@ -176,6 +374,8 @@
     setTimeout(buildMostWished, 1000);
     setTimeout(buildGiftIdeas, 1500);
     buildPlusBanner();
+    // Patch Discover More with infinite scroll (delayed to let minified home.js build it first)
+    setTimeout(patchDiscoverMore, 2000);
   }
 
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -183,6 +383,6 @@
 
   // Responsive styles
   var style = document.createElement('style');
-  style.textContent = '@media(max-width:768px){.dh-extra-grid{grid-template-columns:repeat(2,1fr)!important}.dh-cat-pills{padding:8px 0}}@media(max-width:480px){.dh-extra-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}}';
+  style.textContent = '@media(max-width:768px){.dh-extra-grid{grid-template-columns:repeat(2,1fr)!important}.dh-cat-pills{padding:8px 0}#dh-home-discover-overflow{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}}@media(max-width:480px){.dh-extra-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}}@keyframes dhspin{to{transform:rotate(360deg)}}';
   document.head.appendChild(style);
 })();

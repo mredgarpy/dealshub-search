@@ -635,6 +635,28 @@ class AmazonAdapter extends BaseAdapter {
       p.productInformation = { ...d.product_information };
     }
 
+    // Product details (Fabric type, Neck style, Origin, Sleeve type)
+    p.productDetails = {};
+    if (d.product_details && typeof d.product_details === 'object') {
+      p.productDetails = { ...d.product_details };
+    }
+
+    // Category path for better size chart detection
+    p.categoryPath = [];
+    if (Array.isArray(d.category_path)) {
+      p.categoryPath = d.category_path.map(c => {
+        if (typeof c === 'string') return c;
+        if (c && typeof c === 'object') return c.name || c.title || '';
+        return '';
+      }).filter(Boolean);
+    }
+
+    // All product variations map (ASIN → {size, color}) for variant switching
+    p.allVariations = null;
+    if (d.all_product_variations && typeof d.all_product_variations === 'object') {
+      p.allVariations = d.all_product_variations;
+    }
+
     // Quick specs (product_details) as structured data
     p.quickSpecs = [];
     if (d.product_details && typeof d.product_details === 'object') {

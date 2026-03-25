@@ -159,6 +159,7 @@ class AliExpressAdapter extends BaseAdapter {
   }
 
   // Fetch store_info for seller rating (cached 24h)
+  // Returns normalized: { positiveRate, sellerScore, sellerLevel, storeFollowers }
   async _fetchStoreInfo(sellerId) {
     if (!sellerId) return null;
     const cacheKey = String(sellerId);
@@ -167,12 +168,21 @@ class AliExpressAdapter extends BaseAdapter {
     try {
       const url = `https://${SEARCH_HOST}${STORE_INFO_ENDPOINT}?sellerId=${encodeURIComponent(sellerId)}`;
       const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
-      const info = data?.result || null;
-      if (info) {
-        storeInfoCache.set(cacheKey, { data: info, ts: Date.now() });
-        logger.info('aliexpress', 'store_info fetched', { sellerId, positiveRate: info.positiveRate });
+      const seller = data?.result?.seller || {};
+      const rating = seller.storeRating || {};
+      const normalized = {
+        positiveRate: rating.sellerPositiveRate || null,
+        sellerScore: rating.sellerScore || null,
+        sellerLevel: rating.sellerLevel || null,
+        storeFollowers: seller.storeFollowers || null,
+        storeItemCount: seller.storeItemCount || null,
+        storeImage: seller.storeImage || null
+      };
+      if (normalized.positiveRate) {
+        storeInfoCache.set(cacheKey, { data: normalized, ts: Date.now() });
+        logger.info('aliexpress', 'store_info fetched', { sellerId, positiveRate: normalized.positiveRate, score: normalized.sellerScore });
       }
-      return info;
+      return normalized;
     } catch (e) {
       logger.warn('aliexpress', 'store_info failed', { sellerId, error: e.message });
       return null;
@@ -216,9 +226,7 @@ class AliExpressAdapter extends BaseAdapter {
               if (storeInfo.positiveRate) product.sellerData.rating = parseFloat(storeInfo.positiveRate);
               if (storeInfo.sellerScore) product.sellerData.score = storeInfo.sellerScore;
               if (storeInfo.sellerLevel) product.sellerData.level = storeInfo.sellerLevel;
-              if (storeInfo.followingNumber || storeInfo.storeFollowers) {
-                product.rawSourceMeta.storeFollowers = storeInfo.followingNumber || storeInfo.storeFollowers;
-              }
+              if (storeInfo.storeFollowers) product.rawSourceMeta.storeFollowers = storeInfo.storeFollowers;
             }
           } catch (e) { /* non-critical */ }
         }

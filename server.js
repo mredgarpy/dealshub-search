@@ -323,8 +323,9 @@ async function productDetailHandler(req, res) {
 
     // Fix return policy based on origin: USA warehouse = 30 days, International = 15 days
     if (originInfo.origin === 'USA' && product.source === 'aliexpress') {
-      if (!product.returnPolicy || product.returnPolicy.window < 30) {
-        product.returnPolicy = { window: 30, summary: 'Returns accepted within 30 days' };
+      const rpDays = product.returnPolicy?.window || product.returnPolicy?.days || 15;
+      if (rpDays < 30) {
+        product.returnPolicy = { window: 30, days: 30, summary: 'Returns accepted within 30 days' };
       }
     }
 

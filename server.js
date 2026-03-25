@@ -671,6 +671,50 @@ app.get('/api/featured', async (req, res) => {
   }
 });
 
+// ---- RECOMMENDATIONS ----
+app.get('/api/recommendations', async (req, res) => {
+  const { id, title = '', category = '' } = req.query;
+  if (!id) return res.status(400).json({ error: 'Missing product id' });
+
+  function extractKeywords(t) {
+    const stopWords = new Set(['for','the','and','with','in','of','a','an','to','by','men','mens',"men's",'women','womens',"women's",'pack','set','pcs','piece','1','2','3','4','5','6','7','8','9','10','new','from','all']);
+    var words = t.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
+      .filter(w => w.length > 2 && !stopWords.has(w));
+    return words.slice(0, 4).join(' ');
+  }
+
+  const keywords = extractKeywords(title);
+  const cacheKey = `recs:${id}:${keywords}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const amazon = getAdapter('amazon');
+    if (!amazon) throw new Error('Amazon adapter not available');
+
+    const [similarRes, dealsRes] = await Promise.allSettled([
+      keywords ? amazon.search(keywords, 15) : Promise.resolve([]),
+      category ? amazon.search(category + ' deals best sellers', 15) : (keywords ? amazon.search(keywords + ' best rated', 15) : Promise.resolve([]))
+    ]);
+
+    const similar = (similarRes.status === 'fulfilled' ? similarRes.value || [] : [])
+      .filter(p => (p.sourceId || p.asin || p.id) !== id)
+      .slice(0, 12);
+
+    const deals = (dealsRes.status === 'fulfilled' ? dealsRes.value || [] : [])
+      .filter(p => (p.sourceId || p.asin || p.id) !== id)
+      .filter(p => !similar.find(s => (s.sourceId||s.id) === (p.sourceId||p.id)))
+      .slice(0, 12);
+
+    const response = { similar: applySearchPricing(similar), deals: applySearchPricing(deals) };
+    searchCache.set(cacheKey, response, 7200000); // 2 hours
+    res.json(response);
+  } catch (e) {
+    console.error('Recommendations error:', e.message);
+    res.json({ similar: [], deals: [], error: e.message });
+  }
+});
+
 // ---- FLASH DEALS ----
 app.get('/api/flash-deals', async (req, res) => {
   const cacheKey = 'flash-deals';

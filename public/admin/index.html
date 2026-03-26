@@ -900,11 +900,11 @@ async function loadReviews() {
     const stars = '★'.repeat(rev.rating || 5);
 
     html += `<tr>
-      <td style="font-size:10px">${rev.product_name || 'N/A'}</td>
-      <td>${rev.customer_name || 'N/A'}</td>
+      <td style="font-size:10px">${rev.productTitle || rev.product_name || 'N/A'}</td>
+      <td>${rev.customerName || rev.customer_name || 'N/A'}</td>
       <td style="color:var(--amber);font-weight:600">${stars}</td>
       <td style="font-size:10px;max-width:200px">${(rev.text || 'N/A').substring(0,50)}...</td>
-      <td style="font-size:9px">${new Date(rev.created_at).toLocaleDateString()}</td>
+      <td style="font-size:9px">${new Date(rev.createdAt || rev.created_at).toLocaleDateString()}</td>
       <td><button class="btn btn-g btn-sm" onclick="approveReview('${rev.id}')">Approve</button></td>
     </tr>`;
   });
@@ -964,11 +964,11 @@ async function loadTickets() {
 
     html += `<tr>
       <td class="mono-text">#${tick.id}</td>
-      <td>${tick.customer_name || 'N/A'}</td>
+      <td>${tick.customerName || tick.customer_name || 'N/A'}</td>
       <td style="font-size:11px">${tick.subject || 'N/A'}</td>
       <td style="font-size:10px">${tick.category || 'general'}</td>
       <td><span class="bdg ${statusBadge}">● ${tick.status || 'open'}</span></td>
-      <td style="font-size:9px">${new Date(tick.created_at).toLocaleDateString()}</td>
+      <td style="font-size:9px">${new Date(tick.createdAt || tick.created_at).toLocaleDateString()}</td>
     </tr>`;
   });
 

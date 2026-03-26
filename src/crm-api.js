@@ -181,7 +181,8 @@ function setupCRMApi(app) {
 
   // Customer creates return
   app.post('/api/crm/returns/create', (req, res) => {
-    const { orderId, customerId, reason, comment } = req.body;
+    const b = req.body;
+    const { orderId, customerId, reason, comment } = b;
     if (!orderId) return res.status(400).json({ error: 'Missing orderId' });
 
     const id = 'RET-' + Date.now();
@@ -189,11 +190,16 @@ function setupCRMApi(app) {
       id,
       orderId,
       customerId,
-      orderNumber: db.orders[orderId]?.number || orderId,
-      customerEmail: db.orders[orderId]?.email || '',
-      customerName: db.orders[orderId]?.customerName || '',
+      orderNumber: b.orderNumber || db.orders[orderId]?.number || orderId,
+      customerEmail: b.customerEmail || db.orders[orderId]?.email || '',
+      customerName: b.customerName || db.orders[orderId]?.customerName || '',
       reason: reason || '',
+      reasonLabel: b.reasonLabel || reason || '',
       comment: comment || '',
+      description: b.description || '',
+      amount: parseFloat(b.amount) || 0,
+      items: b.items || [],
+      source: b.source || 'unknown',
       status: 'pending',
       refundAmount: 0,
       adminNotes: '',
@@ -211,8 +217,8 @@ function setupCRMApi(app) {
     res.json({ success: true, returnId: id });
   });
 
-  // Admin updates return
-  app.put('/api/crm/returns/:id', auth, (req, res) => {
+  // Admin updates return (shared handler for PUT and POST)
+  function handleReturnUpdate(req, res) {
     const r = db.returns[req.params.id];
     if (!r) return res.status(404).json({ error: 'Not found' });
 
@@ -225,7 +231,9 @@ function setupCRMApi(app) {
     r.updatedAt = new Date().toISOString();
     save('returns');
     res.json({ success: true });
-  });
+  }
+  app.put('/api/crm/returns/:id', auth, handleReturnUpdate);
+  app.post('/api/crm/returns/:id', auth, handleReturnUpdate);
 
   // Admin lists returns
   app.get('/api/crm/returns', auth, (req, res) => {
@@ -246,22 +254,27 @@ function setupCRMApi(app) {
 
   // Customer creates review
   app.post('/api/crm/reviews/create', (req, res) => {
-    const { productId, productTitle, customerId, customerName, rating, title, text, orderId } = req.body;
-    if (!productId || !rating) return res.status(400).json({ error: 'Missing required fields' });
+    const b = req.body;
+    const { productId, productTitle, customerId, customerName, customerEmail, rating, title, text, orderId } = b;
+    if (!rating) return res.status(400).json({ error: 'Missing required fields' });
 
     const review = {
       id: 'REV-' + Date.now(),
-      productId,
+      productId: productId || '',
+      product_name: productTitle || b.product_name || '',
       productTitle: productTitle || '',
       customerId,
       customerName: customerName || 'Customer',
+      customer_name: customerName || 'Customer',
+      customerEmail: customerEmail || '',
       orderId: orderId || null,
       rating: Math.min(5, Math.max(1, parseInt(rating))),
       title: title || '',
-      text: text || '',
+      text: b.body || text || '',
       status: 'pending',
       helpful: 0,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString()
     };
 
     db.reviews.push(review);

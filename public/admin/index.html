@@ -692,24 +692,31 @@ async function loadDashboard() {
   if (overview) {
     document.getElementById('metric-revenue').textContent = '$' + (overview.revenue || 0).toFixed(2);
     document.getElementById('metric-profit').textContent = '$' + (overview.profit || 0).toFixed(2);
-    document.getElementById('metric-orders').textContent = (overview.orders || 0).toString();
-    document.getElementById('metric-pending').textContent = (overview.pending || 0).toString();
-    document.getElementById('metric-manual').textContent = (overview.manual || 0).toString();
-    document.getElementById('metric-aov').textContent = '$' + (overview.aov || 0).toFixed(2);
+    document.getElementById('metric-orders').textContent = (overview.totalOrders || 0).toString();
+    document.getElementById('metric-pending').textContent = (counts.pending || 0).toString();
+    document.getElementById('metric-manual').textContent = (counts.manual || 0).toString();
+    document.getElementById('metric-aov').textContent = '$' + (overview.avgOrder || 0).toFixed(2);
   }
 
   // Update badges
   if (counts) {
-    document.getElementById('ordersBadge').textContent = (counts.pending_orders || 0).toString();
-    document.getElementById('returnsBadge').textContent = (counts.pending_returns || 0).toString();
-    document.getElementById('reviewsBadge').textContent = (counts.pending_reviews || 0).toString();
-    document.getElementById('ticketsBadge').textContent = (counts.pending_tickets || 0).toString();
-    document.getElementById('alertCount').textContent = (counts.pending_orders + counts.pending_returns + counts.pending_reviews + counts.pending_tickets).toString();
+    const pendingOrders = counts.pending || 0;
+    const manualOrders = counts.manual || 0;
+    const pendingReturns = counts.pendingReturns || 0;
+    const pendingReviews = counts.pendingReviews || 0;
+    document.getElementById('ordersBadge').textContent = pendingOrders.toString();
+    document.getElementById('returnsBadge').textContent = pendingReturns.toString();
+    document.getElementById('reviewsBadge').textContent = pendingReviews.toString();
+    document.getElementById('ticketsBadge').textContent = '0';
+    const totalAlerts = pendingOrders + manualOrders + pendingReturns + pendingReviews;
+    document.getElementById('alertCount').textContent = totalAlerts.toString();
+    if (totalAlerts === 0) document.getElementById('alertCount').style.display = 'none';
+    else document.getElementById('alertCount').style.display = 'flex';
 
-    document.getElementById('qa-orders').textContent = (counts.total_orders || 0).toString();
-    document.getElementById('qa-returns').textContent = (counts.total_returns || 0).toString();
-    document.getElementById('qa-reviews').textContent = (counts.pending_reviews || 0).toString();
-    document.getElementById('qa-suppliers').textContent = (counts.active_suppliers || 5).toString();
+    document.getElementById('qa-orders').textContent = (counts.pending || 0).toString();
+    document.getElementById('qa-returns').textContent = (counts.pendingReturns || 0).toString();
+    document.getElementById('qa-reviews').textContent = (counts.pendingReviews || 0).toString();
+    document.getElementById('qa-suppliers').textContent = '5';
   }
 
   // System health
@@ -720,7 +727,7 @@ async function loadDashboard() {
       for (const [key, val] of Object.entries(health.sources)) {
         const status = val.status || 'unknown';
         const latency = val.latencyMs || 0;
-        const statusBadge = status === 'healthy' ? '<span class="bdg bdg-gr">● Healthy</span>' : status === 'slow' ? '<span class="bdg bdg-am">● Slow</span>' : '<span class="bdg bdg-re">● Down</span>';
+        const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">● Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">● Paused</span>' : '<span class="bdg bdg-re">● Down</span>';
         html += `<div style="display:flex;justify-content:space-between;font-size:11px;padding:6px;border-bottom:1px solid var(--border)"><span>${key}</span><span>${statusBadge}</span><span class="mono-text">${latency}ms</span></div>`;
       }
       html += '</div>';
@@ -958,7 +965,7 @@ async function loadAnalytics() {
     document.getElementById('a-revenue').textContent = '$' + (data.overview.revenue || 0).toFixed(2);
     document.getElementById('a-profit').textContent = '$' + (data.overview.profit || 0).toFixed(2);
     document.getElementById('a-margin').textContent = (data.overview.margin || 0).toFixed(0) + '%';
-    document.getElementById('a-orders').textContent = (data.overview.orders || 0).toString();
+    document.getElementById('a-orders').textContent = (data.overview.totalOrders || 0).toString();
   }
 
   // Daily chart
@@ -1010,7 +1017,7 @@ async function loadSuppliers() {
 
     for (const [key, val] of Object.entries(data.sources)) {
       const status = val.status || 'unknown';
-      const statusBadge = status === 'healthy' ? '<span class="bdg bdg-gr">● Healthy</span>' : status === 'slow' ? '<span class="bdg bdg-am">● Slow</span>' : '<span class="bdg bdg-re">● Down</span>';
+      const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">● Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">● Paused</span>' : '<span class="bdg bdg-re">● Down</span>';
       const sourceName = { amazon: 'Amazon', aliexpress: 'AliExpress', sephora: 'Sephora', macys: "Macy's", shein: 'SHEIN' }[key] || key;
 
       html += `<tr>

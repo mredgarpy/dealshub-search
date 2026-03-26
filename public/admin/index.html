@@ -4,694 +4,1069 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>StyleHub CRM Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#06060a;--bg2:#0d0d14;--bg3:#14141e;--bg4:#1c1c28;--bg5:#242432;
-  --border:#1e1e2e;--border2:#2a2a3a;
-  --text:#e4e4ef;--text2:#9898ac;--text3:#5e5e72;
-  --accent:#e53e3e;--accent2:#c53030;
-  --green:#38a169;--amber:#d69e2e;--blue:#3182ce;--purple:#805ad5;--pink:#d53f8c;--orange:#dd6b20;
+  --bg:#06060a;--bg2:#0c0c14;--bg3:#12121e;--bg4:#1a1a2e;
+  --border:#1e1e30;--border2:#2a2a40;
+  --text:#e8e8f0;--text2:#9898b0;--text3:#606078;
+  --red:#e53e3e;--red2:#ff5252;--green:#22c55e;--green2:#16a34a;
+  --amber:#f59e0b;--blue:#3b82f6;--purple:#8b5cf6;--pink:#ec4899;--cyan:#06b6d4;
+  --mono:'JetBrains Mono',monospace;--sans:'Plus Jakarta Sans',system-ui,sans-serif;
   --radius:10px;--radius-sm:6px;
 }
-body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;overflow:hidden}
-.mono{font-family:'SF Mono','Fira Code','Cascadia Code',monospace}
-::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--bg5);border-radius:3px}
+html,body{width:100%;height:100%;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hidden}
+*{font-family:var(--sans)}
 
-/* ── SIDEBAR ── */
-.sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;flex-shrink:0;position:fixed;left:0;top:0;z-index:100}
-.sidebar-brand{padding:20px 16px 16px;border-bottom:1px solid var(--border)}
-.sidebar-brand h1{font-size:18px;font-weight:700;color:var(--accent)}
-.sidebar-brand span{font-size:11px;color:var(--text3);display:block;margin-top:2px}
-.sidebar-nav{flex:1;padding:12px 8px;overflow-y:auto}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;margin-bottom:2px;border:1px solid transparent}
-.nav-item:hover{background:var(--bg3);color:var(--text)}
-.nav-item.active{background:var(--accent);color:#fff;font-weight:600;border-color:var(--accent2)}
-.nav-item .icon{width:18px;text-align:center;font-size:14px}
-.nav-item .badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700}
-.nav-item.active .badge{background:rgba(255,255,255,.25)}
-.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)}
-.sidebar-footer button{background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:4px 0}
-.sidebar-footer button:hover{color:var(--accent)}
+.mono{font-family:var(--mono)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--border2)}
 
-/* ── MAIN ── */
-.main{margin-left:220px;flex:1;height:100vh;display:flex;flex-direction:column;overflow:hidden}
-.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.topbar h2{font-size:16px;font-weight:600}
-.topbar .meta{font-size:12px;color:var(--text3)}
-.content{flex:1;padding:24px;overflow-y:auto}
+/* ─────────── LOGIN SCREEN ─────────── */
+.login-screen{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg)}
+.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:32px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-title{font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text)}
+.login-subtitle{font-size:12px;color:var(--text3);margin-bottom:24px;letter-spacing:.5px}
+.login-title span{color:var(--red)}
+.form-group{margin-bottom:16px}
+.form-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;color:var(--text);font-size:13px;outline:none;transition:border .2s}
+.form-input:focus{border-color:var(--red)}
+.form-input::placeholder{color:var(--text3)}
+.btn-login{width:100%;background:var(--red);color:#fff;border:none;border-radius:var(--radius-sm);padding:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;margin-top:8px}
+.btn-login:hover{background:var(--red2)}
 
-/* ── CARDS ── */
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
-.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
-.stat-card .label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
-.stat-card .value{font-size:22px;font-weight:700}
-.stat-card .sub{font-size:11px;color:var(--text3);margin-top:4px}
-.c-green{color:var(--green)}.c-amber{color:var(--amber)}.c-accent{color:var(--accent)}.c-blue{color:var(--blue)}.c-purple{color:var(--purple)}
+/* ─────────── APP LAYOUT ─────────── */
+.app{display:grid;grid-template-columns:210px 1fr;grid-template-rows:52px 1fr;height:100vh;gap:0}
+.topbar{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;gap:16px;z-index:10}
+.topbar-logo{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-weight:700;font-size:13px}
+.topbar-logo .brand{color:var(--red)}
+.topbar-logo .sub{color:var(--text3);font-size:10px}
+.topbar-search{flex:1;max-width:300px}
+.topbar-search input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:12px;color:var(--text);outline:none}
+.topbar-search input:focus{border-color:var(--red)}
+.topbar-search input::placeholder{color:var(--text3);font-size:11px}
+.topbar-alerts{display:flex;align-items:center;gap:12px;margin-left:auto}
+.alert-bell{position:relative;cursor:pointer;font-size:18px}
+.alert-badge{position:absolute;top:-4px;right:-6px;background:var(--red);color:#fff;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.topbar-avatar{display:flex;align-items:center;gap:8px;cursor:pointer}
+.avatar-circle{width:32px;height:32px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700}
+.topbar-name{display:flex;flex-direction:column;font-size:11px}
+.topbar-name .name{color:var(--text);font-weight:600}
+.topbar-name .role{color:var(--text3)}
 
-/* ── TABLES ── */
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:12px 0;overflow-y:auto}
+.sidebar-brand{padding:12px 16px;border-bottom:1px solid var(--border);margin-bottom:8px;text-align:center}
+.sidebar-brand h1{font-size:12px;font-weight:700;color:var(--red);font-family:var(--mono);letter-spacing:.5px}
+.sidebar-nav{padding:0 8px}
+.nav-section{margin-bottom:16px}
+.nav-section-label{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);padding:8px 12px;margin-bottom:6px;font-weight:700}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:12px;color:var(--text2);transition:all .15s;margin-bottom:2px;border-left:3px solid transparent;position:relative}
+.nav-item:hover{background:rgba(229,62,62,.05);color:var(--text)}
+.nav-item.active{background:rgba(229,62,62,.08);color:var(--red);border-left-color:var(--red);font-weight:600}
+.nav-item .icon{width:16px;text-align:center;font-size:13px}
+.nav-item .badge{margin-left:auto;background:var(--red);color:#fff;font-size:8px;padding:1px 5px;border-radius:8px;font-weight:700}
+.nav-item.active .badge{background:rgba(255,255,255,.25);color:#fff}
+
+.main{background:var(--bg);overflow-y:auto}
+.page{display:none}
+.page.active{display:block}
+
+.page-header{margin-bottom:20px}
+.page-title{font-size:18px;font-weight:700;color:var(--text)}
+.page-subtitle{font-size:11px;color:var(--text3);margin-top:4px}
+
+/* ─────────── CARDS & LAYOUT ─────────── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.stat-value{font-size:20px;font-weight:700;color:var(--text);font-family:var(--mono)}
+.stat-sub{font-size:10px;color:var(--text3);margin-top:4px}
+.stat-sub.positive{color:var(--green)}
+.stat-sub.negative{color:var(--red)}
+
+.quick-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.action-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer;transition:all .15s;text-align:center}
+.action-card:hover{border-color:var(--red);background:rgba(229,62,62,.05)}
+.action-icon{font-size:24px;margin-bottom:6px}
+.action-label{font-size:11px;color:var(--text2);margin-bottom:4px}
+.action-count{font-size:16px;font-weight:700;color:var(--red);font-family:var(--mono)}
+
+/* ─────────── TABLES ─────────── */
 .table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
-table{width:100%;border-collapse:collapse;font-size:13px}
-thead tr{border-bottom:1px solid var(--border)}
-th{text-align:left;padding:10px 14px;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
-td{padding:10px 14px;border-bottom:1px solid var(--border)}
-tbody tr:last-child td{border-bottom:none}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead tr{border-bottom:1px solid var(--border);background:var(--bg3)}
+th{text-align:left;padding:8px 12px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text)}
 tbody tr:hover{background:var(--bg3)}
-.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
-.tag-open{background:rgba(214,158,46,.15);color:var(--amber)}
-.tag-progress{background:rgba(49,130,206,.15);color:var(--blue)}
-.tag-resolved{background:rgba(56,161,105,.15);color:var(--green)}
-.tag-closed{background:rgba(94,94,114,.15);color:var(--text3)}
-.tag-pending{background:rgba(214,158,46,.15);color:var(--amber)}
-.tag-approved{background:rgba(56,161,105,.15);color:var(--green)}
-.tag-rejected{background:rgba(229,62,62,.15);color:var(--accent)}
-.tag-refunded{background:rgba(49,130,206,.15);color:var(--blue)}
-.tag-published{background:rgba(56,161,105,.15);color:var(--green)}
-.tag-fulfilled{background:rgba(56,161,105,.15);color:var(--green)}
-.tag-cancelled{background:rgba(229,62,62,.15);color:var(--accent)}
-.tag-manual{background:rgba(128,90,213,.15);color:var(--purple)}
+tbody tr:last-child td{border-bottom:none}
+.mono-text{font-family:var(--mono);font-size:10px}
 
-.src-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.3px}
-.src-amazon{background:rgba(221,107,32,.15);color:var(--orange)}
-.src-aliexpress{background:rgba(56,161,105,.15);color:var(--green)}
-.src-sephora{background:rgba(213,63,140,.15);color:var(--pink)}
-.src-macys{background:rgba(229,62,62,.15);color:var(--accent)}
-.src-shein{background:rgba(128,90,213,.15);color:var(--purple)}
+/* ─────────── BADGES ─────────── */
+.bdg{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600}
+.bdg-gr{background:rgba(34,197,94,.1);color:var(--green)}
+.bdg-re{background:rgba(229,62,62,.1);color:var(--red)}
+.bdg-am{background:rgba(245,158,11,.1);color:var(--amber)}
+.bdg-bl{background:rgba(59,130,246,.1);color:var(--blue)}
+.bdg-pu{background:rgba(139,92,246,.1);color:var(--purple)}
 
-/* ── FILTERS / TOOLBAR ── */
-.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
-.filter-btn{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .15s}
-.filter-btn:hover{border-color:var(--accent);color:var(--text)}
-.filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.search-input{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 12px;font-size:13px;color:var(--text);outline:none;transition:border .15s;margin-left:auto}
-.search-input:focus{border-color:var(--accent)}
-.search-input::placeholder{color:var(--text3)}
+.src{padding:2px 5px;border-radius:3px;font-size:8px;font-weight:700;color:#fff;font-family:var(--mono)}
+.s-amz{background:rgba(245,158,11,.75)}
+.s-ali{background:rgba(34,197,94,.65)}
+.s-seph{background:rgba(236,72,153,.65)}
+.s-macy{background:rgba(229,62,62,.65)}
+.s-shein{background:rgba(139,92,246,.65)}
 
-/* ── BUTTONS ── */
-.btn{padding:6px 16px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s}
-.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent2)}
-.btn-primary:hover{background:var(--accent2)}
-.btn-ghost{background:transparent;color:var(--text2);border-color:var(--border)}
-.btn-ghost:hover{border-color:var(--text3);color:var(--text)}
-.btn-sm{padding:4px 10px;font-size:11px}
-.btn-green{background:var(--green);color:#fff}.btn-green:hover{opacity:.85}
+/* ─────────── BUTTONS ─────────── */
+.btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:4px}
+.btn-r{background:var(--red);color:#fff}
+.btn-r:hover{background:var(--red2)}
+.btn-g{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-g:hover{border-color:var(--red);color:var(--text)}
+.btn-sm{padding:4px 8px;font-size:10px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 
-/* ── FORMS ── */
-.form-group{margin-bottom:14px}
-.form-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px}
-.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;font-size:13px;color:var(--text);outline:none}
-.form-input:focus{border-color:var(--accent)}
-select.form-input{cursor:pointer}
-textarea.form-input{resize:vertical;min-height:60px}
+/* ─────────── TABS ─────────── */
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;gap:0}
+.tab-btn{padding:8px 16px;font-size:12px;color:var(--text2);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--red);border-bottom-color:var(--red)}
 
-/* ── DETAIL PANEL ── */
-.detail-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
-.detail-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
-.detail-close{background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer}
-.detail-close:hover{color:var(--accent)}
-.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
-.detail-box{background:var(--bg3);border-radius:var(--radius-sm);padding:14px}
-.detail-box h4{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
-.detail-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
-.detail-row .lbl{color:var(--text2)}
+/* ─────────── FILTERS & SEARCH ─────────── */
+.toolbar{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.filter-btn{padding:5px 12px;border-radius:20px;font-size:11px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .15s}
+.filter-btn:hover{border-color:var(--red);color:var(--text)}
+.filter-btn.active{background:var(--red);color:#fff;border-color:var(--red)}
+.search-input{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:11px;color:var(--text);outline:none}
+.search-input:focus{border-color:var(--red)}
 
-/* ── MESSAGES / TICKETS ── */
-.msg-list{max-height:400px;overflow-y:auto;margin-bottom:14px}
-.msg{padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:8px;font-size:13px}
-.msg-customer{background:var(--bg3);border-left:3px solid var(--blue)}
-.msg-admin{background:var(--bg3);border-left:3px solid var(--green)}
-.msg-system{background:var(--bg3);border-left:3px solid var(--amber)}
-.msg-meta{font-size:11px;color:var(--text3);margin-bottom:4px}
+/* ─────────── CHARTS (CSS BARS) ─────────── */
+.chart-bar{display:flex;align-items:flex-end;gap:6px;height:120px;margin-bottom:16px}
+.bar{flex:1;background:var(--red);border-radius:2px 2px 0 0;min-height:8px;cursor:pointer;transition:background .15s;position:relative}
+.bar:hover{background:var(--red2)}
+.bar-label{font-size:9px;color:var(--text3);text-align:center;margin-top:4px}
 
-/* ── LOADING / EMPTY ── */
-.loading{text-align:center;padding:48px;color:var(--text3);font-size:14px}
-.empty{text-align:center;padding:48px;color:var(--text3)}
-.empty .icon{font-size:32px;margin-bottom:8px}
-@keyframes spin{to{transform:rotate(360deg)}}.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+/* ─────────── LOADING & STATES ─────────── */
+.loading{color:var(--text3);font-size:12px;padding:20px;text-align:center}
+.empty-state{color:var(--text3);font-size:12px;padding:30px;text-align:center}
+.error-msg{background:rgba(229,62,62,.1);border:1px solid var(--red);color:var(--red);padding:10px 12px;border-radius:var(--radius-sm);font-size:11px;margin-bottom:16px}
+.success-msg{background:rgba(34,197,94,.1);border:1px solid var(--green);color:var(--green);padding:10px 12px;border-radius:var(--radius-sm);font-size:11px;margin-bottom:16px}
 
-/* ── LOGIN ── */
-.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;width:100vw}
-.login-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:32px;width:360px}
-.login-box h1{font-size:22px;font-weight:700;margin-bottom:4px}
-.login-box p{font-size:13px;color:var(--text3);margin-bottom:20px}
-.login-error{color:var(--accent);font-size:12px;margin-bottom:10px}
+.pulse{animation:pulse-anim 2s infinite}
+@keyframes pulse-anim{0%,100%{opacity:1}50%{opacity:.5}}
 
-/* ── CHARTS (simple bar) ── */
-.chart-bar-wrap{display:flex;align-items:flex-end;gap:4px;height:120px;padding-top:10px}
-.chart-bar{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:4px;transition:height .3s;position:relative}
-.chart-bar:hover{opacity:.8}
-.chart-bar-label{font-size:9px;color:var(--text3);text-align:center;margin-top:4px;white-space:nowrap}
-.chart-labels{display:flex;gap:4px}.chart-labels span{flex:1;text-align:center;font-size:9px;color:var(--text3)}
+/* ─────────── MODALS ─────────── */
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
+.modal.active{display:flex}
+.modal-content{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
+.modal-close{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px}
 
-/* ── SETTINGS ── */
-.settings-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
-.settings-section h3{font-size:14px;font-weight:600;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
-.settings-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
-.settings-row:last-child{border-bottom:none}
-.toggle{width:36px;height:20px;background:var(--bg5);border-radius:10px;cursor:pointer;position:relative;transition:background .2s}
-.toggle.on{background:var(--green)}
-.toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s}
-.toggle.on::after{transform:translateX(16px)}
-
-/* ── RESPONSIVE ── */
+/* ─────────── RESPONSIVE ─────────── */
 @media(max-width:768px){
-  .sidebar{width:60px}.sidebar-brand h1{font-size:14px}.sidebar-brand span,.nav-item span:not(.icon):not(.badge){display:none}
-  .nav-item{padding:9px;justify-content:center}.nav-item .badge{display:none}
-  .main{margin-left:60px}.stats-grid{grid-template-columns:1fr 1fr}.detail-grid{grid-template-columns:1fr}
+  .app{grid-template-columns:50px 1fr}
+  .sidebar{padding:8px 0}
+  .nav-section-label{display:none}
+  .nav-item .text{display:none}
+  .nav-item{justify-content:center;padding:8px}
+  .nav-item .badge{display:none}
+  .card-grid{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+  table{font-size:10px}
+  th,td{padding:6px 8px}
+  .stat-value{font-size:16px}
 }
 </style>
 </head>
 <body>
 
-<div id="app"></div>
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-title"><span>STYLEHUB</span> CRM PRO</div>
+    <div class="login-subtitle">Admin Dashboard</div>
+    <div class="form-group">
+      <label class="form-label">Admin Token</label>
+      <input type="password" id="tokenInput" class="form-input" placeholder="Enter token" value="stylehub-admin-2026">
+    </div>
+    <button class="btn-login" onclick="handleLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app" style="display:none">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-logo">
+      <span class="brand">STYLEHUB</span>
+      <span class="sub">CRM PRO</span>
+    </div>
+    <div class="topbar-search">
+      <input type="text" placeholder="Search orders, customers, products... (Ctrl+K)" id="globalSearch">
+    </div>
+    <div class="topbar-alerts">
+      <div class="alert-bell" onclick="toggleAlerts()">
+        🔔
+        <div class="alert-badge" id="alertCount">0</div>
+      </div>
+      <div class="topbar-avatar" onclick="logout()">
+        <div class="avatar-circle">ES</div>
+        <div class="topbar-name">
+          <span class="name">Edgar</span>
+          <span class="role">Admin</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <h1>CRM</h1>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-label">Dashboard</div>
+        <div class="nav-item active" data-page="overview" onclick="switchPage('overview')">
+          <span class="icon">◉</span>
+          <span class="text">Overview</span>
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">Commerce</div>
+        <div class="nav-item" data-page="orders" onclick="switchPage('orders')">
+          <span class="icon">📦</span>
+          <span class="text">Orders</span>
+          <span class="badge" id="ordersBadge">0</span>
+        </div>
+        <div class="nav-item" data-page="customers" onclick="switchPage('customers')">
+          <span class="icon">👥</span>
+          <span class="text">Customers</span>
+        </div>
+        <div class="nav-item" data-page="returns" onclick="switchPage('returns')">
+          <span class="icon">↩</span>
+          <span class="text">Returns</span>
+          <span class="badge" id="returnsBadge">0</span>
+        </div>
+        <div class="nav-item" data-page="reviews" onclick="switchPage('reviews')">
+          <span class="icon">⭐</span>
+          <span class="text">Reviews</span>
+          <span class="badge" id="reviewsBadge">0</span>
+        </div>
+        <div class="nav-item" data-page="tickets" onclick="switchPage('tickets')">
+          <span class="icon">🎫</span>
+          <span class="text">Tickets</span>
+          <span class="badge" id="ticketsBadge">0</span>
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">Insights</div>
+        <div class="nav-item" data-page="analytics" onclick="switchPage('analytics')">
+          <span class="icon">📈</span>
+          <span class="text">Analytics</span>
+        </div>
+        <div class="nav-item" data-page="suppliers" onclick="switchPage('suppliers')">
+          <span class="icon">🌐</span>
+          <span class="text">Suppliers</span>
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">System</div>
+        <div class="nav-item" data-page="settings" onclick="switchPage('settings')">
+          <span class="icon">⚙</span>
+          <span class="text">Settings</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main" id="mainContent">
+
+    <!-- PAGE: OVERVIEW -->
+    <div id="page-overview" class="page active" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Dashboard Overview</div>
+        <div class="page-subtitle">Real-time metrics and alerts</div>
+      </div>
+
+      <!-- ALERTS BAR -->
+      <div id="alertBar" style="display:none;margin-bottom:16px">
+        <div class="error-msg">
+          <span style="font-size:8px;color:var(--red)" class="pulse">● </span>
+          <span id="alertMsg">Loading alerts...</span>
+        </div>
+      </div>
+
+      <!-- METRICS GRID -->
+      <div class="card-grid" id="metricsGrid">
+        <div class="stat-card">
+          <div class="stat-label">Revenue</div>
+          <div class="stat-value" id="metric-revenue">$0</div>
+          <div class="stat-sub positive">+12% this month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Profit</div>
+          <div class="stat-value" id="metric-profit">$0</div>
+          <div class="stat-sub positive">28% margin</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Orders</div>
+          <div class="stat-value" id="metric-orders">0</div>
+          <div class="stat-sub">+5 today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pending</div>
+          <div class="stat-value" id="metric-pending">0</div>
+          <div class="stat-sub negative">Needs action</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Manual Sync</div>
+          <div class="stat-value" id="metric-manual">0</div>
+          <div class="stat-sub">In progress</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Order</div>
+          <div class="stat-value" id="metric-aov">$0</div>
+          <div class="stat-sub">Per transaction</div>
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS -->
+      <div style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:12px">Quick Actions</div>
+        <div class="quick-actions">
+          <div class="action-card" onclick="switchPage('orders')">
+            <div class="action-icon">📦</div>
+            <div class="action-label">Orders</div>
+            <div class="action-count" id="qa-orders">0</div>
+          </div>
+          <div class="action-card" onclick="switchPage('returns')">
+            <div class="action-icon">↩</div>
+            <div class="action-label">Returns</div>
+            <div class="action-count" id="qa-returns">0</div>
+          </div>
+          <div class="action-card" onclick="switchPage('reviews')">
+            <div class="action-icon">⭐</div>
+            <div class="action-label">Reviews</div>
+            <div class="action-count" id="qa-reviews">0</div>
+          </div>
+          <div class="action-card" onclick="switchPage('suppliers')">
+            <div class="action-icon">🌐</div>
+            <div class="action-label">Suppliers</div>
+            <div class="action-count" id="qa-suppliers">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REVENUE CHART -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:12px">Revenue by Day</div>
+        <div class="chart-bar" id="revenueChart">
+          <div class="bar" style="height:35%"></div>
+          <div class="bar" style="height:52%"></div>
+          <div class="bar" style="height:28%"></div>
+          <div class="bar" style="height:68%"></div>
+          <div class="bar" style="height:45%"></div>
+          <div class="bar" style="height:71%"></div>
+          <div class="bar" style="height:58%"></div>
+        </div>
+      </div>
+
+      <!-- SYSTEM HEALTH -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:12px">System Health</div>
+        <div id="systemHealth" class="loading">Loading health data...</div>
+      </div>
+
+      <!-- ACTIVITY FEED -->
+      <div class="card">
+        <div class="page-subtitle" style="margin-bottom:12px">Recent Activity</div>
+        <div id="activityFeed" class="loading">Loading activity...</div>
+      </div>
+    </div>
+
+    <!-- PAGE: ORDERS -->
+    <div id="page-orders" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Orders</div>
+        <div class="page-subtitle">Manage all orders</div>
+      </div>
+      <div class="toolbar">
+        <button class="filter-btn active" onclick="filterOrders('all')">All</button>
+        <button class="filter-btn" onclick="filterOrders('pending')">Pending</button>
+        <button class="filter-btn" onclick="filterOrders('manual')">Manual</button>
+        <button class="filter-btn" onclick="filterOrders('shipped')">Shipped</button>
+        <button class="filter-btn" onclick="filterOrders('cancelled')">Cancelled</button>
+        <input type="text" class="search-input" style="margin-left:auto" placeholder="Search order #...">
+      </div>
+      <div id="ordersTable" class="loading">Loading orders...</div>
+    </div>
+
+    <!-- PAGE: CUSTOMERS -->
+    <div id="page-customers" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Customers</div>
+        <div class="page-subtitle">Customer segments and details</div>
+      </div>
+      <div class="toolbar">
+        <button class="filter-btn active" onclick="filterCustomers('all')">All</button>
+        <button class="filter-btn" onclick="filterCustomers('vip')">VIP</button>
+        <button class="filter-btn" onclick="filterCustomers('new')">New</button>
+        <button class="filter-btn" onclick="filterCustomers('atrisk')">At Risk</button>
+        <input type="text" class="search-input" style="margin-left:auto" placeholder="Search customer...">
+      </div>
+      <div id="customersTable" class="loading">Loading customers...</div>
+    </div>
+
+    <!-- PAGE: RETURNS -->
+    <div id="page-returns" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Returns</div>
+        <div class="page-subtitle">Return requests and status</div>
+      </div>
+      <div class="toolbar">
+        <input type="text" class="search-input" placeholder="Search return ID...">
+      </div>
+      <div id="returnsTable" class="loading">Loading returns...</div>
+    </div>
+
+    <!-- PAGE: REVIEWS -->
+    <div id="page-reviews" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Reviews</div>
+        <div class="page-subtitle">Moderate and manage reviews</div>
+      </div>
+      <div class="toolbar">
+        <button class="filter-btn active" onclick="filterReviews('pending')">Pending</button>
+        <button class="filter-btn" onclick="filterReviews('published')">Published</button>
+        <button class="filter-btn" onclick="filterReviews('rejected')">Rejected</button>
+      </div>
+      <div id="reviewsTable" class="loading">Loading reviews...</div>
+    </div>
+
+    <!-- PAGE: TICKETS -->
+    <div id="page-tickets" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Support Tickets</div>
+        <div class="page-subtitle">Customer support and incidents</div>
+      </div>
+      <div class="toolbar">
+        <button class="filter-btn active" onclick="filterTickets('all')">All</button>
+        <button class="filter-btn" onclick="filterTickets('open')">Open</button>
+        <button class="filter-btn" onclick="filterTickets('in_progress')">In Progress</button>
+        <button class="filter-btn" onclick="filterTickets('resolved')">Resolved</button>
+        <button class="filter-btn" onclick="filterTickets('closed')">Closed</button>
+      </div>
+      <div id="ticketsKPIs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">
+        <div class="stat-card">
+          <div class="stat-label">Open</div>
+          <div class="stat-value" id="kpi-open">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">In Progress</div>
+          <div class="stat-value" id="kpi-progress">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Resolved</div>
+          <div class="stat-value" id="kpi-resolved">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Response</div>
+          <div class="stat-value" id="kpi-response">0h</div>
+        </div>
+      </div>
+      <div id="ticketsTable" class="loading">Loading tickets...</div>
+    </div>
+
+    <!-- PAGE: ANALYTICS -->
+    <div id="page-analytics" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Analytics</div>
+        <div class="page-subtitle">Detailed insights and trends</div>
+      </div>
+      <div class="toolbar">
+        <button class="filter-btn active" onclick="setPeriod('7d')">7d</button>
+        <button class="filter-btn" onclick="setPeriod('30d')">30d</button>
+        <button class="filter-btn" onclick="setPeriod('90d')">90d</button>
+      </div>
+      <div class="card-grid">
+        <div class="stat-card">
+          <div class="stat-label">Revenue</div>
+          <div class="stat-value" id="a-revenue">$0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Profit</div>
+          <div class="stat-value" id="a-profit">$0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Margin %</div>
+          <div class="stat-value" id="a-margin">0%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Orders</div>
+          <div class="stat-value" id="a-orders">0</div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:12px">Daily Revenue</div>
+        <div class="chart-bar" id="dailyChart"></div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:12px">Top Products</div>
+        <div id="topProducts" class="loading">Loading products...</div>
+      </div>
+      <div class="card">
+        <div class="page-subtitle" style="margin-bottom:12px">Top Return Reasons</div>
+        <div id="topReturns" class="loading">Loading return data...</div>
+      </div>
+    </div>
+
+    <!-- PAGE: SUPPLIERS -->
+    <div id="page-suppliers" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Suppliers</div>
+        <div class="page-subtitle">External source health and status</div>
+      </div>
+      <div id="suppliersTable" class="loading">Loading supplier data...</div>
+    </div>
+
+    <!-- PAGE: SETTINGS -->
+    <div id="page-settings" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Settings</div>
+        <div class="page-subtitle">System configuration</div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:16px">Markup Rules</div>
+        <div class="form-group">
+          <label class="form-label">Amazon Markup %</label>
+          <input type="number" id="markupAmazon" class="form-input" value="20">
+        </div>
+        <div class="form-group">
+          <label class="form-label">AliExpress Markup %</label>
+          <input type="number" id="markupAliexpress" class="form-input" value="35">
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:16px">Shipping Rules</div>
+        <div class="form-group">
+          <label class="form-label">Free Shipping Threshold ($)</label>
+          <input type="number" id="freeShippingThreshold" class="form-input" value="50">
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:16px">Return Windows</div>
+        <div class="form-group">
+          <label class="form-label">Default Return Days</label>
+          <input type="number" id="returnDays" class="form-input" value="30">
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:16px">Email Settings</div>
+        <div class="form-group">
+          <label class="form-label">From Name</label>
+          <input type="text" id="emailFromName" class="form-input" value="StyleHub">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reply-To Address</label>
+          <input type="email" id="emailReplyTo" class="form-input" value="support@stylehub.com">
+        </div>
+      </div>
+      <button class="btn btn-r" onclick="saveSettings()">Save Settings</button>
+      <div id="settingsMsg" style="margin-top:8px"></div>
+    </div>
+
+  </div>
+</div>
 
 <script>
-(function(){
-'use strict';
-
-const API = window.location.origin;
-let TOKEN = localStorage.getItem('sh_crm_token') || '';
+// ──────────────────── INIT & STATE ────────────────────
+let token = localStorage.getItem('sh_crm_token') || 'stylehub-admin-2026';
 let currentPage = 'overview';
-let pageData = {};
+let currentFilter = { orders: 'all', customers: 'all', reviews: 'pending', tickets: 'all' };
+let cacheData = {};
 
-// ── API HELPER ──
-async function api(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN, ...(opts.headers || {}) };
-  try {
-    const r = await fetch(API + path, { ...opts, headers });
-    if (r.status === 401) { logout(); return { error: 'Unauthorized' }; }
-    return await r.json();
-  } catch(e) { return { error: e.message }; }
+// ──────────────────── LOGIN ────────────────────
+function handleLogin() {
+  const tokenInput = document.getElementById('tokenInput').value.trim();
+  if (!tokenInput) {
+    alert('Please enter a token');
+    return;
+  }
+  token = tokenInput;
+  localStorage.setItem('sh_crm_token', token);
+  showApp();
 }
 
 function logout() {
-  localStorage.removeItem('sh_crm_token');
-  TOKEN = '';
-  renderLogin();
-}
-
-function $(sel, ctx) { return (ctx || document).querySelector(sel); }
-function $$(sel, ctx) { return (ctx || document).querySelectorAll(sel); }
-
-function srcBadge(source) {
-  const map = { amazon:'AMZ', aliexpress:'ALI', sephora:'SEPH', macys:'MACY', shein:'SHEIN' };
-  return '<span class="src-badge src-' + (source||'') + '">' + (map[source] || '???') + '</span>';
-}
-
-function statusTag(status) {
-  const s = (status || '').replace(/_/g, ' ');
-  const cls = status === 'open' ? 'tag-open' : status === 'in_progress' ? 'tag-progress' : status === 'resolved' ? 'tag-resolved' : status === 'closed' ? 'tag-closed' : status === 'pending' ? 'tag-pending' : status === 'approved' ? 'tag-approved' : status === 'rejected' ? 'tag-rejected' : status === 'refunded' ? 'tag-refunded' : status === 'published' ? 'tag-published' : status === 'fulfilled' ? 'tag-fulfilled' : status === 'cancelled' ? 'tag-cancelled' : status === 'manual' ? 'tag-manual' : '';
-  return '<span class="tag ' + cls + '">' + s + '</span>';
-}
-
-function money(n) { return '$' + (Number(n) || 0).toFixed(2); }
-function pct(n) { return (Number(n) || 0).toFixed(1) + '%'; }
-function dateStr(d) { return d ? new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—'; }
-function timeStr(d) { return d ? new Date(d).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '—'; }
-function stars(n) { return '<span style="color:var(--amber)">' + '★'.repeat(n) + '☆'.repeat(5-n) + '</span>'; }
-
-// ── RENDER LOGIN ──
-function renderLogin() {
-  document.getElementById('app').innerHTML = '<div class="login-wrap"><form class="login-box" id="loginForm"><h1>StyleHub CRM Pro</h1><p>Enter your admin token</p><div id="loginError"></div><div class="form-group"><input type="password" class="form-input" id="tokenInput" placeholder="Admin Token" autocomplete="off"></div><button type="submit" class="btn btn-primary" style="width:100%;padding:10px">Sign In</button></form></div>';
-  $('#loginForm').onsubmit = async function(e) {
-    e.preventDefault();
-    const t = $('#tokenInput').value.trim();
-    if (!t) return;
-    const d = await fetch(API + '/api/crm/dashboard', { headers: { 'X-Admin-Token': t } }).then(r => r.json()).catch(() => ({ error: 'Connection failed' }));
-    if (d.error) { $('#loginError').innerHTML = '<div class="login-error">' + d.error + '</div>'; return; }
-    TOKEN = t;
-    localStorage.setItem('sh_crm_token', t);
-    renderApp();
-  };
-}
-
-// ── RENDER SHELL ──
-function renderApp() {
-  const pages = [
-    { id:'overview', icon:'📊', label:'Overview' },
-    { id:'orders', icon:'📦', label:'Orders' },
-    { id:'customers', icon:'👥', label:'Customers' },
-    { id:'returns', icon:'↩️', label:'Returns' },
-    { id:'reviews', icon:'⭐', label:'Reviews' },
-    { id:'tickets', icon:'🎫', label:'Tickets' },
-    { id:'analytics', icon:'📈', label:'Analytics' },
-    { id:'suppliers', icon:'🏭', label:'Suppliers' },
-    { id:'settings', icon:'⚙️', label:'Settings' }
-  ];
-  let nav = pages.map(p => '<div class="nav-item' + (p.id === currentPage ? ' active' : '') + '" data-page="' + p.id + '"><span class="icon">' + p.icon + '</span><span>' + p.label + '</span></div>').join('');
-
-  document.getElementById('app').innerHTML =
-    '<div class="sidebar"><div class="sidebar-brand"><h1>StyleHub</h1><span>CRM Pro</span></div><div class="sidebar-nav">' + nav + '</div><div class="sidebar-footer"><button id="logoutBtn">Logout</button></div></div>' +
-    '<div class="main"><div class="topbar"><h2 id="pageTitle">' + (pages.find(p => p.id === currentPage)?.label || '') + '</h2><div class="meta">' + new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) + '</div></div><div class="content" id="pageContent"><div class="loading"><span class="spinner"></span> Loading...</div></div></div>';
-
-  $$('.nav-item').forEach(el => {
-    el.onclick = function() {
-      currentPage = this.dataset.page;
-      $$('.nav-item').forEach(n => n.classList.remove('active'));
-      this.classList.add('active');
-      $('#pageTitle').textContent = pages.find(p => p.id === currentPage)?.label || '';
-      loadPage(currentPage);
-    };
-  });
-  $('#logoutBtn').onclick = logout;
-  loadPage(currentPage);
-}
-
-// ── PAGE ROUTER ──
-function loadPage(page) {
-  const c = $('#pageContent');
-  if (!c) return;
-  c.innerHTML = '<div class="loading"><span class="spinner"></span> Loading...</div>';
-  const fn = { overview: loadOverview, orders: loadOrders, customers: loadCustomers, returns: loadReturns, reviews: loadReviews, tickets: loadTickets, analytics: loadAnalytics, suppliers: loadSuppliers, settings: loadSettings };
-  if (fn[page]) fn[page](c);
-}
-
-// ══════════════════════════════════════════
-// 1. OVERVIEW
-// ══════════════════════════════════════════
-async function loadOverview(c) {
-  const [dash, tStats] = await Promise.all([api('/api/crm/dashboard'), api('/api/crm/tickets/stats')]);
-  if (dash.error) { c.innerHTML = '<div class="empty"><div class="icon">⚠️</div>Failed to load dashboard</div>'; return; }
-  const o = dash.overview || {};
-  const cnt = dash.counts || {};
-  const ts = tStats.error ? {} : tStats;
-
-  c.innerHTML =
-    '<div class="stats-grid">' +
-      statCard('💰','Revenue', money(o.revenue), '+' + money(o.todayRevenue) + ' today', 'c-green') +
-      statCard('📈','Profit', money(o.profit), pct(o.margin) + ' margin', 'c-green') +
-      statCard('📦','Orders', o.totalOrders || 0, (o.todayOrders||0) + ' today') +
-      statCard('⏳','Pending', cnt.pending || 0, 'need action', cnt.pending ? 'c-amber' : '') +
-      statCard('⚠️','Manual', cnt.manual || 0, cnt.manual ? 'ALERT' : 'none', cnt.manual ? 'c-accent' : '') +
-      statCard('🎫','Open Tickets', ts.open || 0, (ts.inProgress||0) + ' in progress', ts.open ? 'c-amber' : '') +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
-      '<div class="detail-box"><h4>Recent Orders</h4><div id="recentOrders">Loading...</div></div>' +
-      '<div class="detail-box"><h4>Open Tickets</h4><div id="recentTickets">Loading...</div></div>' +
-    '</div>';
-
-  // Load recent orders
-  const ordData = await api('/api/crm/orders?limit=5');
-  const orders = ordData.orders || [];
-  $('#recentOrders').innerHTML = orders.length ? orders.map(o =>
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span class="mono">#' + o.number + '</span><span>' + (o.customerName||'—') + '</span>' + srcBadge(o.source) + '<span class="mono">' + money(o.total) + '</span></div>'
-  ).join('') : '<div style="color:var(--text3);font-size:12px">No orders yet</div>';
-
-  // Load recent tickets
-  const tkData = await api('/api/crm/tickets?status=open');
-  const tks = (tkData.tickets || []).slice(0,5);
-  $('#recentTickets').innerHTML = tks.length ? tks.map(t =>
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span class="mono">' + t.id + '</span><span style="flex:1;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t.subject) + '</span>' + statusTag(t.status) + '</div>'
-  ).join('') : '<div style="color:var(--text3);font-size:12px">No open tickets</div>';
-}
-
-function statCard(icon, label, value, sub, cls) {
-  return '<div class="stat-card"><div class="label">' + icon + ' ' + label + '</div><div class="value ' + (cls||'') + '">' + value + '</div>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
-}
-
-// ══════════════════════════════════════════
-// 2. ORDERS
-// ══════════════════════════════════════════
-async function loadOrders(c) {
-  const filters = ['all','pending','manual','fulfilled','cancelled'];
-  let filter = 'all', search = '';
-
-  async function render() {
-    const params = new URLSearchParams();
-    if (filter !== 'all') params.set('status', filter);
-    if (search) params.set('q', search);
-    const data = await api('/api/crm/orders?' + params);
-    const orders = data.orders || [];
-
-    c.innerHTML =
-      '<div class="toolbar">' + filters.map(f => '<button class="filter-btn' + (f === filter ? ' active' : '') + '" data-f="' + f + '">' + f.charAt(0).toUpperCase() + f.slice(1) + '</button>').join('') +
-      '<input class="search-input" placeholder="Search orders..." value="' + esc(search) + '" id="orderSearch" style="width:220px"></div>' +
-      (orders.length === 0 ? '<div class="empty"><div class="icon">📦</div>No orders found</div>' :
-      '<div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Items</th><th style="text-align:right">Total</th><th>Source</th><th>Status</th><th style="text-align:right">Profit</th><th>Actions</th></tr></thead><tbody>' +
-      orders.map(o => {
-        const st = o.financialStatus === 'cancelled' ? 'cancelled' : o.fulfillmentStatus === 'fulfilled' ? 'fulfilled' : o.requiresManual ? 'manual' : 'pending';
-        return '<tr data-oid="' + o.id + '" class="order-row" style="cursor:pointer"><td class="mono" style="font-weight:600">#' + o.number + '</td><td><div style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(o.customerName||'Unknown') + '</div><div style="font-size:11px;color:var(--text3)">' + esc(o.email||'') + '</div></td><td>' + (o.items||[]).length + '</td><td style="text-align:right" class="mono">' + money(o.total) + '</td><td>' + srcBadge(o.source) + '</td><td>' + statusTag(st) + '</td><td style="text-align:right" class="mono c-green">' + money(o.estimatedProfit) + '</td><td><button class="btn btn-ghost btn-sm view-order" data-oid="' + o.id + '">View</button></td></tr>';
-      }).join('') + '</tbody></table></div>');
-
-    // Bind events
-    $$('.filter-btn', c).forEach(b => b.onclick = function() { filter = this.dataset.f; render(); });
-    const si = $('#orderSearch', c);
-    if (si) { let t; si.oninput = function() { clearTimeout(t); t = setTimeout(() => { search = si.value; render(); }, 400); }; }
-    $$('.order-row', c).forEach(r => r.onclick = function() { showOrderDetail(this.dataset.oid, render); });
-  }
-  await render();
-}
-
-async function showOrderDetail(oid, onBack) {
-  const c = $('#pageContent');
-  c.innerHTML = '<div class="loading"><span class="spinner"></span> Loading order...</div>';
-  // Fetch orders list to find the one (API gives list)
-  const data = await api('/api/crm/orders');
-  const order = (data.orders || []).find(o => o.id == oid);
-  if (!order) { c.innerHTML = '<div class="empty">Order not found</div>'; return; }
-
-  const addr = order.shippingAddress;
-  const canFulfill = !order.fulfillmentStatus && order.financialStatus !== 'cancelled';
-  const margin = order.total > 0 ? Math.round((order.estimatedProfit||0) / order.total * 100) : 0;
-
-  c.innerHTML =
-    '<div class="detail-panel"><div class="detail-header"><div><h3 style="font-size:18px;font-weight:700">Order #' + order.number + '</h3><div style="font-size:13px;color:var(--text2)">' + esc(order.customerName||'') + ' (' + esc(order.email||'') + ')</div></div><div style="display:flex;gap:8px;align-items:center">' + srcBadge(order.source) + '<button class="detail-close" id="closeDetail">&times;</button></div></div>' +
-
-    '<div style="margin-bottom:16px"><h4 style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Items</h4>' +
-    (order.items||[]).map(it => '<div style="display:flex;align-items:center;gap:10px;background:var(--bg3);border-radius:var(--radius-sm);padding:8px;margin-bottom:6px">' + (it.image ? '<img src="' + esc(it.image) + '" style="width:40px;height:40px;border-radius:4px;object-fit:cover">' : '') + '<div style="flex:1;min-width:0"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(it.title) + '</div>' + (it.variant ? '<div style="font-size:11px;color:var(--text3)">' + esc(it.variant) + '</div>' : '') + '</div><span class="mono" style="font-size:13px">' + money(it.price) + ' x ' + it.quantity + '</span></div>').join('') + '</div>' +
-
-    '<div class="detail-grid"><div class="detail-box"><h4>Financials</h4>' +
-      '<div class="detail-row"><span class="lbl">Subtotal</span><span class="mono">' + money(order.subtotal) + '</span></div>' +
-      '<div class="detail-row"><span class="lbl">Tax</span><span class="mono">' + money(order.tax) + '</span></div>' +
-      '<div class="detail-row" style="font-weight:700"><span>Total</span><span class="mono">' + money(order.total) + ' ' + (order.currency||'USD') + '</span></div>' +
-      (order.refundAmount > 0 ? '<div class="detail-row c-accent"><span>Refunded</span><span class="mono">-' + money(order.refundAmount) + '</span></div>' : '') +
-    '</div><div class="detail-box"><h4>Profit</h4>' +
-      '<div class="detail-row"><span class="lbl">Est. Cost</span><span class="mono">' + money(order.estimatedCost) + '</span></div>' +
-      '<div class="detail-row c-green" style="font-weight:700"><span>Est. Profit</span><span class="mono">' + money(order.estimatedProfit) + '</span></div>' +
-      '<div class="detail-row"><span class="lbl">Margin</span><span class="mono">' + margin + '%</span></div>' +
-    '</div></div>' +
-
-    (addr ? '<div class="detail-box" style="margin-bottom:16px"><h4>Ship to</h4><div style="font-size:13px">' + esc([addr.first_name, addr.last_name].join(' ')) + ', ' + esc(addr.address1||'') + (addr.address2 ? ', ' + esc(addr.address2) : '') + ', ' + esc(addr.city||'') + ' ' + esc(addr.province||'') + ' ' + esc(addr.zip||'') + ', ' + esc(addr.country||'') + '</div></div>' : '') +
-
-    (order.tracking ?
-      '<div class="detail-box" style="margin-bottom:16px"><h4>Tracking</h4><div class="mono" style="font-size:13px">' + esc(order.trackingCompany||'') + ': ' + esc(order.tracking) + '</div>' + (order.trackingUrl ? '<a href="' + esc(order.trackingUrl) + '" target="_blank" style="font-size:12px;color:var(--accent)">Track shipment →</a>' : '') + '</div>' :
-      (canFulfill ? '<div class="detail-box" style="margin-bottom:16px"><h4>Fulfill Order</h4><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px"><input class="form-input" id="fTracking" placeholder="Tracking #"><select class="form-input" id="fCarrier"><option>USPS</option><option>UPS</option><option>FedEx</option><option>DHL</option><option>Other</option></select><input class="form-input" id="fUrl" placeholder="Tracking URL"></div><button class="btn btn-green" id="fulfillBtn">Fulfill & Notify Customer</button><span id="fulfillMsg" style="margin-left:10px;font-size:12px"></span></div>' : '')
-    ) +
-
-    '<div class="detail-box" style="margin-bottom:16px"><h4>Internal Notes</h4><div style="display:flex;gap:8px"><textarea class="form-input" id="noteArea" rows="2">' + esc(order.notes||'') + '</textarea><button class="btn btn-ghost" id="saveNoteBtn">Save</button></div><span id="noteMsg" style="font-size:11px;color:var(--text3)"></span></div>' +
-
-    '<div><h4 style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Timeline</h4>' +
-    (order.events||[]).map(ev => '<div style="display:flex;gap:8px;font-size:12px;margin-bottom:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3);margin-top:5px;flex-shrink:0"></span><span style="color:var(--text3)">' + timeStr(ev.at) + '</span><span>' + esc(ev.type||'') + (ev.tracking ? ' — ' + esc(ev.tracking) : '') + (ev.text ? ' — ' + esc(ev.text) : '') + (ev.amount ? ' — ' + money(ev.amount) : '') + '</span></div>').join('') + '</div>' +
-
-  '</div>';
-
-  $('#closeDetail').onclick = function() { loadPage('orders'); };
-  if ($('#fulfillBtn')) {
-    $('#fulfillBtn').onclick = async function() {
-      const tr = $('#fTracking').value.trim();
-      if (!tr) { $('#fulfillMsg').textContent = 'Enter tracking number'; return; }
-      this.disabled = true; this.textContent = 'Fulfilling...';
-      const res = await api('/api/crm/orders/' + order.id + '/fulfill', { method:'POST', body: JSON.stringify({ trackingNumber: tr, trackingCompany: $('#fCarrier').value, trackingUrl: $('#fUrl').value }) });
-      $('#fulfillMsg').textContent = res.success ? 'Fulfilled!' : (res.error || 'Failed');
-      if (res.success) setTimeout(() => showOrderDetail(oid, onBack), 1000);
-    };
-  }
-  if ($('#saveNoteBtn')) {
-    $('#saveNoteBtn').onclick = async function() {
-      await api('/api/crm/orders/' + order.id + '/note', { method:'POST', body: JSON.stringify({ note: $('#noteArea').value }) });
-      $('#noteMsg').textContent = 'Note saved';
-    };
+  if (confirm('Logout?')) {
+    localStorage.removeItem('sh_crm_token');
+    location.reload();
   }
 }
 
-// ══════════════════════════════════════════
-// 3. CUSTOMERS
-// ══════════════════════════════════════════
-async function loadCustomers(c) {
-  c.innerHTML = '<div class="loading"><span class="spinner"></span> Loading customers...</div>';
-  const data = await api('/api/crm/customers');
-  if (data.error) { c.innerHTML = '<div class="empty"><div class="icon">⚠️</div>Failed to load customers<div style="font-size:12px;color:var(--text3);margin-top:6px">Shopify Admin API may not be configured</div></div>'; return; }
-  const custs = data.customers || [];
-  let segment = 'all';
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'grid';
+  loadDashboard();
+}
 
-  function render() {
-    const filtered = segment === 'all' ? custs : custs.filter(cu => cu.segment === segment);
-    c.innerHTML =
-      '<div class="toolbar">' + ['all','vip','new','at_risk','regular'].map(s => '<button class="filter-btn' + (s === segment ? ' active' : '') + '" data-s="' + s + '">' + s.charAt(0).toUpperCase() + s.slice(1).replace('_',' ') + '</button>').join('') +
-      '<span style="margin-left:auto;font-size:12px;color:var(--text3)">' + filtered.length + ' customers</span></div>' +
-      (filtered.length === 0 ? '<div class="empty"><div class="icon">👥</div>No customers found</div>' :
-      '<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Email</th><th>Segment</th><th style="text-align:right">Orders</th><th style="text-align:right">Total Spent</th><th>Since</th></tr></thead><tbody>' +
-      filtered.map(cu => '<tr><td style="font-weight:600">' + esc(cu.name||'Unknown') + '</td><td style="color:var(--text2)">' + esc(cu.email||'') + '</td><td>' + statusTag(cu.segment||'regular') + '</td><td style="text-align:right" class="mono">' + (cu.ordersCount||0) + '</td><td style="text-align:right" class="mono">' + money(cu.totalSpent) + '</td><td style="font-size:12px;color:var(--text3)">' + dateStr(cu.createdAt) + '</td></tr>').join('') +
-      '</tbody></table></div>');
-
-    $$('.filter-btn', c).forEach(b => b.onclick = function() { segment = this.dataset.s; render(); });
+// ──────────────────── API CALLS ────────────────────
+async function apiCall(endpoint) {
+  try {
+    const url = `/api/crm/${endpoint}?token=${encodeURIComponent(token)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.error('API Error:', e);
+    return null;
   }
-  render();
 }
 
-// ══════════════════════════════════════════
-// 4. RETURNS
-// ══════════════════════════════════════════
-async function loadReturns(c) {
-  const data = await api('/api/crm/returns');
-  const returns = data.returns || [];
-  const statuses = ['pending','approved','shipped_back','received','refunded','rejected'];
-
-  c.innerHTML = returns.length === 0 ? '<div class="empty"><div class="icon">↩️</div>No returns yet</div>' :
-    '<div class="table-wrap"><table><thead><tr><th>Return ID</th><th>Order</th><th>Customer</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
-    returns.map(r => '<tr><td class="mono" style="font-size:11px">' + esc(r.id) + '</td><td class="mono">' + esc(r.orderNumber||'') + '</td><td>' + esc(r.customerName||r.customerEmail||'') + '</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">' + esc(r.reason||'') + '</td><td>' + statusTag(r.status) + '</td><td><select class="form-input" style="width:auto;padding:4px 8px;font-size:11px" data-rid="' + r.id + '" onchange="window._updateReturn(this)">' + statuses.map(s => '<option value="' + s + '"' + (s === r.status ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></td></tr>').join('') +
-    '</tbody></table></div>';
-
-  window._updateReturn = async function(sel) {
-    await api('/api/crm/returns/' + sel.dataset.rid, { method:'PUT', body: JSON.stringify({ status: sel.value }) });
-  };
-}
-
-// ══════════════════════════════════════════
-// 5. REVIEWS
-// ══════════════════════════════════════════
-async function loadReviews(c) {
-  const data = await api('/api/crm/reviews');
-  const reviews = data.reviews || [];
-
-  function render() {
-    c.innerHTML = reviews.length === 0 ? '<div class="empty"><div class="icon">⭐</div>No reviews yet</div>' :
-      '<div class="table-wrap"><table><thead><tr><th>Product</th><th>Review</th><th>Customer</th><th>Rating</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
-      reviews.map(r => '<tr><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.productTitle||r.productId||'') + '</td><td style="max-width:220px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.title ? '<strong>' + esc(r.title) + '</strong> — ' : '') + esc(r.text||'') + '</div></td><td>' + esc(r.customerName||'') + '</td><td class="mono" style="font-size:12px">' + stars(r.rating||0) + '</td><td>' + statusTag(r.status) + '</td><td style="white-space:nowrap">' +
-      (r.status === 'pending' ? '<button class="btn btn-green btn-sm" onclick="window._reviewAction(\'' + r.id + '\',\'published\')">✓</button> <button class="btn btn-sm" style="background:var(--accent);color:#fff" onclick="window._reviewAction(\'' + r.id + '\',\'rejected\')">✕</button>' : '') +
-      '</td></tr>').join('') + '</tbody></table></div>';
+async function apiCallPost(endpoint, data) {
+  try {
+    const url = `/api/crm/${endpoint}?token=${encodeURIComponent(token)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.error('API Error:', e);
+    return null;
   }
-  render();
-
-  window._reviewAction = async function(id, status) {
-    await api('/api/crm/reviews/' + id, { method:'PUT', body: JSON.stringify({ status }) });
-    const rv = reviews.find(r => r.id === id);
-    if (rv) rv.status = status;
-    render();
-  };
 }
 
-// ══════════════════════════════════════════
-// 6. TICKETS
-// ══════════════════════════════════════════
-async function loadTickets(c) {
-  let filter = 'all';
-
-  async function render() {
-    const [listData, statsData] = await Promise.all([
-      api('/api/crm/tickets' + (filter !== 'all' ? '?status=' + filter : '')),
-      api('/api/crm/tickets/stats')
-    ]);
-    const tickets = listData.tickets || [];
-    const st = statsData.error ? {} : statsData;
-
-    c.innerHTML =
-      '<div class="stats-grid" style="margin-bottom:16px">' +
-        statCard('🎫','Open', st.open||0, '', st.open ? 'c-amber' : '') +
-        statCard('🔄','In Progress', st.inProgress||0, '', 'c-blue') +
-        statCard('✅','Resolved', st.resolved||0, '', 'c-green') +
-        statCard('⏱','Avg Response', (st.avgResponseHrs||0) + 'h', '', '') +
-      '</div>' +
-      '<div class="toolbar">' + ['all','open','in_progress','resolved','closed'].map(f => '<button class="filter-btn' + (f === filter ? ' active' : '') + '" data-f="' + f + '">' + f.replace('_',' ').replace(/^./,m=>m.toUpperCase()) + '</button>').join('') + '</div>' +
-      (tickets.length === 0 ? '<div class="empty"><div class="icon">🎫</div>No tickets found</div>' :
-      '<div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Subject</th><th>Customer</th><th>Category</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead><tbody>' +
-      tickets.map(t => '<tr style="cursor:pointer" class="ticket-row" data-tid="' + t.id + '"><td class="mono" style="font-size:11px">' + esc(t.id) + '</td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t.subject) + '</td><td>' + esc(t.customerName||t.customerEmail||'') + '</td><td><span class="tag tag-' + (t.category||'') + '" style="font-size:10px">' + esc(t.category||'general') + '</span></td><td>' + statusTag(t.status) + '</td><td style="font-size:12px;color:var(--text3)">' + timeStr(t.updatedAt) + '</td><td><button class="btn btn-ghost btn-sm view-ticket" data-tid="' + t.id + '">View</button></td></tr>').join('') +
-      '</tbody></table></div>');
-
-    $$('.filter-btn', c).forEach(b => b.onclick = function() { filter = this.dataset.f; render(); });
-    $$('.ticket-row', c).forEach(r => r.onclick = function() { showTicketDetail(this.dataset.tid, render); });
+async function apiCallPut(endpoint, data) {
+  try {
+    const url = `/api/crm/${endpoint}?token=${encodeURIComponent(token)}`;
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.error('API Error:', e);
+    return null;
   }
-  await render();
 }
 
-async function showTicketDetail(tid, onBack) {
-  const c = $('#pageContent');
-  c.innerHTML = '<div class="loading"><span class="spinner"></span> Loading ticket...</div>';
-  const ticket = await api('/api/crm/tickets/' + tid);
-  if (ticket.error) { c.innerHTML = '<div class="empty">Ticket not found</div>'; return; }
+// ──────────────────── PAGE NAVIGATION ────────────────────
+function switchPage(pageName) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-  c.innerHTML =
-    '<div class="detail-panel"><div class="detail-header"><div><h3 style="font-size:18px;font-weight:700">' + esc(ticket.subject) + '</h3><div style="font-size:13px;color:var(--text2)">' + esc(ticket.customerName||'') + ' &lt;' + esc(ticket.customerEmail||'') + '&gt; &bull; ' + esc(ticket.id) + '</div></div><div style="display:flex;gap:8px;align-items:center"><span class="tag tag-' + (ticket.category||'') + '">' + esc(ticket.category||'') + '</span>' + statusTag(ticket.status) + '<button class="detail-close" id="closeTicket">&times;</button></div></div>' +
+  document.getElementById(`page-${pageName}`).classList.add('active');
+  document.querySelector(`.nav-item[data-page="${pageName}"]`).classList.add('active');
+  currentPage = pageName;
 
-    '<div class="detail-grid" style="margin-bottom:16px"><div class="detail-box"><h4>Details</h4>' +
-      '<div class="detail-row"><span class="lbl">Priority</span><span>' + esc(ticket.priority||'normal') + '</span></div>' +
-      '<div class="detail-row"><span class="lbl">Created</span><span>' + timeStr(ticket.createdAt) + '</span></div>' +
-      '<div class="detail-row"><span class="lbl">Updated</span><span>' + timeStr(ticket.updatedAt) + '</span></div>' +
-      (ticket.orderId ? '<div class="detail-row"><span class="lbl">Order</span><span class="mono">' + esc(ticket.orderId) + '</span></div>' : '') +
-    '</div><div class="detail-box"><h4>Status</h4><select class="form-input" id="ticketStatusSel">' + ['open','in_progress','resolved','closed'].map(s => '<option value="' + s + '"' + (s === ticket.status ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>').join('') + '</select><button class="btn btn-primary btn-sm" id="updateStatusBtn" style="margin-top:8px">Update Status</button><span id="statusMsg" style="margin-left:8px;font-size:11px;color:var(--text3)"></span></div></div>' +
-
-    '<div style="margin-bottom:16px"><h4 style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Messages</h4><div class="msg-list" id="msgList">' +
-    (ticket.messages||[]).map(m => '<div class="msg msg-' + (m.from||'customer') + '"><div class="msg-meta">' + esc(m.name||m.from) + ' &bull; ' + timeStr(m.timestamp) + (m.automated ? ' &bull; <em>auto</em>' : '') + '</div><div>' + esc(m.message||'') + '</div></div>').join('') + '</div>' +
-
-    '<div style="display:flex;gap:8px"><textarea class="form-input" id="replyArea" rows="3" placeholder="Type your reply..."></textarea><button class="btn btn-primary" id="replyBtn" style="align-self:flex-end">Send Reply</button></div><span id="replyMsg" style="font-size:11px;color:var(--text3)"></span></div>' +
-
-  '</div>';
-
-  $('#closeTicket').onclick = function() { loadPage('tickets'); };
-  $('#updateStatusBtn').onclick = async function() {
-    const res = await api('/api/crm/tickets/' + tid + '/status', { method:'POST', body: JSON.stringify({ status: $('#ticketStatusSel').value }) });
-    $('#statusMsg').textContent = res.success ? 'Updated' : (res.error||'Failed');
-  };
-  $('#replyBtn').onclick = async function() {
-    const msg = $('#replyArea').value.trim();
-    if (!msg) return;
-    this.disabled = true; this.textContent = 'Sending...';
-    const res = await api('/api/crm/tickets/' + tid + '/reply', { method:'POST', body: JSON.stringify({ message: msg }) });
-    if (res.success) { showTicketDetail(tid, onBack); } else { $('#replyMsg').textContent = res.error || 'Failed'; this.disabled = false; this.textContent = 'Send Reply'; }
-  };
+  if (pageName === 'orders') loadOrders();
+  else if (pageName === 'customers') loadCustomers();
+  else if (pageName === 'returns') loadReturns();
+  else if (pageName === 'reviews') loadReviews();
+  else if (pageName === 'tickets') loadTickets();
+  else if (pageName === 'analytics') loadAnalytics();
+  else if (pageName === 'suppliers') loadSuppliers();
 }
 
-// ══════════════════════════════════════════
-// 7. ANALYTICS
-// ══════════════════════════════════════════
-async function loadAnalytics(c) {
-  let period = '30d';
-
-  async function render() {
-    const data = await api('/api/crm/analytics?period=' + period);
-    if (data.error) { c.innerHTML = '<div class="empty"><div class="icon">📈</div>Failed to load analytics</div>'; return; }
-
-    const rev = data.revenueByDay || [];
-    const maxRev = Math.max(...rev.map(r => r.revenue), 1);
-    const bySource = data.revenueBySource || [];
-    const topProds = data.topProducts || [];
-    const topReasons = data.topReturnReasons || [];
-
-    c.innerHTML =
-      '<div class="toolbar">' + ['7d','30d','90d'].map(p => '<button class="filter-btn' + (p === period ? ' active' : '') + '" data-p="' + p + '">' + p + '</button>').join('') + '</div>' +
-
-      '<div class="stats-grid">' +
-        statCard('💰','Total Revenue', money(data.totalRevenue), '', 'c-green') +
-        statCard('📦','Total Orders', data.totalOrders||0, '') +
-        statCard('🔄','Returns', data.totalReturns||0, '') +
-        statCard('📈','Avg Order', money(data.avgOrderValue), '') +
-      '</div>' +
-
-      '<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px">' +
-        '<div class="detail-box"><h4>Revenue by Day</h4><div class="chart-bar-wrap">' +
-          rev.slice(-14).map(d => '<div style="flex:1;text-align:center"><div class="chart-bar" style="height:' + Math.max(4, (d.revenue/maxRev)*100) + 'px" title="' + d.date + ': ' + money(d.revenue) + '"></div><div class="chart-bar-label">' + d.date.slice(5) + '</div></div>').join('') +
-        '</div></div>' +
-        '<div class="detail-box"><h4>Revenue by Source</h4>' +
-          bySource.map(s => '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">' + srcBadge(s.source) + '<span class="mono">' + money(s.revenue) + '</span><span style="color:var(--text3)">' + s.orders + ' orders</span></div>').join('') +
-        '</div>' +
-      '</div>' +
-
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
-        '<div class="detail-box"><h4>Top Products</h4>' +
-          topProds.slice(0,8).map((p,i) => '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text3);width:16px">' + (i+1) + '</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.title||p.productId||'') + '</span><span class="mono">' + (p.qty||p.count||0) + ' sold</span></div>').join('') +
-        '</div>' +
-        '<div class="detail-box"><h4>Top Return Reasons</h4>' +
-          (topReasons.length ? topReasons.slice(0,8).map((r,i) => '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text3);width:16px">' + (i+1) + '</span><span style="flex:1">' + esc(r.reason||'') + '</span><span class="mono">' + (r.count||0) + '</span></div>').join('') : '<div style="color:var(--text3);font-size:12px">No returns data</div>') +
-        '</div>' +
-      '</div>';
-
-    $$('.filter-btn', c).forEach(b => b.onclick = function() { period = this.dataset.p; render(); });
-  }
-  await render();
-}
-
-// ══════════════════════════════════════════
-// 8. SUPPLIERS (Source Health)
-// ══════════════════════════════════════════
-async function loadSuppliers(c) {
-  const data = await api('/api/source-health');
-  if (data.error) {
-    // Fallback: show static source info
-    const sources = [
-      { name:'Amazon', key:'amazon', status:'active' },
-      { name:'AliExpress', key:'aliexpress', status:'active' },
-      { name:'Sephora', key:'sephora', status:'active' },
-      { name:'Macy\'s', key:'macys', status:'active' },
-      { name:'SHEIN', key:'shein', status:'active' }
-    ];
-    c.innerHTML =
-      '<div class="stats-grid">' +
-        statCard('🏭','Sources', sources.length, 'configured') +
-        statCard('✅','Active', sources.filter(s=>s.status==='active').length, '', 'c-green') +
-        statCard('⚠️','Issues', 0, '', '') +
-      '</div>' +
-      '<div class="table-wrap"><table><thead><tr><th>Source</th><th>Status</th><th>Markup</th><th>Return Window</th><th>Notes</th></tr></thead><tbody>' +
-      sources.map(s => '<tr><td style="font-weight:600">' + srcBadge(s.key) + ' <span style="margin-left:6px">' + esc(s.name) + '</span></td><td>' + statusTag('active') + '</td><td class="mono">—</td><td class="mono">—</td><td style="color:var(--text3)">Via RapidAPI</td></tr>').join('') +
-      '</tbody></table></div>' +
-      '<div style="margin-top:16px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text2)">Source health monitoring endpoint (<code>/api/source-health</code>) is available when configured. Connect it to get real-time uptime, latency, and error rates per source.</div>';
+// ──────────────────── DASHBOARD (OVERVIEW) ────────────────────
+async function loadDashboard() {
+  const data = await apiCall('dashboard');
+  if (!data) {
+    document.getElementById('alertBar').innerHTML = '<div class="error-msg">Failed to load dashboard</div>';
     return;
   }
-  // If the endpoint works, render real data
-  const sources = Array.isArray(data) ? data : (data.sources || []);
-  c.innerHTML =
-    '<div class="table-wrap"><table><thead><tr><th>Source</th><th>Status</th><th>Latency</th><th>Uptime</th><th>Last Check</th><th>Errors (24h)</th></tr></thead><tbody>' +
-    sources.map(s => '<tr><td>' + srcBadge(s.key||s.source||'') + ' <span style="margin-left:6px;font-weight:600">' + esc(s.name||s.key||'') + '</span></td><td>' + statusTag(s.status||'unknown') + '</td><td class="mono">' + (s.latency||'—') + '</td><td class="mono">' + (s.uptime||'—') + '</td><td style="font-size:12px;color:var(--text3)">' + timeStr(s.lastCheck) + '</td><td class="mono">' + (s.errors24h||0) + '</td></tr>').join('') +
-    '</tbody></table></div>';
+
+  const { overview, counts } = data;
+
+  // Update metrics
+  if (overview) {
+    document.getElementById('metric-revenue').textContent = '$' + (overview.revenue || 0).toFixed(2);
+    document.getElementById('metric-profit').textContent = '$' + (overview.profit || 0).toFixed(2);
+    document.getElementById('metric-orders').textContent = (overview.orders || 0).toString();
+    document.getElementById('metric-pending').textContent = (overview.pending || 0).toString();
+    document.getElementById('metric-manual').textContent = (overview.manual || 0).toString();
+    document.getElementById('metric-aov').textContent = '$' + (overview.aov || 0).toFixed(2);
+  }
+
+  // Update badges
+  if (counts) {
+    document.getElementById('ordersBadge').textContent = (counts.pending_orders || 0).toString();
+    document.getElementById('returnsBadge').textContent = (counts.pending_returns || 0).toString();
+    document.getElementById('reviewsBadge').textContent = (counts.pending_reviews || 0).toString();
+    document.getElementById('ticketsBadge').textContent = (counts.pending_tickets || 0).toString();
+    document.getElementById('alertCount').textContent = (counts.pending_orders + counts.pending_returns + counts.pending_reviews + counts.pending_tickets).toString();
+
+    document.getElementById('qa-orders').textContent = (counts.total_orders || 0).toString();
+    document.getElementById('qa-returns').textContent = (counts.total_returns || 0).toString();
+    document.getElementById('qa-reviews').textContent = (counts.pending_reviews || 0).toString();
+    document.getElementById('qa-suppliers').textContent = (counts.active_suppliers || 5).toString();
+  }
+
+  // System health
+  try {
+    const health = await fetch('/api/source-health').then(r => r.json());
+    if (health && health.sources) {
+      let html = '<div style="display:grid;gap:8px">';
+      for (const [key, val] of Object.entries(health.sources)) {
+        const status = val.status || 'unknown';
+        const latency = val.latencyMs || 0;
+        const statusBadge = status === 'healthy' ? '<span class="bdg bdg-gr">● Healthy</span>' : status === 'slow' ? '<span class="bdg bdg-am">● Slow</span>' : '<span class="bdg bdg-re">● Down</span>';
+        html += `<div style="display:flex;justify-content:space-between;font-size:11px;padding:6px;border-bottom:1px solid var(--border)"><span>${key}</span><span>${statusBadge}</span><span class="mono-text">${latency}ms</span></div>`;
+      }
+      html += '</div>';
+      document.getElementById('systemHealth').innerHTML = html;
+    }
+  } catch (e) {}
+
+  // Activity feed
+  if (data.recent) {
+    let html = '<div style="display:grid;gap:8px;font-size:11px">';
+    data.recent.forEach(item => {
+      html += `<div style="padding:6px;border-bottom:1px solid var(--border)"><div style="color:var(--text)">${item.action}</div><div style="color:var(--text3);font-size:9px">${new Date(item.timestamp).toLocaleString()}</div></div>`;
+    });
+    html += '</div>';
+    document.getElementById('activityFeed').innerHTML = html;
+  }
 }
 
-// ══════════════════════════════════════════
-// 9. SETTINGS
-// ══════════════════════════════════════════
-async function loadSettings(c) {
-  const data = await api('/api/crm/settings');
-  if (data.error) { c.innerHTML = '<div class="empty"><div class="icon">⚙️</div>Failed to load settings</div>'; return; }
+// ──────────────────── ORDERS ────────────────────
+async function loadOrders() {
+  const filter = currentFilter.orders;
+  const data = await apiCall(`orders?status=${filter}`);
+  if (!data) {
+    document.getElementById('ordersTable').innerHTML = '<div class="empty-state">Failed to load orders</div>';
+    return;
+  }
 
-  const s = data;
+  let html = '<div class="table-wrap"><table><thead><tr><th>Order #</th><th>Customer</th><th>Items</th><th>Total</th><th>Source</th><th>Status</th><th>Profit</th><th>Date</th><th>Action</th></tr></thead><tbody>';
 
-  c.innerHTML =
-    '<div class="settings-section"><h3>Markup Rules</h3>' +
-      '<div class="settings-row"><span>Amazon Markup (%)</span><input class="form-input" style="width:80px" type="number" id="s_markupAmazon" value="' + ((s.markup||{}).amazon||12) + '"></div>' +
-      '<div class="settings-row"><span>AliExpress Markup (%)</span><input class="form-input" style="width:80px" type="number" id="s_markupAli" value="' + ((s.markup||{}).aliexpress||15) + '"></div>' +
-    '</div>' +
+  (data.orders || []).forEach(order => {
+    const source = order.source || 'N/A';
+    const status = order.status || 'pending';
+    const sourceBadge = `<span class="src s-${source.toLowerCase()}">${source.substring(0,3).toUpperCase()}</span>`;
+    const statusBadge = `<span class="bdg" style="background:rgba(${status === 'shipped' ? '34,197,94' : '229,62,62'}, .1);color:${status === 'shipped' ? 'var(--green)' : 'var(--red)'}">● ${status}</span>`;
 
-    '<div class="settings-section"><h3>Shipping</h3>' +
-      '<div class="settings-row"><span>Free Shipping Threshold ($)</span><input class="form-input" style="width:80px" type="number" id="s_freeThreshold" value="' + ((s.shipping||{}).freeThreshold||35) + '"></div>' +
-      '<div class="settings-row"><span>Plus Members Free Shipping</span><div class="toggle' + ((s.shipping||{}).plusFreeShipping ? ' on' : '') + '" id="s_plusFree"></div></div>' +
-    '</div>' +
-
-    '<div class="settings-section"><h3>Return Windows</h3>' +
-      '<div class="settings-row"><span>Amazon Return Window (days)</span><input class="form-input" style="width:80px" type="number" id="s_retAmazon" value="' + ((s.returns||{}).windowAmazon||30) + '"></div>' +
-      '<div class="settings-row"><span>AliExpress Return Window (days)</span><input class="form-input" style="width:80px" type="number" id="s_retAli" value="' + ((s.returns||{}).windowAliexpress||15) + '"></div>' +
-    '</div>' +
-
-    '<div class="settings-section"><h3>Notifications</h3>' +
-      Object.entries(s.notifications||{}).map(function(entry) {
-        return '<div class="settings-row"><span>' + entry[0].replace(/([A-Z])/g,' $1').replace(/^./,function(m){return m.toUpperCase()}) + '</span><div class="toggle' + (entry[1] ? ' on' : '') + '" data-nkey="' + entry[0] + '"></div></div>';
-      }).join('') +
-    '</div>' +
-
-    '<div class="settings-section"><h3>Email Settings</h3>' +
-      '<div class="settings-row"><span>From Name</span><input class="form-input" style="width:200px" id="s_fromName" value="' + esc((s.emails||{}).fromName||'') + '"></div>' +
-      '<div class="settings-row"><span>Reply-To</span><input class="form-input" style="width:200px" id="s_replyTo" value="' + esc((s.emails||{}).replyTo||'') + '"></div>' +
-    '</div>' +
-
-    '<div style="margin-top:16px"><button class="btn btn-primary" id="saveSettingsBtn" style="padding:10px 32px">Save All Settings</button><span id="settingsMsg" style="margin-left:12px;font-size:12px;color:var(--text3)"></span></div>';
-
-  // Toggle clicks
-  $$('.toggle', c).forEach(function(t) {
-    t.onclick = function() { this.classList.toggle('on'); };
+    html += `<tr>
+      <td class="mono-text">#${order.id}</td>
+      <td><div style="font-size:11px">${order.customer_name || 'N/A'}</div><div style="font-size:9px;color:var(--text3)">${order.customer_email || ''}</div></td>
+      <td class="mono-text">${order.item_count || 1}</td>
+      <td class="mono-text">$${(order.total || 0).toFixed(2)}</td>
+      <td>${sourceBadge}</td>
+      <td>${statusBadge}</td>
+      <td class="mono-text" style="color:var(--green)">$${(order.profit || 0).toFixed(2)}</td>
+      <td style="font-size:9px">${new Date(order.created_at).toLocaleDateString()}</td>
+      <td><button class="btn btn-g btn-sm" onclick="fulfillOrder('${order.id}')">Fulfill</button></td>
+    </tr>`;
   });
 
-  // Save
-  $('#saveSettingsBtn').onclick = async function() {
-    this.disabled = true; this.textContent = 'Saving...';
-    const notifs = {};
-    $$('[data-nkey]', c).forEach(function(t) { notifs[t.dataset.nkey] = t.classList.contains('on'); });
-    const payload = {
-      markup: { amazon: Number($('#s_markupAmazon').value), aliexpress: Number($('#s_markupAli').value) },
-      shipping: { freeThreshold: Number($('#s_freeThreshold').value), plusFreeShipping: $('#s_plusFree').classList.contains('on') },
-      returns: { windowAmazon: Number($('#s_retAmazon').value), windowAliexpress: Number($('#s_retAli').value) },
-      notifications: notifs,
-      emails: { fromName: $('#s_fromName').value, replyTo: $('#s_replyTo').value }
-    };
-    const res = await api('/api/crm/settings', { method:'POST', body: JSON.stringify(payload) });
-    $('#settingsMsg').textContent = res.success ? 'Settings saved!' : (res.error||'Failed');
-    this.disabled = false; this.textContent = 'Save All Settings';
-  };
+  html += '</tbody></table></div>';
+  document.getElementById('ordersTable').innerHTML = html;
 }
 
-// ── HELPERS ──
-function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+function filterOrders(filter) {
+  currentFilter.orders = filter;
+  document.querySelectorAll('#page-orders .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  loadOrders();
+}
 
-// ── BOOT ──
-if (TOKEN) { renderApp(); } else { renderLogin(); }
+async function fulfillOrder(orderId) {
+  const result = await apiCallPost(`orders/${orderId}/fulfill`, { status: 'shipped' });
+  if (result) {
+    alert('Order fulfilled!');
+    loadOrders();
+  }
+}
 
-})();
+// ──────────────────── CUSTOMERS ────────────────────
+async function loadCustomers() {
+  const filter = currentFilter.customers;
+  const data = await apiCall(`customers?segment=${filter}`);
+  if (!data) {
+    document.getElementById('customersTable').innerHTML = '<div class="empty-state">Failed to load customers</div>';
+    return;
+  }
+
+  let html = '<div class="table-wrap"><table><thead><tr><th>Avatar</th><th>Name</th><th>Email</th><th>Segment</th><th>Total Spent</th><th>Orders</th></tr></thead><tbody>';
+
+  (data.customers || []).forEach(cust => {
+    const initials = (cust.name || 'XX').split(' ').map(n => n[0]).join('').toUpperCase();
+    const segment = cust.segment || 'standard';
+    const segmentBadge = `<span class="bdg bdg-bl">● ${segment}</span>`;
+
+    html += `<tr>
+      <td><div style="width:28px;height:28px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">${initials}</div></td>
+      <td>${cust.name || 'N/A'}</td>
+      <td style="font-size:10px">${cust.email || 'N/A'}</td>
+      <td>${segmentBadge}</td>
+      <td class="mono-text">$${(cust.total_spent || 0).toFixed(2)}</td>
+      <td class="mono-text">${cust.order_count || 0}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  document.getElementById('customersTable').innerHTML = html;
+}
+
+function filterCustomers(filter) {
+  currentFilter.customers = filter;
+  document.querySelectorAll('#page-customers .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  loadCustomers();
+}
+
+// ──────────────────── RETURNS ────────────────────
+async function loadReturns() {
+  const data = await apiCall('returns');
+  if (!data) {
+    document.getElementById('returnsTable').innerHTML = '<div class="empty-state">Failed to load returns</div>';
+    return;
+  }
+
+  let html = '<div class="table-wrap"><table><thead><tr><th>Return ID</th><th>Order #</th><th>Customer</th><th>Reason</th><th>Amount</th><th>Source</th><th>Status</th></tr></thead><tbody>';
+
+  (data.returns || []).forEach(ret => {
+    const source = ret.source || 'N/A';
+    const sourceBadge = `<span class="src s-${source.toLowerCase()}">${source.substring(0,3).toUpperCase()}</span>`;
+
+    html += `<tr>
+      <td class="mono-text">#${ret.id}</td>
+      <td class="mono-text">#${ret.order_id || 'N/A'}</td>
+      <td>${ret.customer_name || 'N/A'}</td>
+      <td style="font-size:10px">${ret.reason || 'N/A'}</td>
+      <td class="mono-text">$${(ret.amount || 0).toFixed(2)}</td>
+      <td>${sourceBadge}</td>
+      <td><span class="bdg bdg-am">● ${ret.status || 'pending'}</span></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  document.getElementById('returnsTable').innerHTML = html;
+}
+
+// ──────────────────── REVIEWS ────────────────────
+async function loadReviews() {
+  const filter = currentFilter.reviews;
+  const data = await apiCall(`reviews?status=${filter}`);
+  if (!data) {
+    document.getElementById('reviewsTable').innerHTML = '<div class="empty-state">Failed to load reviews</div>';
+    return;
+  }
+
+  let html = '<div class="table-wrap"><table><thead><tr><th>Product</th><th>Customer</th><th>Rating</th><th>Review</th><th>Date</th><th>Action</th></tr></thead><tbody>';
+
+  (data.reviews || []).forEach(rev => {
+    const stars = '★'.repeat(rev.rating || 5);
+
+    html += `<tr>
+      <td style="font-size:10px">${rev.product_name || 'N/A'}</td>
+      <td>${rev.customer_name || 'N/A'}</td>
+      <td style="color:var(--amber);font-weight:600">${stars}</td>
+      <td style="font-size:10px;max-width:200px">${(rev.text || 'N/A').substring(0,50)}...</td>
+      <td style="font-size:9px">${new Date(rev.created_at).toLocaleDateString()}</td>
+      <td><button class="btn btn-g btn-sm" onclick="approveReview('${rev.id}')">Approve</button></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  document.getElementById('reviewsTable').innerHTML = html;
+}
+
+function filterReviews(filter) {
+  currentFilter.reviews = filter;
+  document.querySelectorAll('#page-reviews .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  loadReviews();
+}
+
+async function approveReview(reviewId) {
+  const result = await apiCallPut(`reviews/${reviewId}`, { status: 'approved' });
+  if (result) {
+    alert('Review approved!');
+    loadReviews();
+  }
+}
+
+// ──────────────────── TICKETS ────────────────────
+async function loadTickets() {
+  const filter = currentFilter.tickets;
+  const stats = await apiCall('tickets/stats');
+  const data = await apiCall(`tickets?status=${filter}`);
+
+  if (stats) {
+    document.getElementById('kpi-open').textContent = (stats.open || 0).toString();
+    document.getElementById('kpi-progress').textContent = (stats.in_progress || 0).toString();
+    document.getElementById('kpi-resolved').textContent = (stats.resolved || 0).toString();
+    document.getElementById('kpi-response').textContent = (stats.avg_response_time || '0h');
+  }
+
+  if (!data) {
+    document.getElementById('ticketsTable').innerHTML = '<div class="empty-state">Failed to load tickets</div>';
+    return;
+  }
+
+  let html = '<div class="table-wrap"><table><thead><tr><th>Ticket ID</th><th>Customer</th><th>Subject</th><th>Category</th><th>Status</th><th>Date</th></tr></thead><tbody>';
+
+  (data.tickets || []).forEach(tick => {
+    const statusBadge = {
+      'open': 'bdg-am',
+      'in_progress': 'bdg-bl',
+      'resolved': 'bdg-gr',
+      'closed': 'bdg-re'
+    }[tick.status] || 'bdg-am';
+
+    html += `<tr>
+      <td class="mono-text">#${tick.id}</td>
+      <td>${tick.customer_name || 'N/A'}</td>
+      <td style="font-size:11px">${tick.subject || 'N/A'}</td>
+      <td style="font-size:10px">${tick.category || 'general'}</td>
+      <td><span class="bdg ${statusBadge}">● ${tick.status || 'open'}</span></td>
+      <td style="font-size:9px">${new Date(tick.created_at).toLocaleDateString()}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  document.getElementById('ticketsTable').innerHTML = html;
+}
+
+function filterTickets(filter) {
+  currentFilter.tickets = filter;
+  document.querySelectorAll('#page-tickets .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  loadTickets();
+}
+
+// ──────────────────── ANALYTICS ────────────────────
+async function loadAnalytics() {
+  const data = await apiCall('analytics?period=30');
+  if (!data) {
+    document.getElementById('topProducts').innerHTML = '<div class="empty-state">Failed to load analytics</div>';
+    return;
+  }
+
+  if (data.overview) {
+    document.getElementById('a-revenue').textContent = '$' + (data.overview.revenue || 0).toFixed(2);
+    document.getElementById('a-profit').textContent = '$' + (data.overview.profit || 0).toFixed(2);
+    document.getElementById('a-margin').textContent = (data.overview.margin || 0).toFixed(0) + '%';
+    document.getElementById('a-orders').textContent = (data.overview.orders || 0).toString();
+  }
+
+  // Daily chart
+  if (data.daily_revenue) {
+    const max = Math.max(...data.daily_revenue);
+    let html = '<div class="chart-bar">';
+    data.daily_revenue.forEach(val => {
+      const pct = (val / max * 100) || 10;
+      html += `<div class="bar" style="height:${pct}%"></div>`;
+    });
+    html += '</div>';
+    document.getElementById('dailyChart').innerHTML = html;
+  }
+
+  // Top products
+  if (data.top_products) {
+    let html = '<div style="display:grid;gap:8px;font-size:11px">';
+    data.top_products.forEach(prod => {
+      html += `<div style="display:flex;justify-content:space-between;padding:6px;border-bottom:1px solid var(--border)"><span>${prod.name}</span><span class="mono-text" style="color:var(--green)">$${(prod.revenue || 0).toFixed(2)}</span></div>`;
+    });
+    html += '</div>';
+    document.getElementById('topProducts').innerHTML = html;
+  }
+
+  // Top returns
+  if (data.top_return_reasons) {
+    let html = '<div style="display:grid;gap:8px;font-size:11px">';
+    data.top_return_reasons.forEach(reason => {
+      html += `<div style="display:flex;justify-content:space-between;padding:6px;border-bottom:1px solid var(--border)"><span>${reason.reason}</span><span class="mono-text">${reason.count} returns</span></div>`;
+    });
+    html += '</div>';
+    document.getElementById('topReturns').innerHTML = html;
+  }
+}
+
+function setPeriod(period) {
+  document.querySelectorAll('#page-analytics .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  loadAnalytics();
+}
+
+// ──────────────────── SUPPLIERS ────────────────────
+async function loadSuppliers() {
+  try {
+    const data = await fetch('/api/source-health').then(r => r.json());
+    if (!data || !data.sources) throw new Error('No data');
+
+    let html = '<div class="table-wrap"><table><thead><tr><th>Source</th><th>Name</th><th>Status</th><th>Latency</th><th>Results</th><th>Uptime</th></tr></thead><tbody>';
+
+    for (const [key, val] of Object.entries(data.sources)) {
+      const status = val.status || 'unknown';
+      const statusBadge = status === 'healthy' ? '<span class="bdg bdg-gr">● Healthy</span>' : status === 'slow' ? '<span class="bdg bdg-am">● Slow</span>' : '<span class="bdg bdg-re">● Down</span>';
+      const sourceName = { amazon: 'Amazon', aliexpress: 'AliExpress', sephora: 'Sephora', macys: "Macy's", shein: 'SHEIN' }[key] || key;
+
+      html += `<tr>
+        <td><span class="src s-${key.toLowerCase()}">${key.substring(0,3).toUpperCase()}</span></td>
+        <td>${sourceName}</td>
+        <td>${statusBadge}</td>
+        <td class="mono-text">${val.latencyMs || 0}ms</td>
+        <td class="mono-text">${val.resultCount || 0}</td>
+        <td style="color:var(--green);font-weight:600">${val.uptime || 99}%</td>
+      </tr>`;
+    }
+
+    html += '</tbody></table></div>';
+    document.getElementById('suppliersTable').innerHTML = html;
+  } catch (e) {
+    document.getElementById('suppliersTable').innerHTML = '<div class="empty-state">Failed to load supplier data</div>';
+  }
+}
+
+// ──────────────────── SETTINGS ────────────────────
+async function saveSettings() {
+  const settings = {
+    markup_amazon: parseInt(document.getElementById('markupAmazon').value) || 20,
+    markup_aliexpress: parseInt(document.getElementById('markupAliexpress').value) || 35,
+    free_shipping_threshold: parseInt(document.getElementById('freeShippingThreshold').value) || 50,
+    return_days: parseInt(document.getElementById('returnDays').value) || 30,
+    email_from_name: document.getElementById('emailFromName').value,
+    email_reply_to: document.getElementById('emailReplyTo').value
+  };
+
+  const result = await apiCallPost('settings', settings);
+  const msg = document.getElementById('settingsMsg');
+  if (result && result.success) {
+    msg.className = 'success-msg';
+    msg.textContent = 'Settings saved!';
+  } else {
+    msg.className = 'error-msg';
+    msg.textContent = 'Failed to save settings';
+  }
+  setTimeout(() => msg.textContent = '', 3000);
+}
+
+// ──────────────────── UTILITIES ────────────────────
+function toggleAlerts() {
+  const alertBar = document.getElementById('alertBar');
+  alertBar.style.display = alertBar.style.display === 'none' ? 'block' : 'none';
+}
+
+// ──────────────────── INIT ────────────────────
+window.addEventListener('load', () => {
+  if (token && token !== 'stylehub-admin-2026') {
+    showApp();
+  } else if (token === 'stylehub-admin-2026') {
+    showApp();
+  }
+});
 </script>
 </body>
 </html>

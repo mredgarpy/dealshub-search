@@ -405,6 +405,239 @@ function setupCRMApi(app) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // NUEVOS ENDPOINTS — CRM Pro upgrade
+  // NO MODIFICAR NADA ARRIBA DE ESTA LÍNEA
+  // ═══════════════════════════════════════════════════════════
+
+  const fs = require('fs');
+  const path = require('path');
+
+  // ─── CUSTOMERS (data real de Shopify Admin API) ───
+
+  app.get('/api/crm/customers', auth, async function(req, res) {
+    try {
+      const limit = parseInt(req.query.limit) || 50;
+      const shopifyRes = await fetch(
+        'https://' + process.env.SHOPIFY_STORE_DOMAIN + '/admin/api/2024-01/customers.json?limit=' + limit + '&order=created_at+desc',
+        { headers: { 'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_TOKEN } }
+      );
+      const data = await shopifyRes.json();
+
+      const orders = Object.values(db.orders || {});
+      const returns = Object.values(db.returns || {});
+
+      const customers = (data.customers || []).map(function(c) {
+        const email = c.email || '';
+        const custOrders = orders.filter(function(o) { return o.customerEmail === email; });
+        const custReturns = returns.filter(function(r) { return r.customerEmail === email; });
+        const totalSpent = custOrders.reduce(function(sum, o) { return sum + parseFloat(o.totalPrice || 0); }, 0);
+        const orderCount = c.orders_count || custOrders.length;
+
+        let segment = 'regular';
+        if (totalSpent > 200 || orderCount >= 3) segment = 'vip';
+        else if (orderCount === 0) segment = 'new';
+        else if (custReturns.length > 2) segment = 'at_risk';
+
+        return {
+          id: c.id,
+          name: ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || email,
+          email: email,
+          phone: c.phone || null,
+          ordersCount: orderCount,
+          totalSpent: Math.round(totalSpent * 100) / 100,
+          returnsCount: custReturns.length,
+          lastOrder: custOrders.length ? custOrders[0].createdAt : null,
+          createdAt: c.created_at,
+          segment: segment,
+          tags: c.tags ? c.tags.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : []
+        };
+      });
+
+      const totalCustomers = customers.length;
+      const vipCount = customers.filter(function(c) { return c.segment === 'vip'; }).length;
+      const newCount = customers.filter(function(c) { return c.segment === 'new'; }).length;
+      const atRiskCount = customers.filter(function(c) { return c.segment === 'at_risk'; }).length;
+      const avgSpent = totalCustomers ? customers.reduce(function(s,c) { return s + c.totalSpent; }, 0) / totalCustomers : 0;
+
+      res.json({
+        customers: customers,
+        stats: {
+          total: totalCustomers,
+          vip: vipCount,
+          new: newCount,
+          atRisk: atRiskCount,
+          avgSpent: Math.round(avgSpent * 100) / 100
+        }
+      });
+    } catch(e) {
+      logger.error('crm', 'Customers API error: ' + e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/api/crm/customers/:id', auth, async function(req, res) {
+    try {
+      const shopifyRes = await fetch(
+        'https://' + process.env.SHOPIFY_STORE_DOMAIN + '/admin/api/2024-01/customers/' + req.params.id + '.json',
+        { headers: { 'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_TOKEN } }
+      );
+      const data = await shopifyRes.json();
+      if (!data.customer) return res.status(404).json({ error: 'Customer not found' });
+
+      const c = data.customer;
+      const email = c.email || '';
+
+      const orders = Object.values(db.orders || {});
+      const returns = Object.values(db.returns || {});
+      const reviews = db.reviews || [];
+      let tickets = [];
+      try { tickets = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'tickets.json'), 'utf8')); } catch(e) {}
+
+      const custOrders = orders.filter(function(o) { return o.customerEmail === email; });
+      const custReturns = returns.filter(function(r) { return r.customerEmail === email; });
+      const custReviews = reviews.filter(function(r) { return r.customerEmail === email; });
+      const custTickets = tickets.filter(function(t) { return t.customerEmail === email; });
+      const totalSpent = custOrders.reduce(function(s, o) { return s + parseFloat(o.totalPrice || 0); }, 0);
+
+      res.json({
+        customer: {
+          id: c.id,
+          name: ((c.first_name || '') + ' ' + (c.last_name || '')).trim(),
+          email: email,
+          phone: c.phone,
+          addresses: c.addresses || [],
+          createdAt: c.created_at,
+          tags: c.tags
+        },
+        orders: custOrders,
+        returns: custReturns,
+        reviews: custReviews,
+        tickets: custTickets,
+        stats: {
+          totalSpent: Math.round(totalSpent * 100) / 100,
+          ordersCount: custOrders.length,
+          avgOrderValue: custOrders.length ? Math.round(totalSpent / custOrders.length * 100) / 100 : 0,
+          returnRate: custOrders.length ? Math.round(custReturns.length / custOrders.length * 1000) / 10 : 0
+        }
+      });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ─── ANALYTICS (data real de orders + returns) ───
+
+  app.get('/api/crm/analytics', auth, function(req, res) {
+    try {
+      const orders = Object.values(db.orders || {});
+      const returns = Object.values(db.returns || {});
+
+      const period = parseInt(req.query.period) || 30;
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - period);
+
+      const filtered = orders.filter(function(o) { return new Date(o.createdAt) >= cutoff; });
+      const filteredReturns = returns.filter(function(r) { return new Date(r.createdAt) >= cutoff; });
+
+      // Revenue by day
+      const revenueByDay = {};
+      const ordersByDay = {};
+      filtered.forEach(function(o) {
+        const day = (o.createdAt || '').substring(0, 10);
+        if (!day) return;
+        revenueByDay[day] = (revenueByDay[day] || 0) + parseFloat(o.totalPrice || 0);
+        ordersByDay[day] = (ordersByDay[day] || 0) + 1;
+      });
+
+      // By source
+      const revenueBySource = {};
+      const ordersBySource = {};
+      filtered.forEach(function(o) {
+        const src = o.source || 'unknown';
+        revenueBySource[src] = (revenueBySource[src] || 0) + parseFloat(o.totalPrice || 0);
+        ordersBySource[src] = (ordersBySource[src] || 0) + 1;
+      });
+
+      // Top products
+      const productMap = {};
+      filtered.forEach(function(o) {
+        (o.items || []).forEach(function(item) {
+          const key = item.title || item.sourceProductId || 'Unknown';
+          if (!productMap[key]) productMap[key] = { title: key, count: 0, revenue: 0, image: item.image || null };
+          productMap[key].count += 1;
+          productMap[key].revenue += parseFloat(item.price || o.totalPrice || 0);
+        });
+      });
+      const topProducts = Object.values(productMap)
+        .sort(function(a, b) { return b.count - a.count; })
+        .slice(0, 10);
+
+      // Top return reasons
+      const reasonMap = {};
+      filteredReturns.forEach(function(r) {
+        const reason = r.reason || r.reasonLabel || 'Unknown';
+        reasonMap[reason] = (reasonMap[reason] || 0) + 1;
+      });
+      const topReasons = Object.entries(reasonMap)
+        .sort(function(a, b) { return b[1] - a[1]; })
+        .map(function(e) { return { reason: e[0], count: e[1] }; });
+
+      const totalRevenue = filtered.reduce(function(s, o) { return s + parseFloat(o.totalPrice || 0); }, 0);
+      const totalProfit = filtered.reduce(function(s, o) { return s + parseFloat(o.profit || 0); }, 0);
+
+      res.json({
+        period: period,
+        revenueByDay: revenueByDay,
+        ordersByDay: ordersByDay,
+        revenueBySource: revenueBySource,
+        ordersBySource: ordersBySource,
+        topProducts: topProducts,
+        topReturnReasons: topReasons,
+        totals: {
+          revenue: Math.round(totalRevenue * 100) / 100,
+          profit: Math.round(totalProfit * 100) / 100,
+          margin: totalRevenue > 0 ? Math.round(totalProfit / totalRevenue * 1000) / 10 : 0,
+          orders: filtered.length,
+          returns: filteredReturns.length,
+          returnRate: filtered.length > 0 ? Math.round(filteredReturns.length / filtered.length * 1000) / 10 : 0,
+          avgOrderValue: filtered.length > 0 ? Math.round(totalRevenue / filtered.length * 100) / 100 : 0
+        }
+      });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ─── SETTINGS ───
+
+  const SETTINGS_FILE = path.join(__dirname, '..', 'data', 'settings.json');
+
+  app.get('/api/crm/settings', auth, function(req, res) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      res.json(settings);
+    } catch(e) {
+      res.json({
+        markup: { amazon: 12, aliexpress: 15 },
+        shipping: { freeThreshold: 35 },
+        returns: { windowAmazon: 30, windowAliexpress: 15 },
+        notifications: { newOrder: true, returnRequest: true, apiDown: true }
+      });
+    }
+  });
+
+  app.post('/api/crm/settings', auth, function(req, res) {
+    try {
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(req.body, null, 2));
+      res.json({ success: true });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  logger.info('crm', 'CRM Pro endpoints loaded (customers, analytics, settings)');
 }
 
 module.exports = { setupCRMApi };

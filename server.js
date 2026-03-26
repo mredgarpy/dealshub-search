@@ -72,6 +72,7 @@ const { setupCRMApi } = require('./src/crm-api');
 const { setupSubscriptionWebhooks } = require('./src/subscription-webhooks');
 const newsletterRouter = require('./src/routes/newsletter');
 const productImagesRouter = require('./src/routes/product-images');
+const { setupTicketsApi } = require('./src/tickets-api');
 const { STORES, getActiveStores, isStoreActive, classifyOrigin } = require('./src/config/stores');
 
 // Initialize adapters
@@ -117,6 +118,7 @@ app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')));
 setupWebhooks(app);
 setupCRMApi(app);
 setupSubscriptionWebhooks(app);
+setupTicketsApi(app);
 
 // ---- HEALTH ----
 app.get('/health', (req, res) => {

@@ -1,0 +1,16 @@
+{
+  "markup": { "amazon": 12, "aliexpress": 15 },
+  "shipping": { "freeThreshold": 35, "plusFreeShipping": true },
+  "returns": { "windowAmazon": 30, "windowAliexpress": 15 },
+  "notifications": {
+    "newOrder": true,
+    "manualRequired": true,
+    "returnRequest": true,
+    "apiDown": true,
+    "lowProfit": false
+  },
+  "emails": {
+    "fromName": "StyleHub Miami",
+    "replyTo": "support@stylehubmiami.com"
+  }
+}

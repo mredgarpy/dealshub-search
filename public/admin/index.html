@@ -1,576 +1,697 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>StyleHub CRM</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; }
-    .mono { font-family: 'SF Mono', 'Fira Code', monospace; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #171717; }
-    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
-    .fade-in { animation: fadeIn 0.3s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    .pulse { animation: pulse 2s infinite; }
-  </style>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            gray: { 950: '#0a0a0a', 900: '#171717', 850: '#1e1e1e', 800: '#262626', 700: '#374151', 600: '#4B5563', 500: '#6B7280', 400: '#9CA3AF', 300: '#D1D5DB', 200: '#E5E7EB', 100: '#F3F4F6' }
-          }
-        }
-      }
-    }
-  </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StyleHub CRM Pro</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06060a;--bg2:#0d0d14;--bg3:#14141e;--bg4:#1c1c28;--bg5:#242432;
+  --border:#1e1e2e;--border2:#2a2a3a;
+  --text:#e4e4ef;--text2:#9898ac;--text3:#5e5e72;
+  --accent:#e53e3e;--accent2:#c53030;
+  --green:#38a169;--amber:#d69e2e;--blue:#3182ce;--purple:#805ad5;--pink:#d53f8c;--orange:#dd6b20;
+  --radius:10px;--radius-sm:6px;
+}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;overflow:hidden}
+.mono{font-family:'SF Mono','Fira Code','Cascadia Code',monospace}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--bg5);border-radius:3px}
+
+/* ── SIDEBAR ── */
+.sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;flex-shrink:0;position:fixed;left:0;top:0;z-index:100}
+.sidebar-brand{padding:20px 16px 16px;border-bottom:1px solid var(--border)}
+.sidebar-brand h1{font-size:18px;font-weight:700;color:var(--accent)}
+.sidebar-brand span{font-size:11px;color:var(--text3);display:block;margin-top:2px}
+.sidebar-nav{flex:1;padding:12px 8px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;margin-bottom:2px;border:1px solid transparent}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--accent);color:#fff;font-weight:600;border-color:var(--accent2)}
+.nav-item .icon{width:18px;text-align:center;font-size:14px}
+.nav-item .badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700}
+.nav-item.active .badge{background:rgba(255,255,255,.25)}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)}
+.sidebar-footer button{background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:4px 0}
+.sidebar-footer button:hover{color:var(--accent)}
+
+/* ── MAIN ── */
+.main{margin-left:220px;flex:1;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar h2{font-size:16px;font-weight:600}
+.topbar .meta{font-size:12px;color:var(--text3)}
+.content{flex:1;padding:24px;overflow-y:auto}
+
+/* ── CARDS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.stat-card .label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.stat-card .value{font-size:22px;font-weight:700}
+.stat-card .sub{font-size:11px;color:var(--text3);margin-top:4px}
+.c-green{color:var(--green)}.c-amber{color:var(--amber)}.c-accent{color:var(--accent)}.c-blue{color:var(--blue)}.c-purple{color:var(--purple)}
+
+/* ── TABLES ── */
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead tr{border-bottom:1px solid var(--border)}
+th{text-align:left;padding:10px 14px;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+td{padding:10px 14px;border-bottom:1px solid var(--border)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--bg3)}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.tag-open{background:rgba(214,158,46,.15);color:var(--amber)}
+.tag-progress{background:rgba(49,130,206,.15);color:var(--blue)}
+.tag-resolved{background:rgba(56,161,105,.15);color:var(--green)}
+.tag-closed{background:rgba(94,94,114,.15);color:var(--text3)}
+.tag-pending{background:rgba(214,158,46,.15);color:var(--amber)}
+.tag-approved{background:rgba(56,161,105,.15);color:var(--green)}
+.tag-rejected{background:rgba(229,62,62,.15);color:var(--accent)}
+.tag-refunded{background:rgba(49,130,206,.15);color:var(--blue)}
+.tag-published{background:rgba(56,161,105,.15);color:var(--green)}
+.tag-fulfilled{background:rgba(56,161,105,.15);color:var(--green)}
+.tag-cancelled{background:rgba(229,62,62,.15);color:var(--accent)}
+.tag-manual{background:rgba(128,90,213,.15);color:var(--purple)}
+
+.src-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.src-amazon{background:rgba(221,107,32,.15);color:var(--orange)}
+.src-aliexpress{background:rgba(56,161,105,.15);color:var(--green)}
+.src-sephora{background:rgba(213,63,140,.15);color:var(--pink)}
+.src-macys{background:rgba(229,62,62,.15);color:var(--accent)}
+.src-shein{background:rgba(128,90,213,.15);color:var(--purple)}
+
+/* ── FILTERS / TOOLBAR ── */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.filter-btn{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .15s}
+.filter-btn:hover{border-color:var(--accent);color:var(--text)}
+.filter-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.search-input{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 12px;font-size:13px;color:var(--text);outline:none;transition:border .15s;margin-left:auto}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--text3)}
+
+/* ── BUTTONS ── */
+.btn{padding:6px 16px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent2)}
+.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{background:transparent;color:var(--text2);border-color:var(--border)}
+.btn-ghost:hover{border-color:var(--text3);color:var(--text)}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{opacity:.85}
+
+/* ── FORMS ── */
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;font-size:13px;color:var(--text);outline:none}
+.form-input:focus{border-color:var(--accent)}
+select.form-input{cursor:pointer}
+textarea.form-input{resize:vertical;min-height:60px}
+
+/* ── DETAIL PANEL ── */
+.detail-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.detail-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.detail-close{background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer}
+.detail-close:hover{color:var(--accent)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.detail-box{background:var(--bg3);border-radius:var(--radius-sm);padding:14px}
+.detail-box h4{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.detail-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.detail-row .lbl{color:var(--text2)}
+
+/* ── MESSAGES / TICKETS ── */
+.msg-list{max-height:400px;overflow-y:auto;margin-bottom:14px}
+.msg{padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:8px;font-size:13px}
+.msg-customer{background:var(--bg3);border-left:3px solid var(--blue)}
+.msg-admin{background:var(--bg3);border-left:3px solid var(--green)}
+.msg-system{background:var(--bg3);border-left:3px solid var(--amber)}
+.msg-meta{font-size:11px;color:var(--text3);margin-bottom:4px}
+
+/* ── LOADING / EMPTY ── */
+.loading{text-align:center;padding:48px;color:var(--text3);font-size:14px}
+.empty{text-align:center;padding:48px;color:var(--text3)}
+.empty .icon{font-size:32px;margin-bottom:8px}
+@keyframes spin{to{transform:rotate(360deg)}}.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+
+/* ── LOGIN ── */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;width:100vw}
+.login-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:32px;width:360px}
+.login-box h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.login-box p{font-size:13px;color:var(--text3);margin-bottom:20px}
+.login-error{color:var(--accent);font-size:12px;margin-bottom:10px}
+
+/* ── CHARTS (simple bar) ── */
+.chart-bar-wrap{display:flex;align-items:flex-end;gap:4px;height:120px;padding-top:10px}
+.chart-bar{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:4px;transition:height .3s;position:relative}
+.chart-bar:hover{opacity:.8}
+.chart-bar-label{font-size:9px;color:var(--text3);text-align:center;margin-top:4px;white-space:nowrap}
+.chart-labels{display:flex;gap:4px}.chart-labels span{flex:1;text-align:center;font-size:9px;color:var(--text3)}
+
+/* ── SETTINGS ── */
+.settings-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.settings-section h3{font-size:14px;font-weight:600;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+.settings-row:last-child{border-bottom:none}
+.toggle{width:36px;height:20px;background:var(--bg5);border-radius:10px;cursor:pointer;position:relative;transition:background .2s}
+.toggle.on{background:var(--green)}
+.toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s}
+.toggle.on::after{transform:translateX(16px)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .sidebar{width:60px}.sidebar-brand h1{font-size:14px}.sidebar-brand span,.nav-item span:not(.icon):not(.badge){display:none}
+  .nav-item{padding:9px;justify-content:center}.nav-item .badge{display:none}
+  .main{margin-left:60px}.stats-grid{grid-template-columns:1fr 1fr}.detail-grid{grid-template-columns:1fr}
+}
+</style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen">
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect, useCallback, useRef } = React;
+<body>
 
-    const API = window.location.origin;
-    let TOKEN = localStorage.getItem('sh_admin_token') || '';
+<div id="app"></div>
 
-    function api(path, opts = {}) {
-      const headers = { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN, ...(opts.headers || {}) };
-      return fetch(API + path, { ...opts, headers }).then(r => {
-        if (r.status === 401) { localStorage.removeItem('sh_admin_token'); TOKEN = ''; window.location.reload(); }
-        return r.json();
-      });
-    }
+<script>
+(function(){
+'use strict';
 
-    // ── SOURCE BADGES ──
-    const SRC = {
-      amazon: { label: 'AMZ', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-      aliexpress: { label: 'ALI', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-      sephora: { label: 'SEPH', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30' },
-      macys: { label: 'MACY', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
-      shein: { label: 'SHEIN', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-      unknown: { label: '???', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' }
+const API = window.location.origin;
+let TOKEN = localStorage.getItem('sh_crm_token') || '';
+let currentPage = 'overview';
+let pageData = {};
+
+// ── API HELPER ──
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', 'X-Admin-Token': TOKEN, ...(opts.headers || {}) };
+  try {
+    const r = await fetch(API + path, { ...opts, headers });
+    if (r.status === 401) { logout(); return { error: 'Unauthorized' }; }
+    return await r.json();
+  } catch(e) { return { error: e.message }; }
+}
+
+function logout() {
+  localStorage.removeItem('sh_crm_token');
+  TOKEN = '';
+  renderLogin();
+}
+
+function $(sel, ctx) { return (ctx || document).querySelector(sel); }
+function $$(sel, ctx) { return (ctx || document).querySelectorAll(sel); }
+
+function srcBadge(source) {
+  const map = { amazon:'AMZ', aliexpress:'ALI', sephora:'SEPH', macys:'MACY', shein:'SHEIN' };
+  return '<span class="src-badge src-' + (source||'') + '">' + (map[source] || '???') + '</span>';
+}
+
+function statusTag(status) {
+  const s = (status || '').replace(/_/g, ' ');
+  const cls = status === 'open' ? 'tag-open' : status === 'in_progress' ? 'tag-progress' : status === 'resolved' ? 'tag-resolved' : status === 'closed' ? 'tag-closed' : status === 'pending' ? 'tag-pending' : status === 'approved' ? 'tag-approved' : status === 'rejected' ? 'tag-rejected' : status === 'refunded' ? 'tag-refunded' : status === 'published' ? 'tag-published' : status === 'fulfilled' ? 'tag-fulfilled' : status === 'cancelled' ? 'tag-cancelled' : status === 'manual' ? 'tag-manual' : '';
+  return '<span class="tag ' + cls + '">' + s + '</span>';
+}
+
+function money(n) { return '$' + (Number(n) || 0).toFixed(2); }
+function pct(n) { return (Number(n) || 0).toFixed(1) + '%'; }
+function dateStr(d) { return d ? new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—'; }
+function timeStr(d) { return d ? new Date(d).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '—'; }
+function stars(n) { return '<span style="color:var(--amber)">' + '★'.repeat(n) + '☆'.repeat(5-n) + '</span>'; }
+
+// ── RENDER LOGIN ──
+function renderLogin() {
+  document.getElementById('app').innerHTML = '<div class="login-wrap"><form class="login-box" id="loginForm"><h1>StyleHub CRM Pro</h1><p>Enter your admin token</p><div id="loginError"></div><div class="form-group"><input type="password" class="form-input" id="tokenInput" placeholder="Admin Token" autocomplete="off"></div><button type="submit" class="btn btn-primary" style="width:100%;padding:10px">Sign In</button></form></div>';
+  $('#loginForm').onsubmit = async function(e) {
+    e.preventDefault();
+    const t = $('#tokenInput').value.trim();
+    if (!t) return;
+    const d = await fetch(API + '/api/crm/dashboard', { headers: { 'X-Admin-Token': t } }).then(r => r.json()).catch(() => ({ error: 'Connection failed' }));
+    if (d.error) { $('#loginError').innerHTML = '<div class="login-error">' + d.error + '</div>'; return; }
+    TOKEN = t;
+    localStorage.setItem('sh_crm_token', t);
+    renderApp();
+  };
+}
+
+// ── RENDER SHELL ──
+function renderApp() {
+  const pages = [
+    { id:'overview', icon:'📊', label:'Overview' },
+    { id:'orders', icon:'📦', label:'Orders' },
+    { id:'customers', icon:'👥', label:'Customers' },
+    { id:'returns', icon:'↩️', label:'Returns' },
+    { id:'reviews', icon:'⭐', label:'Reviews' },
+    { id:'tickets', icon:'🎫', label:'Tickets' },
+    { id:'analytics', icon:'📈', label:'Analytics' },
+    { id:'suppliers', icon:'🏭', label:'Suppliers' },
+    { id:'settings', icon:'⚙️', label:'Settings' }
+  ];
+  let nav = pages.map(p => '<div class="nav-item' + (p.id === currentPage ? ' active' : '') + '" data-page="' + p.id + '"><span class="icon">' + p.icon + '</span><span>' + p.label + '</span></div>').join('');
+
+  document.getElementById('app').innerHTML =
+    '<div class="sidebar"><div class="sidebar-brand"><h1>StyleHub</h1><span>CRM Pro</span></div><div class="sidebar-nav">' + nav + '</div><div class="sidebar-footer"><button id="logoutBtn">Logout</button></div></div>' +
+    '<div class="main"><div class="topbar"><h2 id="pageTitle">' + (pages.find(p => p.id === currentPage)?.label || '') + '</h2><div class="meta">' + new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) + '</div></div><div class="content" id="pageContent"><div class="loading"><span class="spinner"></span> Loading...</div></div></div>';
+
+  $$('.nav-item').forEach(el => {
+    el.onclick = function() {
+      currentPage = this.dataset.page;
+      $$('.nav-item').forEach(n => n.classList.remove('active'));
+      this.classList.add('active');
+      $('#pageTitle').textContent = pages.find(p => p.id === currentPage)?.label || '';
+      loadPage(currentPage);
     };
+  });
+  $('#logoutBtn').onclick = logout;
+  loadPage(currentPage);
+}
 
-    function SourceBadge({ source }) {
-      const s = SRC[source] || SRC.unknown;
-      return <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold border ${s.color}`}>{s.label}</span>;
-    }
+// ── PAGE ROUTER ──
+function loadPage(page) {
+  const c = $('#pageContent');
+  if (!c) return;
+  c.innerHTML = '<div class="loading"><span class="spinner"></span> Loading...</div>';
+  const fn = { overview: loadOverview, orders: loadOrders, customers: loadCustomers, returns: loadReturns, reviews: loadReviews, tickets: loadTickets, analytics: loadAnalytics, suppliers: loadSuppliers, settings: loadSettings };
+  if (fn[page]) fn[page](c);
+}
 
-    function StatusDot({ order }) {
-      if (order.financialStatus === 'cancelled') return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-red-500"></span>Cancelled</span>;
-      if (order.financialStatus === 'refunded') return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-red-400"></span>Refunded</span>;
-      if (order.fulfillmentStatus === 'fulfilled') return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-green-500"></span>Shipped</span>;
-      if (order.requiresManual) return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-blue-500 pulse"></span>Manual</span>;
-      return <span className="flex items-center gap-1.5 text-xs"><span className="w-2 h-2 rounded-full bg-amber-500 pulse"></span>Pending</span>;
-    }
+// ══════════════════════════════════════════
+// 1. OVERVIEW
+// ══════════════════════════════════════════
+async function loadOverview(c) {
+  const [dash, tStats] = await Promise.all([api('/api/crm/dashboard'), api('/api/crm/tickets/stats')]);
+  if (dash.error) { c.innerHTML = '<div class="empty"><div class="icon">⚠️</div>Failed to load dashboard</div>'; return; }
+  const o = dash.overview || {};
+  const cnt = dash.counts || {};
+  const ts = tStats.error ? {} : tStats;
 
-    // ── LOGIN ──
-    function Login({ onLogin }) {
-      const [token, setToken] = useState('');
-      const [error, setError] = useState('');
-      const [loading, setLoading] = useState(false);
+  c.innerHTML =
+    '<div class="stats-grid">' +
+      statCard('💰','Revenue', money(o.revenue), '+' + money(o.todayRevenue) + ' today', 'c-green') +
+      statCard('📈','Profit', money(o.profit), pct(o.margin) + ' margin', 'c-green') +
+      statCard('📦','Orders', o.totalOrders || 0, (o.todayOrders||0) + ' today') +
+      statCard('⏳','Pending', cnt.pending || 0, 'need action', cnt.pending ? 'c-amber' : '') +
+      statCard('⚠️','Manual', cnt.manual || 0, cnt.manual ? 'ALERT' : 'none', cnt.manual ? 'c-accent' : '') +
+      statCard('🎫','Open Tickets', ts.open || 0, (ts.inProgress||0) + ' in progress', ts.open ? 'c-amber' : '') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+      '<div class="detail-box"><h4>Recent Orders</h4><div id="recentOrders">Loading...</div></div>' +
+      '<div class="detail-box"><h4>Open Tickets</h4><div id="recentTickets">Loading...</div></div>' +
+    '</div>';
 
-      async function handleLogin(e) {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
-        try {
-          const data = await fetch(API + '/api/crm/dashboard', { headers: { 'X-Admin-Token': token } }).then(r => r.json());
-          if (data.error) throw new Error(data.error);
-          TOKEN = token;
-          localStorage.setItem('sh_admin_token', token);
-          onLogin();
-        } catch (err) {
-          setError('Invalid token');
-        }
-        setLoading(false);
-      }
+  // Load recent orders
+  const ordData = await api('/api/crm/orders?limit=5');
+  const orders = ordData.orders || [];
+  $('#recentOrders').innerHTML = orders.length ? orders.map(o =>
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span class="mono">#' + o.number + '</span><span>' + (o.customerName||'—') + '</span>' + srcBadge(o.source) + '<span class="mono">' + money(o.total) + '</span></div>'
+  ).join('') : '<div style="color:var(--text3);font-size:12px">No orders yet</div>';
 
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <form onSubmit={handleLogin} className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-96 fade-in">
-            <h1 className="text-2xl font-bold mb-1">StyleHub CRM</h1>
-            <p className="text-gray-400 text-sm mb-6">Enter your admin token to continue</p>
-            <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="Admin Token"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 mb-3 text-sm focus:outline-none focus:border-red-500 transition" />
-            {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
-            <button type="submit" disabled={loading || !token}
-              className="w-full bg-red-600 hover:bg-red-500 disabled:bg-gray-700 text-white font-semibold py-2.5 rounded-lg transition text-sm">
-              {loading ? 'Verifying...' : 'Sign In'}
-            </button>
-          </form>
-        </div>
-      );
-    }
+  // Load recent tickets
+  const tkData = await api('/api/crm/tickets?status=open');
+  const tks = (tkData.tickets || []).slice(0,5);
+  $('#recentTickets').innerHTML = tks.length ? tks.map(t =>
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span class="mono">' + t.id + '</span><span style="flex:1;margin:0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t.subject) + '</span>' + statusTag(t.status) + '</div>'
+  ).join('') : '<div style="color:var(--text3);font-size:12px">No open tickets</div>';
+}
 
-    // ── METRIC CARD ──
-    function MetricCard({ icon, label, value, sub, color = 'text-gray-100' }) {
-      return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex-1 min-w-[140px]">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">{icon}</span>
-            <span className="text-xs text-gray-400 uppercase tracking-wide">{label}</span>
-          </div>
-          <div className={`text-xl font-bold mono ${color}`}>{value}</div>
-          {sub && <div className="text-xs text-gray-500 mt-0.5">{sub}</div>}
-        </div>
-      );
-    }
+function statCard(icon, label, value, sub, cls) {
+  return '<div class="stat-card"><div class="label">' + icon + ' ' + label + '</div><div class="value ' + (cls||'') + '">' + value + '</div>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
+}
 
-    // ── ORDER DETAIL PANEL ──
-    function OrderDetail({ order, onClose, onRefresh }) {
-      const [tracking, setTracking] = useState('');
-      const [carrier, setCarrier] = useState('USPS');
-      const [trackingUrl, setTrackingUrl] = useState('');
-      const [note, setNote] = useState(order.notes || '');
-      const [fulfilling, setFulfilling] = useState(false);
-      const [msg, setMsg] = useState('');
+// ══════════════════════════════════════════
+// 2. ORDERS
+// ══════════════════════════════════════════
+async function loadOrders(c) {
+  const filters = ['all','pending','manual','fulfilled','cancelled'];
+  let filter = 'all', search = '';
 
-      async function handleFulfill() {
-        if (!tracking.trim()) return setMsg('Enter tracking number');
-        setFulfilling(true);
-        setMsg('');
-        try {
-          const res = await api(`/api/crm/orders/${order.id}/fulfill`, {
-            method: 'POST',
-            body: JSON.stringify({ trackingNumber: tracking, trackingCompany: carrier, trackingUrl })
-          });
-          if (res.success) { setMsg('Fulfilled!'); onRefresh(); }
-          else setMsg(res.error || 'Failed');
-        } catch (e) { setMsg(e.message); }
-        setFulfilling(false);
-      }
+  async function render() {
+    const params = new URLSearchParams();
+    if (filter !== 'all') params.set('status', filter);
+    if (search) params.set('q', search);
+    const data = await api('/api/crm/orders?' + params);
+    const orders = data.orders || [];
 
-      async function handleNote() {
-        await api(`/api/crm/orders/${order.id}/note`, { method: 'POST', body: JSON.stringify({ note }) });
-        setMsg('Note saved');
-        onRefresh();
-      }
+    c.innerHTML =
+      '<div class="toolbar">' + filters.map(f => '<button class="filter-btn' + (f === filter ? ' active' : '') + '" data-f="' + f + '">' + f.charAt(0).toUpperCase() + f.slice(1) + '</button>').join('') +
+      '<input class="search-input" placeholder="Search orders..." value="' + esc(search) + '" id="orderSearch" style="width:220px"></div>' +
+      (orders.length === 0 ? '<div class="empty"><div class="icon">📦</div>No orders found</div>' :
+      '<div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Items</th><th style="text-align:right">Total</th><th>Source</th><th>Status</th><th style="text-align:right">Profit</th><th>Actions</th></tr></thead><tbody>' +
+      orders.map(o => {
+        const st = o.financialStatus === 'cancelled' ? 'cancelled' : o.fulfillmentStatus === 'fulfilled' ? 'fulfilled' : o.requiresManual ? 'manual' : 'pending';
+        return '<tr data-oid="' + o.id + '" class="order-row" style="cursor:pointer"><td class="mono" style="font-weight:600">#' + o.number + '</td><td><div style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(o.customerName||'Unknown') + '</div><div style="font-size:11px;color:var(--text3)">' + esc(o.email||'') + '</div></td><td>' + (o.items||[]).length + '</td><td style="text-align:right" class="mono">' + money(o.total) + '</td><td>' + srcBadge(o.source) + '</td><td>' + statusTag(st) + '</td><td style="text-align:right" class="mono c-green">' + money(o.estimatedProfit) + '</td><td><button class="btn btn-ghost btn-sm view-order" data-oid="' + o.id + '">View</button></td></tr>';
+      }).join('') + '</tbody></table></div>');
 
-      const addr = order.shippingAddress;
-      const canFulfill = !order.fulfillmentStatus && order.financialStatus !== 'cancelled';
-      const margin = order.total > 0 ? Math.round((order.estimatedProfit || 0) / order.total * 100) : 0;
+    // Bind events
+    $$('.filter-btn', c).forEach(b => b.onclick = function() { filter = this.dataset.f; render(); });
+    const si = $('#orderSearch', c);
+    if (si) { let t; si.oninput = function() { clearTimeout(t); t = setTimeout(() => { search = si.value; render(); }, 400); }; }
+    $$('.order-row', c).forEach(r => r.onclick = function() { showOrderDetail(this.dataset.oid, render); });
+  }
+  await render();
+}
 
-      return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 fade-in">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h3 className="text-lg font-bold">Order {order.number}</h3>
-              <p className="text-sm text-gray-400">{order.customerName} ({order.email})</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <StatusDot order={order} />
-              <SourceBadge source={order.source} />
-              <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-xl">&times;</button>
-            </div>
-          </div>
+async function showOrderDetail(oid, onBack) {
+  const c = $('#pageContent');
+  c.innerHTML = '<div class="loading"><span class="spinner"></span> Loading order...</div>';
+  // Fetch orders list to find the one (API gives list)
+  const data = await api('/api/crm/orders');
+  const order = (data.orders || []).find(o => o.id == oid);
+  if (!order) { c.innerHTML = '<div class="empty">Order not found</div>'; return; }
 
-          {/* Items */}
-          <div className="mb-4">
-            <h4 className="text-xs text-gray-500 uppercase tracking-wide mb-2">Items</h4>
-            <div className="space-y-2">
-              {(order.items || []).map((item, i) => (
-                <div key={i} className="flex items-center gap-3 bg-gray-850 rounded-lg p-2">
-                  {item.image && <img src={item.image} className="w-10 h-10 rounded object-cover" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate">{item.title}</p>
-                    {item.variant && <p className="text-xs text-gray-500">{item.variant}</p>}
-                  </div>
-                  <span className="mono text-sm">${item.price} &times; {item.quantity}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+  const addr = order.shippingAddress;
+  const canFulfill = !order.fulfillmentStatus && order.financialStatus !== 'cancelled';
+  const margin = order.total > 0 ? Math.round((order.estimatedProfit||0) / order.total * 100) : 0;
 
-          {/* Financials */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-gray-850 rounded-lg p-3">
-              <h4 className="text-xs text-gray-500 uppercase mb-2">Financials</h4>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between"><span className="text-gray-400">Subtotal</span><span className="mono">${(order.subtotal || 0).toFixed(2)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Tax</span><span className="mono">${(order.tax || 0).toFixed(2)}</span></div>
-                <div className="flex justify-between font-bold"><span>Total</span><span className="mono">${(order.total || 0).toFixed(2)} {order.currency}</span></div>
-                {order.refundAmount > 0 && <div className="flex justify-between text-red-400"><span>Refunded</span><span className="mono">-${order.refundAmount.toFixed(2)}</span></div>}
-              </div>
-            </div>
-            <div className="bg-gray-850 rounded-lg p-3">
-              <h4 className="text-xs text-gray-500 uppercase mb-2">Profit</h4>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between"><span className="text-gray-400">Est. Cost</span><span className="mono">${(order.estimatedCost || 0).toFixed(2)}</span></div>
-                <div className="flex justify-between font-bold text-green-400"><span>Est. Profit</span><span className="mono">${(order.estimatedProfit || 0).toFixed(2)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Margin</span><span className="mono">{margin}%</span></div>
-              </div>
-            </div>
-          </div>
+  c.innerHTML =
+    '<div class="detail-panel"><div class="detail-header"><div><h3 style="font-size:18px;font-weight:700">Order #' + order.number + '</h3><div style="font-size:13px;color:var(--text2)">' + esc(order.customerName||'') + ' (' + esc(order.email||'') + ')</div></div><div style="display:flex;gap:8px;align-items:center">' + srcBadge(order.source) + '<button class="detail-close" id="closeDetail">&times;</button></div></div>' +
 
-          {/* Shipping */}
-          {addr && (
-            <div className="mb-4 bg-gray-850 rounded-lg p-3">
-              <h4 className="text-xs text-gray-500 uppercase mb-1">Ship to</h4>
-              <p className="text-sm">{addr.first_name} {addr.last_name}, {addr.address1}{addr.address2 ? ', ' + addr.address2 : ''}, {addr.city} {addr.province} {addr.zip}, {addr.country}</p>
-            </div>
-          )}
+    '<div style="margin-bottom:16px"><h4 style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Items</h4>' +
+    (order.items||[]).map(it => '<div style="display:flex;align-items:center;gap:10px;background:var(--bg3);border-radius:var(--radius-sm);padding:8px;margin-bottom:6px">' + (it.image ? '<img src="' + esc(it.image) + '" style="width:40px;height:40px;border-radius:4px;object-fit:cover">' : '') + '<div style="flex:1;min-width:0"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(it.title) + '</div>' + (it.variant ? '<div style="font-size:11px;color:var(--text3)">' + esc(it.variant) + '</div>' : '') + '</div><span class="mono" style="font-size:13px">' + money(it.price) + ' x ' + it.quantity + '</span></div>').join('') + '</div>' +
 
-          {/* Tracking / Fulfill */}
-          {order.tracking ? (
-            <div className="mb-4 bg-gray-850 rounded-lg p-3">
-              <h4 className="text-xs text-gray-500 uppercase mb-1">Tracking</h4>
-              <p className="text-sm mono">{order.trackingCompany}: {order.tracking}</p>
-              {order.trackingUrl && <a href={order.trackingUrl} target="_blank" className="text-xs text-red-400 hover:underline">Track shipment &rarr;</a>}
-            </div>
-          ) : canFulfill ? (
-            <div className="mb-4 bg-gray-850 rounded-lg p-3">
-              <h4 className="text-xs text-gray-500 uppercase mb-2">Fulfill Order</h4>
-              <div className="grid grid-cols-3 gap-2 mb-2">
-                <input placeholder="Tracking #" value={tracking} onChange={e => setTracking(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-red-500" />
-                <select value={carrier} onChange={e => setCarrier(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none">
-                  <option>USPS</option><option>UPS</option><option>FedEx</option><option>DHL</option><option>Other</option>
-                </select>
-                <input placeholder="Tracking URL" value={trackingUrl} onChange={e => setTrackingUrl(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-red-500" />
-              </div>
-              <button onClick={handleFulfill} disabled={fulfilling}
-                className="bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-sm font-semibold px-4 py-1.5 rounded transition">
-                {fulfilling ? 'Fulfilling...' : 'Fulfill & Notify Customer'}
-              </button>
-            </div>
-          ) : null}
+    '<div class="detail-grid"><div class="detail-box"><h4>Financials</h4>' +
+      '<div class="detail-row"><span class="lbl">Subtotal</span><span class="mono">' + money(order.subtotal) + '</span></div>' +
+      '<div class="detail-row"><span class="lbl">Tax</span><span class="mono">' + money(order.tax) + '</span></div>' +
+      '<div class="detail-row" style="font-weight:700"><span>Total</span><span class="mono">' + money(order.total) + ' ' + (order.currency||'USD') + '</span></div>' +
+      (order.refundAmount > 0 ? '<div class="detail-row c-accent"><span>Refunded</span><span class="mono">-' + money(order.refundAmount) + '</span></div>' : '') +
+    '</div><div class="detail-box"><h4>Profit</h4>' +
+      '<div class="detail-row"><span class="lbl">Est. Cost</span><span class="mono">' + money(order.estimatedCost) + '</span></div>' +
+      '<div class="detail-row c-green" style="font-weight:700"><span>Est. Profit</span><span class="mono">' + money(order.estimatedProfit) + '</span></div>' +
+      '<div class="detail-row"><span class="lbl">Margin</span><span class="mono">' + margin + '%</span></div>' +
+    '</div></div>' +
 
-          {/* Notes */}
-          <div className="mb-4 bg-gray-850 rounded-lg p-3">
-            <h4 className="text-xs text-gray-500 uppercase mb-2">Internal Notes</h4>
-            <div className="flex gap-2">
-              <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
-                className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm resize-none focus:outline-none focus:border-red-500" />
-              <button onClick={handleNote} className="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-sm transition">Save</button>
-            </div>
-          </div>
+    (addr ? '<div class="detail-box" style="margin-bottom:16px"><h4>Ship to</h4><div style="font-size:13px">' + esc([addr.first_name, addr.last_name].join(' ')) + ', ' + esc(addr.address1||'') + (addr.address2 ? ', ' + esc(addr.address2) : '') + ', ' + esc(addr.city||'') + ' ' + esc(addr.province||'') + ' ' + esc(addr.zip||'') + ', ' + esc(addr.country||'') + '</div></div>' : '') +
 
-          {/* Timeline */}
-          <div>
-            <h4 className="text-xs text-gray-500 uppercase mb-2">Timeline</h4>
-            <div className="space-y-2">
-              {(order.events || []).map((ev, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-500 mt-1.5 flex-shrink-0"></span>
-                  <span className="text-gray-400">{new Date(ev.at).toLocaleString()}</span>
-                  <span className="text-gray-300">{ev.type}{ev.tracking ? ` — ${ev.tracking}` : ''}{ev.text ? ` — ${ev.text}` : ''}{ev.amount ? ` — $${ev.amount}` : ''}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+    (order.tracking ?
+      '<div class="detail-box" style="margin-bottom:16px"><h4>Tracking</h4><div class="mono" style="font-size:13px">' + esc(order.trackingCompany||'') + ': ' + esc(order.tracking) + '</div>' + (order.trackingUrl ? '<a href="' + esc(order.trackingUrl) + '" target="_blank" style="font-size:12px;color:var(--accent)">Track shipment →</a>' : '') + '</div>' :
+      (canFulfill ? '<div class="detail-box" style="margin-bottom:16px"><h4>Fulfill Order</h4><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px"><input class="form-input" id="fTracking" placeholder="Tracking #"><select class="form-input" id="fCarrier"><option>USPS</option><option>UPS</option><option>FedEx</option><option>DHL</option><option>Other</option></select><input class="form-input" id="fUrl" placeholder="Tracking URL"></div><button class="btn btn-green" id="fulfillBtn">Fulfill & Notify Customer</button><span id="fulfillMsg" style="margin-left:10px;font-size:12px"></span></div>' : '')
+    ) +
 
-          {msg && <p className="mt-3 text-xs text-amber-400">{msg}</p>}
-        </div>
-      );
-    }
+    '<div class="detail-box" style="margin-bottom:16px"><h4>Internal Notes</h4><div style="display:flex;gap:8px"><textarea class="form-input" id="noteArea" rows="2">' + esc(order.notes||'') + '</textarea><button class="btn btn-ghost" id="saveNoteBtn">Save</button></div><span id="noteMsg" style="font-size:11px;color:var(--text3)"></span></div>' +
 
-    // ── ORDERS TAB ──
-    function OrdersTab({ onRefresh, refreshKey }) {
-      const [orders, setOrders] = useState([]);
-      const [filter, setFilter] = useState('all');
-      const [search, setSearch] = useState('');
-      const [selected, setSelected] = useState(null);
-      const [loading, setLoading] = useState(true);
+    '<div><h4 style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Timeline</h4>' +
+    (order.events||[]).map(ev => '<div style="display:flex;gap:8px;font-size:12px;margin-bottom:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3);margin-top:5px;flex-shrink:0"></span><span style="color:var(--text3)">' + timeStr(ev.at) + '</span><span>' + esc(ev.type||'') + (ev.tracking ? ' — ' + esc(ev.tracking) : '') + (ev.text ? ' — ' + esc(ev.text) : '') + (ev.amount ? ' — ' + money(ev.amount) : '') + '</span></div>').join('') + '</div>' +
 
-      const load = useCallback(async () => {
-        setLoading(true);
-        const params = new URLSearchParams();
-        if (filter !== 'all') params.set('status', filter);
-        if (search) params.set('q', search);
-        const data = await api('/api/crm/orders?' + params.toString());
-        setOrders(data.orders || []);
-        setLoading(false);
-      }, [filter, search, refreshKey]);
+  '</div>';
 
-      useEffect(() => { load(); }, [load]);
+  $('#closeDetail').onclick = function() { loadPage('orders'); };
+  if ($('#fulfillBtn')) {
+    $('#fulfillBtn').onclick = async function() {
+      const tr = $('#fTracking').value.trim();
+      if (!tr) { $('#fulfillMsg').textContent = 'Enter tracking number'; return; }
+      this.disabled = true; this.textContent = 'Fulfilling...';
+      const res = await api('/api/crm/orders/' + order.id + '/fulfill', { method:'POST', body: JSON.stringify({ trackingNumber: tr, trackingCompany: $('#fCarrier').value, trackingUrl: $('#fUrl').value }) });
+      $('#fulfillMsg').textContent = res.success ? 'Fulfilled!' : (res.error || 'Failed');
+      if (res.success) setTimeout(() => showOrderDetail(oid, onBack), 1000);
+    };
+  }
+  if ($('#saveNoteBtn')) {
+    $('#saveNoteBtn').onclick = async function() {
+      await api('/api/crm/orders/' + order.id + '/note', { method:'POST', body: JSON.stringify({ note: $('#noteArea').value }) });
+      $('#noteMsg').textContent = 'Note saved';
+    };
+  }
+}
 
-      if (selected) {
-        const fullOrder = orders.find(o => o.id === selected);
-        if (fullOrder) return <OrderDetail order={fullOrder} onClose={() => setSelected(null)} onRefresh={() => { load(); onRefresh(); }} />;
-      }
+// ══════════════════════════════════════════
+// 3. CUSTOMERS
+// ══════════════════════════════════════════
+async function loadCustomers(c) {
+  c.innerHTML = '<div class="loading"><span class="spinner"></span> Loading customers...</div>';
+  const data = await api('/api/crm/customers');
+  if (data.error) { c.innerHTML = '<div class="empty"><div class="icon">⚠️</div>Failed to load customers<div style="font-size:12px;color:var(--text3);margin-top:6px">Shopify Admin API may not be configured</div></div>'; return; }
+  const custs = data.customers || [];
+  let segment = 'all';
 
-      const filters = [
-        { key: 'all', label: 'All' },
-        { key: 'pending', label: 'Pending' },
-        { key: 'manual', label: 'Manual' },
-        { key: 'fulfilled', label: 'Shipped' },
-        { key: 'cancelled', label: 'Cancelled' }
-      ];
+  function render() {
+    const filtered = segment === 'all' ? custs : custs.filter(cu => cu.segment === segment);
+    c.innerHTML =
+      '<div class="toolbar">' + ['all','vip','new','at_risk','regular'].map(s => '<button class="filter-btn' + (s === segment ? ' active' : '') + '" data-s="' + s + '">' + s.charAt(0).toUpperCase() + s.slice(1).replace('_',' ') + '</button>').join('') +
+      '<span style="margin-left:auto;font-size:12px;color:var(--text3)">' + filtered.length + ' customers</span></div>' +
+      (filtered.length === 0 ? '<div class="empty"><div class="icon">👥</div>No customers found</div>' :
+      '<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Email</th><th>Segment</th><th style="text-align:right">Orders</th><th style="text-align:right">Total Spent</th><th>Since</th></tr></thead><tbody>' +
+      filtered.map(cu => '<tr><td style="font-weight:600">' + esc(cu.name||'Unknown') + '</td><td style="color:var(--text2)">' + esc(cu.email||'') + '</td><td>' + statusTag(cu.segment||'regular') + '</td><td style="text-align:right" class="mono">' + (cu.ordersCount||0) + '</td><td style="text-align:right" class="mono">' + money(cu.totalSpent) + '</td><td style="font-size:12px;color:var(--text3)">' + dateStr(cu.createdAt) + '</td></tr>').join('') +
+      '</tbody></table></div>');
 
-      return (
-        <div className="fade-in">
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            {filters.map(f => (
-              <button key={f.key} onClick={() => setFilter(f.key)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition ${filter === f.key ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-                {f.label}
-              </button>
-            ))}
-            <input placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)}
-              className="ml-auto bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:border-red-500" />
-          </div>
+    $$('.filter-btn', c).forEach(b => b.onclick = function() { segment = this.dataset.s; render(); });
+  }
+  render();
+}
 
-          {loading ? (
-            <div className="text-center py-12 text-gray-500">Loading orders...</div>
-          ) : orders.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">No orders found</div>
-          ) : (
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase">
-                    <th className="text-left px-4 py-3">Order</th>
-                    <th className="text-left px-4 py-3">Customer</th>
-                    <th className="text-center px-4 py-3">Items</th>
-                    <th className="text-right px-4 py-3">Total</th>
-                    <th className="text-center px-4 py-3">Source</th>
-                    <th className="text-center px-4 py-3">Status</th>
-                    <th className="text-right px-4 py-3">Profit</th>
-                    <th className="text-center px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map(o => (
-                    <tr key={o.id} className="border-b border-gray-800/50 hover:bg-gray-850 transition cursor-pointer" onClick={() => setSelected(o.id)}>
-                      <td className="px-4 py-3 mono font-medium">{o.number}</td>
-                      <td className="px-4 py-3">
-                        <div className="truncate max-w-[160px]">{o.customerName || 'Unknown'}</div>
-                        <div className="text-xs text-gray-500 truncate max-w-[160px]">{o.email}</div>
-                      </td>
-                      <td className="px-4 py-3 text-center">{(o.items || []).length}</td>
-                      <td className="px-4 py-3 text-right mono">${(o.total || 0).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-center"><SourceBadge source={o.source} /></td>
-                      <td className="px-4 py-3 text-center"><StatusDot order={o} /></td>
-                      <td className="px-4 py-3 text-right mono text-green-400">${(o.estimatedProfit || 0).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button className="text-xs text-red-400 hover:text-red-300 font-medium">View</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      );
-    }
+// ══════════════════════════════════════════
+// 4. RETURNS
+// ══════════════════════════════════════════
+async function loadReturns(c) {
+  const data = await api('/api/crm/returns');
+  const returns = data.returns || [];
+  const statuses = ['pending','approved','shipped_back','received','refunded','rejected'];
 
-    // ── RETURNS TAB ──
-    function ReturnsTab({ refreshKey }) {
-      const [returns, setReturns] = useState([]);
-      const [loading, setLoading] = useState(true);
+  c.innerHTML = returns.length === 0 ? '<div class="empty"><div class="icon">↩️</div>No returns yet</div>' :
+    '<div class="table-wrap"><table><thead><tr><th>Return ID</th><th>Order</th><th>Customer</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
+    returns.map(r => '<tr><td class="mono" style="font-size:11px">' + esc(r.id) + '</td><td class="mono">' + esc(r.orderNumber||'') + '</td><td>' + esc(r.customerName||r.customerEmail||'') + '</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">' + esc(r.reason||'') + '</td><td>' + statusTag(r.status) + '</td><td><select class="form-input" style="width:auto;padding:4px 8px;font-size:11px" data-rid="' + r.id + '" onchange="window._updateReturn(this)">' + statuses.map(s => '<option value="' + s + '"' + (s === r.status ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></td></tr>').join('') +
+    '</tbody></table></div>';
 
-      useEffect(() => {
-        api('/api/crm/returns').then(d => { setReturns(d.returns || []); setLoading(false); });
-      }, [refreshKey]);
+  window._updateReturn = async function(sel) {
+    await api('/api/crm/returns/' + sel.dataset.rid, { method:'PUT', body: JSON.stringify({ status: sel.value }) });
+  };
+}
 
-      async function updateStatus(id, status) {
-        await api(`/api/crm/returns/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
-        setReturns(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-      }
+// ══════════════════════════════════════════
+// 5. REVIEWS
+// ══════════════════════════════════════════
+async function loadReviews(c) {
+  const data = await api('/api/crm/reviews');
+  const reviews = data.reviews || [];
 
-      const statuses = ['pending', 'approved', 'shipped_back', 'received', 'refunded', 'rejected'];
+  function render() {
+    c.innerHTML = reviews.length === 0 ? '<div class="empty"><div class="icon">⭐</div>No reviews yet</div>' :
+      '<div class="table-wrap"><table><thead><tr><th>Product</th><th>Review</th><th>Customer</th><th>Rating</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
+      reviews.map(r => '<tr><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.productTitle||r.productId||'') + '</td><td style="max-width:220px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.title ? '<strong>' + esc(r.title) + '</strong> — ' : '') + esc(r.text||'') + '</div></td><td>' + esc(r.customerName||'') + '</td><td class="mono" style="font-size:12px">' + stars(r.rating||0) + '</td><td>' + statusTag(r.status) + '</td><td style="white-space:nowrap">' +
+      (r.status === 'pending' ? '<button class="btn btn-green btn-sm" onclick="window._reviewAction(\'' + r.id + '\',\'published\')">✓</button> <button class="btn btn-sm" style="background:var(--accent);color:#fff" onclick="window._reviewAction(\'' + r.id + '\',\'rejected\')">✕</button>' : '') +
+      '</td></tr>').join('') + '</tbody></table></div>';
+  }
+  render();
 
-      return (
-        <div className="fade-in">
-          {loading ? <div className="text-center py-12 text-gray-500">Loading...</div> :
-          returns.length === 0 ? <div className="text-center py-12 text-gray-500">No returns yet</div> : (
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase">
-                    <th className="text-left px-4 py-3">Return ID</th>
-                    <th className="text-left px-4 py-3">Order</th>
-                    <th className="text-left px-4 py-3">Customer</th>
-                    <th className="text-left px-4 py-3">Reason</th>
-                    <th className="text-center px-4 py-3">Status</th>
-                    <th className="text-center px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {returns.map(r => (
-                    <tr key={r.id} className="border-b border-gray-800/50 hover:bg-gray-850">
-                      <td className="px-4 py-3 mono text-xs">{r.id}</td>
-                      <td className="px-4 py-3 mono">{r.orderNumber}</td>
-                      <td className="px-4 py-3">{r.customerName || r.customerEmail}</td>
-                      <td className="px-4 py-3 text-gray-400 max-w-[200px] truncate">{r.reason}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          r.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
-                          r.status === 'approved' ? 'bg-green-500/20 text-green-400' :
-                          r.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
-                          r.status === 'refunded' ? 'bg-blue-500/20 text-blue-400' :
-                          'bg-gray-500/20 text-gray-400'
-                        }`}>{r.status}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <select value={r.status} onChange={e => updateStatus(r.id, e.target.value)}
-                          className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs">
-                          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      );
-    }
+  window._reviewAction = async function(id, status) {
+    await api('/api/crm/reviews/' + id, { method:'PUT', body: JSON.stringify({ status }) });
+    const rv = reviews.find(r => r.id === id);
+    if (rv) rv.status = status;
+    render();
+  };
+}
 
-    // ── REVIEWS TAB ──
-    function ReviewsTab({ refreshKey }) {
-      const [reviews, setReviews] = useState([]);
-      const [loading, setLoading] = useState(true);
+// ══════════════════════════════════════════
+// 6. TICKETS
+// ══════════════════════════════════════════
+async function loadTickets(c) {
+  let filter = 'all';
 
-      useEffect(() => {
-        api('/api/crm/reviews').then(d => { setReviews(d.reviews || []); setLoading(false); });
-      }, [refreshKey]);
+  async function render() {
+    const [listData, statsData] = await Promise.all([
+      api('/api/crm/tickets' + (filter !== 'all' ? '?status=' + filter : '')),
+      api('/api/crm/tickets/stats')
+    ]);
+    const tickets = listData.tickets || [];
+    const st = statsData.error ? {} : statsData;
 
-      async function updateReview(id, status) {
-        await api(`/api/crm/reviews/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
-        setReviews(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-      }
+    c.innerHTML =
+      '<div class="stats-grid" style="margin-bottom:16px">' +
+        statCard('🎫','Open', st.open||0, '', st.open ? 'c-amber' : '') +
+        statCard('🔄','In Progress', st.inProgress||0, '', 'c-blue') +
+        statCard('✅','Resolved', st.resolved||0, '', 'c-green') +
+        statCard('⏱','Avg Response', (st.avgResponseHrs||0) + 'h', '', '') +
+      '</div>' +
+      '<div class="toolbar">' + ['all','open','in_progress','resolved','closed'].map(f => '<button class="filter-btn' + (f === filter ? ' active' : '') + '" data-f="' + f + '">' + f.replace('_',' ').replace(/^./,m=>m.toUpperCase()) + '</button>').join('') + '</div>' +
+      (tickets.length === 0 ? '<div class="empty"><div class="icon">🎫</div>No tickets found</div>' :
+      '<div class="table-wrap"><table><thead><tr><th>Ticket</th><th>Subject</th><th>Customer</th><th>Category</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead><tbody>' +
+      tickets.map(t => '<tr style="cursor:pointer" class="ticket-row" data-tid="' + t.id + '"><td class="mono" style="font-size:11px">' + esc(t.id) + '</td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t.subject) + '</td><td>' + esc(t.customerName||t.customerEmail||'') + '</td><td><span class="tag tag-' + (t.category||'') + '" style="font-size:10px">' + esc(t.category||'general') + '</span></td><td>' + statusTag(t.status) + '</td><td style="font-size:12px;color:var(--text3)">' + timeStr(t.updatedAt) + '</td><td><button class="btn btn-ghost btn-sm view-ticket" data-tid="' + t.id + '">View</button></td></tr>').join('') +
+      '</tbody></table></div>');
 
-      function stars(n) { return '★'.repeat(n) + '☆'.repeat(5 - n); }
+    $$('.filter-btn', c).forEach(b => b.onclick = function() { filter = this.dataset.f; render(); });
+    $$('.ticket-row', c).forEach(r => r.onclick = function() { showTicketDetail(this.dataset.tid, render); });
+  }
+  await render();
+}
 
-      return (
-        <div className="fade-in">
-          {loading ? <div className="text-center py-12 text-gray-500">Loading...</div> :
-          reviews.length === 0 ? <div className="text-center py-12 text-gray-500">No reviews yet</div> : (
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase">
-                    <th className="text-left px-4 py-3">Product</th>
-                    <th className="text-left px-4 py-3">Review</th>
-                    <th className="text-left px-4 py-3">Customer</th>
-                    <th className="text-center px-4 py-3">Rating</th>
-                    <th className="text-center px-4 py-3">Status</th>
-                    <th className="text-center px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reviews.map(r => (
-                    <tr key={r.id} className="border-b border-gray-800/50 hover:bg-gray-850">
-                      <td className="px-4 py-3 max-w-[180px] truncate">{r.productTitle || r.productId}</td>
-                      <td className="px-4 py-3 text-gray-400 max-w-[250px]">
-                        {r.title && <span className="font-medium text-gray-300">{r.title} — </span>}
-                        <span className="truncate">{r.text}</span>
-                      </td>
-                      <td className="px-4 py-3">{r.customerName}</td>
-                      <td className="px-4 py-3 text-center text-amber-400 mono text-xs">{stars(r.rating)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          r.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
-                          r.status === 'published' ? 'bg-green-500/20 text-green-400' :
-                          'bg-red-500/20 text-red-400'
-                        }`}>{r.status}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center flex gap-1 justify-center">
-                        {r.status === 'pending' && (
-                          <>
-                            <button onClick={() => updateReview(r.id, 'published')} className="px-2 py-1 bg-green-600/30 hover:bg-green-600/50 rounded text-xs text-green-400 transition">✓</button>
-                            <button onClick={() => updateReview(r.id, 'rejected')} className="px-2 py-1 bg-red-600/30 hover:bg-red-600/50 rounded text-xs text-red-400 transition">✕</button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      );
-    }
+async function showTicketDetail(tid, onBack) {
+  const c = $('#pageContent');
+  c.innerHTML = '<div class="loading"><span class="spinner"></span> Loading ticket...</div>';
+  const ticket = await api('/api/crm/tickets/' + tid);
+  if (ticket.error) { c.innerHTML = '<div class="empty">Ticket not found</div>'; return; }
 
-    // ── MAIN APP ──
-    function App() {
-      const [authed, setAuthed] = useState(!!TOKEN);
-      const [tab, setTab] = useState('orders');
-      const [dash, setDash] = useState(null);
-      const [refreshKey, setRefreshKey] = useState(0);
+  c.innerHTML =
+    '<div class="detail-panel"><div class="detail-header"><div><h3 style="font-size:18px;font-weight:700">' + esc(ticket.subject) + '</h3><div style="font-size:13px;color:var(--text2)">' + esc(ticket.customerName||'') + ' &lt;' + esc(ticket.customerEmail||'') + '&gt; &bull; ' + esc(ticket.id) + '</div></div><div style="display:flex;gap:8px;align-items:center"><span class="tag tag-' + (ticket.category||'') + '">' + esc(ticket.category||'') + '</span>' + statusTag(ticket.status) + '<button class="detail-close" id="closeTicket">&times;</button></div></div>' +
 
-      const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
+    '<div class="detail-grid" style="margin-bottom:16px"><div class="detail-box"><h4>Details</h4>' +
+      '<div class="detail-row"><span class="lbl">Priority</span><span>' + esc(ticket.priority||'normal') + '</span></div>' +
+      '<div class="detail-row"><span class="lbl">Created</span><span>' + timeStr(ticket.createdAt) + '</span></div>' +
+      '<div class="detail-row"><span class="lbl">Updated</span><span>' + timeStr(ticket.updatedAt) + '</span></div>' +
+      (ticket.orderId ? '<div class="detail-row"><span class="lbl">Order</span><span class="mono">' + esc(ticket.orderId) + '</span></div>' : '') +
+    '</div><div class="detail-box"><h4>Status</h4><select class="form-input" id="ticketStatusSel">' + ['open','in_progress','resolved','closed'].map(s => '<option value="' + s + '"' + (s === ticket.status ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>').join('') + '</select><button class="btn btn-primary btn-sm" id="updateStatusBtn" style="margin-top:8px">Update Status</button><span id="statusMsg" style="margin-left:8px;font-size:11px;color:var(--text3)"></span></div></div>' +
 
-      const [plusStats, setPlusStats] = useState(null);
-      useEffect(() => {
-        if (!authed) return;
-        const load = () => {
-          api('/api/crm/dashboard').then(d => { if (!d.error) setDash(d); });
-          api('/api/crm/plus-stats').then(d => { if (!d.error) setPlusStats(d); });
-        };
-        load();
-        const interval = setInterval(load, 30000);
-        return () => clearInterval(interval);
-      }, [authed, refreshKey]);
+    '<div style="margin-bottom:16px"><h4 style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Messages</h4><div class="msg-list" id="msgList">' +
+    (ticket.messages||[]).map(m => '<div class="msg msg-' + (m.from||'customer') + '"><div class="msg-meta">' + esc(m.name||m.from) + ' &bull; ' + timeStr(m.timestamp) + (m.automated ? ' &bull; <em>auto</em>' : '') + '</div><div>' + esc(m.message||'') + '</div></div>').join('') + '</div>' +
 
-      if (!authed) return <Login onLogin={() => setAuthed(true)} />;
+    '<div style="display:flex;gap:8px"><textarea class="form-input" id="replyArea" rows="3" placeholder="Type your reply..."></textarea><button class="btn btn-primary" id="replyBtn" style="align-self:flex-end">Send Reply</button></div><span id="replyMsg" style="font-size:11px;color:var(--text3)"></span></div>' +
 
-      const o = dash?.overview || {};
-      const c = dash?.counts || {};
+  '</div>';
 
-      return (
-        <div className="min-h-screen">
-          {/* Header */}
-          <header className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-red-500">StyleHub</span>
-              <span className="text-sm text-gray-500">CRM</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-              <button onClick={() => { localStorage.removeItem('sh_admin_token'); TOKEN = ''; setAuthed(false); }}
-                className="text-xs text-gray-500 hover:text-gray-300 transition">Logout</button>
-            </div>
-          </header>
+  $('#closeTicket').onclick = function() { loadPage('tickets'); };
+  $('#updateStatusBtn').onclick = async function() {
+    const res = await api('/api/crm/tickets/' + tid + '/status', { method:'POST', body: JSON.stringify({ status: $('#ticketStatusSel').value }) });
+    $('#statusMsg').textContent = res.success ? 'Updated' : (res.error||'Failed');
+  };
+  $('#replyBtn').onclick = async function() {
+    const msg = $('#replyArea').value.trim();
+    if (!msg) return;
+    this.disabled = true; this.textContent = 'Sending...';
+    const res = await api('/api/crm/tickets/' + tid + '/reply', { method:'POST', body: JSON.stringify({ message: msg }) });
+    if (res.success) { showTicketDetail(tid, onBack); } else { $('#replyMsg').textContent = res.error || 'Failed'; this.disabled = false; this.textContent = 'Send Reply'; }
+  };
+}
 
-          <main className="max-w-7xl mx-auto px-6 py-6">
-            {/* Metrics */}
-            <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
-              <MetricCard icon="💰" label="Revenue" value={'$' + (o.revenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})} sub={`+$${(o.todayRevenue || 0).toFixed(2)} today`} color="text-green-400" />
-              <MetricCard icon="📈" label="Profit" value={'$' + (o.profit || 0).toLocaleString(undefined, {minimumFractionDigits: 2})} sub={`${o.margin || 0}% margin`} color="text-green-400" />
-              <MetricCard icon="📦" label="Orders" value={o.totalOrders || 0} sub={`${o.todayOrders || 0} today`} />
-              <MetricCard icon="⏳" label="Pending" value={c.pending || 0} sub="need action" color={c.pending ? 'text-amber-400' : 'text-gray-100'} />
-              <MetricCard icon="⚠️" label="Manual" value={c.manual || 0} sub={c.manual ? 'ALERT' : 'none'} color={c.manual ? 'text-red-400' : 'text-gray-100'} />
-              <MetricCard icon="⚡" label="Plus" value={plusStats?.totalActive || 0} sub={`$${(plusStats?.monthlyRevenue || 0).toFixed(2)}/mo`} color="text-purple-400" />
-            </div>
+// ══════════════════════════════════════════
+// 7. ANALYTICS
+// ══════════════════════════════════════════
+async function loadAnalytics(c) {
+  let period = '30d';
 
-            {/* Tabs */}
-            <div className="flex gap-1 mb-6 border-b border-gray-800">
-              {[
-                { key: 'orders', label: 'Orders' },
-                { key: 'returns', label: `Returns${c.pendingReturns ? ` (${c.pendingReturns})` : ''}` },
-                { key: 'reviews', label: `Reviews${c.pendingReviews ? ` (${c.pendingReviews})` : ''}` }
-              ].map(t => (
-                <button key={t.key} onClick={() => setTab(t.key)}
-                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${tab === t.key ? 'border-red-500 text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
+  async function render() {
+    const data = await api('/api/crm/analytics?period=' + period);
+    if (data.error) { c.innerHTML = '<div class="empty"><div class="icon">📈</div>Failed to load analytics</div>'; return; }
 
-            {/* Tab Content */}
-            {tab === 'orders' && <OrdersTab onRefresh={refresh} refreshKey={refreshKey} />}
-            {tab === 'returns' && <ReturnsTab refreshKey={refreshKey} />}
-            {tab === 'reviews' && <ReviewsTab refreshKey={refreshKey} />}
-          </main>
-        </div>
-      );
-    }
+    const rev = data.revenueByDay || [];
+    const maxRev = Math.max(...rev.map(r => r.revenue), 1);
+    const bySource = data.revenueBySource || [];
+    const topProds = data.topProducts || [];
+    const topReasons = data.topReturnReasons || [];
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-  </script>
+    c.innerHTML =
+      '<div class="toolbar">' + ['7d','30d','90d'].map(p => '<button class="filter-btn' + (p === period ? ' active' : '') + '" data-p="' + p + '">' + p + '</button>').join('') + '</div>' +
+
+      '<div class="stats-grid">' +
+        statCard('💰','Total Revenue', money(data.totalRevenue), '', 'c-green') +
+        statCard('📦','Total Orders', data.totalOrders||0, '') +
+        statCard('🔄','Returns', data.totalReturns||0, '') +
+        statCard('📈','Avg Order', money(data.avgOrderValue), '') +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px">' +
+        '<div class="detail-box"><h4>Revenue by Day</h4><div class="chart-bar-wrap">' +
+          rev.slice(-14).map(d => '<div style="flex:1;text-align:center"><div class="chart-bar" style="height:' + Math.max(4, (d.revenue/maxRev)*100) + 'px" title="' + d.date + ': ' + money(d.revenue) + '"></div><div class="chart-bar-label">' + d.date.slice(5) + '</div></div>').join('') +
+        '</div></div>' +
+        '<div class="detail-box"><h4>Revenue by Source</h4>' +
+          bySource.map(s => '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">' + srcBadge(s.source) + '<span class="mono">' + money(s.revenue) + '</span><span style="color:var(--text3)">' + s.orders + ' orders</span></div>').join('') +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+        '<div class="detail-box"><h4>Top Products</h4>' +
+          topProds.slice(0,8).map((p,i) => '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text3);width:16px">' + (i+1) + '</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.title||p.productId||'') + '</span><span class="mono">' + (p.qty||p.count||0) + ' sold</span></div>').join('') +
+        '</div>' +
+        '<div class="detail-box"><h4>Top Return Reasons</h4>' +
+          (topReasons.length ? topReasons.slice(0,8).map((r,i) => '<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text3);width:16px">' + (i+1) + '</span><span style="flex:1">' + esc(r.reason||'') + '</span><span class="mono">' + (r.count||0) + '</span></div>').join('') : '<div style="color:var(--text3);font-size:12px">No returns data</div>') +
+        '</div>' +
+      '</div>';
+
+    $$('.filter-btn', c).forEach(b => b.onclick = function() { period = this.dataset.p; render(); });
+  }
+  await render();
+}
+
+// ══════════════════════════════════════════
+// 8. SUPPLIERS (Source Health)
+// ══════════════════════════════════════════
+async function loadSuppliers(c) {
+  const data = await api('/api/source-health');
+  if (data.error) {
+    // Fallback: show static source info
+    const sources = [
+      { name:'Amazon', key:'amazon', status:'active' },
+      { name:'AliExpress', key:'aliexpress', status:'active' },
+      { name:'Sephora', key:'sephora', status:'active' },
+      { name:'Macy\'s', key:'macys', status:'active' },
+      { name:'SHEIN', key:'shein', status:'active' }
+    ];
+    c.innerHTML =
+      '<div class="stats-grid">' +
+        statCard('🏭','Sources', sources.length, 'configured') +
+        statCard('✅','Active', sources.filter(s=>s.status==='active').length, '', 'c-green') +
+        statCard('⚠️','Issues', 0, '', '') +
+      '</div>' +
+      '<div class="table-wrap"><table><thead><tr><th>Source</th><th>Status</th><th>Markup</th><th>Return Window</th><th>Notes</th></tr></thead><tbody>' +
+      sources.map(s => '<tr><td style="font-weight:600">' + srcBadge(s.key) + ' <span style="margin-left:6px">' + esc(s.name) + '</span></td><td>' + statusTag('active') + '</td><td class="mono">—</td><td class="mono">—</td><td style="color:var(--text3)">Via RapidAPI</td></tr>').join('') +
+      '</tbody></table></div>' +
+      '<div style="margin-top:16px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text2)">Source health monitoring endpoint (<code>/api/source-health</code>) is available when configured. Connect it to get real-time uptime, latency, and error rates per source.</div>';
+    return;
+  }
+  // If the endpoint works, render real data
+  const sources = Array.isArray(data) ? data : (data.sources || []);
+  c.innerHTML =
+    '<div class="table-wrap"><table><thead><tr><th>Source</th><th>Status</th><th>Latency</th><th>Uptime</th><th>Last Check</th><th>Errors (24h)</th></tr></thead><tbody>' +
+    sources.map(s => '<tr><td>' + srcBadge(s.key||s.source||'') + ' <span style="margin-left:6px;font-weight:600">' + esc(s.name||s.key||'') + '</span></td><td>' + statusTag(s.status||'unknown') + '</td><td class="mono">' + (s.latency||'—') + '</td><td class="mono">' + (s.uptime||'—') + '</td><td style="font-size:12px;color:var(--text3)">' + timeStr(s.lastCheck) + '</td><td class="mono">' + (s.errors24h||0) + '</td></tr>').join('') +
+    '</tbody></table></div>';
+}
+
+// ══════════════════════════════════════════
+// 9. SETTINGS
+// ══════════════════════════════════════════
+async function loadSettings(c) {
+  const data = await api('/api/crm/settings');
+  if (data.error) { c.innerHTML = '<div class="empty"><div class="icon">⚙️</div>Failed to load settings</div>'; return; }
+
+  const s = data;
+
+  c.innerHTML =
+    '<div class="settings-section"><h3>Markup Rules</h3>' +
+      '<div class="settings-row"><span>Amazon Markup (%)</span><input class="form-input" style="width:80px" type="number" id="s_markupAmazon" value="' + ((s.markup||{}).amazon||12) + '"></div>' +
+      '<div class="settings-row"><span>AliExpress Markup (%)</span><input class="form-input" style="width:80px" type="number" id="s_markupAli" value="' + ((s.markup||{}).aliexpress||15) + '"></div>' +
+    '</div>' +
+
+    '<div class="settings-section"><h3>Shipping</h3>' +
+      '<div class="settings-row"><span>Free Shipping Threshold ($)</span><input class="form-input" style="width:80px" type="number" id="s_freeThreshold" value="' + ((s.shipping||{}).freeThreshold||35) + '"></div>' +
+      '<div class="settings-row"><span>Plus Members Free Shipping</span><div class="toggle' + ((s.shipping||{}).plusFreeShipping ? ' on' : '') + '" id="s_plusFree"></div></div>' +
+    '</div>' +
+
+    '<div class="settings-section"><h3>Return Windows</h3>' +
+      '<div class="settings-row"><span>Amazon Return Window (days)</span><input class="form-input" style="width:80px" type="number" id="s_retAmazon" value="' + ((s.returns||{}).windowAmazon||30) + '"></div>' +
+      '<div class="settings-row"><span>AliExpress Return Window (days)</span><input class="form-input" style="width:80px" type="number" id="s_retAli" value="' + ((s.returns||{}).windowAliexpress||15) + '"></div>' +
+    '</div>' +
+
+    '<div class="settings-section"><h3>Notifications</h3>' +
+      Object.entries(s.notifications||{}).map(function(entry) {
+        return '<div class="settings-row"><span>' + entry[0].replace(/([A-Z])/g,' $1').replace(/^./,function(m){return m.toUpperCase()}) + '</span><div class="toggle' + (entry[1] ? ' on' : '') + '" data-nkey="' + entry[0] + '"></div></div>';
+      }).join('') +
+    '</div>' +
+
+    '<div class="settings-section"><h3>Email Settings</h3>' +
+      '<div class="settings-row"><span>From Name</span><input class="form-input" style="width:200px" id="s_fromName" value="' + esc((s.emails||{}).fromName||'') + '"></div>' +
+      '<div class="settings-row"><span>Reply-To</span><input class="form-input" style="width:200px" id="s_replyTo" value="' + esc((s.emails||{}).replyTo||'') + '"></div>' +
+    '</div>' +
+
+    '<div style="margin-top:16px"><button class="btn btn-primary" id="saveSettingsBtn" style="padding:10px 32px">Save All Settings</button><span id="settingsMsg" style="margin-left:12px;font-size:12px;color:var(--text3)"></span></div>';
+
+  // Toggle clicks
+  $$('.toggle', c).forEach(function(t) {
+    t.onclick = function() { this.classList.toggle('on'); };
+  });
+
+  // Save
+  $('#saveSettingsBtn').onclick = async function() {
+    this.disabled = true; this.textContent = 'Saving...';
+    const notifs = {};
+    $$('[data-nkey]', c).forEach(function(t) { notifs[t.dataset.nkey] = t.classList.contains('on'); });
+    const payload = {
+      markup: { amazon: Number($('#s_markupAmazon').value), aliexpress: Number($('#s_markupAli').value) },
+      shipping: { freeThreshold: Number($('#s_freeThreshold').value), plusFreeShipping: $('#s_plusFree').classList.contains('on') },
+      returns: { windowAmazon: Number($('#s_retAmazon').value), windowAliexpress: Number($('#s_retAli').value) },
+      notifications: notifs,
+      emails: { fromName: $('#s_fromName').value, replyTo: $('#s_replyTo').value }
+    };
+    const res = await api('/api/crm/settings', { method:'POST', body: JSON.stringify(payload) });
+    $('#settingsMsg').textContent = res.success ? 'Settings saved!' : (res.error||'Failed');
+    this.disabled = false; this.textContent = 'Save All Settings';
+  };
+}
+
+// ── HELPERS ──
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// ── BOOT ──
+if (TOKEN) { renderApp(); } else { renderLogin(); }
+
+})();
+</script>
 </body>
 </html>

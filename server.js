@@ -896,6 +896,90 @@ app.get('/api/banners', async (req, res) => {
   }
 });
 
+// ---- HOME CARDS (Amazon-style 2x2 grid cards) ----
+const HOME_CARD_POOL = [
+  { title:'Shop by category', type:'static', items:[{label:'Fashion',img:'',q:'fashion'},{label:'Home',img:'',q:'home decor'},{label:'Beauty',img:'',q:'beauty'},{label:'Electronics',img:'',q:'electronics'}], link:'/collections/all', linkText:'See all categories' },
+  { title:'Deals under $10', type:'search', query:'deals under 10 dollars', maxPrice:10, link:'/pages/search-results?q=deals+under+10', linkText:'Shop all' },
+  { title:'Deals under $25', type:'search', query:'deals under 25 dollars', maxPrice:25, link:'/pages/search-results?q=deals+under+25', linkText:'Shop all' },
+  { title:'New arrivals', type:'search', query:'new releases 2026', link:'/pages/search-results?q=new+arrivals', linkText:'See more' },
+  { title:'Best sellers', type:'search', query:'best sellers', link:'/pages/search-results?q=best+sellers', linkText:'See more' },
+  { title:'Most wished for', type:'search', query:'most popular products', link:'/pages/search-results?q=popular', linkText:'See more' },
+  { title:'Top rated', type:'search', query:'top rated products', link:'/pages/search-results?q=top+rated', linkText:'See more' },
+  { title:'Gift ideas', type:'search', query:'gift ideas', link:'/pages/search-results?q=gifts', linkText:'Shop gifts' },
+  { title:'Trending in Fashion', type:'search', query:'trending fashion 2026', link:'/pages/search-results?q=fashion', linkText:'See more' },
+  { title:'Trending in Electronics', type:'search', query:'best electronics deals', link:'/pages/search-results?q=electronics', linkText:'See more' },
+  { title:'Trending in Beauty', type:'search', query:'trending beauty skincare', link:'/pages/search-results?q=beauty', linkText:'See more' },
+  { title:'Trending in Home', type:'search', query:'home decor trending', link:'/pages/search-results?q=home+decor', linkText:'See more' }
+];
+
+app.get('/api/home-cards', async (req, res) => {
+  const cacheKey = 'home-cards';
+  const cached = searchCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const dayNum = Math.floor(Date.now() / 86400000);
+    const indices = HOME_CARD_POOL.map((_, i) => i);
+    const selected = [];
+    const used = new Set();
+    for (let i = 0; i < 5 && indices.length; i++) {
+      const idx = (dayNum * 7 + i * 13) % indices.length;
+      selected.push(HOME_CARD_POOL[indices[idx]]);
+      used.add(indices[idx]);
+      indices.splice(idx, 1);
+    }
+
+    const amazonAdapter = getAdapter('amazon');
+    const results = await Promise.allSettled(
+      selected.map(async (card) => {
+        let products = [];
+        if (card.type === 'static') {
+          return { title: card.title, link: card.link, linkText: card.linkText, products: card.items.map(it => ({ image: '', title: it.label, link: '/pages/search-results?q=' + encodeURIComponent(it.q), isCategory: true })) };
+        }
+        if (amazonAdapter) {
+          const raw = await amazonAdapter.search(card.query || 'deals', 6);
+          products = (raw || []).slice(0, 6);
+          if (card.maxPrice) {
+            products = products.filter(p => {
+              const pr = typeof p.price === 'number' ? p.price : parseFloat(String(p.price || '999').replace(/[^0-9.]/g, ''));
+              return pr > 0 && pr <= card.maxPrice;
+            });
+          }
+        }
+        const priced = applySearchPricing(products.slice(0, 4));
+        return {
+          title: card.title,
+          link: card.link,
+          linkText: card.linkText,
+          products: priced.map(p => ({
+            image: p.image || p.primaryImage || '',
+            title: (p.title || '').substring(0, 30),
+            price: typeof p.price === 'number' ? p.price : parseFloat(String(p.price || '0').replace(/[^0-9.]/g, '')),
+            link: '/pages/product?id=' + encodeURIComponent(p.id || p.sourceId || '') + '&store=' + encodeURIComponent(p.source || p.sourceName || 'amazon')
+          }))
+        };
+      })
+    );
+
+    const cards = results
+      .filter(r => r.status === 'fulfilled')
+      .map(r => r.value)
+      .filter(c => c.products && c.products.length >= 2);
+
+    // First card is the side card, rest are grid cards
+    const sideCard = cards[0] || null;
+    const gridCards = cards.slice(1, 5);
+
+    const response = { sideCard, gridCards };
+    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    res.set('Cache-Control', 'public, max-age=21600');
+    res.json(response);
+  } catch (e) {
+    console.error('Home cards error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ---- RELATED PRODUCTS ----
 app.get('/api/related', async (req, res) => {
   const { source, id, title, limit = 6 } = req.query;

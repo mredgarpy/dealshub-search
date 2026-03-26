@@ -28,11 +28,20 @@
     .dh-footer__icon{display:inline-flex;align-items:center;gap:8px}
     .dh-footer__icon svg{flex-shrink:0}
     @media(max-width:768px){
-      .dh-footer__inner{grid-template-columns:1fr 1fr;gap:24px}
+      .dh-footer{overflow-x:hidden}
+      .dh-footer__inner{grid-template-columns:1fr 1fr;gap:24px;padding:0 16px}
+      .dh-footer__col h3{font-size:15px;margin-bottom:12px}
+      .dh-footer__col a{font-size:13px}
+      .dh-footer__col p{font-size:13px}
+      .dh-footer__bottom{padding:16px}
     }
     @media(max-width:480px){
-      .dh-footer__inner{grid-template-columns:1fr;gap:20px}
+      .dh-footer__inner{grid-template-columns:1fr;gap:20px;padding:0 14px}
       .dh-footer__bottom-inner{flex-direction:column;text-align:center}
+      .dh-footer__col h3{font-size:14px}
+      .dh-footer__col a{font-size:13px;padding:3px 0}
+      .dh-footer__newsletter-input{font-size:13px;padding:9px 12px}
+      .dh-footer__newsletter-btn{padding:9px 14px;font-size:13px}
     }
   </style>
 
@@ -72,8 +81,9 @@
       <h3>Help</h3>
       <a href="/pages/tracking">Track My Order</a>
       <a href="/pages/help-center">Help Center</a>
-      <a href="/policies/shipping-policy">Shipping Policy</a>
+      <a href="/pages/shipping-policy">Shipping Policy</a>
       <a href="/policies/refund-policy">Returns & Refunds</a>
+      <a href="/policies/terms-of-service">Terms of Service</a>
       <a href="/pages/contact">Contact Us</a>
       <a href="/pages/plus" style="color:#a78bfa;font-weight:600">⚡ StyleHub Plus</a>
     </div>

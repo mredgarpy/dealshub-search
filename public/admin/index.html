@@ -777,13 +777,13 @@ async function loadOrders() {
 
     html += `<tr>
       <td class="mono-text">#${order.id}</td>
-      <td><div style="font-size:11px">${order.customer_name || 'N/A'}</div><div style="font-size:9px;color:var(--text3)">${order.customer_email || ''}</div></td>
-      <td class="mono-text">${order.item_count || 1}</td>
+      <td><div style="font-size:11px">${order.customerName || order.customer_name || 'N/A'}</div><div style="font-size:9px;color:var(--text3)">${order.email || order.customer_email || ''}</div></td>
+      <td class="mono-text">${order.items?.length || order.item_count || 1}</td>
       <td class="mono-text">$${(order.total || 0).toFixed(2)}</td>
       <td>${sourceBadge}</td>
       <td>${statusBadge}</td>
       <td class="mono-text" style="color:var(--green)">$${(order.profit || 0).toFixed(2)}</td>
-      <td style="font-size:9px">${new Date(order.created_at).toLocaleDateString()}</td>
+      <td style="font-size:9px">${new Date(order.createdAt || order.created_at).toLocaleDateString()}</td>
       <td><button class="btn btn-g btn-sm" onclick="fulfillOrder('${order.id}')">Fulfill</button></td>
     </tr>`;
   });
@@ -866,8 +866,8 @@ async function loadReturns() {
 
     html += `<tr>
       <td class="mono-text">#${ret.id}</td>
-      <td class="mono-text">#${ret.order_id || 'N/A'}</td>
-      <td>${ret.customer_name || 'N/A'}</td>
+      <td class="mono-text">#${ret.orderId || ret.order_id || 'N/A'}</td>
+      <td>${ret.customerName || ret.customer_name || 'N/A'}</td>
       <td style="font-size:10px">${ret.reason || 'N/A'}</td>
       <td class="mono-text">$${(ret.amount || 0).toFixed(2)}</td>
       <td>${sourceBadge}</td>

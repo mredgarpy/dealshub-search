@@ -160,6 +160,34 @@
   // ============================================================
   // SECTION 4: HERO BANNER CAROUSEL
   // ============================================================
+  function buildHeroPlaceholder(container){
+    var h='<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:24px" class="dh-hero-grid">';
+    // Main hero placeholder with branding
+    h+='<div style="position:relative;border-radius:12px;overflow:hidden;aspect-ratio:2.2;background:linear-gradient(135deg,'+NAVY+' 0%,#2d2d52 50%,'+NAVY+' 100%)">';
+    h+='<div style="position:relative;z-index:3;padding:32px;display:flex;flex-direction:column;justify-content:center;height:100%">';
+    h+='<span style="display:inline-block;background:'+RED+';color:#fff;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;margin-bottom:12px;width:fit-content">STYLEHUB MIAMI</span>';
+    h+='<h2 style="color:#fff;font-size:22px;font-weight:700;margin:0 0 8px">Your deals. All in one place.</h2>';
+    h+='<p style="color:rgba(255,255,255,0.6);font-size:13px;margin:0 0 16px;max-width:320px">Shop millions of products from top brands with secure checkout and tracked shipping.</p>';
+    h+='<a href="/pages/search-results?q=trending" style="display:inline-block;background:'+RED+';color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;width:fit-content">Start Shopping</a>';
+    h+='</div></div>';
+    // Side cards (same as final hero — stay in place)
+    h+='<div style="display:flex;flex-direction:column;gap:12px">';
+    h+='<a href="/pages/search-results?q=deals" style="flex:1;background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;text-decoration:none">';
+    h+='<div style="flex:1"><span style="display:inline-block;background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:6px">Up to 70% off</span>';
+    h+='<div style="font-size:13px;font-weight:700;color:'+NAVY+'">Flash deals</div>';
+    h+='<div style="font-size:11px;color:#888">Limited time offers</div></div>';
+    h+='<div id="dh-hero-flash-thumb" style="width:56px;height:56px;border-radius:8px;background:#f7f7f8;overflow:hidden;flex-shrink:0"></div>';
+    h+='</a>';
+    h+='<a href="/pages/search-results?q=bestsellers" style="flex:1;background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;text-decoration:none">';
+    h+='<div style="flex:1"><span style="display:inline-block;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:6px">Most popular</span>';
+    h+='<div style="font-size:13px;font-weight:700;color:'+NAVY+'">Best sellers</div>';
+    h+='<div style="font-size:11px;color:#888">Top rated this week</div></div>';
+    h+='<div id="dh-hero-bs-thumb" style="width:56px;height:56px;border-radius:8px;background:#f7f7f8;overflow:hidden;flex-shrink:0"></div>';
+    h+='</a>';
+    h+='</div></div>';
+    container.innerHTML=h;
+  }
+
   function buildHero(container,trendingData){
     var products=trendingData||[];
     // Group by category
@@ -637,26 +665,29 @@
       root.appendChild(div);
     });
 
-    // Build in order — hero first, then parallel API calls
+    // Build hero IMMEDIATELY with placeholder, then populate with API data
     var heroContainer=document.getElementById('dh-sec-hero');
+    buildHeroPlaceholder(heroContainer);
     apiFetch('/api/trending').then(function(data){
       buildHero(heroContainer,data.results||data.products||data||[]);
-      // Load hero side card thumbnails
-      apiFetch('/api/flash-deals').then(function(fd){
-        var items=fd.results||fd.products||fd||[];
-        if(items[0]&&items[0].image){
-          var el=document.getElementById('dh-hero-flash-thumb');
-          if(el)el.innerHTML='<img src="'+esc(items[0].image)+'" style="width:100%;height:100%;object-fit:contain">';
-        }
-      }).catch(function(){});
-      apiFetch('/api/bestsellers').then(function(bs){
-        var items=bs.results||bs.products||bs||[];
-        if(items[0]&&items[0].image){
-          var el=document.getElementById('dh-hero-bs-thumb');
-          if(el)el.innerHTML='<img src="'+esc(items[0].image)+'" style="width:100%;height:100%;object-fit:contain">';
-        }
-      }).catch(function(){});
-    }).catch(function(){heroContainer.innerHTML='<div style="background:'+NAVY+';border-radius:12px;padding:60px;text-align:center"><h2 style="color:#fff;font-size:20px">Welcome to StyleHub Miami</h2><p style="color:rgba(255,255,255,0.6)">Shop millions of products with secure checkout</p><a href="/pages/search-results?q=trending" style="display:inline-block;margin-top:16px;background:'+RED+';color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700">Start Shopping</a></div>'});
+    }).catch(function(){
+      // Keep the placeholder — it's already showing a nice hero
+    });
+    // Load hero side card thumbnails in parallel (not chained to trending)
+    apiFetch('/api/flash-deals').then(function(fd){
+      var items=fd.results||fd.products||fd||[];
+      if(items[0]&&items[0].image){
+        var el=document.getElementById('dh-hero-flash-thumb');
+        if(el)el.innerHTML='<img src="'+esc(items[0].image)+'" style="width:100%;height:100%;object-fit:contain">';
+      }
+    }).catch(function(){});
+    apiFetch('/api/bestsellers').then(function(bs){
+      var items=bs.results||bs.products||bs||[];
+      if(items[0]&&items[0].image){
+        var el=document.getElementById('dh-hero-bs-thumb');
+        if(el)el.innerHTML='<img src="'+esc(items[0].image)+'" style="width:100%;height:100%;object-fit:contain">';
+      }
+    }).catch(function(){});
 
     // Build remaining sections
     buildBecauseYouSearched(document.getElementById('dh-sec-because-searched'));

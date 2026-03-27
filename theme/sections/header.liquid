@@ -69,16 +69,34 @@
 @media(max-width:768px){
   .dh-header{padding:10px 12px;gap:6px;flex-wrap:wrap}
   .dh-search-cat{display:none}
+  .dh-search-wrap{order:3;flex:0 0 100%;max-width:100%}
+  .dh-search-form{height:38px}
+  .dh-search-input{font-size:14px;padding:0 12px}
+  .dh-search-btn{padding:0 18px;font-size:13px}
   .dh-nav{gap:10px}
   .dh-nav-item span:last-child{display:none}
+  .dh-nav-icon{font-size:18px}
   .dh-logo{font-size:16px}
   .dh-loc{padding:4px 8px;border:none}
   .dh-loc__label{display:none}
   .dh-loc__zip{font-size:12px}
   .dh-loc__dropdown{left:-20px;min-width:260px}
-  .dh-catbar{padding:0 12px}
-  .dh-catbar-item{padding:8px 12px;font-size:12px}
+  .dh-catbar{padding:0 8px;-webkit-overflow-scrolling:touch}
+  .dh-catbar-item{padding:8px 10px;font-size:12px}
+  .dh-catbar-inner{justify-content:flex-start}
   .dh-nav-plus,.dh-nav-plus-cta{font-size:9px;padding:3px 8px}
+  .dh-announce{font-size:11px;padding:4px 0}
+}
+@media(max-width:480px){
+  .dh-header{padding:8px 10px;gap:4px}
+  .dh-logo{font-size:15px}
+  .dh-nav{gap:8px}
+  .dh-nav-icon{font-size:16px}
+  .dh-search-form{height:36px}
+  .dh-search-btn{padding:0 14px;font-size:12px}
+  .dh-loc{padding:3px 6px}
+  .dh-loc__zip{font-size:11px}
+  .dh-catbar-item{padding:7px 8px;font-size:11px}
 }
 </style>
 
@@ -193,6 +211,14 @@
   var zip='';
   var isPlus=false;
   try{zip=localStorage.getItem('stylehub_zip')||'';isPlus=localStorage.getItem('stylehub_plus')==='true'}catch(e){}
+
+  /* Auto-populate ZIP from customer's saved Shopify address if not set */
+  {% if customer and customer.default_address and customer.default_address.zip != blank %}
+  if(!zip){
+    zip='{{ customer.default_address.zip | escape }}';
+    try{localStorage.setItem('stylehub_zip',zip)}catch(e){}
+  }
+  {% endif %}
 
   /* Location pill */
   var locZip=document.getElementById('dh-loc-zip');

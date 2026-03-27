@@ -79,11 +79,20 @@
     margin: 0;
   }
   @media (max-width: 768px) {
+    .dh-trust-section { padding: 32px 0; overflow-x: hidden; }
     .dh-trust-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
     .dh-trust-item { padding: 16px 8px; }
+    .dh-trust-item__icon { width: 48px; height: 48px; border-radius: 12px; }
+    .dh-trust-item h3 { font-size: 13px; }
+    .dh-trust-item p { font-size: 11px; }
   }
   @media (max-width: 480px) {
-    .dh-trust-grid { grid-template-columns: repeat(2, 1fr); }
+    .dh-trust-section { padding: 24px 0; }
+    .dh-trust-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .dh-trust-item { padding: 12px 6px; }
+    .dh-trust-item__icon { width: 44px; height: 44px; }
+    .dh-trust-item h3 { font-size: 12px; }
+    .dh-trust-item p { font-size: 10px; line-height: 1.4; }
   }
 </style>
 

@@ -220,7 +220,7 @@
     h+='<h3 style="font-size:16px;font-weight:700;color:#1a1a2e;margin:0 0 12px">Reviews with images</h3>';
     h+='<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch" class="dhpdp-cust-photos">';
     for(var i=0;i<Math.min(reviewImgs.length,12);i++){
-      h+='<div class="sh-lb-trigger" data-lb-imgs="'+esc(JSON.stringify(reviewImgs))+'" data-lb-idx="'+i+'" style="width:100px;height:100px;flex-shrink:0;border-radius:8px;overflow:hidden;cursor:pointer;background:#f5f5f5;border:1px solid #e5e7eb">';
+      h+='<div class="sh-lb-trigger" data-lb-imgs=\''+JSON.stringify(reviewImgs).replace(/'/g,"&#39;")+'\' data-lb-idx="'+i+'" style="width:100px;height:100px;flex-shrink:0;border-radius:8px;overflow:hidden;cursor:pointer;background:#f5f5f5;border:1px solid #e5e7eb">';
       h+='<img src="'+esc(reviewImgs[i])+'" alt="Customer photo" loading="lazy" style="width:100%;height:100%;object-fit:cover">';
       h+='</div>';
     }

@@ -270,10 +270,13 @@
     // Price
     h+='<div style="margin-bottom:16px">';
     h+='<span style="font-size:32px;font-weight:700;color:#e53e3e" id="dhpdp-price">$'+price.toFixed(2)+'</span>';
-    if(origPrice>price)h+=' <span style="font-size:18px;color:#999;text-decoration:line-through;margin-left:8px">$'+origPrice.toFixed(2)+'</span>';
+    if(origPrice>price)h+=' <span id="dhpdp-orig" style="font-size:18px;color:#999;text-decoration:line-through;margin-left:8px">$'+origPrice.toFixed(2)+'</span>';
+    else h+='<span id="dhpdp-orig" style="display:none"></span>';
     if(discount>0){
       var saved=(origPrice-price).toFixed(2);
-      h+=' <span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600;margin-left:4px">-'+discount+'% Save $'+saved+'</span>';
+      h+=' <span id="dhpdp-discount" style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600;margin-left:4px">-'+discount+'% Save $'+saved+'</span>';
+    }else{
+      h+='<span id="dhpdp-discount" style="display:none"></span>';
     }
     h+='</div>';
 
@@ -887,7 +890,7 @@
       if(!newAsin||_variantLoading)return;
       _variantLoading=true;
       showVariantLoading();
-      fetch(API+'/api/product/'+encodeURIComponent(newAsin)+'?store=amazon',{signal:AbortSignal.timeout(15000)})
+      fetch(API+'/api/product/'+encodeURIComponent(newAsin)+'?store='+encodeURIComponent(store),{signal:AbortSignal.timeout(15000)})
         .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
         .then(function(data){
           var np=data;
@@ -948,7 +951,7 @@
           _currentAsin=newAsin;
           _pdpProductData=np;
           /* Update URL without reload */
-          history.replaceState(null,'','/pages/product?id='+encodeURIComponent(newAsin)+'&store=amazon');
+          history.replaceState(null,'','/pages/product?id='+encodeURIComponent(newAsin)+'&store='+encodeURIComponent(store));
         })
         .catch(function(err){
           console.error('Variant load error:',err);
@@ -957,6 +960,59 @@
           _variantLoading=false;
           hideVariantLoading();
         });
+    }
+
+    /* Match selected option combination to a variant in product data */
+    function findMatchingVariant(){
+      var pd=_pdpProductData||p;
+      if(!pd.variants||!pd.variants.length)return null;
+      var parts=[];
+      container.querySelectorAll('.dhpdp-opt-group').forEach(function(group){
+        var sel=group.querySelector('.dhpdp-opt-sel');
+        if(sel)parts.push((sel.dataset.valtitle||'').trim().toLowerCase());
+      });
+      if(!parts.length)return null;
+      var selectedTitle=parts.join(' / ');
+      /* Try exact match, then partial */
+      for(var vi=0;vi<pd.variants.length;vi++){
+        var vt=(pd.variants[vi].title||'').trim().toLowerCase();
+        if(vt===selectedTitle)return pd.variants[vi];
+      }
+      for(var vi2=0;vi2<pd.variants.length;vi2++){
+        var vt2=(pd.variants[vi2].title||'').trim().toLowerCase();
+        if(vt2.indexOf(selectedTitle)>=0||selectedTitle.indexOf(vt2)>=0)return pd.variants[vi2];
+      }
+      /* Try matching by single selected value (e.g. color only, no size selected yet) */
+      for(var pi2=0;pi2<parts.length;pi2++){
+        for(var vi3=0;vi3<pd.variants.length;vi3++){
+          var vt3=(pd.variants[vi3].title||'').trim().toLowerCase();
+          if(vt3.indexOf(parts[pi2])>=0)return pd.variants[vi3];
+        }
+      }
+      return null;
+    }
+
+    /* Update price display from variant data */
+    function updatePriceFromVariant(variant){
+      if(!variant)return;
+      var vPrice=typeof variant.price==='number'?variant.price:parseFloat(String(variant.price||'0').replace(/[^0-9.]/g,''));
+      if(vPrice<=0)return;
+      var priceEl=document.getElementById('dhpdp-price');
+      if(priceEl)priceEl.textContent='$'+vPrice.toFixed(2);
+      /* Update original price & discount if product has originalPrice */
+      var pd=_pdpProductData||p;
+      var origPrice=typeof pd.originalPrice==='number'?pd.originalPrice:parseFloat(String(pd.originalPrice||'0').replace(/[^0-9.]/g,''));
+      var origEl=document.getElementById('dhpdp-orig');
+      var discEl=document.getElementById('dhpdp-discount');
+      if(origPrice>vPrice){
+        var disc=Math.round((1-vPrice/origPrice)*100);
+        var saved=(origPrice-vPrice).toFixed(2);
+        if(origEl){origEl.textContent='$'+origPrice.toFixed(2);origEl.style.display='';}
+        if(discEl){discEl.textContent='-'+disc+'% Save $'+saved;discEl.style.display='';}
+      }else{
+        if(origEl)origEl.style.display='none';
+        if(discEl)discEl.style.display='none';
+      }
     }
 
     function variantClickHandler(){
@@ -970,13 +1026,25 @@
       });
       this.style.borderColor='#e53e3e';this.style.background='#fef2f2';this.style.fontWeight='600';this.classList.add('dhpdp-opt-sel');
       updateOptionLabels();
-      /* If ASIN available, call API */
+      /* If ASIN available (Amazon), call API for full product switch */
       if(asin&&asin!==_currentAsin){
         selectVariant(asin,dim,val,this);
-      }else if(!asin){
-        /* Fallback: update image from button photo */
-        var btnImg=this.querySelector('img');
-        if(btnImg&&btnImg.src){var mainImg=document.getElementById('dhpdp-main-img');if(mainImg)mainImg.src=btnImg.src;}
+      }else{
+        /* Non-Amazon sources (AliExpress, etc.): match variant from loaded data */
+        var matchedVariant=findMatchingVariant();
+        if(matchedVariant){
+          updatePriceFromVariant(matchedVariant);
+          /* Update main image if variant has one */
+          if(matchedVariant.image){
+            var mainImg=document.getElementById('dhpdp-main-img');
+            if(mainImg)mainImg.src=matchedVariant.image;
+          }
+        }
+        /* Also try button image as fallback */
+        if(!matchedVariant||!matchedVariant.image){
+          var btnImg=this.querySelector('img');
+          if(btnImg&&btnImg.src){var mainImg2=document.getElementById('dhpdp-main-img');if(mainImg2)mainImg2.src=btnImg.src;}
+        }
       }
     }
 

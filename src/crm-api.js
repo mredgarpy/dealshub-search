@@ -379,6 +379,30 @@ function setupCRMApi(app) {
       res.status(400).json({ error: e.message });
     }
   });
+
+  // POST alias for delete (frontend compatibility)
+  app.post('/api/customer/address/delete', async (req, res) => {
+    try {
+      const { customerId, addressId } = req.body;
+      if (!customerId || !addressId) return res.status(400).json({ error: 'Missing data' });
+      await shopifyAdmin('DELETE', `/customers/${customerId}/addresses/${addressId}.json`);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // Set address as default
+  app.post('/api/customer/address/set-default', async (req, res) => {
+    try {
+      const { customerId, addressId } = req.body;
+      if (!customerId || !addressId) return res.status(400).json({ error: 'Missing data' });
+      await shopifyAdmin('PUT', `/customers/${customerId}/addresses/${addressId}/default.json`);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
   // ═══════════════════════════════════════════
   // PLUS MEMBERS STATS
   // ═══════════════════════════════════════════

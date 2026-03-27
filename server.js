@@ -2112,6 +2112,21 @@ app.put('/api/admin/theme-asset', async (req, res) => {
   }
 });
 
+// ═══ ADMIN: Generic Shopify Admin API proxy (for SEO scripts etc.) ═══
+app.post('/api/admin/shopify-proxy', async (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { method, path, body } = req.body;
+    if (!method || !path) return res.status(400).json({ error: 'Missing method or path' });
+    const { shopifyAdmin } = require('./src/shopify-admin');
+    const result = await shopifyAdmin(method, path, body || null);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   logger.info('server', `StyleHub backend v2.3 running on port ${PORT}`);

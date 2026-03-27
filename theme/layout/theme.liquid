@@ -3,13 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{{ page_title }} – {{ shop.name }}</title>
+  <link rel="preconnect" href="https://dealshub-search.onrender.com" crossorigin>
+  <link rel="dns-prefetch" href="https://dealshub-search.onrender.com">
+
+  {%- comment -%} SEO Title — unique per template {%- endcomment -%}
+  {%- if template == 'index' -%}
+    <title>StyleHub Miami | Best Deals on Fashion, Beauty & Electronics | Free Shipping</title>
+  {%- elsif template contains 'product' -%}
+    <title>{{ product.title | escape }} | ${{ product.price | money_without_currency }} | StyleHub Miami</title>
+  {%- elsif template contains 'collection' -%}
+    <title>{{ collection.title | escape }} | Shop at StyleHub Miami</title>
+  {%- elsif template contains 'article' -%}
+    <title>{{ article.title | escape }} | StyleHub Miami Blog</title>
+  {%- else -%}
+    <title>{{ page_title | escape }}{% unless page_title contains 'StyleHub' %} | StyleHub Miami{% endunless %}</title>
+  {%- endif -%}
 
   {%- comment -%} SEO Meta Tags {%- endcomment -%}
   {%- if page_description -%}
     <meta name="description" content="{{ page_description | escape }}">
+  {%- elsif template == 'index' -%}
+    <meta name="description" content="Shop millions of products at the best prices. Fashion, beauty, electronics, shoes & more from Amazon, AliExpress & trusted sellers. Free shipping on $35+. Secure checkout. Fast delivery to all 50 US states.">
   {%- else -%}
-    <meta name="description" content="StyleHub Miami — Shop the best deals on fashion, beauty, electronics &amp; more. Free shipping on $50+. Secure checkout. 24/7 support.">
+    <meta name="description" content="StyleHub Miami — Shop the best deals on fashion, beauty, electronics & more. Free shipping on $35+. Secure checkout. 24/7 support.">
   {%- endif -%}
 
   <link rel="canonical" href="{{ canonical_url }}">
@@ -48,6 +64,96 @@
     @media(max-width:480px){.dh-grid{grid-template-columns:repeat(2,1fr);gap:8px}.dh-api-card h3{font-size:11px!important}}
   </style>
   {{ 'stylehub-api.js' | asset_url | script_tag }}
+
+  {%- comment -%} JSON-LD Structured Data — Home {%- endcomment -%}
+  {%- if template == 'index' -%}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "StyleHub Miami",
+    "url": "https://stylehubmiami.com",
+    "description": "Shop millions of products at the best prices. Fashion, beauty, electronics and more from Amazon, AliExpress and trusted sellers.",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://stylehubmiami.com/pages/search-results?q={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "StyleHub Miami",
+    "url": "https://stylehubmiami.com",
+    "logo": "{{ 'logo.png' | asset_url }}",
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "customer service",
+      "email": "support@stylehubmiami.com",
+      "url": "https://stylehubmiami.com/pages/contact-us",
+      "availableLanguage": "English"
+    },
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Miami",
+      "addressRegion": "FL",
+      "addressCountry": "US"
+    }
+  }
+  </script>
+  {%- endif -%}
+
+  {%- comment -%} JSON-LD Structured Data — Shopify Products {%- endcomment -%}
+  {%- if template contains 'product' and product -%}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": {{ product.title | json }},
+    "image": [{{ product.featured_image | image_url: width: 1200 | json }}],
+    "description": {{ product.description | strip_html | truncate: 300 | default: product.title | json }},
+    "sku": {{ product.selected_or_first_available_variant.sku | default: product.id | json }},
+    "brand": {
+      "@type": "Brand",
+      "name": {{ product.vendor | default: "StyleHub" | json }}
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": "{{ canonical_url }}",
+      "priceCurrency": "{{ cart.currency.iso_code | default: 'USD' }}",
+      "price": "{{ product.selected_or_first_available_variant.price | money_without_currency | remove: ',' }}",
+      "availability": "{% if product.available %}https://schema.org/InStock{% else %}https://schema.org/OutOfStock{% endif %}",
+      "seller": {
+        "@type": "Organization",
+        "name": "StyleHub Miami"
+      }
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://stylehubmiami.com/" },
+      {%- if product.collections.size > 0 -%}
+      { "@type": "ListItem", "position": 2, "name": {{ product.collections.first.title | json }}, "item": "{{ shop.url }}/collections/{{ product.collections.first.handle }}" },
+      { "@type": "ListItem", "position": 3, "name": {{ product.title | truncate: 50 | json }} }
+      {%- else -%}
+      { "@type": "ListItem", "position": 2, "name": {{ product.title | truncate: 50 | json }} }
+      {%- endif -%}
+    ]
+  }
+  </script>
+  {%- endif -%}
+
+  {%- comment -%} Google Search Console — Edgar: replace XXXXX with your verification code {%- endcomment -%}
+  <!-- <meta name="google-site-verification" content="XXXXX"> -->
 
   {%- comment -%} StyleHub Plus — Server-side detection via customer tags {%- endcomment -%}
   {%- assign is_plus = false -%}

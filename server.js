@@ -2094,6 +2094,24 @@ async function warmUpCache() {
   }
 }
 
+// ═══ ADMIN: Theme asset upload (for deploying JS/CSS to Shopify theme) ═══
+app.put('/api/admin/theme-asset', async (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { key, value } = req.body;
+    if (!key || !value) return res.status(400).json({ error: 'Missing key or value' });
+    const { shopifyAdmin } = require('./src/shopify-admin');
+    const themeId = req.body.themeId || '157178462339';
+    const result = await shopifyAdmin('PUT', `/themes/${themeId}/assets.json`, {
+      asset: { key, value }
+    });
+    res.json({ success: true, asset: result.asset?.key });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   logger.info('server', `StyleHub backend v2.3 running on port ${PORT}`);

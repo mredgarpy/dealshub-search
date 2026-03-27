@@ -513,54 +513,135 @@ app.get('/api/search-suggest', async (req, res) => {
   }
 });
 
-// ---- TRENDING ----
+// ---- TRENDING (Auto-Rotative Query Pool) ----
+const TRENDING_QUERIES = {
+  fashion: [
+    'summer dress 2026', 'women casual outfit', 'men sneakers',
+    'trendy sunglasses', 'crossbody bag women', 'athletic wear',
+    'crop top women', 'cargo pants men', 'platform sneakers',
+    'oversized t-shirt', 'linen pants summer', 'maxi dress'
+  ],
+  beauty: [
+    'viral skincare', 'lip gloss set', 'mascara waterproof',
+    'sunscreen face', 'hair oil treatment', 'nail art set',
+    'makeup brush set', 'vitamin c serum', 'eye cream',
+    'face moisturizer spf', 'setting spray', 'cleanser gentle'
+  ],
+  electronics: [
+    'wireless earbuds 2026', 'phone case', 'portable charger',
+    'led strip lights', 'bluetooth speaker', 'smart watch',
+    'usb c hub', 'ring light', 'webcam hd', 'gaming mouse',
+    'laptop stand', 'cable organizer'
+  ],
+  home: [
+    'kitchen gadgets', 'organization bins', 'led desk lamp',
+    'shower head filter', 'wall art modern', 'throw blanket',
+    'water bottle insulated', 'candle set', 'plant pot indoor',
+    'ice maker', 'pillow memory foam', 'air purifier'
+  ],
+  sports: [
+    'yoga mat thick', 'resistance bands set', 'running belt',
+    'gym water bottle', 'jump rope', 'foam roller',
+    'sports bra', 'hiking backpack', 'swim goggles',
+    'cycling shorts', 'fitness tracker', 'ab roller'
+  ]
+};
+
+function getRotatingQueries(pool, count) {
+  const now = new Date();
+  const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  const block = Math.floor(now.getHours() / 6); // 4 blocks per day
+  const seed = dayOfYear * 4 + block;
+  const categories = Object.keys(pool);
+  const queries = [];
+  for (let i = 0; i < count; i++) {
+    const cat = categories[(seed + i) % categories.length];
+    const catPool = pool[cat];
+    queries.push(catPool[(seed * 7 + i) % catPool.length]);
+    if (queries.length < count * 2) {
+      queries.push(catPool[(seed * 13 + i + 3) % catPool.length]);
+    }
+  }
+  // Deduplicate
+  return [...new Set(queries)].slice(0, count * 2);
+}
+
 app.get('/api/trending', async (req, res) => {
-  const cacheKey = 'trending';
+  const now = new Date();
+  const block = Math.floor(now.getHours() / 6);
+  const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  const cacheKey = `trending_${dayOfYear}_${block}`;
   const cached = searchCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
-    const queries = { amazon: 'trending deals', aliexpress: 'hot products', sephora: 'trending beauty', macys: 'trending now', shein: 'trending' };
-    const results = await Promise.allSettled(
-      Object.entries(queries).filter(([source]) => isStoreActive(source)).map(([source, q]) => {
-        const adapter = getAdapter(source);
-        return adapter ? adapter.search(q, 6) : Promise.resolve([]);
-      })
-    );
-    const all = interleaveFromSettled(results, 20);
+    const queries = getRotatingQueries(TRENDING_QUERIES, 3); // 3 categories = ~6 queries
+    const activeStores = ['amazon', 'aliexpress'].filter(s => getAdapter(s));
+    const searchPromises = [];
+
+    // Distribute queries across active stores
+    for (let i = 0; i < queries.length; i++) {
+      const store = activeStores[i % activeStores.length];
+      const adapter = getAdapter(store);
+      if (adapter) {
+        searchPromises.push(adapter.search(queries[i], 5));
+      }
+    }
+
+    const results = await Promise.allSettled(searchPromises);
+    const all = interleaveFromSettled(results, 24);
     const response = { results: applySearchPricing(all), section: 'trending' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
+    logger.error('trending', 'Trending fetch failed', { error: e.message });
     res.status(500).json({ error: e.message });
   }
 });
 
-// ---- BESTSELLERS ----
+// ---- BESTSELLERS (Rotating) ----
+const BESTSELLER_QUERIES = {
+  fashion: ['best selling dresses', 'top rated sneakers', 'popular handbags', 'best jeans women'],
+  beauty: ['best selling skincare', 'top rated mascara', 'popular perfume', 'best face serum'],
+  electronics: ['best selling earbuds', 'top rated charger', 'popular phone accessories', 'best smart watch'],
+  home: ['best selling kitchen', 'top rated home decor', 'popular organizer', 'best bedding set'],
+  sports: ['best selling yoga', 'top rated fitness', 'popular running shoes', 'best gym equipment']
+};
+
 app.get('/api/bestsellers', async (req, res) => {
-  const cacheKey = 'bestsellers';
+  const now = new Date();
+  const block = Math.floor(now.getHours() / 6);
+  const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  const cacheKey = `bestsellers_${dayOfYear}_${block}`;
   const cached = searchCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
-    const queries = { amazon: 'best sellers', aliexpress: 'best selling products', sephora: 'best sellers beauty', macys: 'top rated', shein: 'best sellers' };
-    const results = await Promise.allSettled(
-      Object.entries(queries).filter(([source]) => isStoreActive(source)).map(([source, q]) => {
-        const adapter = getAdapter(source);
-        return adapter ? adapter.search(q, 6) : Promise.resolve([]);
-      })
-    );
+    const queries = getRotatingQueries(BESTSELLER_QUERIES, 2); // 2 categories = ~4 queries
+    const activeStores = ['amazon', 'aliexpress'].filter(s => getAdapter(s));
+    const searchPromises = [];
+
+    for (let i = 0; i < queries.length; i++) {
+      const store = activeStores[i % activeStores.length];
+      const adapter = getAdapter(store);
+      if (adapter) {
+        searchPromises.push(adapter.search(queries[i], 6));
+      }
+    }
+
+    const results = await Promise.allSettled(searchPromises);
     const raw = interleaveFromSettled(results, 30);
     // Filter: bestsellers should have meaningful reviews (>= 50)
     const filtered = raw.filter(p => {
       const revCount = parseInt(p.reviews) || 0;
       return revCount >= 50;
     });
-    const all = filtered.length >= 5 ? filtered.slice(0, 20) : raw.slice(0, 20);
+    const all = filtered.length >= 5 ? filtered.slice(0, 12) : raw.slice(0, 12);
     const response = { results: applySearchPricing(all), section: 'bestsellers' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
+    logger.error('bestsellers', 'Bestsellers fetch failed', { error: e.message });
     res.status(500).json({ error: e.message });
   }
 });

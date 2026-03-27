@@ -1,0 +1,213 @@
+{% comment %}
+  StyleHub Miami — Article / Blog Post Template
+  Clean, readable blog post layout matching brand design.
+{% endcomment %}
+
+<article class="sh-article" itemscope itemtype="https://schema.org/BlogPosting">
+  <style>
+    .sh-article{max-width:800px;margin:0 auto;padding:40px 24px 60px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#333;line-height:1.7}
+    .sh-article__breadcrumb{font-size:13px;color:#888;margin-bottom:24px}
+    .sh-article__breadcrumb a{color:#e53e3e;text-decoration:none}
+    .sh-article__breadcrumb a:hover{text-decoration:underline}
+    .sh-article__title{font-size:32px;font-weight:800;color:#1a1a2e;line-height:1.2;margin:0 0 12px}
+    .sh-article__meta{font-size:14px;color:#888;margin-bottom:24px;display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+    .sh-article__meta time{color:#666}
+    .sh-article__meta .sh-article__author{font-weight:600;color:#555}
+    .sh-article__tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
+    .sh-article__tag{background:#f0f0f0;color:#555;padding:4px 12px;border-radius:20px;font-size:12px;text-decoration:none;transition:background .2s}
+    .sh-article__tag:hover{background:#e53e3e;color:#fff}
+    .sh-article__image{width:100%;border-radius:12px;margin-bottom:32px;aspect-ratio:16/9;object-fit:cover}
+    .sh-article__content{font-size:17px;line-height:1.8;color:#333}
+    .sh-article__content h2{font-size:24px;font-weight:700;color:#1a1a2e;margin:32px 0 12px}
+    .sh-article__content h3{font-size:20px;font-weight:600;color:#1a1a2e;margin:24px 0 10px}
+    .sh-article__content p{margin:0 0 18px}
+    .sh-article__content a{color:#e53e3e;text-decoration:underline}
+    .sh-article__content ul,.sh-article__content ol{margin:0 0 18px 24px}
+    .sh-article__content li{margin-bottom:6px}
+    .sh-article__content img{max-width:100%;border-radius:8px;margin:16px 0}
+    .sh-article__content blockquote{border-left:4px solid #e53e3e;margin:24px 0;padding:12px 20px;background:#faf5f5;color:#555;font-style:italic;border-radius:0 8px 8px 0}
+    .sh-article__share{margin-top:40px;padding-top:24px;border-top:1px solid #eee;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .sh-article__share-label{font-weight:700;font-size:14px;color:#1a1a2e}
+    .sh-article__share-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid #ddd;color:#555;transition:all .2s}
+    .sh-article__share-btn:hover{border-color:#e53e3e;color:#e53e3e}
+    .sh-article__nav{margin-top:40px;padding-top:24px;border-top:1px solid #eee;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    .sh-article__nav a{font-size:14px;color:#e53e3e;text-decoration:none;font-weight:600}
+    .sh-article__nav a:hover{text-decoration:underline}
+    .sh-article__comments{margin-top:48px;padding-top:32px;border-top:1px solid #eee}
+    .sh-article__comments h3{font-size:22px;font-weight:700;color:#1a1a2e;margin-bottom:24px}
+    .sh-comment{padding:16px 0;border-bottom:1px solid #f0f0f0}
+    .sh-comment__author{font-weight:700;font-size:14px;color:#1a1a2e}
+    .sh-comment__date{font-size:12px;color:#999;margin-left:12px}
+    .sh-comment__body{font-size:15px;color:#555;margin-top:6px;line-height:1.6}
+    .sh-comment-form{margin-top:32px}
+    .sh-comment-form h4{font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:16px}
+    .sh-comment-form label{display:block;font-size:14px;font-weight:600;color:#555;margin-bottom:4px}
+    .sh-comment-form input,.sh-comment-form textarea{width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;margin-bottom:12px;outline:none;transition:border .2s}
+    .sh-comment-form input:focus,.sh-comment-form textarea:focus{border-color:#e53e3e}
+    .sh-comment-form textarea{min-height:120px;resize:vertical}
+    .sh-comment-form button{background:#e53e3e;color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:background .2s}
+    .sh-comment-form button:hover{background:#c53030}
+    @media(max-width:600px){
+      .sh-article{padding:24px 16px 40px}
+      .sh-article__title{font-size:24px}
+      .sh-article__content{font-size:15px}
+    }
+  </style>
+
+  {%- comment -%} Breadcrumb {%- endcomment -%}
+  <nav class="sh-article__breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a> &rsaquo;
+    {%- if blog -%}
+      <a href="{{ blog.url }}">{{ blog.title }}</a> &rsaquo;
+    {%- endif -%}
+    <span>{{ article.title }}</span>
+  </nav>
+
+  {%- comment -%} Title {%- endcomment -%}
+  <h1 class="sh-article__title" itemprop="headline">{{ article.title }}</h1>
+
+  {%- comment -%} Meta {%- endcomment -%}
+  <div class="sh-article__meta">
+    {%- if article.author -%}
+      <span class="sh-article__author" itemprop="author">{{ article.author }}</span>
+    {%- endif -%}
+    <time datetime="{{ article.published_at | date: '%Y-%m-%dT%H:%M:%S%z' }}" itemprop="datePublished">
+      {{ article.published_at | date: '%B %d, %Y' }}
+    </time>
+    {%- if article.comments_count > 0 -%}
+      <span>{{ article.comments_count }} comment{{ article.comments_count | pluralize: '', 's' }}</span>
+    {%- endif -%}
+  </div>
+
+  {%- comment -%} Tags {%- endcomment -%}
+  {%- if article.tags.size > 0 -%}
+    <div class="sh-article__tags">
+      {%- for tag in article.tags -%}
+        <a href="{{ blog.url }}/tagged/{{ tag | handle }}" class="sh-article__tag">{{ tag }}</a>
+      {%- endfor -%}
+    </div>
+  {%- endif -%}
+
+  {%- comment -%} Featured Image {%- endcomment -%}
+  {%- if article.image -%}
+    <img
+      class="sh-article__image"
+      src="{{ article.image | image_url: width: 1200 }}"
+      alt="{{ article.image.alt | default: article.title | escape }}"
+      loading="eager"
+      itemprop="image"
+    >
+  {%- endif -%}
+
+  {%- comment -%} Content {%- endcomment -%}
+  <div class="sh-article__content" itemprop="articleBody">
+    {{ article.content }}
+  </div>
+
+  {%- comment -%} Share Buttons {%- endcomment -%}
+  <div class="sh-article__share">
+    <span class="sh-article__share-label">Share:</span>
+    <a class="sh-article__share-btn" href="https://twitter.com/intent/tweet?url={{ article.url | prepend: shop.url | url_encode }}&text={{ article.title | url_encode }}" target="_blank" rel="noopener">Twitter</a>
+    <a class="sh-article__share-btn" href="https://www.facebook.com/sharer/sharer.php?u={{ article.url | prepend: shop.url | url_encode }}" target="_blank" rel="noopener">Facebook</a>
+    <a class="sh-article__share-btn" href="https://pinterest.com/pin/create/button/?url={{ article.url | prepend: shop.url | url_encode }}&description={{ article.title | url_encode }}" target="_blank" rel="noopener">Pinterest</a>
+  </div>
+
+  {%- comment -%} Prev / Next Navigation {%- endcomment -%}
+  {%- if blog -%}
+    <nav class="sh-article__nav">
+      {%- if blog.previous_article -%}
+        <a href="{{ blog.previous_article }}">&#8592; Previous Article</a>
+      {%- else -%}
+        <span></span>
+      {%- endif -%}
+      {%- if blog.next_article -%}
+        <a href="{{ blog.next_article }}">Next Article &#8594;</a>
+      {%- else -%}
+        <span></span>
+      {%- endif -%}
+    </nav>
+  {%- endif -%}
+
+  {%- comment -%} Comments {%- endcomment -%}
+  {%- if blog.comments_enabled? -%}
+    <div class="sh-article__comments">
+      <h3>Comments ({{ article.comments_count | default: 0 }})</h3>
+
+      {%- paginate article.comments by 20 -%}
+        {%- for comment in article.comments -%}
+          <div class="sh-comment">
+            <span class="sh-comment__author">{{ comment.author }}</span>
+            <span class="sh-comment__date">{{ comment.created_at | date: '%B %d, %Y' }}</span>
+            <div class="sh-comment__body">{{ comment.content }}</div>
+          </div>
+        {%- endfor -%}
+      {%- endpaginate -%}
+
+      {%- comment -%} Comment Form {%- endcomment -%}
+      {%- form 'new_comment', article -%}
+        <div class="sh-comment-form">
+          <h4>Leave a Comment</h4>
+
+          {%- if form.errors -%}
+            <div style="color:#e53e3e;margin-bottom:12px;font-size:14px">
+              {{ form.errors | default_errors }}
+            </div>
+          {%- endif -%}
+
+          {%- if form.posted_successfully? -%}
+            <div style="color:#38a169;margin-bottom:12px;font-size:14px;font-weight:600">
+              Your comment has been submitted{% if blog.moderated? %} and is awaiting moderation{% endif %}.
+            </div>
+          {%- endif -%}
+
+          <label for="comment-author">Name</label>
+          <input type="text" name="comment[author]" id="comment-author" value="{{ form.author }}" required>
+
+          <label for="comment-email">Email</label>
+          <input type="email" name="comment[email]" id="comment-email" value="{{ form.email }}" required>
+
+          <label for="comment-body">Comment</label>
+          <textarea name="comment[body]" id="comment-body" required>{{ form.body }}</textarea>
+
+          <button type="submit">Post Comment</button>
+        </div>
+      {%- endform -%}
+    </div>
+  {%- endif -%}
+
+  {%- comment -%} JSON-LD for Article {%- endcomment -%}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": {{ article.title | json }},
+    "datePublished": "{{ article.published_at | date: '%Y-%m-%dT%H:%M:%S%z' }}",
+    "dateModified": "{{ article.updated_at | date: '%Y-%m-%dT%H:%M:%S%z' }}",
+    {%- if article.author -%}
+    "author": { "@type": "Person", "name": {{ article.author | json }} },
+    {%- endif -%}
+    {%- if article.image -%}
+    "image": "{{ article.image | image_url: width: 1200 }}",
+    {%- endif -%}
+    "description": {{ article.excerpt_or_content | strip_html | truncate: 160 | json }},
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "{{ article.url | prepend: shop.url }}"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "StyleHub Miami",
+      "url": "https://stylehubmiami.com"
+    }
+  }
+  </script>
+</article>
+
+{% schema %}
+{
+  "name": "Article Content",
+  "tag": "section",
+  "class": "sh-article-section",
+  "settings": []
+}
+{% endschema %}

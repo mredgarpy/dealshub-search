@@ -29,6 +29,7 @@
       if(p.badge)p.badge=(p.badge||'').replace(/Amazon'?s?\s*Choice/gi,'Popular Choice');
       if(p.salesVolume)p.salesVolume=(p.salesVolume||'').replace(/on Amazon\s*/gi,'').replace(/New\s+in past month/i,'New this month').trim();
       renderProduct(p);
+      updateSEO(p);
       addToRecentlyViewed(p);
       setTimeout(function(){loadRecommendations(p)},200);
     })
@@ -39,6 +40,37 @@
 
   function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
   function unesc(s){if(!s||typeof s!=='string')return s||'';var d=document.createElement('textarea');d.innerHTML=s;return d.value}
+
+  /* ═══ SEO: Dynamic meta tags, OG, JSON-LD for custom PDP ═══ */
+  function updateSEO(product){
+    if(!product||!product.title)return;
+    var price=parseFloat(product.price||0).toFixed(2);
+    var title=product.title;
+    /* Title tag */
+    document.title=title.substring(0,55)+' | $'+price+' | StyleHub Miami';
+    /* Meta description */
+    var desc='Buy '+title.substring(0,100)+' for $'+price+' at StyleHub Miami. Free shipping on $35+. Secure checkout. Fast delivery.';
+    setMeta('description',desc);
+    /* Open Graph */
+    setOG('og:title',title.substring(0,60)+' | $'+price);
+    setOG('og:description',desc.substring(0,160));
+    setOG('og:type','product');
+    if(product.image||product.primaryImage)setOG('og:image',product.image||product.primaryImage);
+    setOG('og:url',window.location.href);
+    /* Twitter */
+    setMeta('twitter:title',title.substring(0,60));
+    setMeta('twitter:description',desc.substring(0,160));
+    if(product.image||product.primaryImage)setMeta('twitter:image',product.image||product.primaryImage);
+    /* JSON-LD Product */
+    var ld={"@context":"https://schema.org","@type":"Product","name":title,"image":[product.image||product.primaryImage||''],"description":product.description||title,"brand":{"@type":"Brand","name":product.brand||product.sourceName||"StyleHub"},"sku":product.sourceId||product.id,"offers":{"@type":"Offer","url":window.location.href,"priceCurrency":"USD","price":price,"availability":"https://schema.org/InStock","seller":{"@type":"Organization","name":"StyleHub Miami"}}};
+    if(product.rating){ld.aggregateRating={"@type":"AggregateRating","ratingValue":parseFloat(product.rating),"reviewCount":parseInt(product.reviews||product.ratingsTotal)||1,"bestRating":5}}
+    injectLD(ld);
+    /* JSON-LD Breadcrumb */
+    injectLD({"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://stylehubmiami.com/"},{"@type":"ListItem","position":2,"name":product.category||"Products","item":"https://stylehubmiami.com/pages/search-results?q="+encodeURIComponent(product.category||'deals')},{"@type":"ListItem","position":3,"name":title.substring(0,50)}]});
+  }
+  function setMeta(name,content){var el=document.querySelector('meta[name="'+name+'"]');if(el){el.content=content}else{el=document.createElement('meta');el.name=name;el.content=content;document.head.appendChild(el)}}
+  function setOG(prop,content){var el=document.querySelector('meta[property="'+prop+'"]');if(el){el.content=content}else{el=document.createElement('meta');el.setAttribute('property',prop);el.content=content;document.head.appendChild(el)}}
+  function injectLD(data){var s=document.createElement('script');s.type='application/ld+json';s.textContent=JSON.stringify(data);document.head.appendChild(s)}
 
   function skeletonHTML(){
     return '<div style="max-width:1200px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:40px" class="dhpdp-skel">'+
@@ -67,10 +99,12 @@
 
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px" class="dhpdp-grid">';
 
-    // LEFT COLUMN
+    // LEFT COLUMN (sticky on desktop)
     html+='<div class="dhpdp-left-col">';
     // ═══ SECTION 2: IMAGE GALLERY (left) ═══
     html+=renderGallery(p, imgs, mainImg, discount);
+    // ═══ EXTRA: Customer photos + A+ images below gallery (fills space) ═══
+    html+=renderGalleryExtra(p);
     html+='</div>'; // end left col
 
     // RIGHT COLUMN
@@ -125,8 +159,9 @@
 
     // Responsive CSS
     html+='<style>';
-    html+='.dhpdp-grid{grid-template-columns:1fr 1fr;gap:40px}';
-    html+='@media(max-width:768px){.dhpdp-grid{grid-template-columns:1fr!important;gap:20px!important}.dhpdp h1{font-size:20px!important}#dhpdp-sticky{display:flex!important}}';
+    html+='.dhpdp-grid{grid-template-columns:1fr 1fr;gap:40px;align-items:start}';
+    html+='.dhpdp-left-col{position:sticky;top:80px;align-self:start}';
+    html+='@media(max-width:768px){.dhpdp-grid{grid-template-columns:1fr!important;gap:20px!important}.dhpdp h1{font-size:20px!important}#dhpdp-sticky{display:flex!important}.dhpdp-left-col{position:static!important}}';
     html+='.dhpdp-spec-table{width:100%;border-collapse:collapse}.dhpdp-spec-table tr:nth-child(even){background:#f8fafc}.dhpdp-spec-table td{padding:10px 14px;font-size:14px;border-bottom:1px solid #f0f0f0}.dhpdp-spec-table td:first-child{font-weight:600;color:#374151;width:40%}';
     html+='.dhpdp-thumbs::-webkit-scrollbar{display:none}.dhpdp-cust-photos::-webkit-scrollbar{display:none}';
     html+='.dhpdp-review{border-bottom:1px solid #f0f0f0;padding:20px 0}.dhpdp-review:last-child{border-bottom:none}';
@@ -201,6 +236,40 @@
       h+='<div style="margin-top:10px;clear:both"><button class="dhpdp-video-btn" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">&#9654; Watch Video</button></div>';
     }
     h+='</div>'; // end dhpdp-gallery
+    return h;
+  }
+
+  // ═══ GALLERY EXTRA: Customer photos + A+ below gallery (desktop only, fills space) ═══
+  function renderGalleryExtra(p){
+    var h='<div class="dhpdp-gallery-extra" style="margin-top:20px">';
+    // 1. Customer review photos grid
+    var reviewImgs=[];
+    (p.topReviews||[]).forEach(function(r){if(r.images&&r.images.length)reviewImgs=reviewImgs.concat(r.images)});
+    if(reviewImgs.length>0){
+      h+='<div style="margin-bottom:20px">';
+      h+='<h3 style="font-size:14px;font-weight:600;color:#374151;margin:0 0 10px">Customer photos</h3>';
+      h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">';
+      reviewImgs.slice(0,6).forEach(function(img,idx){
+        var allImgs=JSON.stringify(reviewImgs).replace(/'/g,"&#39;");
+        h+='<div class="sh-lb-trigger" data-lb-imgs=\''+allImgs+'\' data-lb-idx="'+idx+'" style="aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer">';
+        h+='<img src="'+esc(img)+'" alt="Customer photo" loading="lazy" style="width:100%;height:100%;object-fit:cover">';
+        h+='</div>';
+      });
+      h+='</div></div>';
+    }
+    // 2. A+ content images (from the manufacturer)
+    var aplusImgs=p.aplusImages||p.aplus_images||[];
+    if(aplusImgs.length>0){
+      h+='<div>';
+      h+='<h3 style="font-size:14px;font-weight:600;color:#374151;margin:0 0 10px">From the manufacturer</h3>';
+      aplusImgs.slice(0,4).forEach(function(img){
+        h+='<img src="'+esc(img)+'" alt="" loading="lazy" style="width:100%;border-radius:8px;margin-bottom:6px">';
+      });
+      h+='</div>';
+    }
+    h+='</div>';
+    // Only show if there's content
+    if(reviewImgs.length===0&&aplusImgs.length===0)return '';
     return h;
   }
 

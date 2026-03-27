@@ -158,127 +158,283 @@
   }
 
   // ============================================================
-  // SECTION 4: HERO BANNER CAROUSEL
+  // SECTION 4: HERO — AUTO BANNERS + SIDE CARD + GRID CARDS
+  // Uses /api/banners (event-driven) + /api/home-cards (daily rotation)
   // ============================================================
+
+  // --- CSS keyframes for banner effects ---
+  var _bannerStylesInjected=false;
+  function injectBannerStyles(){
+    if(_bannerStylesInjected)return;_bannerStylesInjected=true;
+    var s=document.createElement('style');
+    s.textContent=''+
+      '@keyframes sh-particleUp{0%{transform:translateY(0) scale(1);opacity:.6}100%{transform:translateY(-320px) scale(0);opacity:0}}'+
+      '@keyframes sh-sparkle{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}'+
+      '@keyframes sh-float1{0%,100%{transform:translate(0,0) rotate(-3deg)}50%{transform:translate(4px,-8px) rotate(0deg)}}'+
+      '@keyframes sh-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}'+
+      '@keyframes sh-glow{0%,100%{box-shadow:0 0 6px rgba(229,62,62,.3)}50%{box-shadow:0 0 18px rgba(229,62,62,.7)}}'+
+      '@keyframes sh-confetti{0%{transform:translateY(-10px) rotate(0);opacity:1}100%{transform:translateY(340px) rotate(720deg);opacity:0}}'+
+      '@keyframes sh-marquee{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}'+
+      '@keyframes sh-bounceIn{0%{transform:scale(0)}50%{transform:scale(1.15)}100%{transform:scale(1)}}'+
+      '@keyframes sh-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}'+
+      '.sh-banner-slide{position:absolute;inset:0;display:flex;align-items:stretch;opacity:0;transition:opacity .6s ease;z-index:1;pointer-events:none}'+
+      '.sh-banner-slide.active{opacity:1;z-index:2;pointer-events:auto}'+
+      '.sh-banner-content{position:relative;z-index:3;padding:28px 32px;display:flex;flex-direction:column;justify-content:center;flex:1;min-width:0}'+
+      '.sh-banner-tag{display:inline-block;background:rgba(255,255,255,.15);backdrop-filter:blur(4px);color:#fff;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:10px;width:fit-content;animation:sh-bounceIn .5s ease}'+
+      '.sh-banner-heading{color:#fff;font-size:24px;font-weight:800;margin:0 0 6px;line-height:1.2}'+
+      '.sh-banner-sub{color:rgba(255,255,255,.7);font-size:13px;margin:0 0 14px;max-width:340px;line-height:1.4}'+
+      '.sh-banner-products{display:flex;gap:8px;margin-bottom:14px}'+
+      '.sh-banner-product-mini{position:relative;width:56px;height:56px;border-radius:8px;background:#fff;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.15);transition:transform .2s;animation:sh-float1 3s ease-in-out infinite}'+
+      '.sh-banner-product-mini:nth-child(2){animation-delay:.3s}'+
+      '.sh-banner-product-mini:nth-child(3){animation-delay:.6s}'+
+      '.sh-banner-product-mini:nth-child(4){animation-delay:.9s}'+
+      '.sh-banner-product-mini:hover{transform:scale(1.1)!important}'+
+      '.sh-banner-product-mini img{width:100%;height:100%;object-fit:contain}'+
+      '.sh-banner-discount{position:absolute;bottom:0;left:0;right:0;background:'+RED+';color:#fff;font-size:8px;font-weight:700;text-align:center;padding:1px 0}'+
+      '.sh-banner-cta{display:inline-block;background:#fff;color:'+NAVY+';padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;width:fit-content;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.1)}'+
+      '.sh-banner-cta:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}'+
+      '.sh-banner-hero-img{position:absolute;right:0;top:0;bottom:0;width:40%;z-index:2;display:flex;align-items:center;justify-content:center;overflow:hidden}'+
+      '.sh-banner-hero-img img{max-height:80%;max-width:80%;object-fit:contain;filter:drop-shadow(0 8px 24px rgba(0,0,0,.3));animation:sh-float1 4s ease-in-out infinite}'+
+      '.sh-banner-dots{position:absolute;bottom:14px;left:32px;display:flex;gap:6px;z-index:10}'+
+      '.sh-banner-dot{display:block;height:4px;border-radius:2px;cursor:pointer;transition:all .3s;width:8px;background:rgba(255,255,255,.4);border:none;padding:0}'+
+      '.sh-banner-dot.active{width:20px;background:'+RED+'}'+
+      '.sh-banner-arr{position:absolute;top:50%;transform:translateY(-50%);z-index:10;background:rgba(255,255,255,.12);backdrop-filter:blur(4px);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;transition:background .2s;display:flex;align-items:center;justify-content:center}'+
+      '.sh-banner-arr:hover{background:rgba(255,255,255,.25)}'+
+      '.sh-banner-arr.prev{left:10px}.sh-banner-arr.next{right:10px}'+
+      /* Particles (sale type) */
+      '.sh-particles{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}'+
+      '.sh-particle{position:absolute;bottom:-10px;width:4px;height:4px;border-radius:50%;animation:sh-particleUp 4s linear infinite}'+
+      /* Sparkles */
+      '.sh-sparkle{position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;animation:sh-sparkle 2s ease-in-out infinite;pointer-events:none;z-index:1}'+
+      /* Confetti (holiday) */
+      '.sh-confetti-piece{position:absolute;top:-10px;width:6px;height:6px;animation:sh-confetti 3.5s linear infinite;pointer-events:none;z-index:1}'+
+      /* Marquee ticker */
+      '.sh-banner-marquee{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.3);z-index:4;overflow:hidden;height:24px;display:flex;align-items:center}'+
+      '.sh-banner-marquee span{white-space:nowrap;font-size:11px;font-weight:600;color:#fff;animation:sh-marquee 20s linear infinite}'+
+      /* Shimmer text */
+      '.sh-shimmer{background:linear-gradient(90deg,#fff 0%,#ffd700 50%,#fff 100%);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:sh-shimmer 2.5s linear infinite}'+
+      /* Side card */
+      '.sh-hero-side-card{background:#fff;border-radius:12px;padding:14px;border:1px solid #eee;display:flex;flex-direction:column;height:100%;overflow:hidden}'+
+      '.sh-hero-side-card h3{font-size:14px;font-weight:700;color:'+NAVY+';margin:0 0 10px}'+
+      '.sh-hc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:1}'+
+      '.sh-hc-item{text-align:center;text-decoration:none;display:flex;flex-direction:column;align-items:center}'+
+      '.sh-hc-item img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:6px;background:#f8f9fa}'+
+      '.sh-hc-item span{font-size:10px;color:#555;margin-top:3px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}'+
+      '.sh-hc-link{display:block;text-align:left;font-size:12px;color:'+RED+';font-weight:600;text-decoration:none;margin-top:8px;padding-top:6px;border-top:1px solid #f0f0f0}'+
+      '.sh-hc-link:hover{text-decoration:underline}'+
+      /* Grid cards row */
+      '.sh-home-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}'+
+      '.sh-home-card{background:#fff;border-radius:12px;padding:14px;border:1px solid #eee;display:flex;flex-direction:column}'+
+      '.sh-home-card h3{font-size:14px;font-weight:700;color:'+NAVY+';margin:0 0 10px}'+
+      /* Responsive */
+      '@media(max-width:1024px){.sh-hero-row{grid-template-columns:1fr!important}.sh-hero-side-card{display:none}.sh-home-cards{grid-template-columns:repeat(2,1fr)}}'+
+      '@media(max-width:600px){.sh-home-cards{grid-template-columns:1fr 1fr;gap:8px}.sh-banner-heading{font-size:18px!important}.sh-banner-products{gap:6px}.sh-banner-product-mini{width:44px;height:44px}.sh-banner-hero-img{width:30%}}';
+    document.head.appendChild(s);
+  }
+
+  // --- Generate decorative effects per slide type ---
+  function bannerEffects(type){
+    var h='';
+    if(type==='sale'){
+      // Particles rising
+      h+='<div class="sh-particles">';
+      for(var i=0;i<10;i++){
+        var l=Math.random()*100,d=2+Math.random()*4,del=Math.random()*3;
+        h+='<div class="sh-particle" style="left:'+l+'%;animation-duration:'+d+'s;animation-delay:'+del+'s;background:rgba(255,255,255,'+(0.15+Math.random()*0.2)+')"></div>';
+      }
+      h+='</div>';
+      // Sparkles
+      for(var j=0;j<6;j++){
+        h+='<div class="sh-sparkle" style="left:'+(10+Math.random()*80)+'%;top:'+(10+Math.random()*80)+'%;animation-delay:'+(Math.random()*2)+'s"></div>';
+      }
+    } else if(type==='holiday'){
+      // Confetti
+      var colors=['#e53e3e','#f59e0b','#22c55e','#3b82f6','#a855f7','#ec4899'];
+      for(var k=0;k<12;k++){
+        var cl=colors[k%colors.length],lp=Math.random()*100,dl=Math.random()*3,dur=2.5+Math.random()*2;
+        h+='<div class="sh-confetti-piece" style="left:'+lp+'%;background:'+cl+';animation-delay:'+dl+'s;animation-duration:'+dur+'s;border-radius:'+(Math.random()>.5?'50%':'2px')+';transform:rotate('+(Math.random()*360)+'deg)"></div>';
+      }
+    } else if(type==='plus'){
+      // Sparkles on purple
+      for(var m=0;m<8;m++){
+        h+='<div class="sh-sparkle" style="left:'+(5+Math.random()*90)+'%;top:'+(5+Math.random()*90)+'%;animation-delay:'+(Math.random()*2)+'s;background:rgba(255,255,255,'+(0.3+Math.random()*0.4)+')"></div>';
+      }
+    } else {
+      // Category — subtle sparkles
+      for(var n=0;n<4;n++){
+        h+='<div class="sh-sparkle" style="left:'+(10+Math.random()*80)+'%;top:'+(10+Math.random()*80)+'%;animation-delay:'+(Math.random()*2)+'s"></div>';
+      }
+    }
+    return h;
+  }
+
+  // --- Build hero placeholder (instant render while APIs load) ---
   function buildHeroPlaceholder(container){
-    var h='<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:24px" class="dh-hero-grid">';
-    // Main hero placeholder with branding
-    h+='<div style="position:relative;border-radius:12px;overflow:hidden;aspect-ratio:2.2;background:linear-gradient(135deg,'+NAVY+' 0%,#2d2d52 50%,'+NAVY+' 100%)">';
-    h+='<div style="position:relative;z-index:3;padding:32px;display:flex;flex-direction:column;justify-content:center;height:100%">';
-    h+='<span style="display:inline-block;background:'+RED+';color:#fff;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;margin-bottom:12px;width:fit-content">STYLEHUB MIAMI</span>';
-    h+='<h2 style="color:#fff;font-size:22px;font-weight:700;margin:0 0 8px">Your deals. All in one place.</h2>';
-    h+='<p style="color:rgba(255,255,255,0.6);font-size:13px;margin:0 0 16px;max-width:320px">Shop millions of products from top brands with secure checkout and tracked shipping.</p>';
-    h+='<a href="/pages/search-results?q=trending" style="display:inline-block;background:'+RED+';color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;width:fit-content">Start Shopping</a>';
+    injectBannerStyles();
+    var h='<div class="sh-hero-row" style="display:grid;grid-template-columns:1fr 300px;gap:12px;align-items:stretch">';
+    // Banner placeholder
+    h+='<div style="position:relative;border-radius:12px;overflow:hidden;min-height:320px;background:'+NAVY+'">';
+    h+='<div class="sh-banner-content">';
+    h+='<span class="sh-banner-tag">STYLEHUB MIAMI</span>';
+    h+='<h2 class="sh-banner-heading">Your deals. All in one place.</h2>';
+    h+='<p class="sh-banner-sub">Shop millions of products from top brands with secure checkout and tracked shipping.</p>';
+    h+='<a href="/pages/search-results?q=trending" class="sh-banner-cta">Start Shopping</a>';
     h+='</div></div>';
-    // Side cards (same as final hero — stay in place)
-    h+='<div style="display:flex;flex-direction:column;gap:12px">';
-    h+='<a href="/pages/search-results?q=deals" style="flex:1;background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;text-decoration:none">';
-    h+='<div style="flex:1"><span style="display:inline-block;background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:6px">Up to 70% off</span>';
-    h+='<div style="font-size:13px;font-weight:700;color:'+NAVY+'">Flash deals</div>';
-    h+='<div style="font-size:11px;color:#888">Limited time offers</div></div>';
-    h+='<div id="dh-hero-flash-thumb" style="width:56px;height:56px;border-radius:8px;background:#f7f7f8;overflow:hidden;flex-shrink:0"></div>';
-    h+='</a>';
-    h+='<a href="/pages/search-results?q=bestsellers" style="flex:1;background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;text-decoration:none">';
-    h+='<div style="flex:1"><span style="display:inline-block;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:6px">Most popular</span>';
-    h+='<div style="font-size:13px;font-weight:700;color:'+NAVY+'">Best sellers</div>';
-    h+='<div style="font-size:11px;color:#888">Top rated this week</div></div>';
-    h+='<div id="dh-hero-bs-thumb" style="width:56px;height:56px;border-radius:8px;background:#f7f7f8;overflow:hidden;flex-shrink:0"></div>';
-    h+='</a>';
-    h+='</div></div>';
-    container.innerHTML=h;
-  }
-
-  function buildHero(container,trendingData){
-    var products=trendingData||[];
-    // Group by category
-    var cats={};
-    products.forEach(function(p){
-      var cat=p.category||p.product_type||'General';
-      if(!cats[cat])cats[cat]=[];
-      cats[cat].push(p);
-    });
-    // Top 3 categories
-    var sorted=Object.keys(cats).sort(function(a,b){return cats[b].length-cats[a].length}).slice(0,3);
-    if(sorted.length===0)sorted=['Trending'];
-
-    var slides=sorted.map(function(cat,i){
-      var items=cats[cat]||products.slice(i*3,(i+1)*3);
-      var topImg=items[0]?items[0].image||items[0].primaryImage||'':'';
-      var top3=items.slice(0,3).map(function(p){return decodeEntities(p.title||'').substring(0,40)}).join(' · ');
-      return {cat:cat,img:topImg,top3:top3};
-    });
-
-    var h='<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:24px" class="dh-hero-grid">';
-
-    // Main carousel
-    h+='<div id="dh-hero-carousel" style="position:relative;border-radius:12px;overflow:hidden;aspect-ratio:2.2;background:'+NAVY+'">';
-    slides.forEach(function(s,i){
-      h+='<div class="dh-hero-slide" data-slide="'+i+'" style="position:absolute;inset:0;opacity:'+(i===0?'1':'0')+';transition:opacity 0.6s ease;z-index:'+(i===0?'2':'1')+'">';
-      if(s.img)h+='<img src="'+esc(s.img)+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" loading="'+(i===0?'eager':'lazy')+'">';
-      h+='<div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(26,26,46,0.95) 0%,rgba(26,26,46,0.85) 45%,rgba(26,26,46,0.35) 100%)"></div>';
-      h+='<div style="position:relative;z-index:3;padding:32px;display:flex;flex-direction:column;justify-content:center;height:100%">';
-      h+='<span style="display:inline-block;background:'+RED+';color:#fff;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;margin-bottom:12px;width:fit-content">Trending now</span>';
-      h+='<h2 style="color:#fff;font-size:18px;font-weight:700;margin:0 0 8px">Top picks in '+esc(s.cat)+'</h2>';
-      h+='<p style="color:rgba(255,255,255,0.6);font-size:12px;margin:0 0 16px;max-width:320px">'+esc(s.top3)+'</p>';
-      h+='<a href="/pages/search-results?q='+encodeURIComponent(s.cat)+'" style="display:inline-block;background:'+RED+';color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;width:fit-content">Shop '+esc(s.cat)+'</a>';
+    // Side card placeholder
+    h+='<div class="sh-hero-side-card"><h3>Loading deals...</h3><div class="sh-hc-grid">';
+    for(var i=0;i<4;i++)h+='<div style="aspect-ratio:1;background:#f7f7f8;border-radius:6px"></div>';
+    h+='</div></div></div>';
+    // Grid cards placeholder
+    h+='<div class="sh-home-cards" id="dh-home-cards">';
+    for(var j=0;j<4;j++){
+      h+='<div class="sh-home-card"><div style="height:16px;width:60%;background:#f0f0f0;border-radius:4px;margin-bottom:10px"></div>';
+      h+='<div class="sh-hc-grid">';
+      for(var k=0;k<4;k++)h+='<div style="aspect-ratio:1;background:#f7f7f8;border-radius:6px"></div>';
       h+='</div></div>';
-    });
-    // Dots
-    h+='<div style="position:absolute;bottom:16px;left:32px;display:flex;gap:6px;z-index:5">';
-    slides.forEach(function(_,i){
-      h+='<span class="dh-hero-dot" data-dot="'+i+'" style="display:block;height:4px;border-radius:2px;cursor:pointer;transition:all 0.3s;'+(i===0?'width:20px;background:'+RED:'width:8px;background:rgba(255,255,255,0.4)')+'"></span>';
-    });
+    }
     h+='</div>';
-    // Arrows
-    h+='<button class="dh-hero-arr" data-dir="-1" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:5;background:rgba(255,255,255,0.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer">‹</button>';
-    h+='<button class="dh-hero-arr" data-dir="1" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:5;background:rgba(255,255,255,0.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer">›</button>';
-    h+='</div>';
-
-    // Side cards
-    h+='<div style="display:flex;flex-direction:column;gap:12px">';
-    // Flash deals card
-    h+='<a href="/pages/search-results?q=deals" style="flex:1;background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;text-decoration:none">';
-    h+='<div style="flex:1"><span style="display:inline-block;background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:6px">Up to 70% off</span>';
-    h+='<div style="font-size:13px;font-weight:700;color:'+NAVY+'">Flash deals</div>';
-    h+='<div style="font-size:11px;color:#888">Limited time offers</div></div>';
-    h+='<div id="dh-hero-flash-thumb" style="width:56px;height:56px;border-radius:8px;background:#f7f7f8;overflow:hidden;flex-shrink:0"></div>';
-    h+='</a>';
-    // Best sellers card
-    h+='<a href="/pages/search-results?q=bestsellers" style="flex:1;background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;text-decoration:none">';
-    h+='<div style="flex:1"><span style="display:inline-block;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;margin-bottom:6px">Most popular</span>';
-    h+='<div style="font-size:13px;font-weight:700;color:'+NAVY+'">Best sellers</div>';
-    h+='<div style="font-size:11px;color:#888">Top rated this week</div></div>';
-    h+='<div id="dh-hero-bs-thumb" style="width:56px;height:56px;border-radius:8px;background:#f7f7f8;overflow:hidden;flex-shrink:0"></div>';
-    h+='</a>';
-    h+='</div></div>';
-
     container.innerHTML=h;
-    initHeroCarousel(slides.length);
   }
 
-  function initHeroCarousel(count){
-    if(count<=1)return;
-    var current=0,paused=false,timer;
-    var carousel=document.getElementById('dh-hero-carousel');
-    if(!carousel)return;
+  // --- Render banner carousel from /api/banners data ---
+  var _bannerCurrent=0,_bannerTotal=0,_bannerTimer=null;
+
+  function renderBannerCarousel(banners,sideCardData){
+    injectBannerStyles();
+    var heroRow=document.querySelector('.sh-hero-row');
+    if(!heroRow)return;
+
+    // Build banner slider
+    _bannerTotal=banners.length;_bannerCurrent=0;
+    var h='<div id="sh-banner-slider" style="position:relative;border-radius:12px;overflow:hidden;min-height:320px">';
+    banners.forEach(function(b,i){
+      h+='<div class="sh-banner-slide'+(i===0?' active':'')+'" style="background:'+esc(b.gradient)+'">';
+      // Effects overlay
+      h+=bannerEffects(b.type||'sale');
+      // Gradient overlay for text readability
+      h+='<div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,.35) 0%,rgba(0,0,0,.1) 60%,transparent 100%);z-index:2"></div>';
+      // Text content
+      h+='<div class="sh-banner-content">';
+      if(b.emoji)h+='<span class="sh-banner-tag">'+b.emoji+' '+esc(b.event)+'</span>';
+      h+='<h2 class="sh-banner-heading">'+esc(b.heading)+'</h2>';
+      h+='<p class="sh-banner-sub">'+esc(b.subheading)+'</p>';
+      // Mini product previews
+      if(b.featuredProducts&&b.featuredProducts.length){
+        h+='<div class="sh-banner-products">';
+        b.featuredProducts.slice(0,4).forEach(function(p){
+          if(!p.image)return;
+          h+='<a href="'+esc(p.link)+'" class="sh-banner-product-mini">';
+          h+='<img src="'+esc(p.image)+'" alt="" loading="lazy">';
+          if(p.discount>0)h+='<span class="sh-banner-discount">-'+p.discount+'%</span>';
+          h+='</a>';
+        });
+        h+='</div>';
+      }
+      h+='<a href="'+esc(b.ctaLink)+'" class="sh-banner-cta">'+esc(b.cta)+'</a>';
+      h+='</div>';
+      // Hero product image (right side)
+      if(b.heroImage){
+        h+='<div class="sh-banner-hero-img">';
+        h+='<img src="'+esc(b.heroImage)+'" alt="" loading="lazy">';
+        h+='</div>';
+      }
+      // Marquee ticker for sale banners
+      if(b.type==='sale'&&b.featuredProducts&&b.featuredProducts.length>1){
+        var ticker=b.featuredProducts.map(function(p){return p.title+(p.discount>0?' (-'+p.discount+'%)':'')}).join('    ·    ');
+        h+='<div class="sh-banner-marquee"><span>'+esc(ticker)+'    ·    '+esc(ticker)+'</span></div>';
+      }
+      h+='</div>';
+    });
+    // Navigation dots
+    if(_bannerTotal>1){
+      h+='<div class="sh-banner-dots">';
+      banners.forEach(function(_,i){h+='<button class="sh-banner-dot'+(i===0?' active':'')+'" data-idx="'+i+'"></button>'});
+      h+='</div>';
+      h+='<button class="sh-banner-arr prev" data-dir="-1">&#8249;</button>';
+      h+='<button class="sh-banner-arr next" data-dir="1">&#8250;</button>';
+    }
+    h+='</div>';
+
+    // Side card
+    h+='<div class="sh-hero-side-card" id="dh-side-card">';
+    if(sideCardData&&sideCardData.products&&sideCardData.products.length){
+      h+=renderSideCard(sideCardData);
+    } else {
+      h+='<h3>Trending</h3><div class="sh-hc-grid">';
+      for(var i=0;i<4;i++)h+='<div style="aspect-ratio:1;background:#f7f7f8;border-radius:6px"></div>';
+      h+='</div>';
+    }
+    h+='</div>';
+
+    heroRow.innerHTML=h;
+    initBannerCarousel();
+  }
+
+  function renderSideCard(card){
+    var h='<h3>'+esc(card.title)+'</h3>';
+    h+='<div class="sh-hc-grid">';
+    (card.products||[]).slice(0,4).forEach(function(p){
+      h+='<a href="'+esc(p.link||'#')+'" class="sh-hc-item">';
+      if(p.image)h+='<img src="'+esc(p.image)+'" alt="'+esc(p.title)+'" loading="lazy">';
+      else if(p.isCategory)h+='<div style="width:100%;aspect-ratio:1;background:linear-gradient(135deg,'+NAVY+','+RED+');border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">'+esc(p.title)+'</div>';
+      else h+='<div style="width:100%;aspect-ratio:1;background:#f7f7f8;border-radius:6px"></div>';
+      if(p.title&&!p.isCategory)h+='<span>'+esc(p.title)+'</span>';
+      if(p.price)h+='<span style="font-size:10px;font-weight:700;color:'+RED+'">$'+parseFloat(p.price).toFixed(2)+'</span>';
+      h+='</a>';
+    });
+    h+='</div>';
+    if(card.linkText)h+='<a href="'+esc(card.link||'#')+'" class="sh-hc-link">'+esc(card.linkText)+' ›</a>';
+    return h;
+  }
+
+  function renderGridCards(gridCards){
+    var el=document.getElementById('dh-home-cards');
+    if(!el)return;
+    if(!gridCards||!gridCards.length){el.style.display='none';return}
+    var h='';
+    gridCards.slice(0,4).forEach(function(card){
+      h+='<div class="sh-home-card">';
+      h+='<h3>'+esc(card.title)+'</h3>';
+      h+='<div class="sh-hc-grid">';
+      (card.products||[]).slice(0,4).forEach(function(p){
+        h+='<a href="'+esc(p.link||'#')+'" class="sh-hc-item">';
+        if(p.image)h+='<img src="'+esc(p.image)+'" alt="'+esc(p.title)+'" loading="lazy">';
+        else if(p.isCategory)h+='<div style="width:100%;aspect-ratio:1;background:linear-gradient(135deg,'+NAVY+','+RED+');border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">'+esc(p.title)+'</div>';
+        else h+='<div style="width:100%;aspect-ratio:1;background:#f7f7f8;border-radius:6px"></div>';
+        if(p.title)h+='<span>'+esc(p.title)+'</span>';
+        if(p.price)h+='<span style="font-size:10px;font-weight:700;color:'+RED+'">$'+parseFloat(p.price).toFixed(2)+'</span>';
+        h+='</a>';
+      });
+      h+='</div>';
+      if(card.linkText)h+='<a href="'+esc(card.link||'#')+'" class="sh-hc-link">'+esc(card.linkText)+' ›</a>';
+      h+='</div>';
+    });
+    el.innerHTML=h;
+  }
+
+  function initBannerCarousel(){
+    if(_bannerTotal<=1)return;
+    var slider=document.getElementById('sh-banner-slider');
+    if(!slider)return;
+    var paused=false;
 
     function goTo(idx){
-      current=((idx%count)+count)%count;
-      var slides=carousel.querySelectorAll('.dh-hero-slide');
-      var dots=carousel.querySelectorAll('.dh-hero-dot');
-      slides.forEach(function(s,i){s.style.opacity=i===current?'1':'0';s.style.zIndex=i===current?'2':'1'});
-      dots.forEach(function(d,i){d.style.width=i===current?'20px':'8px';d.style.background=i===current?RED:'rgba(255,255,255,0.4)'});
+      _bannerCurrent=((idx%_bannerTotal)+_bannerTotal)%_bannerTotal;
+      slider.querySelectorAll('.sh-banner-slide').forEach(function(s,i){s.classList.toggle('active',i===_bannerCurrent)});
+      slider.querySelectorAll('.sh-banner-dot').forEach(function(d,i){d.classList.toggle('active',i===_bannerCurrent)});
     }
-    function next(){if(!paused)goTo(current+1)}
-    timer=setInterval(next,5000);
+    function next(){if(!paused)goTo(_bannerCurrent+1)}
 
-    carousel.addEventListener('mouseenter',function(){paused=true});
-    carousel.addEventListener('mouseleave',function(){paused=false});
-    carousel.querySelectorAll('.dh-hero-arr').forEach(function(btn){
-      btn.addEventListener('click',function(e){e.preventDefault();goTo(current+parseInt(this.dataset.dir))});
+    clearInterval(_bannerTimer);
+    _bannerTimer=setInterval(next,6000);
+
+    slider.addEventListener('mouseenter',function(){paused=true});
+    slider.addEventListener('mouseleave',function(){paused=false});
+    slider.querySelectorAll('.sh-banner-arr').forEach(function(btn){
+      btn.addEventListener('click',function(e){e.preventDefault();goTo(_bannerCurrent+parseInt(this.dataset.dir));clearInterval(_bannerTimer);_bannerTimer=setInterval(next,6000)});
     });
-    carousel.querySelectorAll('.dh-hero-dot').forEach(function(dot){
-      dot.addEventListener('click',function(){goTo(parseInt(this.dataset.dot))});
+    slider.querySelectorAll('.sh-banner-dot').forEach(function(dot){
+      dot.addEventListener('click',function(){goTo(parseInt(this.dataset.idx));clearInterval(_bannerTimer);_bannerTimer=setInterval(next,6000)});
     });
   }
 
@@ -640,7 +796,7 @@
   // ============================================================
   function injectStyles(){
     var css=document.createElement('style');
-    css.textContent='@media(max-width:1024px){.dh-grid{grid-template-columns:repeat(3,1fr)!important}.dh-hero-grid{grid-template-columns:1fr!important}.dh-cat-banners{grid-template-columns:1fr!important}.dh-stats-grid{grid-template-columns:repeat(3,1fr)!important}.dh-cat-circles{grid-template-columns:repeat(4,1fr)!important}.dh-usp-grid{grid-template-columns:repeat(2,1fr)!important}}@media(max-width:768px){.dh-grid{grid-template-columns:repeat(2,1fr)!important}.dh-hero-grid{grid-template-columns:1fr!important}#dh-hero-carousel{aspect-ratio:1.5!important}.dh-cat-circles{grid-template-columns:repeat(4,1fr)!important}.dh-stats-grid{grid-template-columns:1fr!important}.dh-usp-grid{grid-template-columns:repeat(2,1fr)!important}}.dh-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.08);transform:translateY(-2px);transition:all 0.2s}.dh-card{transition:all 0.2s}';
+    css.textContent='@media(max-width:1024px){.dh-grid{grid-template-columns:repeat(3,1fr)!important}.dh-cat-banners{grid-template-columns:1fr!important}.dh-stats-grid{grid-template-columns:repeat(3,1fr)!important}.dh-cat-circles{grid-template-columns:repeat(4,1fr)!important}.dh-usp-grid{grid-template-columns:repeat(2,1fr)!important}}@media(max-width:768px){.dh-grid{grid-template-columns:repeat(2,1fr)!important}.dh-cat-circles{grid-template-columns:repeat(4,1fr)!important}.dh-stats-grid{grid-template-columns:1fr!important}.dh-usp-grid{grid-template-columns:repeat(2,1fr)!important}}.dh-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.08);transform:translateY(-2px);transition:all 0.2s}.dh-card{transition:all 0.2s}';
     document.head.appendChild(css);
   }
 
@@ -668,26 +824,18 @@
     // Build hero IMMEDIATELY with placeholder, then populate with API data
     var heroContainer=document.getElementById('dh-sec-hero');
     buildHeroPlaceholder(heroContainer);
-    apiFetch('/api/trending').then(function(data){
-      buildHero(heroContainer,data.results||data.products||data||[]);
-    }).catch(function(){
-      // Keep the placeholder — it's already showing a nice hero
-    });
-    // Load hero side card thumbnails in parallel (not chained to trending)
-    apiFetch('/api/flash-deals').then(function(fd){
-      var items=fd.results||fd.products||fd||[];
-      if(items[0]&&items[0].image){
-        var el=document.getElementById('dh-hero-flash-thumb');
-        if(el)el.innerHTML='<img src="'+esc(items[0].image)+'" style="width:100%;height:100%;object-fit:contain">';
+    // Load banners + home cards in parallel
+    var bannersP=apiFetch('/api/banners',3600000).catch(function(){return {banners:[]}});
+    var cardsP=apiFetch('/api/home-cards',3600000).catch(function(){return {sideCard:null,gridCards:[]}});
+    Promise.all([bannersP,cardsP]).then(function(res){
+      var banners=(res[0]&&res[0].banners)||[];
+      var sideCard=(res[1]&&res[1].sideCard)||null;
+      var gridCards=(res[1]&&res[1].gridCards)||[];
+      if(banners.length){
+        renderBannerCarousel(banners,sideCard);
+        renderGridCards(gridCards);
       }
-    }).catch(function(){});
-    apiFetch('/api/bestsellers').then(function(bs){
-      var items=bs.results||bs.products||bs||[];
-      if(items[0]&&items[0].image){
-        var el=document.getElementById('dh-hero-bs-thumb');
-        if(el)el.innerHTML='<img src="'+esc(items[0].image)+'" style="width:100%;height:100%;object-fit:contain">';
-      }
-    }).catch(function(){});
+    }).catch(function(){/* keep placeholder */});
 
     // Build remaining sections
     buildBecauseYouSearched(document.getElementById('dh-sec-because-searched'));

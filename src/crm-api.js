@@ -13,12 +13,164 @@ function auth(req, res, next) {
   next();
 }
 
+// ═══════════════════════════════════════════
+// SHOPIFY ORDER HYDRATION
+// Pulls orders from Shopify Admin API into db.orders
+// Solves ephemeral filesystem issue on Render
+// ═══════════════════════════════════════════
+let lastHydration = 0;
+const HYDRATION_COOLDOWN = 60000; // 1 min cooldown
+
+async function hydrateOrdersFromShopify(force = false) {
+  const now = Date.now();
+  if (!force && (now - lastHydration) < HYDRATION_COOLDOWN && Object.keys(db.orders).length > 0) {
+    return; // skip if recently hydrated and we have data
+  }
+
+  try {
+    const domain = process.env.SHOPIFY_STORE_DOMAIN;
+    const token = process.env.SHOPIFY_ADMIN_TOKEN;
+    if (!domain || !token) {
+      logger.warn('crm', 'Shopify not configured — skipping order hydration');
+      return;
+    }
+
+    // Fetch up to 250 recent orders from Shopify
+    const resp = await fetch(
+      `https://${domain}/admin/api/2024-01/orders.json?status=any&limit=250&order=created_at+desc&fields=id,name,order_number,email,total_price,subtotal_price,total_tax,currency,financial_status,fulfillment_status,line_items,shipping_address,customer,created_at,cancelled_at,fulfillments,refunds,note`,
+      {
+        headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(20000)
+      }
+    );
+
+    if (!resp.ok) {
+      logger.error('crm', `Shopify orders API returned ${resp.status}`);
+      return;
+    }
+
+    const data = await resp.json();
+    const orders = data.orders || [];
+    let added = 0;
+    let updated = 0;
+
+    for (const o of orders) {
+      const existing = db.orders[o.id];
+
+      // Detect source from vendors
+      const vendors = (o.line_items || []).map(i => (i.vendor || '').toLowerCase());
+      let source = 'unknown';
+      if (vendors.some(v => v.includes('amazon'))) source = 'amazon';
+      else if (vendors.some(v => v.includes('aliexpress'))) source = 'aliexpress';
+      else if (vendors.some(v => v.includes('sephora'))) source = 'sephora';
+      else if (vendors.some(v => v.includes('macy'))) source = 'macys';
+      else if (vendors.some(v => v.includes('shein'))) source = 'shein';
+
+      const manualSources = ['sephora', 'macys', 'shein'];
+      const requiresManual = (o.line_items || []).some(i =>
+        manualSources.some(s => (i.vendor || '').toLowerCase().includes(s))
+      );
+
+      const cost = (o.line_items || []).reduce((s, i) =>
+        s + (parseFloat(i.price) * (i.quantity || 1) * 0.60), 0);
+      const total = parseFloat(o.total_price || 0);
+
+      // Get tracking from fulfillments
+      let tracking = null, trackingUrl = null, trackingCompany = null, fulfilledAt = null;
+      if (o.fulfillments && o.fulfillments.length) {
+        const f = o.fulfillments[o.fulfillments.length - 1];
+        tracking = f.tracking_number || null;
+        trackingUrl = f.tracking_url || null;
+        trackingCompany = f.tracking_company || null;
+        fulfilledAt = f.created_at || null;
+      }
+
+      // Calculate refund amount
+      let refundAmount = 0;
+      if (o.refunds && o.refunds.length) {
+        for (const r of o.refunds) {
+          refundAmount += (r.transactions || []).reduce((s, t) => s + parseFloat(t.amount || 0), 0);
+        }
+      }
+
+      const orderData = {
+        id: o.id,
+        shopifyId: o.id,
+        number: o.name || '#' + o.order_number,
+        email: o.customer?.email || o.email || '',
+        customerName: ((o.customer?.first_name || '') + ' ' + (o.customer?.last_name || '')).trim(),
+        customerId: o.customer?.id,
+        total: total,
+        subtotal: parseFloat(o.subtotal_price || 0),
+        tax: parseFloat(o.total_tax || 0),
+        currency: o.currency || 'USD',
+        financialStatus: o.financial_status || 'pending',
+        fulfillmentStatus: o.fulfillment_status || null,
+        items: (o.line_items || []).map(i => ({
+          id: i.id,
+          title: i.title,
+          variant: i.variant_title,
+          price: parseFloat(i.price),
+          quantity: i.quantity || 1,
+          image: i.image?.src || null,
+          vendor: i.vendor || 'Unknown',
+          sku: i.sku,
+          productId: i.product_id
+        })),
+        shippingAddress: o.shipping_address || null,
+        estimatedCost: Math.round(cost * 100) / 100,
+        estimatedProfit: Math.round((total - cost) * 100) / 100,
+        tracking,
+        trackingUrl,
+        trackingCompany,
+        fulfilledAt,
+        cancelledAt: o.cancelled_at || null,
+        refundAmount,
+        returnId: null,
+        source,
+        requiresManual,
+        notes: existing?.notes || o.note || '',
+        createdAt: o.created_at || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        events: existing?.events || [{ type: 'created', at: o.created_at || new Date().toISOString() }]
+      };
+
+      // Preserve CRM-specific data from existing entry
+      if (existing) {
+        orderData.notes = existing.notes || orderData.notes;
+        orderData.events = existing.events || orderData.events;
+        orderData.returnId = existing.returnId || null;
+        updated++;
+      } else {
+        added++;
+      }
+
+      db.orders[o.id] = orderData;
+    }
+
+    save('orders');
+    lastHydration = Date.now();
+    logger.info('crm', `[Hydration] Synced ${orders.length} orders from Shopify (${added} new, ${updated} updated)`);
+  } catch (e) {
+    logger.error('crm', `[Hydration] Failed: ${e.message}`);
+  }
+}
+
 function setupCRMApi(app) {
+  // Hydrate orders from Shopify on first load
+  setTimeout(() => hydrateOrdersFromShopify(true), 5000);
+  // Re-hydrate every 5 minutes
+  setInterval(() => hydrateOrdersFromShopify(), 5 * 60 * 1000);
 
   // ═══════════════════════════════════════════
   // DASHBOARD METRICS
   // ═══════════════════════════════════════════
-  app.get('/api/crm/dashboard', auth, (req, res) => {
+  app.get('/api/crm/dashboard', auth, async (req, res) => {
+    // Ensure orders are hydrated from Shopify
+    if (Object.keys(db.orders).length === 0) {
+      await hydrateOrdersFromShopify(true);
+    }
+
     const all = Object.values(db.orders);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -51,6 +203,30 @@ function setupCRMApi(app) {
     const pendingReturns = returns.filter(r => r.status === 'pending');
     const pendingReviews = db.reviews.filter(r => r.status === 'pending');
 
+    // Get AutoDS stats if available
+    let autodsStats = null;
+    try {
+      const autods = require('./services/autods');
+      autodsStats = autods.getAutodsStats();
+    } catch (e) {}
+
+    // Get cron status if available
+    let cronStatus = null;
+    try {
+      const cron = require('./services/cron');
+      cronStatus = cron.getCronStatus();
+    } catch (e) {}
+
+    // Build recent activity from orders
+    const recent = all
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 30)
+      .map(o => ({
+        ...o,
+        action: `Order ${o.number} — $${(o.total || 0).toFixed(2)} (${o.source || 'unknown'})`,
+        timestamp: o.createdAt
+      }));
+
     res.json({
       overview: {
         totalOrders: all.length,
@@ -74,19 +250,25 @@ function setupCRMApi(app) {
         pendingReviews: pendingReviews.length
       },
       bySource,
-      recent: all.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 30)
+      recent,
+      autods: autodsStats,
+      cron: cronStatus
     });
   });
 
   // ═══════════════════════════════════════════
   // ORDERS
   // ═══════════════════════════════════════════
-  app.get('/api/crm/orders', auth, (req, res) => {
+  app.get('/api/crm/orders', auth, async (req, res) => {
+    // Ensure orders are hydrated
+    if (Object.keys(db.orders).length === 0) {
+      await hydrateOrdersFromShopify(true);
+    }
     const { status, source, q } = req.query;
     let list = Object.values(db.orders);
 
     if (status === 'pending') list = list.filter(o => !o.fulfillmentStatus && o.financialStatus !== 'cancelled');
-    else if (status === 'fulfilled') list = list.filter(o => o.fulfillmentStatus === 'fulfilled');
+    else if (status === 'fulfilled' || status === 'shipped') list = list.filter(o => o.fulfillmentStatus === 'fulfilled');
     else if (status === 'cancelled') list = list.filter(o => o.financialStatus === 'cancelled');
     else if (status === 'manual') list = list.filter(o => o.requiresManual && !o.fulfillmentStatus && o.financialStatus !== 'cancelled');
     else if (status === 'returns') list = list.filter(o => o.returnId);
@@ -469,7 +651,7 @@ function setupCRMApi(app) {
         const email = c.email || '';
         const custOrders = orders.filter(function(o) { return o.customerEmail === email; });
         const custReturns = returns.filter(function(r) { return r.customerEmail === email; });
-        const totalSpent = custOrders.reduce(function(sum, o) { return sum + parseFloat(o.totalPrice || 0); }, 0);
+        const totalSpent = custOrders.reduce(function(sum, o) { return sum + parseFloat(o.total || o.totalPrice || 0); }, 0);
         const orderCount = c.orders_count || custOrders.length;
 
         let segment = 'regular';
@@ -536,7 +718,7 @@ function setupCRMApi(app) {
       const custReturns = returns.filter(function(r) { return r.customerEmail === email; });
       const custReviews = reviews.filter(function(r) { return r.customerEmail === email; });
       const custTickets = tickets.filter(function(t) { return t.customerEmail === email; });
-      const totalSpent = custOrders.reduce(function(s, o) { return s + parseFloat(o.totalPrice || 0); }, 0);
+      const totalSpent = custOrders.reduce(function(s, o) { return s + parseFloat(o.total || o.totalPrice || 0); }, 0);
 
       res.json({
         customer: {
@@ -566,8 +748,12 @@ function setupCRMApi(app) {
 
   // ─── ANALYTICS (data real de orders + returns) ───
 
-  app.get('/api/crm/analytics', auth, function(req, res) {
+  app.get('/api/crm/analytics', auth, async function(req, res) {
     try {
+      // Ensure orders are hydrated
+      if (Object.keys(db.orders).length === 0) {
+        await hydrateOrdersFromShopify(true);
+      }
       const orders = Object.values(db.orders || {});
       const returns = Object.values(db.returns || {});
 
@@ -584,7 +770,7 @@ function setupCRMApi(app) {
       filtered.forEach(function(o) {
         const day = (o.createdAt || '').substring(0, 10);
         if (!day) return;
-        revenueByDay[day] = (revenueByDay[day] || 0) + parseFloat(o.totalPrice || 0);
+        revenueByDay[day] = (revenueByDay[day] || 0) + parseFloat(o.total || o.totalPrice || 0);
         ordersByDay[day] = (ordersByDay[day] || 0) + 1;
       });
 
@@ -593,7 +779,7 @@ function setupCRMApi(app) {
       const ordersBySource = {};
       filtered.forEach(function(o) {
         const src = o.source || 'unknown';
-        revenueBySource[src] = (revenueBySource[src] || 0) + parseFloat(o.totalPrice || 0);
+        revenueBySource[src] = (revenueBySource[src] || 0) + parseFloat(o.total || o.totalPrice || 0);
         ordersBySource[src] = (ordersBySource[src] || 0) + 1;
       });
 
@@ -621,17 +807,35 @@ function setupCRMApi(app) {
         .sort(function(a, b) { return b[1] - a[1]; })
         .map(function(e) { return { reason: e[0], count: e[1] }; });
 
-      const totalRevenue = filtered.reduce(function(s, o) { return s + parseFloat(o.totalPrice || 0); }, 0);
-      const totalProfit = filtered.reduce(function(s, o) { return s + parseFloat(o.profit || 0); }, 0);
+      const totalRevenue = filtered.reduce(function(s, o) { return s + parseFloat(o.total || o.totalPrice || 0); }, 0);
+      const totalProfit = filtered.reduce(function(s, o) { return s + parseFloat(o.estimatedProfit || o.profit || 0); }, 0);
+
+      // Build daily revenue array for chart
+      const days = Object.keys(revenueByDay).sort();
+      const dailyRevenue = days.map(d => revenueByDay[d] || 0);
+
+      // Build top products list for frontend
+      const topProductsList = topProducts.map(p => ({
+        name: p.title,
+        count: p.count,
+        revenue: Math.round(p.revenue * 100) / 100
+      }));
 
       res.json({
         period: period,
+        overview: {
+          revenue: Math.round(totalRevenue * 100) / 100,
+          profit: Math.round(totalProfit * 100) / 100,
+          margin: totalRevenue > 0 ? Math.round(totalProfit / totalRevenue * 1000) / 10 : 0,
+          totalOrders: filtered.length
+        },
+        daily_revenue: dailyRevenue,
+        top_products: topProductsList,
+        top_return_reasons: topReasons,
         revenueByDay: revenueByDay,
         ordersByDay: ordersByDay,
         revenueBySource: revenueBySource,
         ordersBySource: ordersBySource,
-        topProducts: topProducts,
-        topReturnReasons: topReasons,
         totals: {
           revenue: Math.round(totalRevenue * 100) / 100,
           profit: Math.round(totalProfit * 100) / 100,
@@ -674,7 +878,17 @@ function setupCRMApi(app) {
     }
   });
 
-  logger.info('crm', 'CRM Pro endpoints loaded (customers, analytics, settings)');
+  // ─── MANUAL REFRESH: Force re-hydrate orders from Shopify ───
+  app.post('/api/crm/refresh-orders', auth, async function(req, res) {
+    try {
+      await hydrateOrdersFromShopify(true);
+      res.json({ success: true, orderCount: Object.keys(db.orders).length });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  logger.info('crm', 'CRM Pro endpoints loaded (customers, analytics, settings, hydration)');
 }
 
-module.exports = { setupCRMApi };
+module.exports = { setupCRMApi, hydrateOrdersFromShopify };

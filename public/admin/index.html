@@ -263,6 +263,18 @@ tbody tr:last-child td{border-bottom:none}
         </div>
       </div>
       <div class="nav-section">
+        <div class="nav-section-label">Operations</div>
+        <div class="nav-item" data-page="autods" onclick="switchPage('autods')">
+          <span class="icon">🤖</span>
+          <span class="text">AutoDS</span>
+          <span class="badge" id="autodsBadge" style="background:var(--purple)">0</span>
+        </div>
+        <div class="nav-item" data-page="cron" onclick="switchPage('cron')">
+          <span class="icon">⏱</span>
+          <span class="text">Cron Jobs</span>
+        </div>
+      </div>
+      <div class="nav-section">
         <div class="nav-section-label">Insights</div>
         <div class="nav-item" data-page="analytics" onclick="switchPage('analytics')">
           <span class="icon">📈</span>
@@ -288,9 +300,12 @@ tbody tr:last-child td{border-bottom:none}
 
     <!-- PAGE: OVERVIEW -->
     <div id="page-overview" class="page active" style="padding:20px">
-      <div class="page-header">
-        <div class="page-title">Dashboard Overview</div>
-        <div class="page-subtitle">Real-time metrics and alerts</div>
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="page-title">Dashboard Overview</div>
+          <div class="page-subtitle">Real-time metrics and alerts — synced from Shopify</div>
+        </div>
+        <button class="btn btn-g" onclick="refreshOrdersFromShopify()">🔄 Refresh from Shopify</button>
       </div>
 
       <!-- ALERTS BAR -->
@@ -534,6 +549,83 @@ tbody tr:last-child td{border-bottom:none}
       <div id="suppliersTable" class="loading">Loading supplier data...</div>
     </div>
 
+    <!-- PAGE: AUTODS -->
+    <div id="page-autods" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">AutoDS Integration</div>
+        <div class="page-subtitle">Order fulfillment automation and product tracking</div>
+      </div>
+
+      <!-- AutoDS KPIs -->
+      <div class="card-grid" id="autodsKPIs">
+        <div class="stat-card">
+          <div class="stat-label">Tracked Products</div>
+          <div class="stat-value" id="ad-products">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Linked to AutoDS</div>
+          <div class="stat-value" id="ad-linked">0</div>
+          <div class="stat-sub" id="ad-linkrate">0% link rate</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Orders</div>
+          <div class="stat-value" id="ad-orders">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ready for AutoDS</div>
+          <div class="stat-value" id="ad-ready" style="color:var(--green)">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pending Review</div>
+          <div class="stat-value" id="ad-pending" style="color:var(--amber)">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Errors</div>
+          <div class="stat-value" id="ad-errors" style="color:var(--red)">0</div>
+        </div>
+      </div>
+
+      <!-- AutoDS Actions -->
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+        <button class="btn btn-r" onclick="autodsDownloadCSV()">Download CSV for AutoDS</button>
+        <button class="btn btn-g" onclick="autodsSyncExisting()">Sync All Mappings</button>
+        <button class="btn btn-g" onclick="autodsRefresh()">Refresh Stats</button>
+      </div>
+
+      <!-- AutoDS Orders -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="page-subtitle" style="margin-bottom:12px">Recent AutoDS Orders</div>
+        <div id="autodsOrdersTable" class="loading">Loading AutoDS orders...</div>
+      </div>
+
+      <!-- AutoDS Pending Products -->
+      <div class="card">
+        <div class="page-subtitle" style="margin-bottom:12px">Pending Products (Not Linked)</div>
+        <div id="autodsPendingTable" class="loading">Loading pending products...</div>
+      </div>
+    </div>
+
+    <!-- PAGE: CRON JOBS -->
+    <div id="page-cron" class="page" style="padding:20px">
+      <div class="page-header">
+        <div class="page-title">Cron Jobs</div>
+        <div class="page-subtitle">Automated scheduled tasks</div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="page-subtitle">Task Schedule</div>
+          <span class="bdg" id="cronStatusBadge">Loading...</span>
+        </div>
+        <div id="cronTasksTable" class="loading">Loading cron tasks...</div>
+      </div>
+
+      <div class="card">
+        <div class="page-subtitle" style="margin-bottom:12px">Recent Task History</div>
+        <div id="cronHistoryTable" class="loading">Loading history...</div>
+      </div>
+    </div>
+
     <!-- PAGE: SETTINGS -->
     <div id="page-settings" class="page" style="padding:20px">
       <div class="page-header">
@@ -682,6 +774,8 @@ function switchPage(pageName) {
   else if (pageName === 'analytics') loadAnalytics();
   else if (pageName === 'suppliers') loadSuppliers();
   else if (pageName === 'settings') loadSettings();
+  else if (pageName === 'autods') loadAutoDS();
+  else if (pageName === 'cron') loadCronJobs();
 }
 
 // ──────────────────── DASHBOARD (OVERVIEW) ────────────────────
@@ -742,13 +836,23 @@ async function loadDashboard() {
   } catch (e) {}
 
   // Activity feed
-  if (data.recent) {
+  if (data.recent && data.recent.length > 0) {
     let html = '<div style="display:grid;gap:8px;font-size:11px">';
     data.recent.forEach(item => {
-      html += `<div style="padding:6px;border-bottom:1px solid var(--border)"><div style="color:var(--text)">${item.action}</div><div style="color:var(--text3);font-size:9px">${new Date(item.timestamp).toLocaleString()}</div></div>`;
+      const action = item.action || `Order ${item.number} — $${(item.total||0).toFixed(2)}`;
+      const ts = item.timestamp || item.createdAt;
+      html += `<div style="padding:6px;border-bottom:1px solid var(--border)"><div style="color:var(--text)">${action}</div><div style="color:var(--text3);font-size:9px">${ts ? new Date(ts).toLocaleString() : 'N/A'}</div></div>`;
     });
     html += '</div>';
     document.getElementById('activityFeed').innerHTML = html;
+  } else {
+    document.getElementById('activityFeed').innerHTML = '<div class="empty-state">No recent activity</div>';
+  }
+
+  // AutoDS badge
+  if (data.autods && data.autods.summary) {
+    const pending = (data.autods.summary.totalProducts || 0) - (data.autods.summary.linkedProducts || 0);
+    document.getElementById('autodsBadge').textContent = pending.toString();
   }
 }
 
@@ -770,21 +874,29 @@ async function loadOrders() {
   let html = '<div class="table-wrap"><table><thead><tr><th>Order #</th><th>Customer</th><th>Items</th><th>Total</th><th>Source</th><th>Status</th><th>Profit</th><th>Date</th><th>Action</th></tr></thead><tbody>';
 
   orders.forEach(order => {
-    const source = order.source || 'N/A';
-    const status = order.status || 'pending';
-    const sourceBadge = `<span class="src s-${source.toLowerCase()}">${source.substring(0,3).toUpperCase()}</span>`;
-    const statusBadge = `<span class="bdg" style="background:rgba(${status === 'shipped' ? '34,197,94' : '229,62,62'}, .1);color:${status === 'shipped' ? 'var(--green)' : 'var(--red)'}">● ${status}</span>`;
+    const source = order.source || 'unknown';
+    const fulfillment = order.fulfillmentStatus || order.fulfillment_status;
+    const financial = order.financialStatus || order.financial_status || 'pending';
+    let status = 'pending';
+    let statusColor = 'var(--amber)';
+    if (financial === 'cancelled') { status = 'cancelled'; statusColor = 'var(--red)'; }
+    else if (financial === 'refunded') { status = 'refunded'; statusColor = 'var(--red)'; }
+    else if (fulfillment === 'fulfilled') { status = 'shipped'; statusColor = 'var(--green)'; }
+    else if (order.requiresManual) { status = 'manual'; statusColor = 'var(--purple)'; }
+    const sourceBadge = `<span class="src s-${source.substring(0,4).toLowerCase()}">${source.substring(0,3).toUpperCase()}</span>`;
+    const statusBadge = `<span class="bdg" style="background:rgba(${statusColor === 'var(--green)' ? '34,197,94' : statusColor === 'var(--red)' ? '229,62,62' : statusColor === 'var(--purple)' ? '139,92,246' : '245,158,11'}, .1);color:${statusColor}">● ${status}</span>`;
 
+    const profit = order.estimatedProfit || order.profit || 0;
     html += `<tr>
-      <td class="mono-text">#${order.id}</td>
+      <td class="mono-text">${order.number || '#' + order.id}</td>
       <td><div style="font-size:11px">${order.customerName || order.customer_name || 'N/A'}</div><div style="font-size:9px;color:var(--text3)">${order.email || order.customer_email || ''}</div></td>
       <td class="mono-text">${order.items?.length || order.item_count || 1}</td>
       <td class="mono-text">$${(order.total || 0).toFixed(2)}</td>
       <td>${sourceBadge}</td>
       <td>${statusBadge}</td>
-      <td class="mono-text" style="color:var(--green)">$${(order.profit || 0).toFixed(2)}</td>
+      <td class="mono-text" style="color:var(--green)">$${profit.toFixed(2)}</td>
       <td style="font-size:9px">${new Date(order.createdAt || order.created_at).toLocaleDateString()}</td>
-      <td><button class="btn btn-g btn-sm" onclick="fulfillOrder('${order.id}')">Fulfill</button></td>
+      <td>${status === 'pending' || status === 'manual' ? `<button class="btn btn-g btn-sm" onclick="fulfillOrder('${order.id}')">Fulfill</button>` : ''}</td>
     </tr>`;
   });
 
@@ -1143,6 +1255,199 @@ async function saveSettings() {
     msg.textContent = 'Failed to save settings';
   }
   setTimeout(() => msg.textContent = '', 3000);
+}
+
+// ──────────────────── AUTODS ────────────────────
+async function loadAutoDS() {
+  try {
+    const resp = await fetch(`/api/admin/autods/stats?token=${encodeURIComponent(token)}`);
+    const stats = await resp.json();
+
+    if (stats.summary) {
+      document.getElementById('ad-products').textContent = stats.summary.totalProducts || 0;
+      document.getElementById('ad-linked').textContent = stats.summary.linkedProducts || 0;
+      document.getElementById('ad-linkrate').textContent = (stats.summary.linkRate || 0) + '% link rate';
+      document.getElementById('ad-orders').textContent = stats.summary.totalOrders || 0;
+      document.getElementById('ad-ready').textContent = stats.summary.readyOrders || 0;
+      document.getElementById('ad-pending').textContent = stats.summary.pendingOrders || 0;
+      document.getElementById('ad-errors').textContent = stats.summary.errorOrders || 0;
+    }
+  } catch (e) {
+    console.error('AutoDS stats error:', e);
+  }
+
+  // Load orders
+  try {
+    const resp = await fetch(`/api/admin/autods/orders?token=${encodeURIComponent(token)}`);
+    const data = await resp.json();
+    const orders = data.orders || [];
+
+    if (orders.length === 0) {
+      document.getElementById('autodsOrdersTable').innerHTML = '<div class="empty-state">No AutoDS orders yet — orders appear when customers purchase synced products.</div>';
+    } else {
+      let html = '<div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th></tr></thead><tbody>';
+      orders.slice(0, 20).forEach(o => {
+        const statusColor = o.autods_status === 'ready' ? 'var(--green)' : o.autods_status === 'error' ? 'var(--red)' : 'var(--amber)';
+        html += `<tr>
+          <td class="mono-text">${o.shopify_order_name || '#' + o.shopify_order_id}</td>
+          <td><div style="font-size:11px">${o.customer_name || 'N/A'}</div><div style="font-size:9px;color:var(--text3)">${o.customer_email || ''}</div></td>
+          <td class="mono-text">${o.items?.length || 0}</td>
+          <td class="mono-text">$${parseFloat(o.total_price || 0).toFixed(2)}</td>
+          <td><span class="bdg" style="background:rgba(${o.autods_status === 'ready' ? '34,197,94' : o.autods_status === 'error' ? '229,62,62' : '245,158,11'},.1);color:${statusColor}">● ${o.autods_status}</span></td>
+          <td style="font-size:9px">${new Date(o.created_at).toLocaleDateString()}</td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+      document.getElementById('autodsOrdersTable').innerHTML = html;
+    }
+  } catch (e) {
+    document.getElementById('autodsOrdersTable').innerHTML = '<div class="empty-state">Failed to load AutoDS orders</div>';
+  }
+
+  // Load pending products
+  try {
+    const resp = await fetch(`/api/admin/autods/pending?token=${encodeURIComponent(token)}`);
+    const data = await resp.json();
+    const products = data.products || [];
+
+    if (products.length === 0) {
+      document.getElementById('autodsPendingTable').innerHTML = '<div class="empty-state">All products are linked! No pending items.</div>';
+    } else {
+      let html = '<div class="table-wrap"><table><thead><tr><th>Source</th><th>Source ID</th><th>Shopify Handle</th><th>Source URL</th><th>Action</th></tr></thead><tbody>';
+      products.slice(0, 30).forEach(p => {
+        const sourceBadge = `<span class="src s-${(p.source||'').toLowerCase()}">${(p.source||'N/A').substring(0,3).toUpperCase()}</span>`;
+        html += `<tr>
+          <td>${sourceBadge}</td>
+          <td class="mono-text" style="font-size:9px">${(p.source_id || '').substring(0, 20)}</td>
+          <td style="font-size:10px">${p.shopify_handle || 'N/A'}</td>
+          <td style="font-size:9px"><a href="${p.source_url || '#'}" target="_blank" style="color:var(--blue)">${p.source_url ? 'View' : 'N/A'}</a></td>
+          <td><button class="btn btn-g btn-sm" onclick="autodsMarkLinked('${p.source}','${p.source_id}')">Mark Linked</button></td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+      document.getElementById('autodsPendingTable').innerHTML = html;
+    }
+  } catch (e) {
+    document.getElementById('autodsPendingTable').innerHTML = '<div class="empty-state">Failed to load pending products</div>';
+  }
+}
+
+async function autodsDownloadCSV() {
+  window.open(`/api/admin/autods/csv?download=true&token=${encodeURIComponent(token)}`, '_blank');
+}
+
+async function autodsSyncExisting() {
+  try {
+    const resp = await fetch(`/api/admin/autods/sync-existing?token=${encodeURIComponent(token)}`, { method: 'POST' });
+    const data = await resp.json();
+    alert(`Synced ${data.registered || 0} products to AutoDS tracking`);
+    loadAutoDS();
+  } catch (e) {
+    alert('Sync failed: ' + e.message);
+  }
+}
+
+async function autodsRefresh() {
+  loadAutoDS();
+}
+
+async function autodsMarkLinked(source, sourceId) {
+  try {
+    const resp = await fetch(`/api/admin/autods/mark-linked?token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source, sourceId })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      alert('Product marked as linked in AutoDS');
+      loadAutoDS();
+    }
+  } catch (e) {
+    alert('Failed: ' + e.message);
+  }
+}
+
+// ──────────────────── CRON JOBS ────────────────────
+async function loadCronJobs() {
+  try {
+    const resp = await fetch(`/api/admin/cron/status?token=${encodeURIComponent(token)}`);
+    const data = await resp.json();
+
+    const badge = document.getElementById('cronStatusBadge');
+    if (data.started) {
+      badge.className = 'bdg bdg-gr';
+      badge.textContent = '● Running';
+    } else {
+      badge.className = 'bdg bdg-re';
+      badge.textContent = '● Stopped';
+    }
+
+    // Tasks table
+    const tasks = data.tasks || [];
+    if (tasks.length === 0) {
+      document.getElementById('cronTasksTable').innerHTML = '<div class="empty-state">No cron tasks configured</div>';
+    } else {
+      let html = '<div class="table-wrap"><table><thead><tr><th>Task</th><th>Interval</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+      tasks.forEach(t => {
+        const running = t.running;
+        html += `<tr>
+          <td style="font-size:11px">${t.name}</td>
+          <td class="mono-text">${t.intervalMin} min</td>
+          <td><span class="bdg ${running ? 'bdg-gr' : 'bdg-am'}">● ${running ? 'Active' : 'Waiting'}</span></td>
+          <td><button class="btn btn-g btn-sm" onclick="cronRunTask('${t.key}')">Run Now</button></td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+      document.getElementById('cronTasksTable').innerHTML = html;
+    }
+
+    // History
+    const history = data.recentHistory || [];
+    if (history.length === 0) {
+      document.getElementById('cronHistoryTable').innerHTML = '<div class="empty-state">No task history yet</div>';
+    } else {
+      let html = '<div class="table-wrap"><table><thead><tr><th>Task</th><th>Status</th><th>Details</th><th>Time</th></tr></thead><tbody>';
+      history.slice(0, 30).forEach(h => {
+        const statusBadge = h.status === 'ok' ? 'bdg-gr' : h.status === 'error' ? 'bdg-re' : 'bdg-am';
+        const details = typeof h.details === 'string' ? h.details : JSON.stringify(h.details || '').substring(0, 60);
+        html += `<tr>
+          <td style="font-size:11px">${h.task}</td>
+          <td><span class="bdg ${statusBadge}">● ${h.status}</span></td>
+          <td style="font-size:9px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${details}</td>
+          <td style="font-size:9px">${h.at ? new Date(h.at).toLocaleString() : 'N/A'}</td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+      document.getElementById('cronHistoryTable').innerHTML = html;
+    }
+  } catch (e) {
+    document.getElementById('cronTasksTable').innerHTML = '<div class="empty-state">Failed to load cron status</div>';
+  }
+}
+
+async function cronRunTask(taskKey) {
+  try {
+    const resp = await fetch(`/api/admin/cron/run/${taskKey}?token=${encodeURIComponent(token)}`, { method: 'POST' });
+    const data = await resp.json();
+    alert(`Task "${taskKey}" executed: ${data.result?.status || 'done'}`);
+    loadCronJobs();
+  } catch (e) {
+    alert('Task failed: ' + e.message);
+  }
+}
+
+// ──────────────────── REFRESH ORDERS FROM SHOPIFY ────────────────────
+async function refreshOrdersFromShopify() {
+  try {
+    const resp = await fetch(`/api/crm/refresh-orders?token=${encodeURIComponent(token)}`, { method: 'POST' });
+    const data = await resp.json();
+    alert(`Synced ${data.orderCount || 0} orders from Shopify`);
+    loadDashboard();
+    if (currentPage === 'orders') loadOrders();
+  } catch (e) {
+    alert('Refresh failed: ' + e.message);
+  }
 }
 
 // ──────────────────── UTILITIES ────────────────────

@@ -57,22 +57,58 @@ async function hydrateOrdersFromShopify(force = false) {
     for (const o of orders) {
       const existing = db.orders[o.id];
 
-      // Detect source from vendors
-      const vendors = (o.line_items || []).map(i => (i.vendor || '').toLowerCase());
+      // Detect source: SKU pattern (DH-SOURCE-xxx) > line item properties > vendor name
       let source = 'unknown';
-      if (vendors.some(v => v.includes('amazon'))) source = 'amazon';
-      else if (vendors.some(v => v.includes('aliexpress'))) source = 'aliexpress';
-      else if (vendors.some(v => v.includes('sephora'))) source = 'sephora';
-      else if (vendors.some(v => v.includes('macy'))) source = 'macys';
-      else if (vendors.some(v => v.includes('shein'))) source = 'shein';
+      const items = o.line_items || [];
+
+      for (const item of items) {
+        // Strategy 1: SKU pattern DH-AMAZON-xxx, DH-ALIEXPRESS-xxx, etc.
+        const sku = (item.sku || '').toUpperCase();
+        if (sku.startsWith('DH-')) {
+          const parts = sku.split('-');
+          if (parts.length >= 3) {
+            const src = parts[1].toLowerCase();
+            if (['amazon', 'aliexpress', 'sephora', 'macys', 'shein'].includes(src)) {
+              source = src;
+              break;
+            }
+          }
+        }
+
+        // Strategy 2: Line item properties (_source_store)
+        const props = item.properties || [];
+        const sourceProp = props.find(p => p.name === '_source_store');
+        if (sourceProp && sourceProp.value) {
+          source = sourceProp.value.toLowerCase();
+          break;
+        }
+
+        // Strategy 3: Vendor name fallback
+        const vendor = (item.vendor || '').toLowerCase();
+        if (vendor.includes('amazon')) { source = 'amazon'; break; }
+        else if (vendor.includes('aliexpress')) { source = 'aliexpress'; break; }
+        else if (vendor.includes('sephora')) { source = 'sephora'; break; }
+        else if (vendor.includes('macy')) { source = 'macys'; break; }
+        else if (vendor.includes('shein')) { source = 'shein'; break; }
+      }
 
       const manualSources = ['sephora', 'macys', 'shein'];
-      const requiresManual = (o.line_items || []).some(i =>
-        manualSources.some(s => (i.vendor || '').toLowerCase().includes(s))
-      );
+      const requiresManual = items.some(i => {
+        const sku = (i.sku || '').toUpperCase();
+        if (sku.startsWith('DH-')) {
+          const src = sku.split('-')[1]?.toLowerCase();
+          if (manualSources.includes(src)) return true;
+        }
+        return manualSources.some(s => (i.vendor || '').toLowerCase().includes(s));
+      });
 
-      const cost = (o.line_items || []).reduce((s, i) =>
-        s + (parseFloat(i.price) * (i.quantity || 1) * 0.60), 0);
+      // Cost estimation based on source margins
+      const marginBySource = {
+        aliexpress: 0.45, amazon: 0.70, sephora: 0.75, macys: 0.70, shein: 0.40, unknown: 0.60
+      };
+      const costRatio = marginBySource[source] || 0.60;
+      const cost = items.reduce((s, i) =>
+        s + (parseFloat(i.price) * (i.quantity || 1) * costRatio), 0);
       const total = parseFloat(o.total_price || 0);
 
       // Get tracking from fulfillments

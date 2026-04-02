@@ -23,19 +23,49 @@ function verifyHmac(req) {
 
 function detectSource(items) {
   if (!items || !items.length) return 'unknown';
-  const vendors = items.map(i => (i.vendor || '').toLowerCase());
-  if (vendors.some(v => v.includes('amazon'))) return 'amazon';
-  if (vendors.some(v => v.includes('aliexpress'))) return 'aliexpress';
-  if (vendors.some(v => v.includes('sephora'))) return 'sephora';
-  if (vendors.some(v => v.includes('macy'))) return 'macys';
-  if (vendors.some(v => v.includes('shein'))) return 'shein';
+
+  for (const item of items) {
+    // Strategy 1: SKU pattern DH-AMAZON-xxx, DH-ALIEXPRESS-xxx, etc.
+    const sku = (item.sku || '').toUpperCase();
+    if (sku.startsWith('DH-')) {
+      const parts = sku.split('-');
+      if (parts.length >= 3) {
+        const src = parts[1].toLowerCase();
+        if (['amazon', 'aliexpress', 'sephora', 'macys', 'shein'].includes(src)) {
+          return src;
+        }
+      }
+    }
+
+    // Strategy 2: Line item properties (_source_store)
+    const props = item.properties || [];
+    const sourceProp = props.find(p => p.name === '_source_store');
+    if (sourceProp && sourceProp.value) {
+      return sourceProp.value.toLowerCase();
+    }
+
+    // Strategy 3: Vendor name fallback
+    const vendor = (item.vendor || '').toLowerCase();
+    if (vendor.includes('amazon')) return 'amazon';
+    if (vendor.includes('aliexpress')) return 'aliexpress';
+    if (vendor.includes('sephora')) return 'sephora';
+    if (vendor.includes('macy')) return 'macys';
+    if (vendor.includes('shein')) return 'shein';
+  }
   return 'unknown';
 }
 
 function needsManual(items) {
   if (!items || !items.length) return false;
   const manualSources = ['sephora', 'macys', 'shein'];
-  return items.some(i => manualSources.some(s => (i.vendor || '').toLowerCase().includes(s)));
+  return items.some(i => {
+    const sku = (i.sku || '').toUpperCase();
+    if (sku.startsWith('DH-')) {
+      const src = sku.split('-')[1]?.toLowerCase();
+      if (manualSources.includes(src)) return true;
+    }
+    return manualSources.some(s => (i.vendor || '').toLowerCase().includes(s));
+  });
 }
 
 function setupWebhooks(app) {
@@ -50,8 +80,13 @@ function setupWebhooks(app) {
       const o = req.body;
       if (!o || !o.id) return res.sendStatus(400);
 
+      const detectedSource = detectSource(o.line_items);
+      const marginBySource = {
+        aliexpress: 0.45, amazon: 0.70, sephora: 0.75, macys: 0.70, shein: 0.40, unknown: 0.60
+      };
+      const costRatio = marginBySource[detectedSource] || 0.60;
       const cost = (o.line_items || []).reduce((s, i) =>
-        s + (parseFloat(i.price) * (i.quantity || 1) * 0.60), 0);
+        s + (parseFloat(i.price) * (i.quantity || 1) * costRatio), 0);
 
       db.orders[o.id] = {
         id: o.id,
@@ -87,7 +122,7 @@ function setupWebhooks(app) {
         cancelledAt: null,
         refundAmount: 0,
         returnId: null,
-        source: detectSource(o.line_items),
+        source: detectedSource,
         requiresManual: needsManual(o.line_items),
         notes: '',
         createdAt: o.created_at || new Date().toISOString(),

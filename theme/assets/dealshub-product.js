@@ -840,7 +840,7 @@
       if(r.avatar)h+='<img src="'+esc(r.avatar)+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover" onerror="this.style.display=\'none\'">';
       else h+='<div style="width:32px;height:32px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:14px;color:#9ca3af">'+esc((r.author||'B')[0])+'</div>';
       h+='<div>';
-      h+='<div style="font-size:13px;font-weight:600;color:#333">'+esc(r.author||'Verified Buyer');
+      h+='<div style="font-size:13px;font-weight:600;color:#333">'+esc(r.author||'Verified Buyer')+'';
       if(r.isVerified)h+=' <span style="color:#16a34a;font-size:11px;font-weight:400">&#10003; Verified Purchase</span>';
       h+='</div>';
       if(r.date)h+='<div style="font-size:11px;color:#9ca3af">'+esc(r.date)+'</div>';

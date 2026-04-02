@@ -2323,6 +2323,38 @@ app.get('/webhooks/health', (req, res) => {
   res.json({ status: 'ok', webhooks: ['orders/create', 'orders/updated'], timestamp: new Date().toISOString() });
 });
 
+// ============================================================
+// CRON / SCHEDULED TASKS
+// ============================================================
+const cron = require('./src/services/cron');
+
+// ---- ADMIN: Cron Status ----
+app.get('/api/admin/cron/status', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  res.json(cron.getCronStatus());
+});
+
+// ---- ADMIN: Run a specific cron task on demand ----
+app.post('/api/admin/cron/run/:task', async (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const result = await cron.runTask(req.params.task);
+    res.json({ success: true, result });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: Cron History ----
+app.get('/api/admin/cron/history', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  const { limit = 50 } = req.query;
+  res.json(cron.taskHistory.slice(0, parseInt(limit)));
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   logger.info('server', `StyleHub backend v2.3 running on port ${PORT}`);
@@ -2330,6 +2362,13 @@ app.listen(PORT, () => {
   logger.info('server', `Shopify: ${process.env.SHOPIFY_STORE_DOMAIN ? 'configured' : 'NOT configured'}`);
   // Warm up cache after server starts (don't await â let it run in background)
   setTimeout(warmUpCache, 2000);
+
+  // ---- START CRON JOBS ----
+  try {
+    cron.startCronJobs();
+  } catch (e) {
+    logger.warn('server', `Cron startup failed: ${e.message}`);
+  }
 
   // ---- KEEP-ALIVE SELF-PING ----
   // Render free tier spins down after ~15min of inactivity.

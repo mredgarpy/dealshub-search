@@ -103,8 +103,6 @@
     html+='<div class="dhpdp-left-col">';
     // ═══ SECTION 2: IMAGE GALLERY (left) ═══
     html+=renderGallery(p, imgs, mainImg, discount);
-    // ═══ EXTRA: Customer photos + A+ images below gallery (fills space) ═══
-    html+=renderGalleryExtra(p);
     html+='</div>'; // end left col
 
     // RIGHT COLUMN

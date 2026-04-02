@@ -98,6 +98,17 @@ function setupWebhooks(app) {
       save('orders');
       logger.info('webhook', `[CRM] Order created: ${db.orders[o.id].number} - $${o.total_price} - ${(o.line_items || []).length} items`);
 
+      // ── AUTODS ORDER PROCESSING (non-blocking) ──
+      (async () => {
+        try {
+          const autodsService = require('./services/autods');
+          const result = await autodsService.processOrderWebhook(o);
+          logger.info('webhook', `[AutoDS] Order ${o.name} processed → status: ${result?.status}, items: ${result?.items?.length}`);
+        } catch (autodsErr) {
+          logger.error('webhook', `[AutoDS] Order processing failed: ${autodsErr.message}`);
+        }
+      })();
+
       // ── AUTO-DETECT PLUS MEMBERSHIP PURCHASE ──
       const plusItem = (o.line_items || []).find(i =>
         i.product_id === PLUS_PRODUCT_ID || i.product_id === String(PLUS_PRODUCT_ID)

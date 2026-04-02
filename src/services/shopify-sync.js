@@ -14,6 +14,14 @@ const { calculateFinalPrice, parsePrice } = require('../utils/pricing');
 const { syncCache } = require('../utils/cache');
 const { findMapping, upsertMapping, logSync } = require('../utils/db');
 
+// AutoDS integration — register products after sync
+let autodsService = null;
+try {
+  autodsService = require('./autods');
+} catch (e) {
+  // AutoDS service optional — will be null if not available
+}
+
 const SHOPIFY_DOMAIN = () => process.env.SHOPIFY_STORE_DOMAIN;
 const SHOPIFY_TOKEN  = () => process.env.SHOPIFY_ADMIN_TOKEN;
 const LOCATION_ID    = () => parseInt(process.env.SHOPIFY_LOCATION_ID || '84042121347');
@@ -462,6 +470,21 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
       originalPrice: productData.originalPrice
     });
     logSync(source, sourceId, 'create', 'success', { shopifyId: mapping.shopifyProductId });
+
+    // Register with AutoDS (non-blocking)
+    if (autodsService) {
+      try {
+        autodsService.registerProduct({
+          source, sourceId,
+          sourceUrl: productData.sourceUrl || '',
+          shopifyProductId: mapping.shopifyProductId,
+          shopifyVariantId: mapping.shopifyVariantId,
+          shopifyHandle: mapping.handle
+        });
+      } catch (e) {
+        logger.debug('sync', `AutoDS registration failed (non-blocking): ${e.message}`);
+      }
+    }
   } else if (forceResync && mapping.shopifyProductId) {
     // Repair existing product
     try {

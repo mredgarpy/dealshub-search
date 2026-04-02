@@ -513,135 +513,54 @@ app.get('/api/search-suggest', async (req, res) => {
   }
 });
 
-// ---- TRENDING (Auto-Rotative Query Pool) ----
-const TRENDING_QUERIES = {
-  fashion: [
-    'summer dress 2026', 'women casual outfit', 'men sneakers',
-    'trendy sunglasses', 'crossbody bag women', 'athletic wear',
-    'crop top women', 'cargo pants men', 'platform sneakers',
-    'oversized t-shirt', 'linen pants summer', 'maxi dress'
-  ],
-  beauty: [
-    'viral skincare', 'lip gloss set', 'mascara waterproof',
-    'sunscreen face', 'hair oil treatment', 'nail art set',
-    'makeup brush set', 'vitamin c serum', 'eye cream',
-    'face moisturizer spf', 'setting spray', 'cleanser gentle'
-  ],
-  electronics: [
-    'wireless earbuds 2026', 'phone case', 'portable charger',
-    'led strip lights', 'bluetooth speaker', 'smart watch',
-    'usb c hub', 'ring light', 'webcam hd', 'gaming mouse',
-    'laptop stand', 'cable organizer'
-  ],
-  home: [
-    'kitchen gadgets', 'organization bins', 'led desk lamp',
-    'shower head filter', 'wall art modern', 'throw blanket',
-    'water bottle insulated', 'candle set', 'plant pot indoor',
-    'ice maker', 'pillow memory foam', 'air purifier'
-  ],
-  sports: [
-    'yoga mat thick', 'resistance bands set', 'running belt',
-    'gym water bottle', 'jump rope', 'foam roller',
-    'sports bra', 'hiking backpack', 'swim goggles',
-    'cycling shorts', 'fitness tracker', 'ab roller'
-  ]
-};
-
-function getRotatingQueries(pool, count) {
-  const now = new Date();
-  const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
-  const block = Math.floor(now.getHours() / 6); // 4 blocks per day
-  const seed = dayOfYear * 4 + block;
-  const categories = Object.keys(pool);
-  const queries = [];
-  for (let i = 0; i < count; i++) {
-    const cat = categories[(seed + i) % categories.length];
-    const catPool = pool[cat];
-    queries.push(catPool[(seed * 7 + i) % catPool.length]);
-    if (queries.length < count * 2) {
-      queries.push(catPool[(seed * 13 + i + 3) % catPool.length]);
-    }
-  }
-  // Deduplicate
-  return [...new Set(queries)].slice(0, count * 2);
-}
-
+// ---- TRENDING ----
 app.get('/api/trending', async (req, res) => {
-  const now = new Date();
-  const block = Math.floor(now.getHours() / 6);
-  const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
-  const cacheKey = `trending_${dayOfYear}_${block}`;
+  const cacheKey = 'trending';
   const cached = searchCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
-    const queries = getRotatingQueries(TRENDING_QUERIES, 3); // 3 categories = ~6 queries
-    const activeStores = ['amazon', 'aliexpress'].filter(s => getAdapter(s));
-    const searchPromises = [];
-
-    // Distribute queries across active stores
-    for (let i = 0; i < queries.length; i++) {
-      const store = activeStores[i % activeStores.length];
-      const adapter = getAdapter(store);
-      if (adapter) {
-        searchPromises.push(adapter.search(queries[i], 5));
-      }
-    }
-
-    const results = await Promise.allSettled(searchPromises);
-    const all = interleaveFromSettled(results, 24);
+    const queries = { amazon: 'trending deals', aliexpress: 'hot products', sephora: 'trending beauty', macys: 'trending now', shein: 'trending' };
+    const results = await Promise.allSettled(
+      Object.entries(queries).filter(([source]) => isStoreActive(source)).map(([source, q]) => {
+        const adapter = getAdapter(source);
+        return adapter ? adapter.search(q, 6) : Promise.resolve([]);
+      })
+    );
+    const all = interleaveFromSettled(results, 20);
     const response = { results: applySearchPricing(all), section: 'trending' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
-    logger.error('trending', 'Trending fetch failed', { error: e.message });
     res.status(500).json({ error: e.message });
   }
 });
 
-// ---- BESTSELLERS (Rotating) ----
-const BESTSELLER_QUERIES = {
-  fashion: ['best selling dresses', 'top rated sneakers', 'popular handbags', 'best jeans women'],
-  beauty: ['best selling skincare', 'top rated mascara', 'popular perfume', 'best face serum'],
-  electronics: ['best selling earbuds', 'top rated charger', 'popular phone accessories', 'best smart watch'],
-  home: ['best selling kitchen', 'top rated home decor', 'popular organizer', 'best bedding set'],
-  sports: ['best selling yoga', 'top rated fitness', 'popular running shoes', 'best gym equipment']
-};
-
+// ---- BESTSELLERS ----
 app.get('/api/bestsellers', async (req, res) => {
-  const now = new Date();
-  const block = Math.floor(now.getHours() / 6);
-  const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
-  const cacheKey = `bestsellers_${dayOfYear}_${block}`;
+  const cacheKey = 'bestsellers';
   const cached = searchCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
-    const queries = getRotatingQueries(BESTSELLER_QUERIES, 2); // 2 categories = ~4 queries
-    const activeStores = ['amazon', 'aliexpress'].filter(s => getAdapter(s));
-    const searchPromises = [];
-
-    for (let i = 0; i < queries.length; i++) {
-      const store = activeStores[i % activeStores.length];
-      const adapter = getAdapter(store);
-      if (adapter) {
-        searchPromises.push(adapter.search(queries[i], 6));
-      }
-    }
-
-    const results = await Promise.allSettled(searchPromises);
+    const queries = { amazon: 'best sellers', aliexpress: 'best selling products', sephora: 'best sellers beauty', macys: 'top rated', shein: 'best sellers' };
+    const results = await Promise.allSettled(
+      Object.entries(queries).filter(([source]) => isStoreActive(source)).map(([source, q]) => {
+        const adapter = getAdapter(source);
+        return adapter ? adapter.search(q, 6) : Promise.resolve([]);
+      })
+    );
     const raw = interleaveFromSettled(results, 30);
     // Filter: bestsellers should have meaningful reviews (>= 50)
     const filtered = raw.filter(p => {
       const revCount = parseInt(p.reviews) || 0;
       return revCount >= 50;
     });
-    const all = filtered.length >= 5 ? filtered.slice(0, 12) : raw.slice(0, 12);
+    const all = filtered.length >= 5 ? filtered.slice(0, 20) : raw.slice(0, 20);
     const response = { results: applySearchPricing(all), section: 'bestsellers' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
-    logger.error('bestsellers', 'Bestsellers fetch failed', { error: e.message });
     res.status(500).json({ error: e.message });
   }
 });
@@ -2206,6 +2125,202 @@ app.post('/api/admin/shopify-proxy', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ============================================================
+// AUTODS INTEGRATION — Webhooks, Admin, CSV Export
+// ============================================================
+
+const autods = require('./src/services/autods');
+// Initialize AutoDS DB schema on startup
+try { autods.initAutodsSchema(); } catch (e) { logger.warn('server', `AutoDS schema init: ${e.message}`); }
+
+// NOTE: Order webhooks are handled in src/webhooks.js (order-created, order-fulfilled, order-cancelled)
+// AutoDS processing is hooked into the existing order-created handler there.
+// The endpoints below provide a FALLBACK for direct Shopify webhook registration if needed.
+app.post('/webhooks/orders/create', async (req, res) => {
+  res.status(200).json({ received: true });
+  try {
+    if (req.body && req.body.id) {
+      await autods.processOrderWebhook(req.body);
+    }
+  } catch (e) {
+    logger.error('webhook', 'Order webhook (direct) failed', { error: e.message });
+  }
+});
+
+// ---- ADMIN: AutoDS Dashboard ----
+app.get('/api/admin/autods/stats', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    res.json(autods.getAutodsStats());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: AutoDS Orders ----
+app.get('/api/admin/autods/orders', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { limit = 50, status } = req.query;
+    res.json(autods.getAutodsOrders(parseInt(limit), status || null));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: AutoDS Pending Products (not yet linked in AutoDS) ----
+app.get('/api/admin/autods/pending', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { limit = 100, source } = req.query;
+    res.json(autods.getPendingProducts(parseInt(limit), source || null));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: AutoDS CSV Export (for bulk import into AutoDS) ----
+app.get('/api/admin/autods/csv', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { status, source, limit, download } = req.query;
+    const result = autods.generateAutodsCSV({
+      status: status || 'pending',
+      source: source || null,
+      limit: limit ? parseInt(limit) : null
+    });
+
+    if (download === 'true') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="autods-import-${Date.now()}.csv"`);
+      return res.send(result.csv);
+    }
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: AutoDS Variant Mapping CSV ----
+app.get('/api/admin/autods/mapping-csv', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { source, unlinkedOnly, download } = req.query;
+    const result = autods.generateVariantMappingCSV({
+      source: source || null,
+      unlinkedOnly: unlinkedOnly !== 'false'
+    });
+
+    if (download === 'true') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="autods-mapping-${Date.now()}.csv"`);
+      return res.send(result.csv);
+    }
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: Mark product(s) as linked in AutoDS ----
+app.post('/api/admin/autods/mark-linked', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { source, sourceId, autodsProductId, ids } = req.body;
+
+    // Bulk mode
+    if (ids && Array.isArray(ids)) {
+      const count = autods.bulkMarkLinked(ids);
+      return res.json({ success: true, markedCount: count });
+    }
+
+    // Single mode
+    if (!source || !sourceId) return res.status(400).json({ error: 'Missing source or sourceId' });
+    const success = autods.markProductLinked(source, sourceId, autodsProductId);
+    res.json({ success });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: Register existing products to AutoDS tracking ----
+// Scans product_mappings table and registers any untracked products
+app.post('/api/admin/autods/sync-existing', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { getAllMappings } = require('./src/utils/db');
+    const mappings = getAllMappings(500, 0);
+    let registered = 0;
+
+    for (const m of mappings) {
+      try {
+        autods.registerProduct({
+          source: m.source_store,
+          sourceId: m.source_product_id,
+          sourceUrl: '', // Will use URL builder
+          shopifyProductId: m.shopify_product_id,
+          shopifyVariantId: m.shopify_variant_id,
+          shopifyHandle: m.shopify_handle
+        });
+        registered++;
+      } catch (e) {
+        logger.debug('autods', `Failed to register mapping ${m.id}: ${e.message}`);
+      }
+    }
+
+    res.json({ success: true, total: mappings.length, registered });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: Webhook setup helper ----
+// Returns the webhook URLs that need to be configured in Shopify
+app.get('/api/admin/autods/webhook-info', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+
+  const baseUrl = process.env.RENDER_EXTERNAL_URL || `https://dealshub-search.onrender.com`;
+
+  res.json({
+    info: 'Register these webhooks in Shopify Admin → Settings → Notifications → Webhooks',
+    webhooks: [
+      {
+        event: 'Order creation',
+        url: `${baseUrl}/webhooks/orders/create`,
+        format: 'JSON',
+        apiVersion: '2024-01'
+      },
+      {
+        event: 'Order update',
+        url: `${baseUrl}/webhooks/orders/updated`,
+        format: 'JSON',
+        apiVersion: '2024-01'
+      }
+    ],
+    envVars: {
+      SHOPIFY_WEBHOOK_SECRET: 'Set this to the webhook signing secret from Shopify',
+      AUTODS_API_KEY: '(Optional) Set when AutoDS API is activated',
+      AUTODS_STORE_ID: '(Optional) Your AutoDS store ID',
+      AUTODS_ENABLED: '(Optional) Set to "true" to enable API calls'
+    }
+  });
+});
+
+// ---- PUBLIC: Webhook test endpoint ----
+app.get('/webhooks/health', (req, res) => {
+  res.json({ status: 'ok', webhooks: ['orders/create', 'orders/updated'], timestamp: new Date().toISOString() });
 });
 
 const PORT = process.env.PORT || 10000;

@@ -10,6 +10,9 @@
 //   3. Stale Order Reprocessing (every 1 hour)
 //   4. AutoDS Stats Snapshot / Alerting (every 6 hours)
 //   5. DB Cleanup — old logs/failures (every 24 hours)
+//   6. Catch Up Missed Orders (every 20 min)
+//   7. Blog Post Generation — SEO content via blog-engine (every 24 hours)
+// ============================================================ — old logs/failures (every 24 hours)
 // ============================================================
 
 const logger = require('../utils/logger');
@@ -313,6 +316,37 @@ async function taskCatchUpMissedOrders() {
   }
 }
 
+
+// ---- TASK 7: Generate SEO Blog Post ----
+// Generates 1 high-quality editorial blog post per day using the blog engine
+async function taskGenerateBlogPost() {
+  const taskName = 'generate-blog-post';
+  try {
+    const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+    if (!shopifyToken) {
+      logTask(taskName, 'skip', 'SHOPIFY_ADMIN_TOKEN not configured');
+      return;
+    }
+
+    const { generateBlogPosts } = require('./blog-engine');
+    logger.info('cron', `[${taskName}] Starting blog post generation...`);
+
+    const results = await generateBlogPosts(1);
+
+    if (results && results.length > 0) {
+      const post = results[0];
+      logger.info('cron', `[${taskName}] Published: "${post.title}" → ${post.url}`);
+      logTask(taskName, 'ok', { title: post.title, url: post.url, products: post.products });
+    } else {
+      logger.warn('cron', `[${taskName}] No post generated (insufficient product data or all topics used)`);
+      logTask(taskName, 'warning', 'No post generated');
+    }
+  } catch (e) {
+    logger.error('cron', `[${taskName}] Failed: ${e.message}`);
+    logTask(taskName, 'error', e.message);
+  }
+}
+
 // ---- SCHEDULE CONFIGURATION ----
 const CRON_SCHEDULE = {
   syncMappings:     { fn: taskSyncMappingsToAutods,   interval: 15 * 60 * 1000,      name: 'Sync Mappings → AutoDS',       delay: 30000 },
@@ -320,7 +354,8 @@ const CRON_SCHEDULE = {
   reprocessOrders:  { fn: taskReprocessStaleOrders,    interval: 60 * 60 * 1000,      name: 'Reprocess Stale Orders',        delay: 120000 },
   catchUpOrders:    { fn: taskCatchUpMissedOrders,     interval: 20 * 60 * 1000,      name: 'Catch Up Missed Orders',        delay: 45000 },
   statsSnapshot:    { fn: taskAutodsStatsSnapshot,     interval: 6 * 60 * 60 * 1000,  name: 'AutoDS Stats Snapshot',         delay: 180000 },
-  dbCleanup:        { fn: taskDbCleanup,               interval: 24 * 60 * 60 * 1000, name: 'DB Cleanup',                    delay: 300000 }
+  dbCleanup:        { fn: taskDbCleanup,               interval: 24 * 60 * 60 * 1000, name: 'DB Cleanup',                    delay: 300000 },
+  blogGeneration:   { fn: taskGenerateBlogPost,        interval: 24 * 60 * 60 * 1000, name: 'Blog Post Generation',          delay: 600000 }
 };
 
 const runningIntervals = {};
@@ -417,5 +452,6 @@ module.exports = {
   taskReprocessStaleOrders,
   taskCatchUpMissedOrders,
   taskAutodsStatsSnapshot,
-  taskDbCleanup
+  taskDbCleanup,
+  taskGenerateBlogPost
 };

@@ -1,12 +1,12 @@
 // ============================================================
-// DealsHub — Pricing Engine v3.0
+// DealsHub — Pricing Engine v4.0
 // ============================================================
 // Controls markup, margins, rounding, compare-at logic
-// Reads from settings.json first, then DB rules, then defaults
-// Supports: source rules, category rules, brand rules, price floors
-// v3.0: Fixed markup values for Meta Ads profitability
-//        Added tiered markup for low-cost products
-//        Added settings.json integration for admin control
+// v4.0: TIERED MULTIPLIER SYSTEM — markup varies by source + price range
+//        Cheap products get high markup (nobody compares)
+//        Expensive products get low markup (everyone compares)
+//        Branded sources (Amazon/Sephora/Macys) lower markup = traffic magnets
+//        Generic sources (AliExpress/SHEIN) higher markup = profit centers
 // ============================================================
 
 const logger = require('./logger');
@@ -16,10 +16,21 @@ const fs = require('fs');
 // ---- SETTINGS FILE (editable from admin) ----
 const SETTINGS_FILE = path.join(__dirname, '..', '..', 'data', 'settings.json');
 
+// Cache settings in memory for 30s to avoid reading disk on every call
+let _settingsCache = null;
+let _settingsCacheTime = 0;
+const SETTINGS_TTL = 30000; // 30s
+
 function loadSettings() {
+  if (_settingsCache && Date.now() - _settingsCacheTime < SETTINGS_TTL) {
+    return _settingsCache;
+  }
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
-      return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      _settingsCache = data;
+      _settingsCacheTime = Date.now();
+      return data;
     }
   } catch (e) {
     logger.debug('pricing', `Settings load failed: ${e.message}`);
@@ -27,208 +38,161 @@ function loadSettings() {
   return null;
 }
 
-// ---- DEFAULT MARKUP RULES (Meta Ads profitable) ----
-const DEFAULT_RULES = {
-  amazon:     { markupPct: 40, minMarginPct: 25, roundTo: 0.99, priceFloor: 2.99 },
-  aliexpress: { markupPct: 50, minMarginPct: 30, roundTo: 0.99, priceFloor: 2.99 },
-  sephora:    { markupPct: 35, minMarginPct: 22, roundTo: 0.99, priceFloor: 4.99 },
-  macys:      { markupPct: 35, minMarginPct: 22, roundTo: 0.99, priceFloor: 4.99 },
-  shein:      { markupPct: 50, minMarginPct: 30, roundTo: 0.99, priceFloor: 1.99 }
-};
+// ---- DEFAULT TIERED MARKUP (multipliers, not percentages) ----
+const DEFAULT_TIERS = [
+  { max: 3,      amazon: 1.70, aliexpress: 2.50, sephora: 1.50, macys: 1.50, shein: 2.50, default: 1.70 },
+  { max: 10,     amazon: 1.35, aliexpress: 1.70, sephora: 1.30, macys: 1.30, shein: 1.70, default: 1.35 },
+  { max: 25,     amazon: 1.25, aliexpress: 1.50, sephora: 1.22, macys: 1.22, shein: 1.50, default: 1.25 },
+  { max: 50,     amazon: 1.20, aliexpress: 1.40, sephora: 1.18, macys: 1.18, shein: 1.40, default: 1.20 },
+  { max: 100,    amazon: 1.15, aliexpress: 1.30, sephora: 1.12, macys: 1.12, shein: 1.30, default: 1.15 },
+  { max: 200,    amazon: 1.10, aliexpress: 1.22, sephora: 1.08, macys: 1.08, shein: 1.22, default: 1.10 },
+  { max: 500,    amazon: 1.07, aliexpress: 1.15, sephora: 1.06, macys: 1.06, shein: 1.15, default: 1.07 },
+  { max: 999999, amazon: 1.05, aliexpress: 1.10, sephora: 1.05, macys: 1.05, shein: 1.10, default: 1.05 }
+];
+���Y�X�H�]Y�][�
+�[�X��Y���Y\��]�Z[X�JB��ۜ�Q�USԕST�H[X^�ێ��X\��\��
+Z[�X\��[����K��[�Έ�NK�X�Q��܎���NHK�[Y^�\�Έ�X\��\��
+LZ[�X\��[������[�Έ�NK�X�Q��܎���NHK��\ܘN��X\��\���KZ[�X\��[�������[�Έ�NK�X�Q��܎�
+�NHK�XX�\Έ�X\��\���KZ[�X\��[�������[�Έ�NK�X�Q��܎�
+�NHK��Z[���X\��\��
+LZ[�X\��[������[�Έ�NK�X�Q��܎�K�NHB�N����\�܈�X���\���\]^ܝ�ۜ�QT�QԕST�H[�\��Έ�X\��\��LZ[�X\��[���
+K�[�\��N��X\��\��
+�Z[�X\��[����B�N�]���[\��X�HH�[]���[\��X�U[YHH�ۜ��ԕST��H����
+HZ[��X�B���[��[ۈ��Y��[\�
+HY�
+���[\��X�H	��]K����
+HH���[\��X�U[YH�ԕST��
+H�]\�����[\��X�NB��H�ۜ���]�X�[�ԝ[\�HH�\]Z\�J	ˋ���N�ۜ��[\�H�]�X�[�ԝ[\�
+NY�
+�[\�	���[\˛[���
+H���[\��X�HH�[\˙�[\��O���\��X�]�JN���[\��X�U[YHH]K����
+N�]\�����[\��X�NB�H�]�
+JH�����]�Z[X�K\�HY�][B��]\���[B���[��[ۈ��ԝ[J�H�]\��X\��\����X\��\���Z[�X\��[�����Z[��X\��[������[�Έ����[����NK��X�Q��܎����X�Wٛ�܈�[��[RY���Y��[U\N�����[��	؜�[�	��
+���]Y�ܞH�	��]Y�ܞI��	���\��I�B�NB����KKKH�UQT�QUSTQT��܈��\��H
+��X�HKKKB��[��[ۈ�]Y\�][\Y\���\��T�X�K��\��JH�ۜ��][���H�Y�][���
+N�ۜ�Y\��H
+�][���	���][��˛X\��\�Y\��H��][��˛X\��\�Y\���Q�US�QT���ۜ���[��NHH�][���˜�X�[��˜��[����NHOOH�[�N����ܛX[^�H��\��H�[YB��ۜ�ܘ�H
+��\��H	�Y�][	�K����\��\�J
+K��[J
+N����[�HX]�[��Y\�
+�\��Y\��\�H��\��T�X�HX^
+B��ۜ�Y\�HY\�˙�[�
+O���\��T�X�H�X^
+HY\���Y\�˛[��HWN����]][\Y\��܈\���\��K�[�X���Y�][��ۜ�][\Y\�HY\��ܘ�HY\���Y�][	�HK����]\��][\Y\��\��Q��]
+][\Y\�K�Y\�X^�Y\��X^���[��NK��[U\N�	�Y\�Y	NB����KKKH�U�P�S���SH
+Y\�Y���Y�X�HY�][�HKKKB��[��[ۈ�]�X�[�ԝ[J��\��K��H�JH�ۜ���\��T�X�HH�˜��\��T�X�H�ۜ��][���H�Y�][���
+N���K�Y��][��˚��ۈ\�X\��\�Y\��\�H�]�Y\�Y�\�[B�Y�
+�][���	���][��˛X\��\�Y\��	���][��˛X\��\�Y\�˛[���
+H�ۜ�Y\�[���H�]Y\�][\Y\���\��T�X�K��\��JN���۝�\�][\Y\��X\��\��܈�X���\���\]��ۜ�X\��\�H
+Y\�[��˛][\Y\�HJH
+�L�]\��X\��\��][\Y\��Y\�[��˛][\Y\��Z[�X\��[���X\��\�
+������[�ΈY\�[��˜��[��NH��NH���X�Q��܎��[��[U\N�	�Y\�Y	��Y\�X^�Y\�[��˝Y\�X^�NB������Y�X�N��][��˚��ۈ�]�]X\��\ؚ�X��Y�
+�][���	���][��˛X\��\	���][��˛X\��\���\��WHOOH[�Y�[�Y
+H]X\��\�H\��Q��]
+�][��˛X\��\���\��WJN�ۜ�Y\�YH�][��˛X\��\ܝ[\�QT�QԕST�Y�
+��\��T�X�H�	����\��T�X�H�	��Y\�Y�[�\���HX\��\�H\��Q��]
+Y\�Y�[�\���NH[�HY�
+��\��T�X�H�	����\��T�X�H
+H	��Y\�Y�[�\��JHX\��\�H\��Q��]
+Y\�Y�[�\��JNB��]\��X\��\��Z[�X\��[���X\��\�
+������[�Έ�][��˜�X�[��˜��[����NHOOH�[�H��NH���X�Q��܎��[��[U\N�	��][���NB����ˈ�H��[\�
+��[���]Y�ܞH���\��JB��ۜ���[\�H��Y��[\�
+NY�
+��[\�	����[\˛[���
+H�ۜ���]Y�ܞK��[�HH��Y�
+��[�
+H�ۜ���[��[HH��[\˙�[�
+�O������\��W��ܙHOOH��\��H	������[�	������[�����\��\�J
+HOOH��[�����\��\�J
+B�
+NY�
+��[��[JH�]\����ԝ[J��[��[JNB�Y�
+�]Y�ܞJH�ۜ��]�[HH��[\˙�[�
+�O������\��W��ܙHOOH��\��H	�����]Y�ܞH	�����]Y�ܞK����\��\�J
+HOOH�]Y�ܞK����\��\�J
+H	��\����[��
+NY�
+�]�[JH�]\����ԝ[J�]�[JNB��ۜ���\��T�[HH��[\˙�[�
+�O������\��W��ܙHOOH��\��H	��\���]Y�ܞH	��\����[��
+NY�
+��\��T�[JH�]\����ԝ[J��\��T�[JNB����
+�Y�X�HY�][��]Y\�Y[�\����[�\��B�]Y�][�[HHQ�USԕST����\��WH�X\��\��
+Z[�X\��[����K��[�Έ�NK�X�Q��܎���NHNY�
+��\��T�X�H�	����\��T�X�H�HY�][�[HH����Y�][�[KX\��\��QT�QԕST˝[�\��˛X\��\�Z[�X\��[���QT�QԕST˝[�\��˛Z[�X\��[��NH[�HY�
+��\��T�X�H�	����\��T�X�H
+JHY�][�[HH����Y�][�[KX\��\��QT�QԕST˝[�\��K�X\��\�Z[�X\��[���QT�QԕST˝[�\��K�Z[�X\��[��NB��]\��Y�][�[NB����KKKHPRS��P�S���S��SӈKKKB��[��[ۈ�[�[]Q�[�[�X�J��\��T�X�K��\��K��H�JHY�
+\��\��T�X�H��\��T�X�HH
+H�]\����X�N��[��\\�P]��[N��ۜ��[HH�]�X�[�ԝ[J��\��K�]Y�ܞN��˘�]Y�ܞK���[���˘��[����\��T�X�N���\��T�X�B�JN��ۜ��\[�����H�˜�\[������ۜ��Y\�H�˙�Y\��ۜ�[�Y���H��\��T�X�H
+��\[�����
+��Y\��]�[�[�X�N����]�Y\�Y�\�[N�\�H][\Y\�\�X�B�Y�
+�[K�][\Y\�H�[�[�X�HH��\��T�X�H
+��[K�][\Y\���Y�\[��ٙY\�ۈ��Y�
+�\[�������Y\��
+H�[�[�X�H
+�H�\[�����
+��Y\�B�H[�H��Y�X�H\��[�Y�H�\�[B��ۜ�X\��\][\Y\�HH
+�
+�[K�X\��\��L
+N�[�[�X�HH[�Y���
+�X\��\][\Y\�B����[��ܘ�HZ[�[][HX\��[�
+[�Y���
+�L	HZ[�[][JB��ۜ�Z[�X\��[�X��H[�Y���
+��LY�
+�[�[�X�HH[�Y���Z[�X\��[�X��H�[�[�X�HH[�Y���
+�Z[�X\��[�X��B����[��ܘ�H�X�H��܂�Y�
+�[K��X�Q��܈	���[�[�X�H�[K��X�Q��܊H�[�[�X�HH�[K��X�Q��܎B������[���NB��ۜ���[��H�[K���[��Y�
+��[��H�[�[�X�HHX]���܊�[�[�X�JH
+���[����[��\�H��[�[��Y�����[��[�Y����Y�
+�[�[�X�HH[�Y���
+H�[�[�X�HHX]���܊[�Y���
+H
+�H
+���[��B�B������\\�KX]�X�H
+�܈���[����\�	���Z�]��Y�
+B�]��\\�P]H�[Y�
+�˛ܚY�[�[�X�H	���˛ܚY�[�[�X�H���\��T�X�JH�ۜ���\\�S][\Y\�H�[K�][\Y\���[K�][\Y\�
+�K�
+H�
+H
+�
+�[K�X\��\��L
+JH
+�K�
+N��\\�P]H�˛ܚY�[�[�X�H
+���\\�S][\Y\���\\�P]HX]���܊��\\�P]
+H
+�
+��[���NJNY�
+��\\�P]H�[�[�X�JH��\\�P]H�[�[�X�H
+�H
+�
+��[��
+NB�B�����[�[]HX�X[X\��\\YY�܈�\ܝ[��ۜ�X\��\�\YYH�[K�][\Y\���\��Q��]
 
-// Tiered rules for low-cost products (absolute margin too small otherwise)
-const TIERED_RULES = {
-  under_3: { markupPct: 100, minMarginPct: 40 },  // $2 cost -> $3.99 sale
-  under_5: { markupPct: 60,  minMarginPct: 30 }   // $4 cost -> $6.39 -> $6.99
-};
 
-let _dbRulesCache = null;
-let _dbRulesCacheTime = 0;
-const DB_RULES_TTL = 300000; // 5 min cache
+�[K�][\Y\�HJH
+�L
+K�њ^Y
+JJB���[K�X\��\���]\���X�N�\��Q��]
+�[�[�X�K�њ^Y
+�JK���\\�P]���\\�P]�\��Q��]
+��\\�P]�њ^Y
+�JH��[�[�Y����\��Q��]
+[�Y����њ^Y
+�JK�X\��[��\��Q��]
 
-function _loadDbRules() {
-  if (_dbRulesCache && Date.now() - _dbRulesCacheTime < DB_RULES_TTL) {
-    return _dbRulesCache;
-  }
-  try {
-    const { getPricingRules } = require('./db');
-    const rules = getPricingRules();
-    if (rules && rules.length > 0) {
-      _dbRulesCache = rules.filter(r => r.is_active);
-      _dbRulesCacheTime = Date.now();
-      return _dbRulesCache;
-    }
-  } catch (e) {
-    // DB not available, use defaults
-  }
-  return null;
-}
+�[�[�X�HH[�Y���
+K�њ^Y
+�JK�X\��[���\��Q��]
 
-function _dbToRule(r) {
-  return {
-    markupPct: r.markup_pct,
-    minMarginPct: r.min_margin_pct,
-    roundTo: r.round_to || 0.99,
-    priceFloor: r.price_floor || null,
-    ruleId: r.id,
-    ruleType: r.brand ? 'brand' : (r.category ? 'category' : 'source')
-  };
-}
 
-// ---- GET PRICING RULE (settings.json > DB > defaults) ----
-function getPricingRule(source, opts = {}) {
-  const sourcePrice = opts.sourcePrice || 0;
-
-  // 1. Try settings.json first (admin-editable)
-  const settings = loadSettings();
-  if (settings && settings.markup && settings.markup[source] !== undefined) {
-    let markupPct = parseFloat(settings.markup[source]);
-
-    // Apply tiered rules for cheap products
-    const tiered = settings.markup_rules || TIERED_RULES;
-    if (sourcePrice > 0 && sourcePrice < 3 && tiered.under_3) {
-      markupPct = parseFloat(tiered.under_3);
-    } else if (sourcePrice > 0 && sourcePrice < 5 && tiered.under_5) {
-      markupPct = parseFloat(tiered.under_5);
-    }
-
-    return {
-      markupPct,
-      minMarginPct: markupPct * 0.6,  // ~60% of markup as min margin
-      roundTo: settings.pricing?.round_to_99 !== false ? 0.99 : 0,
-      priceFloor: null,
-      ruleType: 'settings'
-    };
-  }
-
-  // 2. Try DB rules (brand > category > source)
-  const dbRules = _loadDbRules();
-  if (dbRules && dbRules.length > 0) {
-    const { category, brand } = opts;
-    if (brand) {
-      const brandRule = dbRules.find(r =>
-        r.source_store === source && r.brand && r.brand.toLowerCase() === brand.toLowerCase()
-      );
-      if (brandRule) return _dbToRule(brandRule);
-    }
-    if (category) {
-      const catRule = dbRules.find(r =>
-        r.source_store === source && r.category && r.category.toLowerCase() === category.toLowerCase() && !r.brand
-      );
-      if (catRule) return _dbToRule(catRule);
-    }
-    const sourceRule = dbRules.find(r =>
-      r.source_store === source && !r.category && !r.brand
-    );
-    if (sourceRule) return _dbToRule(sourceRule);
-  }
-
-  // 3. Apply tiered rules for cheap products on defaults
-  let defaultRule = DEFAULT_RULES[source] || { markupPct: 40, minMarginPct: 25, roundTo: 0.99, priceFloor: 2.99 };
-  if (sourcePrice > 0 && sourcePrice < 3) {
-    defaultRule = { ...defaultRule, markupPct: TIERED_RULES.under_3.markupPct, minMarginPct: TIERED_RULES.under_3.minMarginPct };
-  } else if (sourcePrice > 0 && sourcePrice < 5) {
-    defaultRule = { ...defaultRule, markupPct: TIERED_RULES.under_5.markupPct, minMarginPct: TIERED_RULES.under_5.minMarginPct };
-  }
-
-  return defaultRule;
-}
-
-// ---- MAIN PRICING FUNCTION ----
-function calculateFinalPrice(sourcePrice, source, opts = {}) {
-  if (!sourcePrice || sourcePrice <= 0) return { price: null, compareAt: null };
-
-  const rule = getPricingRule(source, {
-    category: opts.category,
-    brand: opts.brand,
-    sourcePrice: sourcePrice
-  });
-
-  const shippingCost = opts.shippingCost || 0;
-  const fees = opts.fees || 0;
-  const landedCost = sourcePrice + shippingCost + fees;
-
-  const markupMultiplier = 1 + (rule.markupPct / 100);
-  let finalPrice = landedCost * markupMultiplier;
-
-  // Enforce minimum margin
-  const minMargin = landedCost * (rule.minMarginPct / 100);
-  if (finalPrice - landedCost < minMargin) {
-    finalPrice = landedCost + minMargin;
-  }
-
-  // Enforce price floor
-  if (rule.priceFloor && finalPrice < rule.priceFloor) {
-    finalPrice = rule.priceFloor;
-  }
-
-  // Round to .99
-  if (rule.roundTo) {
-    finalPrice = Math.floor(finalPrice) + rule.roundTo;
-    // Ensure rounding didn't drop below landed cost + min margin
-    if (finalPrice <= landedCost) {
-      finalPrice = Math.floor(landedCost) + 1 + rule.roundTo;
-    }
-  }
-
-  // Compare-at price (for showing "was $X" strikethrough)
-  let compareAt = null;
-  if (opts.originalPrice && opts.originalPrice > sourcePrice) {
-    compareAt = (opts.originalPrice * markupMultiplier * 1.05).toFixed(2);
-    compareAt = Math.floor(parseFloat(compareAt)) + (rule.roundTo || 0.99);
-    // compareAt must be higher than finalPrice
-    if (compareAt <= finalPrice) {
-      compareAt = finalPrice + 1 + (rule.roundTo || 0);
-    }
-  }
-
-  return {
-    price: parseFloat(finalPrice.toFixed(2)),
-    compareAt: compareAt ? parseFloat(compareAt.toFixed(2)) : null,
-    landedCost: parseFloat(landedCost.toFixed(2)),
-    margin: parseFloat((finalPrice - landedCost).toFixed(2)),
-    marginPct: parseFloat(((1 - landedCost / finalPrice) * 100).toFixed(1)),
-    rule: source,
-    ruleId: rule.ruleId || null,
-    ruleType: rule.ruleType || 'default',
-    markupPctApplied: rule.markupPct
-  };
-}
-
-function parsePrice(priceStr) {
-  if (!priceStr) return null;
-  if (typeof priceStr === 'number') return priceStr;
-  const cleaned = String(priceStr).replace(/[^0-9.]/g, '');
-  const num = parseFloat(cleaned);
-  return isNaN(num) ? null : num;
-}
-
-function invalidatePricingCache() {
-  _dbRulesCache = null;
-  _dbRulesCacheTime = 0;
-}
-
-// ---- PREVIEW FUNCTION (for admin) ----
-function previewPricing(sourcePrice, source) {
-  const result = calculateFinalPrice(sourcePrice, source, {});
-  return {
-    sourcePrice,
-    source,
-    finalPrice: result.price,
-    margin: result.margin,
-    marginPct: result.marginPct,
-    markupPctApplied: result.markupPctApplied,
-    ruleType: result.ruleType
-  };
-}
-
-module.exports = {
-  calculateFinalPrice,
-  parsePrice,
-  getPricingRule,
-  invalidatePricingCache,
-  previewPricing,
-  loadSettings,
-  DEFAULT_RULES,
-  TIERED_RULES
-};
+HH[�Y�����[�[�X�JH
+�L
+K�њ^Y
+JJK��[N���\��K��[RY��[K��[RY�[��[U\N��[K��[U\H	�Y�][	��X\��\�\YY�Y\�X^��[K�Y\�X^�[�NB���[��[ۈ\��T�X�J�X�T��HY�
+\�X�T��H�]\���[Y�
+\[و�X�T��OOH	۝[X�\��H�]\���X�T���ۜ��X[�YH��[���X�T��K��\X�J�׌NK�K��	��N�ۜ��[HH\��Q��]
+�X[�Y
+N�]\��\ӘS��[JH��[��[NB���[��[ۈ[��[Y]T�X�[���X�J
+H���[\��X�HH�[���[\��X�U[YHH��][����X�HH�[��][����X�U[YHHB����KKKH�U�QU��S��Sӈ
+�܈YZ[�HKKKB��[��[ۈ�]�Y]��X�[����\��T�X�K��\��JH�ۜ��\�[H�[�[]Q�[�[�X�J��\��T�X�K��\��K�JN�]\����\��T�X�K���\��K��[�[�X�N��\�[��X�K�X\��[���\�[�X\��[��X\��[����\�[�X\��[���X\��\�\YY��\�[�X\��\�\YY��[U\N��\�[��[U\K�Y\�X^��\�[�Y\�X^�NB��[�[K�^ܝ�H�[�[]Q�[�[�X�K�\��T�X�K��]�X�[�ԝ[K�[��[Y]T�X�[���X�K��]�Y]��X�[����Y�][�����]Y\�][\Y\��Q�USԕST��Q�US�QT���QT�QԕSTN�

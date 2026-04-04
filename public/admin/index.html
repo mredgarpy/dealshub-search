@@ -26,7 +26,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hid
 ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
 
-/* ─────────── LOGIN SCREEN ─────────── */
+/* âââââââââââ LOGIN SCREEN âââââââââââ */
 .login-screen{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg)}
 .login-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:32px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 .login-title{font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text)}
@@ -40,7 +40,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hid
 .btn-login{width:100%;background:var(--red);color:#fff;border:none;border-radius:var(--radius-sm);padding:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;margin-top:8px}
 .btn-login:hover{background:var(--red2)}
 
-/* ─────────── APP LAYOUT ─────────── */
+/* âââââââââââ APP LAYOUT âââââââââââ */
 .app{display:grid;grid-template-columns:210px 1fr;grid-template-rows:52px 1fr;height:100vh;gap:0}
 .topbar{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;gap:16px;z-index:10}
 .topbar-logo{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-weight:700;font-size:13px}
@@ -80,7 +80,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hid
 .page-title{font-size:18px;font-weight:700;color:var(--text)}
 .page-subtitle{font-size:11px;color:var(--text3);margin-top:4px}
 
-/* ─────────── CARDS & LAYOUT ─────────── */
+/* âââââââââââ CARDS & LAYOUT âââââââââââ */
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
 .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
@@ -97,7 +97,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hid
 .action-label{font-size:11px;color:var(--text2);margin-bottom:4px}
 .action-count{font-size:16px;font-weight:700;color:var(--red);font-family:var(--mono)}
 
-/* ─────────── TABLES ─────────── */
+/* âââââââââââ TABLES âââââââââââ */
 .table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
 table{width:100%;border-collapse:collapse;font-size:11px}
 thead tr{border-bottom:1px solid var(--border);background:var(--bg3)}
@@ -107,7 +107,7 @@ tbody tr:hover{background:var(--bg3)}
 tbody tr:last-child td{border-bottom:none}
 .mono-text{font-family:var(--mono);font-size:10px}
 
-/* ─────────── BADGES ─────────── */
+/* âââââââââââ BADGES âââââââââââ */
 .bdg{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600}
 .bdg-gr{background:rgba(34,197,94,.1);color:var(--green)}
 .bdg-re{background:rgba(229,62,62,.1);color:var(--red)}
@@ -122,7 +122,7 @@ tbody tr:last-child td{border-bottom:none}
 .s-macy{background:rgba(229,62,62,.65)}
 .s-shein{background:rgba(139,92,246,.65)}
 
-/* ─────────── BUTTONS ─────────── */
+/* âââââââââââ BUTTONS âââââââââââ */
 .btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:4px}
 .btn-r{background:var(--red);color:#fff}
 .btn-r:hover{background:var(--red2)}
@@ -131,13 +131,13 @@ tbody tr:last-child td{border-bottom:none}
 .btn-sm{padding:4px 8px;font-size:10px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
-/* ─────────── TABS ─────────── */
+/* âââââââââââ TABS âââââââââââ */
 .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;gap:0}
 .tab-btn{padding:8px 16px;font-size:12px;color:var(--text2);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
 .tab-btn:hover{color:var(--text)}
 .tab-btn.active{color:var(--red);border-bottom-color:var(--red)}
 
-/* ─────────── FILTERS & SEARCH ─────────── */
+/* âââââââââââ FILTERS & SEARCH âââââââââââ */
 .toolbar{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
 .filter-btn{padding:5px 12px;border-radius:20px;font-size:11px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .15s}
 .filter-btn:hover{border-color:var(--red);color:var(--text)}
@@ -145,13 +145,13 @@ tbody tr:last-child td{border-bottom:none}
 .search-input{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:11px;color:var(--text);outline:none}
 .search-input:focus{border-color:var(--red)}
 
-/* ─────────── CHARTS (CSS BARS) ─────────── */
+/* âââââââââââ CHARTS (CSS BARS) âââââââââââ */
 .chart-bar{display:flex;align-items:flex-end;gap:6px;height:120px;margin-bottom:16px}
 .bar{flex:1;background:var(--red);border-radius:2px 2px 0 0;min-height:8px;cursor:pointer;transition:background .15s;position:relative}
 .bar:hover{background:var(--red2)}
 .bar-label{font-size:9px;color:var(--text3);text-align:center;margin-top:4px}
 
-/* ─────────── LOADING & STATES ─────────── */
+/* âââââââââââ LOADING & STATES âââââââââââ */
 .loading{color:var(--text3);font-size:12px;padding:20px;text-align:center}
 .empty-state{color:var(--text3);font-size:12px;padding:30px;text-align:center}
 .error-msg{background:rgba(229,62,62,.1);border:1px solid var(--red);color:var(--red);padding:10px 12px;border-radius:var(--radius-sm);font-size:11px;margin-bottom:16px}
@@ -160,13 +160,13 @@ tbody tr:last-child td{border-bottom:none}
 .pulse{animation:pulse-anim 2s infinite}
 @keyframes pulse-anim{0%,100%{opacity:1}50%{opacity:.5}}
 
-/* ─────────── MODALS ─────────── */
+/* âââââââââââ MODALS âââââââââââ */
 .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
 .modal.active{display:flex}
 .modal-content{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
 .modal-close{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px}
 
-/* ─────────── RESPONSIVE ─────────── */
+/* âââââââââââ RESPONSIVE âââââââââââ */
 @media(max-width:768px){
   .app{grid-template-columns:50px 1fr}
   .sidebar{padding:8px 0}
@@ -209,7 +209,7 @@ tbody tr:last-child td{border-bottom:none}
     </div>
     <div class="topbar-alerts">
       <div class="alert-bell" onclick="toggleAlerts()">
-        🔔
+        ð
         <div class="alert-badge" id="alertCount">0</div>
       </div>
       <div class="topbar-avatar" onclick="logout()">
@@ -231,33 +231,33 @@ tbody tr:last-child td{border-bottom:none}
       <div class="nav-section">
         <div class="nav-section-label">Dashboard</div>
         <div class="nav-item active" data-page="overview" onclick="switchPage('overview')">
-          <span class="icon">◉</span>
+          <span class="icon">â</span>
           <span class="text">Overview</span>
         </div>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Commerce</div>
         <div class="nav-item" data-page="orders" onclick="switchPage('orders')">
-          <span class="icon">📦</span>
+          <span class="icon">ð¦</span>
           <span class="text">Orders</span>
           <span class="badge" id="ordersBadge">0</span>
         </div>
         <div class="nav-item" data-page="customers" onclick="switchPage('customers')">
-          <span class="icon">👥</span>
+          <span class="icon">ð¥</span>
           <span class="text">Customers</span>
         </div>
         <div class="nav-item" data-page="returns" onclick="switchPage('returns')">
-          <span class="icon">↩</span>
+          <span class="icon">â©</span>
           <span class="text">Returns</span>
           <span class="badge" id="returnsBadge">0</span>
         </div>
         <div class="nav-item" data-page="reviews" onclick="switchPage('reviews')">
-          <span class="icon">⭐</span>
+          <span class="icon">â­</span>
           <span class="text">Reviews</span>
           <span class="badge" id="reviewsBadge">0</span>
         </div>
         <div class="nav-item" data-page="tickets" onclick="switchPage('tickets')">
-          <span class="icon">🎫</span>
+          <span class="icon">ð«</span>
           <span class="text">Tickets</span>
           <span class="badge" id="ticketsBadge">0</span>
         </div>
@@ -265,30 +265,30 @@ tbody tr:last-child td{border-bottom:none}
       <div class="nav-section">
         <div class="nav-section-label">Operations</div>
         <div class="nav-item" data-page="autods" onclick="switchPage('autods')">
-          <span class="icon">🤖</span>
+          <span class="icon">ð¤</span>
           <span class="text">AutoDS</span>
           <span class="badge" id="autodsBadge" style="background:var(--purple)">0</span>
         </div>
         <div class="nav-item" data-page="cron" onclick="switchPage('cron')">
-          <span class="icon">⏱</span>
+          <span class="icon">â±</span>
           <span class="text">Cron Jobs</span>
         </div>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Insights</div>
         <div class="nav-item" data-page="analytics" onclick="switchPage('analytics')">
-          <span class="icon">📈</span>
+          <span class="icon">ð</span>
           <span class="text">Analytics</span>
         </div>
         <div class="nav-item" data-page="suppliers" onclick="switchPage('suppliers')">
-          <span class="icon">🌐</span>
+          <span class="icon">ð</span>
           <span class="text">Suppliers</span>
         </div>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">System</div>
         <div class="nav-item" data-page="settings" onclick="switchPage('settings')">
-          <span class="icon">⚙</span>
+          <span class="icon">â</span>
           <span class="text">Settings</span>
         </div>
       </div>
@@ -303,15 +303,15 @@ tbody tr:last-child td{border-bottom:none}
       <div class="page-header" style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <div class="page-title">Dashboard Overview</div>
-          <div class="page-subtitle">Real-time metrics and alerts — synced from Shopify</div>
+          <div class="page-subtitle">Real-time metrics and alerts â synced from Shopify</div>
         </div>
-        <button class="btn btn-g" onclick="refreshOrdersFromShopify()">🔄 Refresh from Shopify</button>
+        <button class="btn btn-g" onclick="refreshOrdersFromShopify()">ð Refresh from Shopify</button>
       </div>
 
       <!-- ALERTS BAR -->
       <div id="alertBar" style="display:none;margin-bottom:16px">
         <div class="error-msg">
-          <span style="font-size:8px;color:var(--red)" class="pulse">● </span>
+          <span style="font-size:8px;color:var(--red)" class="pulse">â </span>
           <span id="alertMsg">Loading alerts...</span>
         </div>
       </div>
@@ -355,22 +355,22 @@ tbody tr:last-child td{border-bottom:none}
         <div class="page-subtitle" style="margin-bottom:12px">Quick Actions</div>
         <div class="quick-actions">
           <div class="action-card" onclick="switchPage('orders')">
-            <div class="action-icon">📦</div>
+            <div class="action-icon">ð¦</div>
             <div class="action-label">Orders</div>
             <div class="action-count" id="qa-orders">0</div>
           </div>
           <div class="action-card" onclick="switchPage('returns')">
-            <div class="action-icon">↩</div>
+            <div class="action-icon">â©</div>
             <div class="action-label">Returns</div>
             <div class="action-count" id="qa-returns">0</div>
           </div>
           <div class="action-card" onclick="switchPage('reviews')">
-            <div class="action-icon">⭐</div>
+            <div class="action-icon">â­</div>
             <div class="action-label">Reviews</div>
             <div class="action-count" id="qa-reviews">0</div>
           </div>
           <div class="action-card" onclick="switchPage('suppliers')">
-            <div class="action-icon">🌐</div>
+            <div class="action-icon">ð</div>
             <div class="action-label">Suppliers</div>
             <div class="action-count" id="qa-suppliers">0</div>
           </div>
@@ -635,14 +635,58 @@ tbody tr:last-child td{border-bottom:none}
       <div id="settingsLoading" class="empty-state">Loading settings...</div>
       <div id="settingsContent" style="display:none">
         <div class="card" style="margin-bottom:20px">
-          <div class="page-subtitle" style="margin-bottom:16px">Markup Rules</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div class="form-group"><label class="form-label">Amazon Markup %</label><input type="number" id="markupAmazon" class="form-input" value="12"></div>
-            <div class="form-group"><label class="form-label">AliExpress Markup %</label><input type="number" id="markupAliexpress" class="form-input" value="15"></div>
+          <div class="page-subtitle" style="margin-bottom:16px">Markup Rules (% above source cost)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Amazon %</label>
+              <input type="number" id="markupAmazon" class="form-input" value="40" step="1" min="0" max="200">
+              <small style="color:#888" id="exAmazon">$10 cost → $13.99</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">AliExpress %</label>
+              <input type="number" id="markupAliexpress" class="form-input" value="50" step="1" min="0" max="200">
+              <small style="color:#888" id="exAli">$10 cost → $14.99</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sephora %</label>
+              <input type="number" id="markupSephora" class="form-input" value="35" step="1" min="0" max="200">
+              <small style="color:#888" id="exSephora">$10 cost → $13.99</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Macys %</label>
+              <input type="number" id="markupMacys" class="form-input" value="35" step="1" min="0" max="200">
+              <small style="color:#888" id="exMacys">$10 cost → $13.99</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">SHEIN %</label>
+              <input type="number" id="markupShein" class="form-input" value="50" step="1" min="0" max="200">
+              <small style="color:#888" id="exShein">$10 cost → $14.99</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Default %</label>
+              <input type="number" id="markupDefault" class="form-input" value="40" step="1" min="0" max="200">
+              <small style="color:#888" id="exDefault">$10 cost → $13.99</small>
+            </div>
+          </div>
+          <div style="margin-top:16px">
+            <div class="page-subtitle" style="margin-bottom:8px;font-size:13px">Low-Cost Product Rules</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-group">
+                <label class="form-label">Under $3 cost markup %</label>
+                <input type="number" id="markupUnder3" class="form-input" value="100" step="5" min="0" max="300">
+                <small style="color:#888">$2 cost → $3.99</small>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Under $5 cost markup %</label>
+                <input type="number" id="markupUnder5" class="form-input" value="60" step="5" min="0" max="300">
+                <small style="color:#888">$4 cost → $6.99</small>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding:10px;background:rgba(239,68,68,0.1);border-radius:6px;display:none" id="markupWarning">
+            <span style="color:#ef4444">Warning: Markup over 100% may make prices uncompetitive</span>
           </div>
         </div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="page-subtitle" style="margin-bottom:16px">Shipping Rules</div>
           <div class="form-group"><label class="form-label">Free Shipping Threshold ($)</label><input type="number" id="freeShippingThreshold" class="form-input" value="35"></div>
         </div>
         <div class="card" style="margin-bottom:20px">
@@ -678,13 +722,13 @@ tbody tr:last-child td{border-bottom:none}
 </div>
 
 <script>
-// ──────────────────── INIT & STATE ────────────────────
+// ââââââââââââââââââââ INIT & STATE ââââââââââââââââââââ
 let token = localStorage.getItem('sh_crm_token') || 'stylehub-admin-2026';
 let currentPage = 'overview';
 let currentFilter = { orders: 'all', customers: 'all', reviews: 'pending', tickets: 'all' };
 let cacheData = {};
 
-// ──────────────────── LOGIN ────────────────────
+// ââââââââââââââââââââ LOGIN ââââââââââââââââââââ
 function handleLogin() {
   const tokenInput = document.getElementById('tokenInput').value.trim();
   if (!tokenInput) {
@@ -709,7 +753,7 @@ function showApp() {
   loadDashboard();
 }
 
-// ──────────────────── API CALLS ────────────────────
+// ââââââââââââââââââââ API CALLS ââââââââââââââââââââ
 async function apiCall(endpoint) {
   try {
     const sep = endpoint.includes('?') ? '&' : '?';
@@ -757,7 +801,7 @@ async function apiCallPut(endpoint, data) {
   }
 }
 
-// ──────────────────── PAGE NAVIGATION ────────────────────
+// ââââââââââââââââââââ PAGE NAVIGATION ââââââââââââââââââââ
 function switchPage(pageName) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -778,7 +822,7 @@ function switchPage(pageName) {
   else if (pageName === 'cron') loadCronJobs();
 }
 
-// ──────────────────── DASHBOARD (OVERVIEW) ────────────────────
+// ââââââââââââââââââââ DASHBOARD (OVERVIEW) ââââââââââââââââââââ
 async function loadDashboard() {
   const data = await apiCall('dashboard');
   if (!data) {
@@ -827,7 +871,7 @@ async function loadDashboard() {
       for (const [key, val] of Object.entries(health.sources)) {
         const status = val.status || 'unknown';
         const latency = val.latencyMs || 0;
-        const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">● Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">● Paused</span>' : '<span class="bdg bdg-re">● Down</span>';
+        const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">â Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">â Paused</span>' : '<span class="bdg bdg-re">â Down</span>';
         html += `<div style="display:flex;justify-content:space-between;font-size:11px;padding:6px;border-bottom:1px solid var(--border)"><span>${key}</span><span>${statusBadge}</span><span class="mono-text">${latency}ms</span></div>`;
       }
       html += '</div>';
@@ -839,7 +883,7 @@ async function loadDashboard() {
   if (data.recent && data.recent.length > 0) {
     let html = '<div style="display:grid;gap:8px;font-size:11px">';
     data.recent.forEach(item => {
-      const action = item.action || `Order ${item.number} — $${(item.total||0).toFixed(2)}`;
+      const action = item.action || `Order ${item.number} â $${(item.total||0).toFixed(2)}`;
       const ts = item.timestamp || item.createdAt;
       html += `<div style="padding:6px;border-bottom:1px solid var(--border)"><div style="color:var(--text)">${action}</div><div style="color:var(--text3);font-size:9px">${ts ? new Date(ts).toLocaleString() : 'N/A'}</div></div>`;
     });
@@ -856,7 +900,7 @@ async function loadDashboard() {
   }
 }
 
-// ──────────────────── ORDERS ────────────────────
+// ââââââââââââââââââââ ORDERS ââââââââââââââââââââ
 async function loadOrders() {
   const filter = currentFilter.orders;
   const data = await apiCall(`orders?status=${filter}`);
@@ -867,7 +911,7 @@ async function loadOrders() {
 
   const orders = data.orders || [];
   if (orders.length === 0) {
-    document.getElementById('ordersTable').innerHTML = '<div class="empty-state">No orders yet — orders will appear here after your first sale.</div>';
+    document.getElementById('ordersTable').innerHTML = '<div class="empty-state">No orders yet â orders will appear here after your first sale.</div>';
     return;
   }
 
@@ -884,7 +928,7 @@ async function loadOrders() {
     else if (fulfillment === 'fulfilled') { status = 'shipped'; statusColor = 'var(--green)'; }
     else if (order.requiresManual) { status = 'manual'; statusColor = 'var(--purple)'; }
     const sourceBadge = `<span class="src s-${source.substring(0,4).toLowerCase()}">${source.substring(0,3).toUpperCase()}</span>`;
-    const statusBadge = `<span class="bdg" style="background:rgba(${statusColor === 'var(--green)' ? '34,197,94' : statusColor === 'var(--red)' ? '229,62,62' : statusColor === 'var(--purple)' ? '139,92,246' : '245,158,11'}, .1);color:${statusColor}">● ${status}</span>`;
+    const statusBadge = `<span class="bdg" style="background:rgba(${statusColor === 'var(--green)' ? '34,197,94' : statusColor === 'var(--red)' ? '229,62,62' : statusColor === 'var(--purple)' ? '139,92,246' : '245,158,11'}, .1);color:${statusColor}">â ${status}</span>`;
 
     const profit = order.estimatedProfit || order.profit || 0;
     html += `<tr>
@@ -919,7 +963,7 @@ async function fulfillOrder(orderId) {
   }
 }
 
-// ──────────────────── CUSTOMERS ────────────────────
+// ââââââââââââââââââââ CUSTOMERS ââââââââââââââââââââ
 async function loadCustomers() {
   const filter = currentFilter.customers;
   const data = await apiCall(`customers?segment=${filter}`);
@@ -933,7 +977,7 @@ async function loadCustomers() {
   (data.customers || []).forEach(cust => {
     const initials = (cust.name || 'XX').split(' ').map(n => n[0]).join('').toUpperCase();
     const segment = cust.segment || 'standard';
-    const segmentBadge = `<span class="bdg bdg-bl">● ${segment}</span>`;
+    const segmentBadge = `<span class="bdg bdg-bl">â ${segment}</span>`;
 
     html += `<tr>
       <td><div style="width:28px;height:28px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">${initials}</div></td>
@@ -956,7 +1000,7 @@ function filterCustomers(filter) {
   loadCustomers();
 }
 
-// ──────────────────── RETURNS ────────────────────
+// ââââââââââââââââââââ RETURNS ââââââââââââââââââââ
 async function loadReturns() {
   const data = await apiCall('returns');
   if (!data) {
@@ -983,7 +1027,7 @@ async function loadReturns() {
       <td style="font-size:10px">${ret.reason || 'N/A'}</td>
       <td class="mono-text">$${(ret.amount || 0).toFixed(2)}</td>
       <td>${sourceBadge}</td>
-      <td><span class="bdg bdg-am">● ${ret.status || 'pending'}</span></td>
+      <td><span class="bdg bdg-am">â ${ret.status || 'pending'}</span></td>
     </tr>`;
   });
 
@@ -991,7 +1035,7 @@ async function loadReturns() {
   document.getElementById('returnsTable').innerHTML = html;
 }
 
-// ──────────────────── REVIEWS ────────────────────
+// ââââââââââââââââââââ REVIEWS ââââââââââââââââââââ
 async function loadReviews() {
   const filter = currentFilter.reviews;
   const data = await apiCall(`reviews?status=${filter}`);
@@ -1002,14 +1046,14 @@ async function loadReviews() {
 
   const reviews = data.reviews || [];
   if (reviews.length === 0) {
-    document.getElementById('reviewsTable').innerHTML = '<div class="empty-state">No reviews yet — reviews appear when customers rate their purchases.</div>';
+    document.getElementById('reviewsTable').innerHTML = '<div class="empty-state">No reviews yet â reviews appear when customers rate their purchases.</div>';
     return;
   }
 
   let html = '<div class="table-wrap"><table><thead><tr><th>Product</th><th>Customer</th><th>Rating</th><th>Review</th><th>Date</th><th>Action</th></tr></thead><tbody>';
 
   reviews.forEach(rev => {
-    const stars = '★'.repeat(rev.rating || 5);
+    const stars = 'â'.repeat(rev.rating || 5);
 
     html += `<tr>
       <td style="font-size:10px">${rev.productTitle || rev.product_name || 'N/A'}</td>
@@ -1040,7 +1084,7 @@ async function approveReview(reviewId) {
   }
 }
 
-// ──────────────────── TICKETS ────────────────────
+// ââââââââââââââââââââ TICKETS ââââââââââââââââââââ
 async function loadTickets() {
   const filter = currentFilter.tickets;
   const stats = await apiCall('tickets/stats');
@@ -1060,7 +1104,7 @@ async function loadTickets() {
 
   const tickets = data.tickets || [];
   if (tickets.length === 0) {
-    document.getElementById('ticketsTable').innerHTML = '<div class="empty-state">No tickets yet — tickets appear when customers contact support.</div>';
+    document.getElementById('ticketsTable').innerHTML = '<div class="empty-state">No tickets yet â tickets appear when customers contact support.</div>';
     return;
   }
 
@@ -1079,7 +1123,7 @@ async function loadTickets() {
       <td>${tick.customerName || tick.customer_name || 'N/A'}</td>
       <td style="font-size:11px">${tick.subject || 'N/A'}</td>
       <td style="font-size:10px">${tick.category || 'general'}</td>
-      <td><span class="bdg ${statusBadge}">● ${tick.status || 'open'}</span></td>
+      <td><span class="bdg ${statusBadge}">â ${tick.status || 'open'}</span></td>
       <td style="font-size:9px">${new Date(tick.createdAt || tick.created_at).toLocaleDateString()}</td>
     </tr>`;
   });
@@ -1095,7 +1139,7 @@ function filterTickets(filter) {
   loadTickets();
 }
 
-// ──────────────────── ANALYTICS ────────────────────
+// ââââââââââââââââââââ ANALYTICS ââââââââââââââââââââ
 async function loadAnalytics() {
   const data = await apiCall('analytics?period=30');
   if (!data) {
@@ -1131,7 +1175,7 @@ async function loadAnalytics() {
     html += '</div>';
     document.getElementById('topProducts').innerHTML = html;
   } else {
-    document.getElementById('topProducts').innerHTML = '<div class="empty-state">No data yet — analytics populate after your first orders.</div>';
+    document.getElementById('topProducts').innerHTML = '<div class="empty-state">No data yet â analytics populate after your first orders.</div>';
   }
 
   // Top returns
@@ -1153,7 +1197,7 @@ function setPeriod(period) {
   loadAnalytics();
 }
 
-// ──────────────────── SUPPLIERS ────────────────────
+// ââââââââââââââââââââ SUPPLIERS ââââââââââââââââââââ
 async function loadSuppliers() {
   try {
     const data = await fetch('/api/source-health').then(r => r.json());
@@ -1163,7 +1207,7 @@ async function loadSuppliers() {
 
     for (const [key, val] of Object.entries(data.sources)) {
       const status = val.status || 'unknown';
-      const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">● Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">● Paused</span>' : '<span class="bdg bdg-re">● Down</span>';
+      const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">â Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">â Paused</span>' : '<span class="bdg bdg-re">â Down</span>';
       const sourceName = { amazon: 'Amazon', aliexpress: 'AliExpress', sephora: 'Sephora', macys: "Macy's", shein: 'SHEIN' }[key] || key;
 
       html += `<tr>
@@ -1183,81 +1227,118 @@ async function loadSuppliers() {
   }
 }
 
-// ──────────────────── SETTINGS ────────────────────
+// ââââââââââââââââââââ SETTINGS ââââââââââââââââââââ
 async function loadSettings() {
-  document.getElementById('settingsLoading').style.display = 'block';
-  document.getElementById('settingsContent').style.display = 'none';
-  try {
-    const data = await apiCall('settings');
-    if (data) {
-      if (data.markup) {
-        document.getElementById('markupAmazon').value = data.markup.amazon ?? 12;
-        document.getElementById('markupAliexpress').value = data.markup.aliexpress ?? 15;
-      }
-      if (data.shipping) {
-        document.getElementById('freeShippingThreshold').value = data.shipping.freeThreshold ?? 35;
-      }
-      if (data.returns) {
-        document.getElementById('returnAmazon').value = data.returns.windowAmazon ?? 30;
-        document.getElementById('returnAliexpress').value = data.returns.windowAliexpress ?? 15;
-      }
-      if (data.notifications) {
-        document.getElementById('notifNewOrder').checked = data.notifications.newOrder !== false;
-        document.getElementById('notifManualRequired').checked = data.notifications.manualRequired !== false;
-        document.getElementById('notifReturnRequest').checked = data.notifications.returnRequest !== false;
-        document.getElementById('notifApiDown').checked = data.notifications.apiDown !== false;
-        document.getElementById('notifLowProfit').checked = data.notifications.lowProfit === true;
-      }
-      if (data.emails) {
-        document.getElementById('emailFromName').value = data.emails.fromName || 'StyleHub Miami';
-        document.getElementById('emailReplyTo').value = data.emails.replyTo || '';
-      }
+      document.getElementById('settingsLoading').style.display = 'block';
+      document.getElementById('settingsContent').style.display = 'none';
+      try {
+        const data = await apiCall('settings');
+        if (data) {
+          if (data.markup) {
+            document.getElementById('markupAmazon').value = data.markup.amazon ?? 40;
+            document.getElementById('markupAliexpress').value = data.markup.aliexpress ?? 50;
+            document.getElementById('markupSephora').value = data.markup.sephora ?? 35;
+            document.getElementById('markupMacys').value = data.markup.macys ?? 35;
+            document.getElementById('markupShein').value = data.markup.shein ?? 50;
+            document.getElementById('markupDefault').value = data.markup.default ?? 40;
+          }
+          if (data.markup_rules) {
+            document.getElementById('markupUnder3').value = data.markup_rules.under_3 ?? 100;
+            document.getElementById('markupUnder5').value = data.markup_rules.under_5 ?? 60;
+          }
+          if (data.shipping) {
+            document.getElementById('freeShipThreshold').value = data.shipping.freeThreshold ?? 35;
+          }
+          if (data.returns) {
+            document.getElementById('returnAmazon').value = data.returns.windowAmazon ?? 30;
+            document.getElementById('returnAliexpress').value = data.returns.windowAliexpress ?? 15;
+          }
+          if (data.notifications) {
+            if (document.getElementById('notifNewOrder')) document.getElementById('notifNewOrder').checked = data.notifications.newOrder !== false;
+            if (document.getElementById('notifReturn')) document.getElementById('notifReturn').checked = data.notifications.returnRequest !== false;
+            if (document.getElementById('notifApiDown')) document.getElementById('notifApiDown').checked = data.notifications.apiDown !== false;
+          }
+          updateMarkupExamples();
+        }
+      } catch(e) { console.error('Settings load error:', e); }
+      document.getElementById('settingsLoading').style.display = 'none';
+      document.getElementById('settingsContent').style.display = 'block';
     }
-  } catch (e) { console.error('Failed to load settings:', e); }
-  document.getElementById('settingsLoading').style.display = 'none';
-  document.getElementById('settingsContent').style.display = 'block';
-}
 
 async function saveSettings() {
-  const settings = {
-    markup: {
-      amazon: parseInt(document.getElementById('markupAmazon').value) || 12,
-      aliexpress: parseInt(document.getElementById('markupAliexpress').value) || 15
-    },
-    shipping: {
-      freeThreshold: parseInt(document.getElementById('freeShippingThreshold').value) || 35,
-      plusFreeShipping: true
-    },
-    returns: {
-      windowAmazon: parseInt(document.getElementById('returnAmazon').value) || 30,
-      windowAliexpress: parseInt(document.getElementById('returnAliexpress').value) || 15
-    },
-    notifications: {
-      newOrder: document.getElementById('notifNewOrder').checked,
-      manualRequired: document.getElementById('notifManualRequired').checked,
-      returnRequest: document.getElementById('notifReturnRequest').checked,
-      apiDown: document.getElementById('notifApiDown').checked,
-      lowProfit: document.getElementById('notifLowProfit').checked
-    },
-    emails: {
-      fromName: document.getElementById('emailFromName').value,
-      replyTo: document.getElementById('emailReplyTo').value
+      const settings = {
+        markup: {
+          amazon: parseFloat(document.getElementById('markupAmazon').value) || 40,
+          aliexpress: parseFloat(document.getElementById('markupAliexpress').value) || 50,
+          sephora: parseFloat(document.getElementById('markupSephora').value) || 35,
+          macys: parseFloat(document.getElementById('markupMacys').value) || 35,
+          shein: parseFloat(document.getElementById('markupShein').value) || 50,
+          default: parseFloat(document.getElementById('markupDefault').value) || 40
+        },
+        markup_rules: {
+          under_3: parseFloat(document.getElementById('markupUnder3').value) || 100,
+          under_5: parseFloat(document.getElementById('markupUnder5').value) || 60
+        },
+        pricing: {
+          round_to_99: true,
+          free_shipping_threshold: parseFloat(document.getElementById('freeShipThreshold').value) || 35
+        },
+        shipping: {
+          freeThreshold: parseFloat(document.getElementById('freeShipThreshold').value) || 35
+        },
+        returns: {
+          windowAmazon: parseInt(document.getElementById('returnAmazon').value) || 30,
+          windowAliexpress: parseInt(document.getElementById('returnAliexpress').value) || 15
+        },
+        notifications: {
+          newOrder: document.getElementById('notifNewOrder') ? document.getElementById('notifNewOrder').checked : true,
+          returnRequest: document.getElementById('notifReturn') ? document.getElementById('notifReturn').checked : true,
+          apiDown: document.getElementById('notifApiDown') ? document.getElementById('notifApiDown').checked : true
+        }
+      };
+      try {
+        const result = await apiCallPost('settings', settings);
+        if (result && result.success) {
+          showToast('Settings saved! Markup changes take effect immediately.');
+        } else {
+          showToast('Error saving settings', 'error');
+        }
+      } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+      }
     }
-  };
 
-  const result = await apiCallPost('settings', settings);
-  const msg = document.getElementById('settingsMsg');
-  if (result && result.success) {
-    msg.style.color = 'var(--green)';
-    msg.textContent = 'Settings saved!';
-  } else {
-    msg.style.color = 'var(--red)';
-    msg.textContent = 'Failed to save settings';
-  }
-  setTimeout(() => msg.textContent = '', 3000);
-}
+    function updateMarkupExamples() {
+      const sources = [
+        { id: 'Amazon', field: 'markupAmazon', ex: 'exAmazon' },
+        { id: 'AliExpress', field: 'markupAliexpress', ex: 'exAli' },
+        { id: 'Sephora', field: 'markupSephora', ex: 'exSephora' },
+        { id: 'Macys', field: 'markupMacys', ex: 'exMacys' },
+        { id: 'SHEIN', field: 'markupShein', ex: 'exShein' },
+        { id: 'Default', field: 'markupDefault', ex: 'exDefault' }
+      ];
+      for (const s of sources) {
+        const el = document.getElementById(s.field);
+        const exEl = document.getElementById(s.ex);
+        if (el && exEl) {
+          const pct = parseFloat(el.value) || 0;
+          const raw = 10 * (1 + pct / 100);
+          const final = (Math.floor(raw) + 0.99).toFixed(2);
+          exEl.textContent = '$10 cost -> $' + final;
+          el.style.borderColor = pct > 100 ? '#ef4444' : '';
+        }
+      }
+      const warn = document.getElementById('markupWarning');
+      const anyHigh = sources.some(s => parseFloat(document.getElementById(s.field)?.value) > 100);
+      if (warn) warn.style.display = anyHigh ? 'block' : 'none';
+    }
 
-// ──────────────────── AUTODS ────────────────────
+    // Live example updates
+    document.addEventListener('input', function(e) {
+      if (e.target.id && e.target.id.startsWith('markup')) updateMarkupExamples();
+    });
+
+// ââââââââââââââââââââ AUTODS ââââââââââââââââââââ
 async function loadAutoDS() {
   try {
     const resp = await fetch(`/api/admin/autods/stats?token=${encodeURIComponent(token)}`);
@@ -1283,7 +1364,7 @@ async function loadAutoDS() {
     const orders = data.orders || [];
 
     if (orders.length === 0) {
-      document.getElementById('autodsOrdersTable').innerHTML = '<div class="empty-state">No AutoDS orders yet — orders appear when customers purchase synced products.</div>';
+      document.getElementById('autodsOrdersTable').innerHTML = '<div class="empty-state">No AutoDS orders yet â orders appear when customers purchase synced products.</div>';
     } else {
       let html = '<div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th></tr></thead><tbody>';
       orders.slice(0, 20).forEach(o => {
@@ -1293,7 +1374,7 @@ async function loadAutoDS() {
           <td><div style="font-size:11px">${o.customer_name || 'N/A'}</div><div style="font-size:9px;color:var(--text3)">${o.customer_email || ''}</div></td>
           <td class="mono-text">${o.items?.length || 0}</td>
           <td class="mono-text">$${parseFloat(o.total_price || 0).toFixed(2)}</td>
-          <td><span class="bdg" style="background:rgba(${o.autods_status === 'ready' ? '34,197,94' : o.autods_status === 'error' ? '229,62,62' : '245,158,11'},.1);color:${statusColor}">● ${o.autods_status}</span></td>
+          <td><span class="bdg" style="background:rgba(${o.autods_status === 'ready' ? '34,197,94' : o.autods_status === 'error' ? '229,62,62' : '245,158,11'},.1);color:${statusColor}">â ${o.autods_status}</span></td>
           <td style="font-size:9px">${new Date(o.created_at).toLocaleDateString()}</td>
         </tr>`;
       });
@@ -1368,7 +1449,7 @@ async function autodsMarkLinked(source, sourceId) {
   }
 }
 
-// ──────────────────── CRON JOBS ────────────────────
+// ââââââââââââââââââââ CRON JOBS ââââââââââââââââââââ
 async function loadCronJobs() {
   try {
     const resp = await fetch(`/api/admin/cron/status?token=${encodeURIComponent(token)}`);
@@ -1377,10 +1458,10 @@ async function loadCronJobs() {
     const badge = document.getElementById('cronStatusBadge');
     if (data.started) {
       badge.className = 'bdg bdg-gr';
-      badge.textContent = '● Running';
+      badge.textContent = 'â Running';
     } else {
       badge.className = 'bdg bdg-re';
-      badge.textContent = '● Stopped';
+      badge.textContent = 'â Stopped';
     }
 
     // Tasks table
@@ -1394,7 +1475,7 @@ async function loadCronJobs() {
         html += `<tr>
           <td style="font-size:11px">${t.name}</td>
           <td class="mono-text">${t.intervalMin} min</td>
-          <td><span class="bdg ${running ? 'bdg-gr' : 'bdg-am'}">● ${running ? 'Active' : 'Waiting'}</span></td>
+          <td><span class="bdg ${running ? 'bdg-gr' : 'bdg-am'}">â ${running ? 'Active' : 'Waiting'}</span></td>
           <td><button class="btn btn-g btn-sm" onclick="cronRunTask('${t.key}')">Run Now</button></td>
         </tr>`;
       });
@@ -1413,7 +1494,7 @@ async function loadCronJobs() {
         const details = typeof h.details === 'string' ? h.details : JSON.stringify(h.details || '').substring(0, 60);
         html += `<tr>
           <td style="font-size:11px">${h.task}</td>
-          <td><span class="bdg ${statusBadge}">● ${h.status}</span></td>
+          <td><span class="bdg ${statusBadge}">â ${h.status}</span></td>
           <td style="font-size:9px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${details}</td>
           <td style="font-size:9px">${h.at ? new Date(h.at).toLocaleString() : 'N/A'}</td>
         </tr>`;
@@ -1437,7 +1518,7 @@ async function cronRunTask(taskKey) {
   }
 }
 
-// ──────────────────── REFRESH ORDERS FROM SHOPIFY ────────────────────
+// ââââââââââââââââââââ REFRESH ORDERS FROM SHOPIFY ââââââââââââââââââââ
 async function refreshOrdersFromShopify() {
   try {
     const resp = await fetch(`/api/crm/refresh-orders?token=${encodeURIComponent(token)}`, { method: 'POST' });
@@ -1450,13 +1531,13 @@ async function refreshOrdersFromShopify() {
   }
 }
 
-// ──────────────────── UTILITIES ────────────────────
+// ââââââââââââââââââââ UTILITIES ââââââââââââââââââââ
 function toggleAlerts() {
   const alertBar = document.getElementById('alertBar');
   alertBar.style.display = alertBar.style.display === 'none' ? 'block' : 'none';
 }
 
-// ──────────────────── INIT ────────────────────
+// ââââââââââââââââââââ INIT ââââââââââââââââââââ
 window.addEventListener('load', () => {
   if (token && token !== 'stylehub-admin-2026') {
     showApp();

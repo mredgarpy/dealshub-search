@@ -1,5 +1,5 @@
 // ============================================================
-// StyleHub CRM — API Endpoints (Admin + Customer)
+// StyleHub CRM â API Endpoints (Admin + Customer)
 // ============================================================
 const { db, save } = require('./data');
 const { shopifyAdmin } = require('./shopify-admin');
@@ -13,11 +13,11 @@ function auth(req, res, next) {
   next();
 }
 
-// ═══════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââ
 // SHOPIFY ORDER HYDRATION
 // Pulls orders from Shopify Admin API into db.orders
 // Solves ephemeral filesystem issue on Render
-// ═══════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââ
 let lastHydration = 0;
 const HYDRATION_COOLDOWN = 60000; // 1 min cooldown
 
@@ -31,7 +31,7 @@ async function hydrateOrdersFromShopify(force = false) {
     const domain = process.env.SHOPIFY_STORE_DOMAIN;
     const token = process.env.SHOPIFY_ADMIN_TOKEN;
     if (!domain || !token) {
-      logger.warn('crm', 'Shopify not configured — skipping order hydration');
+      logger.warn('crm', 'Shopify not configured â skipping order hydration');
       return;
     }
 
@@ -198,9 +198,9 @@ function setupCRMApi(app) {
   // Re-hydrate every 5 minutes
   setInterval(() => hydrateOrdersFromShopify(), 5 * 60 * 1000);
 
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   // DASHBOARD METRICS
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   app.get('/api/crm/dashboard', auth, async (req, res) => {
     // Ensure orders are hydrated from Shopify
     if (Object.keys(db.orders).length === 0) {
@@ -259,7 +259,7 @@ function setupCRMApi(app) {
       .slice(0, 30)
       .map(o => ({
         ...o,
-        action: `Order ${o.number} — $${(o.total || 0).toFixed(2)} (${o.source || 'unknown'})`,
+        action: `Order ${o.number} â $${(o.total || 0).toFixed(2)} (${o.source || 'unknown'})`,
         timestamp: o.createdAt
       }));
 
@@ -292,9 +292,9 @@ function setupCRMApi(app) {
     });
   });
 
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   // ORDERS
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   app.get('/api/crm/orders', auth, async (req, res) => {
     // Ensure orders are hydrated
     if (Object.keys(db.orders).length === 0) {
@@ -329,9 +329,9 @@ function setupCRMApi(app) {
     res.json(o);
   });
 
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   // FULFILL MANUAL
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   app.post('/api/crm/orders/:id/fulfill', auth, async (req, res) => {
     try {
       const { trackingNumber, trackingCompany, trackingUrl } = req.body;
@@ -377,9 +377,9 @@ function setupCRMApi(app) {
     }
   });
 
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   // ADD NOTE
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   app.post('/api/crm/orders/:id/note', auth, (req, res) => {
     if (!db.orders[req.params.id]) return res.status(404).json({ error: 'Not found' });
     db.orders[req.params.id].notes = req.body.note || '';
@@ -393,9 +393,9 @@ function setupCRMApi(app) {
     res.json({ success: true });
   });
 
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   // RETURNS
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
 
   // Customer creates return
   app.post('/api/crm/returns/create', (req, res) => {
@@ -466,9 +466,9 @@ function setupCRMApi(app) {
     res.json({ returns: list });
   });
 
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   // REVIEWS
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
 
   // Customer creates review
   app.post('/api/crm/reviews/create', (req, res) => {
@@ -524,9 +524,9 @@ function setupCRMApi(app) {
     res.json({ reviews: list, total: list.length });
   });
 
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   // CUSTOMER PROFILE (via Shopify Admin API)
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   app.post('/api/customer/update-profile', async (req, res) => {
     try {
       const { customerId, firstName, lastName, phone } = req.body;
@@ -545,9 +545,9 @@ function setupCRMApi(app) {
     }
   });
 
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   // CUSTOMER ADDRESSES (via Shopify Admin API)
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   app.get('/api/customer/addresses/:cid', async (req, res) => {
     try {
       const data = await shopifyAdmin('GET', `/customers/${req.params.cid}/addresses.json`);
@@ -621,9 +621,9 @@ function setupCRMApi(app) {
       res.status(400).json({ error: e.message });
     }
   });
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   // PLUS MEMBERS STATS
-  // ═══════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââ
   app.get('/api/crm/plus-stats', auth, async (req, res) => {
     try {
       const plusMembers = db.plusMembers || {};
@@ -661,15 +661,15 @@ function setupCRMApi(app) {
     }
   });
 
-  // ═══════════════════════════════════════════════════════════
-  // NUEVOS ENDPOINTS — CRM Pro upgrade
-  // NO MODIFICAR NADA ARRIBA DE ESTA LÍNEA
-  // ═══════════════════════════════════════════════════════════
+  // âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // NUEVOS ENDPOINTS â CRM Pro upgrade
+  // NO MODIFICAR NADA ARRIBA DE ESTA LÃNEA
+  // âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
   const fs = require('fs');
   const path = require('path');
 
-  // ─── CUSTOMERS (data real de Shopify Admin API) ───
+  // âââ CUSTOMERS (data real de Shopify Admin API) âââ
 
   app.get('/api/crm/customers', auth, async function(req, res) {
     try {
@@ -782,7 +782,7 @@ function setupCRMApi(app) {
     }
   });
 
-  // ─── ANALYTICS (data real de orders + returns) ───
+  // âââ ANALYTICS (data real de orders + returns) âââ
 
   app.get('/api/crm/analytics', auth, async function(req, res) {
     try {
@@ -887,7 +887,7 @@ function setupCRMApi(app) {
     }
   });
 
-  // ─── SETTINGS ───
+  // âââ SETTINGS âââ
 
   const SETTINGS_FILE = path.join(__dirname, '..', 'data', 'settings.json');
 
@@ -897,7 +897,7 @@ function setupCRMApi(app) {
       res.json(settings);
     } catch(e) {
       res.json({
-        markup: { amazon: 12, aliexpress: 15 },
+        markup: { amazon: 40, aliexpress: 50, sephora: 35, macys: 35, shein: 50, default: 40 }, markup_rules: { under_3: 100, under_5: 60 }, pricing: { round_to_99: true, free_shipping_threshold: 35 },
         shipping: { freeThreshold: 35 },
         returns: { windowAmazon: 30, windowAliexpress: 15 },
         notifications: { newOrder: true, returnRequest: true, apiDown: true }
@@ -908,13 +908,32 @@ function setupCRMApi(app) {
   app.post('/api/crm/settings', auth, function(req, res) {
     try {
       fs.writeFileSync(SETTINGS_FILE, JSON.stringify(req.body, null, 2));
+      // Invalidate pricing cache so new markup takes effect immediately
+      try { const { invalidatePricingCache } = require('./utils/pricing'); invalidatePricingCache(); } catch(e) {}
       res.json({ success: true });
     } catch(e) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  // ─── MANUAL REFRESH: Force re-hydrate orders from Shopify ───
+  // âââ MANUAL REFRESH: Force re-hydrate orders from Shopify âââ
+  // --- PRICING PREVIEW ---
+  app.get('/api/crm/pricing-preview', auth, function(req, res) {
+    try {
+      const { calculateFinalPrice } = require('./utils/pricing');
+      const testPrices = [2.50, 4.00, 7.99, 11.99, 19.99, 29.99, 49.99];
+      const sources = ['amazon', 'aliexpress', 'sephora', 'macys', 'shein'];
+      const previews = [];
+      for (const source of sources) {
+        for (const price of testPrices) {
+          const result = calculateFinalPrice(price, source, {});
+          previews.push({ source, sourcePrice: price, finalPrice: result.price, margin: result.margin, marginPct: result.marginPct, markupApplied: result.markupPctApplied, ruleType: result.ruleType });
+        }
+      }
+      res.json({ previews });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
   app.post('/api/crm/refresh-orders', auth, async function(req, res) {
     try {
       await hydrateOrdersFromShopify(true);

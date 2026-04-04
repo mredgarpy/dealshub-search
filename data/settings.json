@@ -1,18 +1,102 @@
 {
-    "markup": { "amazon": 40, "aliexpress": 50, "sephora": 35, "macys": 35, "shein": 50, "default": 40 },
-    "markup_rules": { "under_3": 100, "under_5": 60 },
-    "pricing": { "round_to_99": true, "free_shipping_threshold": 35 },
-    "shipping": { "freeThreshold": 35, "plusFreeShipping": true },
-    "returns": { "windowAmazon": 30, "windowAliexpress": 15, "windowSephora": 30, "windowMacys": 30, "windowShein": 15 },
-    "notifications": {
-          "newOrder": true,
-          "manualRequired": true,
-          "returnRequest": true,
-          "apiDown": true,
-          "lowProfit": false
+  "markup_tiers": [
+    {
+      "max": 3,
+      "amazon": 1.7,
+      "aliexpress": 2.5,
+      "sephora": 1.5,
+      "macys": 1.5,
+      "shein": 2.5,
+      "default": 1.7
     },
-    "emails": {
-          "fromName": "StyleHub Miami",
-          "replyTo": "support@stylehubmiami.com"
+    {
+      "max": 10,
+      "amazon": 1.35,
+      "aliexpress": 1.7,
+      "sephora": 1.3,
+      "macys": 1.3,
+      "shein": 1.7,
+      "default": 1.35
+    },
+    {
+      "max": 25,
+      "amazon": 1.25,
+      "aliexpress": 1.5,
+      "sephora": 1.22,
+      "macys": 1.22,
+      "shein": 1.5,
+      "default": 1.25
+    },
+    {
+      "max": 50,
+      "amazon": 1.2,
+      "aliexpress": 1.4,
+      "sephora": 1.18,
+      "macys": 1.18,
+      "shein": 1.4,
+      "default": 1.2
+    },
+    {
+      "max": 100,
+      "amazon": 1.15,
+      "aliexpress": 1.3,
+      "sephora": 1.12,
+      "macys": 1.12,
+      "shein": 1.3,
+      "default": 1.15
+    },
+    {
+      "max": 200,
+      "amazon": 1.1,
+      "aliexpress": 1.22,
+      "sephora": 1.08,
+      "macys": 1.08,
+      "shein": 1.22,
+      "default": 1.1
+    },
+    {
+      "max": 500,
+      "amazon": 1.07,
+      "aliexpress": 1.15,
+      "sephora": 1.06,
+      "macys": 1.06,
+      "shein": 1.15,
+      "default": 1.07
+    },
+    {
+      "max": 999999,
+      "amazon": 1.05,
+      "aliexpress": 1.1,
+      "sephora": 1.05,
+      "macys": 1.05,
+      "shein": 1.1,
+      "default": 1.05
     }
+  ],
+  "pricing": {
+    "round_to_99": true,
+    "free_shipping_threshold": 35
+  },
+  "shipping": {
+    "freeThreshold": 35,
+    "plusFreeShipping": true
+  },
+  "returns": {
+    "windowAmazon": 30,
+    "windowAliexpress": 15,
+    "windowSephora": 30,
+    "windowMacys": 30,
+    "windowShein": 15
+  },
+  "notifications": {
+    "newOrder": true,
+    "manualRequired": true,
+    "returnRequest": true,
+    "apiDown": true,
+    "lowProfit": false
+  },
+  "emails": {
+    "fromName": "StyleHub Miami",
+    "replyTo": "support@stylehubmiami.com"
+  }
 }

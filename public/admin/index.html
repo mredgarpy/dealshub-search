@@ -635,65 +635,39 @@ tbody tr:last-child td{border-bottom:none}
       <div id="settingsLoading" class="empty-state">Loading settings...</div>
       <div id="settingsContent" style="display:none">
         <div class="card" style="margin-bottom:20px">
-          <div class="page-subtitle" style="margin-bottom:16px">Markup Rules (% above source cost)</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-            <div class="form-group">
-              <label class="form-label">Amazon %</label>
-              <input type="number" id="markupAmazon" class="form-input" value="40" step="1" min="0" max="200">
-              <small style="color:#888" id="exAmazon">$10 cost → $13.99</small>
-            </div>
-            <div class="form-group">
-              <label class="form-label">AliExpress %</label>
-              <input type="number" id="markupAliexpress" class="form-input" value="50" step="1" min="0" max="200">
-              <small style="color:#888" id="exAli">$10 cost → $14.99</small>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Sephora %</label>
-              <input type="number" id="markupSephora" class="form-input" value="35" step="1" min="0" max="200">
-              <small style="color:#888" id="exSephora">$10 cost → $13.99</small>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Macys %</label>
-              <input type="number" id="markupMacys" class="form-input" value="35" step="1" min="0" max="200">
-              <small style="color:#888" id="exMacys">$10 cost → $13.99</small>
-            </div>
-            <div class="form-group">
-              <label class="form-label">SHEIN %</label>
-              <input type="number" id="markupShein" class="form-input" value="50" step="1" min="0" max="200">
-              <small style="color:#888" id="exShein">$10 cost → $14.99</small>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Default %</label>
-              <input type="number" id="markupDefault" class="form-input" value="40" step="1" min="0" max="200">
-              <small style="color:#888" id="exDefault">$10 cost → $13.99</small>
-            </div>
+          <div class="page-subtitle" style="margin-bottom:16px">Markup Tiers (Multiplier by Source &amp; Price Range)</div>
+          <p style="color:#888;font-size:12px;margin-bottom:16px">Each cell is a multiplier: cost &times; multiplier = final price (rounded to .99). Lower = competitive, higher = more profit.</p>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px" id="tiersTable">
+              <thead>
+                <tr style="border-bottom:2px solid var(--border)">
+                  <th style="text-align:left;padding:8px;color:var(--text3)">Price Range</th>
+                  <th style="text-align:center;padding:8px;color:#f59e0b">Amazon</th>
+                  <th style="text-align:center;padding:8px;color:#ef4444">AliExpress</th>
+                  <th style="text-align:center;padding:8px;color:#ec4899">Sephora</th>
+                  <th style="text-align:center;padding:8px;color:#8b5cf6">Macy's</th>
+                  <th style="text-align:center;padding:8px;color:#22c55e">SHEIN</th>
+                  <th style="text-align:center;padding:8px;color:var(--text3)">Default</th>
+                </tr>
+              </thead>
+              <tbody id="tiersTableBody"></tbody>
+            </table>
           </div>
-          <div style="margin-top:16px">
-            <div class="page-subtitle" style="margin-bottom:8px;font-size:13px">Low-Cost Product Rules</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="form-group">
-                <label class="form-label">Under $3 cost markup %</label>
-                <input type="number" id="markupUnder3" class="form-input" value="100" step="5" min="0" max="300">
-                <small style="color:#888">$2 cost → $3.99</small>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Under $5 cost markup %</label>
-                <input type="number" id="markupUnder5" class="form-input" value="60" step="5" min="0" max="300">
-                <small style="color:#888">$4 cost → $6.99</small>
-              </div>
-            </div>
-          </div>
-          <div style="margin-top:12px;padding:10px;background:rgba(239,68,68,0.1);border-radius:6px;display:none" id="markupWarning">
-            <span style="color:#ef4444">Warning: Markup over 100% may make prices uncompetitive</span>
+          <div style="margin-top:16px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius)">
+            <div style="font-weight:600;font-size:12px;color:var(--text);margin-bottom:12px">Live Preview: Sample Products</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="previewGrid"></div>
           </div>
         </div>
-          <div class="form-group"><label class="form-label">Free Shipping Threshold ($)</label><input type="number" id="freeShippingThreshold" class="form-input" value="35"></div>
+          <div class="form-group"><label class="form-label">Free Shipping Threshold ($)</label><input type="number" id="freeShipThreshold" class="form-input" value="35"></div>
         </div>
         <div class="card" style="margin-bottom:20px">
           <div class="page-subtitle" style="margin-bottom:16px">Return Windows</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
             <div class="form-group"><label class="form-label">Amazon Return Days</label><input type="number" id="returnAmazon" class="form-input" value="30"></div>
             <div class="form-group"><label class="form-label">AliExpress Return Days</label><input type="number" id="returnAliexpress" class="form-input" value="15"></div>
+            <div class="form-group"><label class="form-label">Sephora Return Days</label><input type="number" id="returnSephora" class="form-input" value="30"></div>
+            <div class="form-group"><label class="form-label">Macy's Return Days</label><input type="number" id="returnMacys" class="form-input" value="30"></div>
+            <div class="form-group"><label class="form-label">SHEIN Return Days</label><input type="number" id="returnShein" class="form-input" value="15"></div>
           </div>
         </div>
         <div class="card" style="margin-bottom:20px">
@@ -1228,72 +1202,158 @@ async function loadSuppliers() {
 }
 
 // ââââââââââââââââââââ SETTINGS ââââââââââââââââââââ
-async function loadSettings() {
+// ===== TIERED MARKUP SYSTEM =====
+    const TIER_LABELS = ['$0-$3','$3-$10','$10-$25','$25-$50','$50-$100','$100-$200','$200-$500','$500+'];
+    const TIER_MAXES = [3, 10, 25, 50, 100, 200, 500, 999999];
+    const TIER_SOURCES = ['amazon','aliexpress','sephora','macys','shein','default'];
+    const SAMPLE_PRODUCTS = [
+      {name:'CeraVe Moisturizer',source:'amazon',cost:12.99},
+      {name:'AirPods Pro',source:'amazon',cost:109},
+      {name:'Leggings',source:'shein',cost:5.50},
+      {name:'iPhone Case',source:'aliexpress',cost:2.20},
+      {name:'Dyson Vacuum',source:'amazon',cost:450},
+      {name:'Lipstick',source:'sephora',cost:22}
+    ];
+
+    function buildTiersTable(tiers) {
+      const tbody = document.getElementById('tiersTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      TIER_LABELS.forEach((label, i) => {
+        const tier = tiers[i] || {};
+        let row = '<tr style="border-bottom:1px solid var(--border)">';
+        row += '<td style="padding:8px;color:var(--text3);font-weight:500;white-space:nowrap">' + label + '</td>';
+        TIER_SOURCES.forEach(src => {
+          const val = (tier[src] || 1.20).toFixed(2);
+          row += '<td style="padding:6px;text-align:center"><input type="number" step="0.01" min="1" max="5" value="' + val + '" data-tier="' + i + '" data-src="' + src + '" class="form-input" style="width:68px;text-align:center;padding:6px" oninput="updateTierPreview()"></td>';
+        });
+        row += '</tr>';
+        tbody.insertAdjacentHTML('beforeend', row);
+      });
+      updateTierPreview();
+    }
+
+    function collectTiers() {
+      const tiers = [];
+      TIER_MAXES.forEach((max, i) => {
+        const t = { max: max };
+        TIER_SOURCES.forEach(src => {
+          const inp = document.querySelector('input[data-tier="' + i + '"][data-src="' + src + '"]');
+          t[src] = inp ? parseFloat(inp.value) || 1.20 : 1.20;
+        });
+        tiers.push(t);
+      });
+      return tiers;
+    }
+
+    function calcTierPrice(cost, source, tiers) {
+      const tier = tiers.find(t => cost < t.max) || tiers[tiers.length - 1];
+      const mult = tier[source] || tier['default'] || 1.20;
+      let price = cost * mult;
+      price = Math.floor(price) + 0.99;
+      if (price <= cost) price = Math.floor(cost) + 1.99;
+      return { price, mult, margin: ((price - cost) / price * 100).toFixed(1) };
+    }
+
+    function updateTierPreview() {
+      const grid = document.getElementById('previewGrid');
+      if (!grid) return;
+      const tiers = collectTiers();
+      grid.innerHTML = '';
+      SAMPLE_PRODUCTS.forEach(p => {
+        const r = calcTierPrice(p.cost, p.source, tiers);
+        grid.insertAdjacentHTML('beforeend',
+          '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;font-size:11px">' +
+          '<div style="font-weight:600;color:var(--text);margin-bottom:4px">' + p.name + '</div>' +
+          '<div style="color:var(--text3);margin-bottom:6px">' + p.source + ' &bull; ' + r.mult.toFixed(2) + '&times;</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+          '<span style="color:var(--text3)">$' + p.cost.toFixed(2) + ' &rarr;</span>' +
+          '<span style="font-weight:700;font-size:14px;color:var(--text)">$' + r.price.toFixed(2) + '</span>' +
+          '</div>' +
+          '<div style="color:#4ade80;font-size:10px;margin-top:4px">Margin: ' + r.margin + '%</div>' +
+          '</div>'
+        );
+      });
+    }
+
+    async function loadSettings() {
       document.getElementById('settingsLoading').style.display = 'block';
       document.getElementById('settingsContent').style.display = 'none';
       try {
         const data = await apiCall('settings');
         if (data) {
-          if (data.markup) {
-            document.getElementById('markupAmazon').value = data.markup.amazon ?? 40;
-            document.getElementById('markupAliexpress').value = data.markup.aliexpress ?? 50;
-            document.getElementById('markupSephora').value = data.markup.sephora ?? 35;
-            document.getElementById('markupMacys').value = data.markup.macys ?? 35;
-            document.getElementById('markupShein').value = data.markup.shein ?? 50;
-            document.getElementById('markupDefault').value = data.markup.default ?? 40;
+          // New tiered system
+          if (data.markup_tiers && data.markup_tiers.length > 0) {
+            buildTiersTable(data.markup_tiers);
+          } else if (data.markup) {
+            // Legacy flat markup - build default tiers
+            buildTiersTable([
+              {max:3,amazon:1.70,aliexpress:2.50,sephora:1.50,macys:1.50,shein:2.50,default:1.70},
+              {max:10,amazon:1.35,aliexpress:1.70,sephora:1.30,macys:1.30,shein:1.70,default:1.35},
+              {max:25,amazon:1.25,aliexpress:1.50,sephora:1.22,macys:1.22,shein:1.50,default:1.25},
+              {max:50,amazon:1.20,aliexpress:1.40,sephora:1.18,macys:1.18,shein:1.40,default:1.20},
+              {max:100,amazon:1.15,aliexpress:1.30,sephora:1.12,macys:1.12,shein:1.30,default:1.15},
+              {max:200,amazon:1.10,aliexpress:1.22,sephora:1.08,macys:1.08,shein:1.22,default:1.10},
+              {max:500,amazon:1.07,aliexpress:1.15,sephora:1.06,macys:1.06,shein:1.15,default:1.07},
+              {max:999999,amazon:1.05,aliexpress:1.10,sephora:1.05,macys:1.05,shein:1.10,default:1.05}
+            ]);
           }
-          if (data.markup_rules) {
-            document.getElementById('markupUnder3').value = data.markup_rules.under_3 ?? 100;
-            document.getElementById('markupUnder5').value = data.markup_rules.under_5 ?? 60;
+          // Shipping
+          if (data.pricing) {
+            const fst = document.getElementById('freeShipThreshold');
+            if (fst) fst.value = data.pricing.free_shipping_threshold || data.shipping?.freeThreshold || 35;
           }
-          if (data.shipping) {
-            document.getElementById('freeShipThreshold').value = data.shipping.freeThreshold ?? 35;
-          }
+          // Returns
           if (data.returns) {
-            document.getElementById('returnAmazon').value = data.returns.windowAmazon ?? 30;
-            document.getElementById('returnAliexpress').value = data.returns.windowAliexpress ?? 15;
+            const ra = document.getElementById('returnAmazon'); if (ra) ra.value = data.returns.windowAmazon || 30;
+            const ral = document.getElementById('returnAliexpress'); if (ral) ral.value = data.returns.windowAliexpress || 15;
+            const rs = document.getElementById('returnSephora'); if (rs) rs.value = data.returns.windowSephora || 30;
+            const rm = document.getElementById('returnMacys'); if (rm) rm.value = data.returns.windowMacys || 30;
+            const rsh = document.getElementById('returnShein'); if (rsh) rsh.value = data.returns.windowShein || 15;
           }
+          // Notifications
           if (data.notifications) {
-            if (document.getElementById('notifNewOrder')) document.getElementById('notifNewOrder').checked = data.notifications.newOrder !== false;
-            if (document.getElementById('notifReturn')) document.getElementById('notifReturn').checked = data.notifications.returnRequest !== false;
-            if (document.getElementById('notifApiDown')) document.getElementById('notifApiDown').checked = data.notifications.apiDown !== false;
+            const n1 = document.getElementById('notifNewOrder'); if (n1) n1.checked = data.notifications.newOrder !== false;
+            const n2 = document.getElementById('notifManualRequired'); if (n2) n2.checked = data.notifications.manualRequired !== false;
+            const n3 = document.getElementById('notifReturnRequest'); if (n3) n3.checked = data.notifications.returnRequest !== false;
+            const n4 = document.getElementById('notifApiDown'); if (n4) n4.checked = data.notifications.apiDown !== false;
+            const n5 = document.getElementById('notifLowProfit'); if (n5) n5.checked = data.notifications.lowProfit === true;
           }
-          updateMarkupExamples();
+          // Emails
+          if (data.emails) {
+            const ef = document.getElementById('emailFromName'); if (ef) ef.value = data.emails.fromName || 'StyleHub Miami';
+            const er = document.getElementById('emailReplyTo'); if (er) er.value = data.emails.replyTo || 'support@stylehubmiami.com';
+          }
         }
       } catch(e) { console.error('Settings load error:', e); }
       document.getElementById('settingsLoading').style.display = 'none';
       document.getElementById('settingsContent').style.display = 'block';
     }
 
-async function saveSettings() {
+    async function saveSettings() {
+      const tiers = collectTiers();
+      const fst = document.getElementById('freeShipThreshold');
       const settings = {
-        markup: {
-          amazon: parseFloat(document.getElementById('markupAmazon').value) || 40,
-          aliexpress: parseFloat(document.getElementById('markupAliexpress').value) || 50,
-          sephora: parseFloat(document.getElementById('markupSephora').value) || 35,
-          macys: parseFloat(document.getElementById('markupMacys').value) || 35,
-          shein: parseFloat(document.getElementById('markupShein').value) || 50,
-          default: parseFloat(document.getElementById('markupDefault').value) || 40
-        },
-        markup_rules: {
-          under_3: parseFloat(document.getElementById('markupUnder3').value) || 100,
-          under_5: parseFloat(document.getElementById('markupUnder5').value) || 60
-        },
-        pricing: {
-          round_to_99: true,
-          free_shipping_threshold: parseFloat(document.getElementById('freeShipThreshold').value) || 35
-        },
-        shipping: {
-          freeThreshold: parseFloat(document.getElementById('freeShipThreshold').value) || 35
-        },
+        markup_tiers: tiers,
+        pricing: { round_to_99: true, free_shipping_threshold: parseFloat(fst?.value) || 35 },
+        shipping: { freeThreshold: parseFloat(fst?.value) || 35, plusFreeShipping: true },
         returns: {
-          windowAmazon: parseInt(document.getElementById('returnAmazon').value) || 30,
-          windowAliexpress: parseInt(document.getElementById('returnAliexpress').value) || 15
+          windowAmazon: parseInt(document.getElementById('returnAmazon')?.value) || 30,
+          windowAliexpress: parseInt(document.getElementById('returnAliexpress')?.value) || 15,
+          windowSephora: parseInt(document.getElementById('returnSephora')?.value) || 30,
+          windowMacys: parseInt(document.getElementById('returnMacys')?.value) || 30,
+          windowShein: parseInt(document.getElementById('returnShein')?.value) || 15
         },
         notifications: {
-          newOrder: document.getElementById('notifNewOrder') ? document.getElementById('notifNewOrder').checked : true,
-          returnRequest: document.getElementById('notifReturn') ? document.getElementById('notifReturn').checked : true,
-          apiDown: document.getElementById('notifApiDown') ? document.getElementById('notifApiDown').checked : true
+          newOrder: document.getElementById('notifNewOrder')?.checked !== false,
+          manualRequired: document.getElementById('notifManualRequired')?.checked !== false,
+          returnRequest: document.getElementById('notifReturnRequest')?.checked !== false,
+          apiDown: document.getElementById('notifApiDown')?.checked !== false,
+          lowProfit: document.getElementById('notifLowProfit')?.checked === true
+        },
+        emails: {
+          fromName: document.getElementById('emailFromName')?.value || 'StyleHub Miami',
+          replyTo: document.getElementById('emailReplyTo')?.value || 'support@stylehubmiami.com'
         }
       };
       try {
@@ -1303,40 +1363,8 @@ async function saveSettings() {
         } else {
           showToast('Error saving settings', 'error');
         }
-      } catch(e) {
-        showToast('Error: ' + e.message, 'error');
-      }
+      } catch(e) { showToast('Error: ' + e.message, 'error'); }
     }
-
-    function updateMarkupExamples() {
-      const sources = [
-        { id: 'Amazon', field: 'markupAmazon', ex: 'exAmazon' },
-        { id: 'AliExpress', field: 'markupAliexpress', ex: 'exAli' },
-        { id: 'Sephora', field: 'markupSephora', ex: 'exSephora' },
-        { id: 'Macys', field: 'markupMacys', ex: 'exMacys' },
-        { id: 'SHEIN', field: 'markupShein', ex: 'exShein' },
-        { id: 'Default', field: 'markupDefault', ex: 'exDefault' }
-      ];
-      for (const s of sources) {
-        const el = document.getElementById(s.field);
-        const exEl = document.getElementById(s.ex);
-        if (el && exEl) {
-          const pct = parseFloat(el.value) || 0;
-          const raw = 10 * (1 + pct / 100);
-          const final = (Math.floor(raw) + 0.99).toFixed(2);
-          exEl.textContent = '$10 cost -> $' + final;
-          el.style.borderColor = pct > 100 ? '#ef4444' : '';
-        }
-      }
-      const warn = document.getElementById('markupWarning');
-      const anyHigh = sources.some(s => parseFloat(document.getElementById(s.field)?.value) > 100);
-      if (warn) warn.style.display = anyHigh ? 'block' : 'none';
-    }
-
-    // Live example updates
-    document.addEventListener('input', function(e) {
-      if (e.target.id && e.target.id.startsWith('markup')) updateMarkupExamples();
-    });
 
 // ââââââââââââââââââââ AUTODS ââââââââââââââââââââ
 async function loadAutoDS() {

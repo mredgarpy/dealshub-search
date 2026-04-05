@@ -1,198 +1,285 @@
 // ============================================================
-// DealsHub — Pricing Engine v4.0
+// DealsHub - Pricing Engine v4.0 (Tiered Multiplier)
 // ============================================================
-// Controls markup, margins, rounding, compare-at logic
-// v4.0: TIERED MULTIPLIER SYSTEM — markup varies by source + price range
-//        Cheap products get high markup (nobody compares)
-//        Expensive products get low markup (everyone compares)
-//        Branded sources (Amazon/Sephora/Macys) lower markup = traffic magnets
-//        Generic sources (AliExpress/SHEIN) higher markup = profit centers
-// ============================================================
+// Priority chain:
+//   1. settings.json markup_tiers (tiered multiplier by price band + source)
+//   2. Legacy flat markup from settings.json (markup_amazon, etc.)
+//   3. DB pricing_rules
+//   4. DEFAULT_RULES hardcoded fallback
+//
+// Tiered system: cost x multiplier = final_price (rounded to .99)
+// 8 price tiers x 6 sources (amazon, aliexpress, sephora, macys, shein, default)
 
 const logger = require('./logger');
 const path = require('path');
 const fs = require('fs');
 
-// ---- SETTINGS FILE (editable from admin) ----
-const SETTINGS_FILE = path.join(__dirname, '..', '..', 'data', 'settings.json');
-
-// Cache settings in memory for 30s to avoid reading disk on every call
+// -- Settings loader (cached, refreshes every 60s) -------------
 let _settingsCache = null;
 let _settingsCacheTime = 0;
-const SETTINGS_TTL = 30000; // 30s
+const SETTINGS_TTL = 60000; // 1 min
 
 function loadSettings() {
-  if (_settingsCache && Date.now() - _settingsCacheTime < SETTINGS_TTL) {
-    return _settingsCache;
-  }
-  try {
-    if (fs.existsSync(SETTINGS_FILE)) {
-      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
-      _settingsCache = data;
-      _settingsCacheTime = Date.now();
-      return data;
+    if (_settingsCache && Date.now() - _settingsCacheTime < SETTINGS_TTL) {
+          return _settingsCache;
     }
-  } catch (e) {
-    logger.debug('pricing', `Settings load failed: ${e.message}`);
-  }
-  return null;
+    try {
+          const settingsPath = path.join(__dirname, '../../data/settings.json');
+          if (fs.existsSync(settingsPath)) {
+                  const raw = fs.readFileSync(settingsPath, 'utf8');
+                  _settingsCache = JSON.parse(raw);
+                  _settingsCacheTime = Date.now();
+                  return _settingsCache;
+          }
+    } catch (e) {
+          logger.warn('pricing: failed to load settings.json:', e.message);
+    }
+    return null;
 }
 
-// ---- DEFAULT TIERED MARKUP (multipliers, not percentages) ----
+// -- Tier definitions ------------------------------------------
+const TIER_MAXES = [3, 10, 25, 50, 100, 200, 500, 999999];
+const TIER_LABELS = ['$0-$3', '$3-$10', '$10-$25', '$25-$50', '$50-$100', '$100-$200', '$200-$500', '$500+'];
+const TIER_SOURCES = ['amazon', 'aliexpress', 'sephora', 'macys', 'shein', 'default'];
+
+// Default tier multipliers (cost x multiplier = final price)
 const DEFAULT_TIERS = [
-  { max: 3,      amazon: 1.70, aliexpress: 2.50, sephora: 1.50, macys: 1.50, shein: 2.50, default: 1.70 },
-  { max: 10,     amazon: 1.35, aliexpress: 1.70, sephora: 1.30, macys: 1.30, shein: 1.70, default: 1.35 },
-  { max: 25,     amazon: 1.25, aliexpress: 1.50, sephora: 1.22, macys: 1.22, shein: 1.50, default: 1.25 },
-  { max: 50,     amazon: 1.20, aliexpress: 1.40, sephora: 1.18, macys: 1.18, shein: 1.40, default: 1.20 },
-  { max: 100,    amazon: 1.15, aliexpress: 1.30, sephora: 1.12, macys: 1.12, shein: 1.30, default: 1.15 },
-  { max: 200,    amazon: 1.10, aliexpress: 1.22, sephora: 1.08, macys: 1.08, shein: 1.22, default: 1.10 },
-  { max: 500,    amazon: 1.07, aliexpress: 1.15, sephora: 1.06, macys: 1.06, shein: 1.15, default: 1.07 },
-  { max: 999999, amazon: 1.05, aliexpress: 1.10, sephora: 1.05, macys: 1.05, shein: 1.10, default: 1.05 }
-];
-���Y�X�H�]Y�][�
-�[�X��Y���Y\��]�Z[X�JB��ۜ�Q�USԕST�H[X^�ێ��X\��\��
-Z[�X\��[����K��[�Έ�NK�X�Q��܎���NHK�[Y^�\�Έ�X\��\��
-LZ[�X\��[������[�Έ�NK�X�Q��܎���NHK��\ܘN��X\��\���KZ[�X\��[�������[�Έ�NK�X�Q��܎�
-�NHK�XX�\Έ�X\��\���KZ[�X\��[�������[�Έ�NK�X�Q��܎�
-�NHK��Z[���X\��\��
-LZ[�X\��[������[�Έ�NK�X�Q��܎�K�NHB�N����\�܈�X���\���\]^ܝ�ۜ�QT�QԕST�H[�\��Έ�X\��\��LZ[�X\��[���
-K�[�\��N��X\��\��
-�Z[�X\��[����B�N�]���[\��X�HH�[]���[\��X�U[YHH�ۜ��ԕST��H����
-HZ[��X�B���[��[ۈ��Y��[\�
-HY�
-���[\��X�H	��]K����
-HH���[\��X�U[YH�ԕST��
-H�]\�����[\��X�NB��H�ۜ���]�X�[�ԝ[\�HH�\]Z\�J	ˋ���N�ۜ��[\�H�]�X�[�ԝ[\�
-NY�
-�[\�	���[\˛[���
-H���[\��X�HH�[\˙�[\��O���\��X�]�JN���[\��X�U[YHH]K����
-N�]\�����[\��X�NB�H�]�
-JH�����]�Z[X�K\�HY�][B��]\���[B���[��[ۈ��ԝ[J�H�]\��X\��\����X\��\���Z[�X\��[�����Z[��X\��[������[�Έ����[����NK��X�Q��܎����X�Wٛ�܈�[��[RY���Y��[U\N�����[��	؜�[�	��
-���]Y�ܞH�	��]Y�ܞI��	���\��I�B�NB����KKKH�UQT�QUSTQT��܈��\��H
-��X�HKKKB��[��[ۈ�]Y\�][\Y\���\��T�X�K��\��JH�ۜ��][���H�Y�][���
-N�ۜ�Y\��H
-�][���	���][��˛X\��\�Y\��H��][��˛X\��\�Y\���Q�US�QT���ۜ���[��NHH�][���˜�X�[��˜��[����NHOOH�[�N����ܛX[^�H��\��H�[YB��ۜ�ܘ�H
-��\��H	�Y�][	�K����\��\�J
-K��[J
-N����[�HX]�[��Y\�
-�\��Y\��\�H��\��T�X�HX^
-B��ۜ�Y\�HY\�˙�[�
-O���\��T�X�H�X^
-HY\���Y\�˛[��HWN����]][\Y\��܈\���\��K�[�X���Y�][��ۜ�][\Y\�HY\��ܘ�HY\���Y�][	�HK����]\��][\Y\��\��Q��]
-][\Y\�K�Y\�X^�Y\��X^���[��NK��[U\N�	�Y\�Y	NB����KKKH�U�P�S���SH
-Y\�Y���Y�X�HY�][�HKKKB��[��[ۈ�]�X�[�ԝ[J��\��K��H�JH�ۜ���\��T�X�HH�˜��\��T�X�H�ۜ��][���H�Y�][���
-N���K�Y��][��˚��ۈ\�X\��\�Y\��\�H�]�Y\�Y�\�[B�Y�
-�][���	���][��˛X\��\�Y\��	���][��˛X\��\�Y\�˛[���
-H�ۜ�Y\�[���H�]Y\�][\Y\���\��T�X�K��\��JN���۝�\�][\Y\��X\��\��܈�X���\���\]��ۜ�X\��\�H
-Y\�[��˛][\Y\�HJH
-�L�]\��X\��\��][\Y\��Y\�[��˛][\Y\��Z[�X\��[���X\��\�
-������[�ΈY\�[��˜��[��NH��NH���X�Q��܎��[��[U\N�	�Y\�Y	��Y\�X^�Y\�[��˝Y\�X^�NB������Y�X�N��][��˚��ۈ�]�]X\��\ؚ�X��Y�
-�][���	���][��˛X\��\	���][��˛X\��\���\��WHOOH[�Y�[�Y
-H]X\��\�H\��Q��]
-�][��˛X\��\���\��WJN�ۜ�Y\�YH�][��˛X\��\ܝ[\�QT�QԕST�Y�
-��\��T�X�H�	����\��T�X�H�	��Y\�Y�[�\���HX\��\�H\��Q��]
-Y\�Y�[�\���NH[�HY�
-��\��T�X�H�	����\��T�X�H
-H	��Y\�Y�[�\��JHX\��\�H\��Q��]
-Y\�Y�[�\��JNB��]\��X\��\��Z[�X\��[���X\��\�
-������[�Έ�][��˜�X�[��˜��[����NHOOH�[�H��NH���X�Q��܎��[��[U\N�	��][���NB����ˈ�H��[\�
-��[���]Y�ܞH���\��JB��ۜ���[\�H��Y��[\�
-NY�
-��[\�	����[\˛[���
-H�ۜ���]Y�ܞK��[�HH��Y�
-��[�
-H�ۜ���[��[HH��[\˙�[�
-�O������\��W��ܙHOOH��\��H	������[�	������[�����\��\�J
-HOOH��[�����\��\�J
-B�
-NY�
-��[��[JH�]\����ԝ[J��[��[JNB�Y�
-�]Y�ܞJH�ۜ��]�[HH��[\˙�[�
-�O������\��W��ܙHOOH��\��H	�����]Y�ܞH	�����]Y�ܞK����\��\�J
-HOOH�]Y�ܞK����\��\�J
-H	��\����[��
-NY�
-�]�[JH�]\����ԝ[J�]�[JNB��ۜ���\��T�[HH��[\˙�[�
-�O������\��W��ܙHOOH��\��H	��\���]Y�ܞH	��\����[��
-NY�
-��\��T�[JH�]\����ԝ[J��\��T�[JNB����
-�Y�X�HY�][��]Y\�Y[�\����[�\��B�]Y�][�[HHQ�USԕST����\��WH�X\��\��
-Z[�X\��[����K��[�Έ�NK�X�Q��܎���NHNY�
-��\��T�X�H�	����\��T�X�H�HY�][�[HH����Y�][�[KX\��\��QT�QԕST˝[�\��˛X\��\�Z[�X\��[���QT�QԕST˝[�\��˛Z[�X\��[��NH[�HY�
-��\��T�X�H�	����\��T�X�H
-JHY�][�[HH����Y�][�[KX\��\��QT�QԕST˝[�\��K�X\��\�Z[�X\��[���QT�QԕST˝[�\��K�Z[�X\��[��NB��]\��Y�][�[NB����KKKHPRS��P�S���S��SӈKKKB��[��[ۈ�[�[]Q�[�[�X�J��\��T�X�K��\��K��H�JHY�
-\��\��T�X�H��\��T�X�HH
-H�]\����X�N��[��\\�P]��[N��ۜ��[HH�]�X�[�ԝ[J��\��K�]Y�ܞN��˘�]Y�ܞK���[���˘��[����\��T�X�N���\��T�X�B�JN��ۜ��\[�����H�˜�\[������ۜ��Y\�H�˙�Y\��ۜ�[�Y���H��\��T�X�H
-��\[�����
-��Y\��]�[�[�X�N����]�Y\�Y�\�[N�\�H][\Y\�\�X�B�Y�
-�[K�][\Y\�H�[�[�X�HH��\��T�X�H
-��[K�][\Y\���Y�\[��ٙY\�ۈ��Y�
-�\[�������Y\��
-H�[�[�X�H
-�H�\[�����
-��Y\�B�H[�H��Y�X�H\��[�Y�H�\�[B��ۜ�X\��\][\Y\�HH
-�
-�[K�X\��\��L
-N�[�[�X�HH[�Y���
-�X\��\][\Y\�B����[��ܘ�HZ[�[][HX\��[�
-[�Y���
-�L	HZ[�[][JB��ۜ�Z[�X\��[�X��H[�Y���
-��LY�
-�[�[�X�HH[�Y���Z[�X\��[�X��H�[�[�X�HH[�Y���
-�Z[�X\��[�X��B����[��ܘ�H�X�H��܂�Y�
-�[K��X�Q��܈	���[�[�X�H�[K��X�Q��܊H�[�[�X�HH�[K��X�Q��܎B������[���NB��ۜ���[��H�[K���[��Y�
-��[��H�[�[�X�HHX]���܊�[�[�X�JH
-���[����[��\�H��[�[��Y�����[��[�Y����Y�
-�[�[�X�HH[�Y���
-H�[�[�X�HHX]���܊[�Y���
-H
-�H
-���[��B�B������\\�KX]�X�H
-�܈���[����\�	���Z�]��Y�
-B�]��\\�P]H�[Y�
-�˛ܚY�[�[�X�H	���˛ܚY�[�[�X�H���\��T�X�JH�ۜ���\\�S][\Y\�H�[K�][\Y\���[K�][\Y\�
-�K�
-H�
-H
-�
-�[K�X\��\��L
-JH
-�K�
-N��\\�P]H�˛ܚY�[�[�X�H
-���\\�S][\Y\���\\�P]HX]���܊��\\�P]
-H
-�
-��[���NJNY�
-��\\�P]H�[�[�X�JH��\\�P]H�[�[�X�H
-�H
-�
-��[��
-NB�B�����[�[]HX�X[X\��\\YY�܈�\ܝ[��ۜ�X\��\�\YYH�[K�][\Y\���\��Q��]
+  { max: 3,      amazon: 3.00, aliexpress: 3.50, sephora: 2.80, macys: 2.80, shein: 3.50, default: 3.00 },
+  { max: 10,     amazon: 2.20, aliexpress: 2.50, sephora: 2.00, macys: 2.00, shein: 2.50, default: 2.20 },
+  { max: 25,     amazon: 1.80, aliexpress: 2.00, sephora: 1.70, macys: 1.70, shein: 2.00, default: 1.80 },
+  { max: 50,     amazon: 1.55, aliexpress: 1.70, sephora: 1.50, macys: 1.50, shein: 1.70, default: 1.55 },
+  { max: 100,    amazon: 1.40, aliexpress: 1.50, sephora: 1.35, macys: 1.35, shein: 1.50, default: 1.40 },
+  { max: 200,    amazon: 1.30, aliexpress: 1.40, sephora: 1.28, macys: 1.28, shein: 1.40, default: 1.30 },
+  { max: 500,    amazon: 1.22, aliexpress: 1.30, sephora: 1.20, macys: 1.20, shein: 1.30, default: 1.22 },
+  { max: 999999, amazon: 1.15, aliexpress: 1.20, sephora: 1.15, macys: 1.15, shein: 1.20, default: 1.15 }
+  ];
 
+// -- Flat markup fallback defaults -----------------------------
+const DEFAULT_RULES = {
+    amazon:     { markupPct: 40, minMarginPct: 25, roundTo: 0.99, priceFloor: null },
+    aliexpress: { markupPct: 50, minMarginPct: 30, roundTo: 0.99, priceFloor: null },
+    sephora:    { markupPct: 35, minMarginPct: 20, roundTo: 0.99, priceFloor: null },
+    macys:      { markupPct: 35, minMarginPct: 20, roundTo: 0.99, priceFloor: null },
+    shein:      { markupPct: 50, minMarginPct: 30, roundTo: 0.99, priceFloor: null }
+};
 
-�[K�][\Y\�HJH
-�L
-K�њ^Y
-JJB���[K�X\��\���]\���X�N�\��Q��]
-�[�[�X�K�њ^Y
-�JK���\\�P]���\\�P]�\��Q��]
-��\\�P]�њ^Y
-�JH��[�[�Y����\��Q��]
-[�Y����њ^Y
-�JK�X\��[��\��Q��]
+// -- DB rules cache --------------------------------------------
+let _dbRulesCache = null;
+let _dbRulesCacheTime = 0;
+const DB_RULES_TTL = 300000; // 5 min
 
-�[�[�X�HH[�Y���
-K�њ^Y
-�JK�X\��[���\��Q��]
+function _loadDbRules() {
+    if (_dbRulesCache && Date.now() - _dbRulesCacheTime < DB_RULES_TTL) {
+          return _dbRulesCache;
+    }
+    try {
+          const { getPricingRules } = require('./db');
+          const rules = getPricingRules();
+          if (rules && rules.length > 0) {
+                  _dbRulesCache = rules.filter(r => r.is_active);
+                  _dbRulesCacheTime = Date.now();
+                  return _dbRulesCache;
+          }
+    } catch (e) {
+          // DB not available - use defaults
+    }
+    return null;
+}
 
+function _dbToRule(r) {
+    return {
+          markupPct: r.markup_pct,
+          minMarginPct: r.min_margin_pct,
+          roundTo: r.round_to || 0.99,
+          priceFloor: r.price_floor || null,
+          ruleId: r.id,
+          ruleType: r.brand ? 'brand' : (r.category ? 'category' : 'source')
+    };
+}
 
-HH[�Y�����[�[�X�JH
-�L
-K�њ^Y
-JJK��[N���\��K��[RY��[K��[RY�[��[U\N��[K��[U\H	�Y�][	��X\��\�\YY�Y\�X^��[K�Y\�X^�[�NB���[��[ۈ\��T�X�J�X�T��HY�
-\�X�T��H�]\���[Y�
-\[و�X�T��OOH	۝[X�\��H�]\���X�T���ۜ��X[�YH��[���X�T��K��\X�J�׌NK�K��	��N�ۜ��[HH\��Q��]
-�X[�Y
-N�]\��\ӘS��[JH��[��[NB���[��[ۈ[��[Y]T�X�[���X�J
-H���[\��X�HH�[���[\��X�U[YHH��][����X�HH�[��][����X�U[YHHB����KKKH�U�QU��S��Sӈ
-�܈YZ[�HKKKB��[��[ۈ�]�Y]��X�[����\��T�X�K��\��JH�ۜ��\�[H�[�[]Q�[�[�X�J��\��T�X�K��\��K�JN�]\����\��T�X�K���\��K��[�[�X�N��\�[��X�K�X\��[���\�[�X\��[��X\��[����\�[�X\��[���X\��\�\YY��\�[�X\��\�\YY��[U\N��\�[��[U\K�Y\�X^��\�[�Y\�X^�NB��[�[K�^ܝ�H�[�[]Q�[�[�X�K�\��T�X�K��]�X�[�ԝ[K�[��[Y]T�X�[���X�K��]�Y]��X�[����Y�][�����]Y\�][\Y\��Q�USԕST��Q�US�QT���QT�QԕSTN�
+// -- Tier multiplier lookup ------------------------------------
+/**
+ * Get the tiered multiplier for a given source price and source.
+ * Reads from settings.json markup_tiers first, falls back to DEFAULT_TIERS.
+ * @param {number} sourcePrice - The cost/source price
+ * @param {string} source - Source store key (amazon, aliexpress, etc.)
+ * @returns {number} multiplier (e.g. 1.40 means cost x 1.40)
+ */
+function getTierMultiplier(sourcePrice, source) {
+    const settings = loadSettings();
+    const tiers = (settings && Array.isArray(settings.markup_tiers))
+      ? settings.markup_tiers
+          : DEFAULT_TIERS;
+
+  const src = (source || 'default').toLowerCase();
+
+  for (const tier of tiers) {
+        if (sourcePrice <= tier.max) {
+                return tier[src] || tier['default'] || 1.40;
+        }
+  }
+    // If price exceeds all tiers, use the last tier
+  const lastTier = tiers[tiers.length - 1];
+    return lastTier[src] || lastTier['default'] || 1.15;
+}
+
+// -- Legacy flat pricing rule lookup ---------------------------
+/**
+ * Get flat pricing rule. Checks DB rules then hardcoded defaults.
+ * Used as fallback when tiered system is disabled or unavailable.
+ */
+function getPricingRule(source, opts = {}) {
+    // Check settings.json for flat markup overrides
+  const settings = loadSettings();
+    if (settings) {
+          const key = 'markup_' + source;
+          if (settings[key] !== undefined) {
+                  const pct = parseFloat(settings[key]);
+                  if (!isNaN(pct) && pct > 0) {
+                            return {
+                                        markupPct: pct,
+                                        minMarginPct: Math.max(pct * 0.6, 10),
+                                        roundTo: 0.99,
+                                        priceFloor: null,
+                                        ruleType: 'settings'
+                            };
+                  }
+          }
+    }
+
+  // Check DB rules
+  const dbRules = _loadDbRules();
+    if (dbRules && dbRules.length > 0) {
+          const { category, brand } = opts;
+          if (brand) {
+                  const brandRule = dbRules.find(r =>
+                            r.source_store === source && r.brand && r.brand.toLowerCase() === brand.toLowerCase()
+                                                       );
+                  if (brandRule) return _dbToRule(brandRule);
+          }
+          if (category) {
+                  const catRule = dbRules.find(r =>
+                            r.source_store === source && r.category && r.category.toLowerCase() === category.toLowerCase() && !r.brand
+                                                     );
+                  if (catRule) return _dbToRule(catRule);
+          }
+          const sourceRule = dbRules.find(r =>
+                  r.source_store === source && !r.category && !r.brand
+                                              );
+          if (sourceRule) return _dbToRule(sourceRule);
+    }
+
+  return DEFAULT_RULES[source] || { markupPct: 15, minMarginPct: 10, roundTo: 0.99, priceFloor: null };
+}
+
+// -- Main pricing function -------------------------------------
+/**
+ * Calculate the final price for a product.
+ * Uses tiered multiplier system as primary, flat markup as fallback.
+ */
+function calculateFinalPrice(sourcePrice, source, opts = {}) {
+    if (!sourcePrice || sourcePrice <= 0) return { price: null, compareAt: null };
+
+  const shippingCost = opts.shippingCost || 0;
+    const fees = opts.fees || 0;
+    const landedCost = sourcePrice + shippingCost + fees;
+
+  // -- Try tiered multiplier first --
+  const settings = loadSettings();
+    const useTiers = settings && Array.isArray(settings.markup_tiers) && settings.markup_tiers.length > 0;
+
+  let finalPrice;
+    let pricingMethod;
+
+  if (useTiers) {
+        const multiplier = getTierMultiplier(sourcePrice, source);
+        finalPrice = landedCost * multiplier;
+        pricingMethod = 'tiered';
+  } else {
+        // Fallback to flat markup
+      const rule = getPricingRule(source, { category: opts.category, brand: opts.brand });
+        const effectiveMarkupPct = (sourcePrice < 5) ? Math.max(rule.markupPct, 60) : rule.markupPct;
+        const markupMultiplier = 1 + (effectiveMarkupPct / 100);
+        finalPrice = landedCost * markupMultiplier;
+
+      // Ensure minimum margin
+      const minMargin = landedCost * (rule.minMarginPct / 100);
+        if (finalPrice - landedCost < minMargin) {
+                finalPrice = landedCost + minMargin;
+        }
+
+      // Apply price floor
+      if (rule.priceFloor && finalPrice < rule.priceFloor) {
+              finalPrice = rule.priceFloor;
+      }
+        pricingMethod = 'flat';
+  }
+
+  // Round to .99
+  finalPrice = Math.floor(finalPrice) + 0.99;
+
+  // Compare-at price: original retail with higher multiplier for perceived discount
+  let compareAt = null;
+    if (opts.originalPrice && opts.originalPrice > sourcePrice) {
+          if (useTiers) {
+                  const compMultiplier = getTierMultiplier(sourcePrice, source) * 1.10;
+                  compareAt = opts.originalPrice * compMultiplier;
+          } else {
+                  const rule = getPricingRule(source, { category: opts.category, brand: opts.brand });
+                  const markupMultiplier = 1 + (rule.markupPct / 100);
+                  compareAt = opts.originalPrice * markupMultiplier * 1.05;
+          }
+          compareAt = Math.floor(compareAt) + 0.99;
+          // Ensure compareAt > finalPrice
+      if (compareAt <= finalPrice) {
+              compareAt = finalPrice + Math.max(Math.floor(finalPrice * 0.15), 2) + 0.99;
+      }
+    }
+
+  return {
+        price: parseFloat(finalPrice.toFixed(2)),
+        compareAt: compareAt ? parseFloat(compareAt.toFixed(2)) : null,
+        landedCost: parseFloat(landedCost.toFixed(2)),
+        margin: parseFloat((finalPrice - landedCost).toFixed(2)),
+        marginPct: parseFloat(((1 - landedCost / finalPrice) * 100).toFixed(1)),
+        rule: source,
+        ruleId: null,
+        ruleType: pricingMethod,
+        multiplier: useTiers ? getTierMultiplier(sourcePrice, source) : null
+  };
+}
+
+// -- Utilities -------------------------------------------------
+function parsePrice(priceStr) {
+    if (!priceStr) return null;
+    if (typeof priceStr === 'number') return priceStr;
+    const cleaned = String(priceStr).replace(/[^0-9.]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? null : num;
+}
+
+function invalidatePricingCache() {
+    _dbRulesCache = null;
+    _dbRulesCacheTime = 0;
+    _settingsCache = null;
+    _settingsCacheTime = 0;
+}
+
+function invalidateSettingsCache() {
+    _settingsCache = null;
+    _settingsCacheTime = 0;
+}
+
+module.exports = {
+    calculateFinalPrice,
+    parsePrice,
+    getPricingRule,
+    getTierMultiplier,
+    invalidatePricingCache,
+    invalidateSettingsCache,
+    loadSettings,
+    DEFAULT_TIERS,
+    TIER_MAXES,
+    TIER_LABELS,
+    TIER_SOURCES
+};

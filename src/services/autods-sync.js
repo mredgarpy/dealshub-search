@@ -49,11 +49,57 @@ const SUPPLIER_MAP = {
   shein: { name: 'shein', region: 'cn' },
 };
 
+// ---- BUY ID SANITIZER ----
+// Extracts clean source product ID for AutoDS CSV BuyId column
+// AutoDS expects: ASIN for Amazon, item ID for AliExpress, etc. — NOT full URLs
+function sanitizeBuyId(source, rawId) {
+  const id = String(rawId || '').trim();
+  const src = (source || '').toLowerCase();
+
+  if (src === 'amazon') {
+    // Extract ASIN: 10-char alphanumeric (e.g. B0F4RM7Y2L)
+    // Handle duplicated ASINs like "B0F4RM7Y2L-B0F4RM7Y2L"
+    // Handle full URLs like "https://www.amazon.com/dp/B0F4RM7Y2L"
+    const asinMatch = id.match(/\b([A-Z0-9]{10})\b/);
+    if (asinMatch) return asinMatch[1];
+    // Fallback: take first segment before hyphen if it looks like ASIN
+    const parts = id.split('-');
+    if (parts[0] && /^[A-Z0-9]{10}$/.test(parts[0])) return parts[0];
+  }
+
+  if (src === 'aliexpress') {
+    // Extract numeric item ID (e.g. 3256811722821342)
+    // Handle URLs like "https://www.aliexpress.com/item/3256811722821342.html"
+    const numMatch = id.match(/(\d{10,20})/);
+    if (numMatch) return numMatch[1];
+  }
+
+  if (src === 'sephora') {
+    // Extract product slug (e.g. P461134)
+    const sephoraMatch = id.match(/(P\d+)/i);
+    if (sephoraMatch) return sephoraMatch[1];
+  }
+
+  // For macys, shein, or unknown: strip URL parts, return clean ID
+  if (id.startsWith('http')) {
+    const urlParts = id.split('/');
+    return urlParts[urlParts.length - 1].replace(/\.html$/, '');
+  }
+
+  // Handle duplicated IDs (e.g. "ID-ID" pattern)
+  if (id.includes('-')) {
+    const parts = id.split('-');
+    if (parts.length === 2 && parts[0] === parts[1]) return parts[0];
+  }
+
+  return id;
+}
+
 // ---- SKU BUILDER ----
 // Format: DH-{SOURCE}-{SOURCE_ID}-{SOURCE_VARIANT_ID}
 function buildVariantSKU(source, sourceId, sourceVariantId) {
   const src = (source || '').toUpperCase();
-  const pid = String(sourceId || '');
+  const pid = sanitizeBuyId(source, sourceId);
   const vid = sourceVariantId ? String(sourceVariantId) : pid;
   return `DH-${src}-${pid}-${vid}`;
 }
@@ -136,9 +182,11 @@ function generateUntrackedCSV(products) {
     }
 
     const productId = String(p.shopify_product_id);
-    const buyId = String(p.source_product_id);
+    const buyId = sanitizeBuyId(source, p.source_product_id);
     const supplier = supplierInfo.name;
-    const region = p.warehouse_region || supplierInfo.region;
+    // AutoDS region must match the supplier's actual region, not the DB warehouse_region
+    // Amazon US = 'us', AliExpress CN = 'cn', etc.
+    const region = supplierInfo.region;
     const sku = buildVariantSKU(source, p.source_product_id, p.shopify_variant_id);
 
     rows.push(`${productId},${buyId},${supplier},${region},${sku}`);
@@ -610,6 +658,7 @@ module.exports = {
   getSyncStats,
 
   // Helpers
+  sanitizeBuyId,
   buildVariantSKU,
   writeCSVToFile,
   SUPPLIER_MAP,

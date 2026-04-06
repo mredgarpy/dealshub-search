@@ -327,6 +327,21 @@ async function processOrderWebhook(orderData) {
           status: 'ready'
         });
 
+        // ── AUTO-REGISTER product in autods_products if missing ──
+        try {
+          registerProduct({
+            source: sourceInfo.source,
+            sourceId: sourceInfo.sourceId,
+            sourceUrl: sourceInfo.sourceUrl || '',
+            shopifyProductId: item.product_id,
+            shopifyVariantId: item.variant_id,
+            shopifyHandle: ''
+          });
+          logger.info('autods', `Auto-registered product from order: ${sourceInfo.source}/${sourceInfo.sourceId}`);
+        } catch (regErr) {
+          logger.debug('autods', `Product registration from order failed (non-blocking): ${regErr.message}`);
+        }
+
         // Also create order_routing entry for the operations layer
         const { createOrderRouting } = require('../utils/db');
         createOrderRouting({

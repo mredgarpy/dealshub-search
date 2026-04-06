@@ -75,7 +75,10 @@ async function taskSourceHealthCheck() {
   const taskName = 'source-health-check';
   try {
     const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:' + (process.env.PORT || 10000);
-    const sources = ['amazon', 'aliexpress', 'sephora', 'macys', 'shein'];
+    // Only check active sources — paused ones generate constant false warnings
+    const pausedSources = (process.env.PAUSED_SOURCES || 'sephora,macys,shein').split(',').map(s => s.trim().toLowerCase());
+    const allSources = ['amazon', 'aliexpress', 'sephora', 'macys', 'shein'];
+    const sources = allSources.filter(s => !pausedSources.includes(s));
     const results = {};
     for (const source of sources) {
       const start = Date.now();
@@ -221,7 +224,39 @@ async function taskCatchUpMissedOrders() {
     let alreadyProcessed = 0;
     for (const order of orders) {
       const existing = db.prepare('SELECT id FROM autods_orders WHERE shopify_order_id = ?').get(order.id);
-      if (existing) { alreadyProcessed++; continue; }
+      if (existing) {
+        // Sync status updates for already-processed orders (cancelled, refunded, fulfilled)
+        try {
+          const currentOrder = db.prepare(
+            'SELECT autods_status, financial_status, fulfillment_status FROM autods_orders WHERE shopify_order_id = ?'
+          ).get(order.id);
+          if (currentOrder) {
+            const shopifyStatus = order.financial_status || '';
+            const shopifyFulfillment = order.fulfillment_status || '';
+            let needsUpdate = false;
+            const updates = {};
+            if ((shopifyStatus === 'refunded' || shopifyStatus === 'voided' || order.cancelled_at) &&
+                currentOrder.autods_status !== 'cancelled') {
+              updates.autods_status = 'cancelled';
+              updates.financial_status = shopifyStatus;
+              needsUpdate = true;
+            }
+            if (shopifyFulfillment === 'fulfilled' && currentOrder.fulfillment_status !== 'fulfilled') {
+              updates.fulfillment_status = 'fulfilled';
+              needsUpdate = true;
+            }
+            if (needsUpdate) {
+              const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+              const values = [...Object.values(updates), order.id];
+              db.prepare(`UPDATE autods_orders SET ${setClauses}, updated_at = datetime('now') WHERE shopify_order_id = ?`).run(...values);
+              logger.info('cron', `[${taskName}] Updated order ${order.name}: ${JSON.stringify(updates)}`);
+            }
+          }
+        } catch (syncErr) {
+          logger.debug('cron', `[${taskName}] Status sync failed for ${order.name}: ${syncErr.message}`);
+        }
+        alreadyProcessed++; continue;
+      }
       try {
         await autods.processOrderWebhook(order);
         newlyProcessed++;

@@ -2355,6 +2355,76 @@ app.get('/api/admin/cron/history', (req, res) => {
   res.json(cron.taskHistory.slice(0, parseInt(limit)));
 });
 
+// ---- ADMIN: Backfill missing products from order items into autods_products ----
+app.post('/api/admin/autods/backfill-products', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { getDb } = require('./src/utils/db');
+    const autods = require('./src/services/autods');
+    const localDb = getDb();
+    if (!localDb) return res.status(500).json({ error: 'DB not available' });
+    const orphanItems = localDb.prepare(`
+      SELECT DISTINCT oi.source_store, oi.source_product_id, oi.source_url,
+             oi.shopify_product_id, oi.shopify_variant_id, oi.buy_id
+      FROM autods_order_items oi
+      WHERE oi.source_store IS NOT NULL AND oi.source_product_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM autods_products ap
+          WHERE ap.source_store = oi.source_store AND ap.source_product_id = oi.source_product_id
+        )
+    `).all();
+    let registered = 0;
+    for (const item of orphanItems) {
+      try {
+        autods.registerProduct({
+          source: item.source_store, sourceId: item.source_product_id,
+          sourceUrl: item.source_url || item.buy_id || '',
+          shopifyProductId: item.shopify_product_id,
+          shopifyVariantId: item.shopify_variant_id, shopifyHandle: ''
+        });
+        registered++;
+      } catch (e) { logger.warn('admin', `Backfill failed: ${e.message}`); }
+    }
+    res.json({ success: true, orphanItems: orphanItems.length, registered });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ---- ADMIN: Force-update order statuses from Shopify ----
+app.post('/api/admin/autods/sync-order-status', async (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { getDb } = require('./src/utils/db');
+    const localDb = getDb();
+    if (!localDb) return res.status(500).json({ error: 'DB not available' });
+    const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
+    const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
+    if (!shopifyDomain || !shopifyToken) return res.status(500).json({ error: 'Shopify not configured' });
+    const localOrders = localDb.prepare('SELECT shopify_order_id, autods_status, financial_status FROM autods_orders').all();
+    let updated = 0; const updates = [];
+    for (const local of localOrders) {
+      try {
+        const resp = await fetch(
+          `https://${shopifyDomain}/admin/api/2024-01/orders/${local.shopify_order_id}.json?fields=id,name,financial_status,fulfillment_status,cancelled_at`,
+          { headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' } }
+        );
+        if (!resp.ok) continue;
+        const { order } = await resp.json();
+        let newStatus = local.autods_status;
+        if (order.cancelled_at || order.financial_status === 'refunded' || order.financial_status === 'voided') newStatus = 'cancelled';
+        if (newStatus !== local.autods_status || order.financial_status !== local.financial_status) {
+          localDb.prepare(`UPDATE autods_orders SET autods_status = ?, financial_status = ?, fulfillment_status = ?, updated_at = datetime('now') WHERE shopify_order_id = ?`)
+            .run(newStatus, order.financial_status, order.fulfillment_status || '', local.shopify_order_id);
+          updated++;
+          updates.push({ orderId: local.shopify_order_id, name: order.name, oldStatus: local.autods_status, newStatus });
+        }
+      } catch (e) { logger.warn('admin', `Sync order ${local.shopify_order_id}: ${e.message}`); }
+    }
+    res.json({ success: true, checked: localOrders.length, updated, updates });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   logger.info('server', `StyleHub backend v2.3 running on port ${PORT}`);

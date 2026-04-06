@@ -265,6 +265,23 @@ function setupWebhooks(app) {
         save('orders');
       }
 
+      // ── UPDATE AUTODS ORDER STATUS TO CANCELLED ──
+      try {
+        const { getDb } = require('./utils/db');
+        const sqliteDb = getDb();
+        if (sqliteDb) {
+          sqliteDb.prepare(`
+            UPDATE autods_orders
+            SET autods_status = 'cancelled', financial_status = 'cancelled',
+                updated_at = datetime('now')
+            WHERE shopify_order_id = ?
+          `).run(o.id);
+          logger.info('webhook', `[AutoDS] Order ${o.name || o.id} marked cancelled in autods_orders`);
+        }
+      } catch (autodsErr) {
+        logger.warn('webhook', `[AutoDS] Failed to cancel order in DB: ${autodsErr.message}`);
+      }
+
       logger.info('webhook', `[CRM] Order cancelled: ${o.name || o.id}`);
       res.sendStatus(200);
     } catch (err) {

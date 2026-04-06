@@ -671,4 +671,152 @@ router.get('/mappings', (req, res) => {
   }
 });
 
+// ============================================================
+// AUTODS SYNC MANAGEMENT
+// ============================================================
+
+const autodsSync = require('../services/autods-sync');
+const autods = require('../services/autods');
+
+/**
+ * GET /admin/autods/stats
+ * Get AutoDS sync stats (pending, uploaded, linked counts)
+ */
+router.get('/autods/stats', (req, res) => {
+  try {
+    const syncStats = autodsSync.getSyncStats();
+    const autodsStats = autods.getAutodsStats();
+    res.json({
+      success: true,
+      sync: syncStats,
+      autods: autodsStats,
+    });
+  } catch (e) {
+    logger.error('admin', 'GET /autods/stats failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * GET /admin/autods/pending
+ * Get pending products not yet synced to AutoDS
+ */
+router.get('/autods/pending', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '100', 10);
+    const products = autodsSync.getPendingForAutoDS(limit);
+    res.json({
+      success: true,
+      count: products.length,
+      products,
+    });
+  } catch (e) {
+    logger.error('admin', 'GET /autods/pending failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * GET /admin/autods/csv
+ * Download a ready-to-upload CSV for AutoDS Untracked Products
+ * Query: ?limit=100&download=true
+ */
+router.get('/autods/csv', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '100', 10);
+    const download = req.query.download === 'true';
+
+    const result = autodsSync.generateDownloadableCSV(limit);
+
+    if (result.count === 0) {
+      return res.json({
+        success: true,
+        count: 0,
+        message: 'No pending products to export',
+      });
+    }
+
+    if (download) {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      return res.send(result.csv);
+    }
+
+    res.json({
+      success: true,
+      count: result.count,
+      filename: result.filename,
+      skipped: result.skipped,
+      productIds: result.productIds,
+      instructions: result.instructions,
+      csvPreview: result.csv.split('\n').slice(0, 6).join('\n'),
+    });
+  } catch (e) {
+    logger.error('admin', 'GET /autods/csv failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * POST /admin/autods/sync
+ * Trigger manual AutoDS sync (generate CSV + Puppeteer upload)
+ */
+router.post('/autods/sync', async (req, res) => {
+  try {
+    logger.info('admin', 'Manual AutoDS sync triggered');
+    const result = await autodsSync.runAutodsSync();
+    res.json({
+      success: result.status === 'success',
+      result,
+    });
+  } catch (e) {
+    logger.error('admin', 'POST /autods/sync failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * POST /admin/autods/mark-uploaded
+ * Mark specific products as CSV uploaded (for manual CSV upload flow)
+ * Body: { productIds: [1, 2, 3] }
+ */
+router.post('/autods/mark-uploaded', (req, res) => {
+  try {
+    const { productIds } = req.body;
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'productIds array required' });
+    }
+
+    const count = autodsSync.markProductsAsUploaded(productIds);
+    res.json({
+      success: true,
+      markedCount: count,
+      requestedCount: productIds.length,
+    });
+  } catch (e) {
+    logger.error('admin', 'POST /autods/mark-uploaded failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * POST /admin/autods/mark-linked
+ * Mark a product as successfully linked in AutoDS
+ * Body: { shopifyProductId: 1234567890 }
+ */
+router.post('/autods/mark-linked', (req, res) => {
+  try {
+    const { shopifyProductId } = req.body;
+    if (!shopifyProductId) {
+      return res.status(400).json({ success: false, error: 'shopifyProductId required' });
+    }
+
+    const result = autodsSync.markProductAsLinked(shopifyProductId);
+    res.json({ success: result });
+  } catch (e) {
+    logger.error('admin', 'POST /autods/mark-linked failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 module.exports = router;

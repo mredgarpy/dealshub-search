@@ -10,9 +10,6 @@
 //   3. Stale Order Reprocessing (every 1 hour)
 //   4. AutoDS Stats Snapshot / Alerting (every 6 hours)
 //   5. DB Cleanup — old logs/failures (every 24 hours)
-//   6. Catch Up Missed Orders (every 20 min)
-//   7. Blog Post Generation (every 12 hours)
-//   8. Product Price/Stock Refresh (every 4 hours)
 // ============================================================
 
 const logger = require('../utils/logger');
@@ -35,16 +32,19 @@ function logTask(name, status, details = '') {
 }
 
 // ---- TASK 1: Sync product_mappings → autods_products ----
+// Ensures any product synced to Shopify is also registered for AutoDS tracking
 async function taskSyncMappingsToAutods() {
   const taskName = 'sync-mappings-to-autods';
   try {
     const { getAllMappings } = require('../utils/db');
     const autods = require('./autods');
+
     const mappings = getAllMappings(500, 0);
     if (!mappings || mappings.length === 0) {
       logTask(taskName, 'ok', 'No mappings to sync');
       return;
     }
+
     let registered = 0;
     let skipped = 0;
     for (const m of mappings) {
@@ -62,6 +62,7 @@ async function taskSyncMappingsToAutods() {
         skipped++;
       }
     }
+
     logger.info('cron', `[${taskName}] Synced ${registered} mappings, skipped ${skipped}`);
     logTask(taskName, 'ok', { total: mappings.length, registered, skipped });
   } catch (e) {
@@ -71,15 +72,17 @@ async function taskSyncMappingsToAutods() {
 }
 
 // ---- TASK 2: Source Health Check ----
+// Pings each source adapter to verify APIs are responding
 async function taskSourceHealthCheck() {
   const taskName = 'source-health-check';
   try {
     const baseUrl = process.env.RENDER_EXTERNAL_URL || 'http://localhost:' + (process.env.PORT || 10000);
-    // Only check active sources — paused ones generate constant false warnings
+    // Only check active sources — paused sources generate constant false warnings
     const pausedSources = (process.env.PAUSED_SOURCES || 'sephora,macys,shein').split(',').map(s => s.trim().toLowerCase());
     const allSources = ['amazon', 'aliexpress', 'sephora', 'macys', 'shein'];
     const sources = allSources.filter(s => !pausedSources.includes(s));
     const results = {};
+
     for (const source of sources) {
       const start = Date.now();
       try {
@@ -87,18 +90,30 @@ async function taskSourceHealthCheck() {
           signal: AbortSignal.timeout(15000)
         });
         const elapsed = Date.now() - start;
-        results[source] = { status: resp.ok ? 'up' : 'error', code: resp.status, latency: elapsed };
+        results[source] = {
+          status: resp.ok ? 'up' : 'error',
+          code: resp.status,
+          latency: elapsed
+        };
       } catch (e) {
-        results[source] = { status: 'down', error: e.message, latency: Date.now() - start };
+        results[source] = {
+          status: 'down',
+          error: e.message,
+          latency: Date.now() - start
+        };
       }
     }
+
     const downSources = Object.entries(results).filter(([, r]) => r.status !== 'up');
     if (downSources.length > 0) {
       logger.warn('cron', `[${taskName}] Down sources: ${downSources.map(([s]) => s).join(', ')}`, results);
     } else {
       logger.info('cron', `[${taskName}] All sources healthy`);
     }
+
     logTask(taskName, downSources.length > 0 ? 'warning' : 'ok', results);
+
+    // Log failures to DB
     const { logSourceFailure } = require('../utils/db');
     for (const [source, result] of Object.entries(results)) {
       if (result.status !== 'up') {
@@ -112,25 +127,38 @@ async function taskSourceHealthCheck() {
 }
 
 // ---- TASK 3: Reprocess stale/failed orders ----
+// Checks for orders in 'processing' or 'error' status and retries them
 async function taskReprocessStaleOrders() {
   const taskName = 'reprocess-stale-orders';
   try {
     const { getDb } = require('../utils/db');
     const autods = require('./autods');
     const db = getDb();
-    if (!db) { logTask(taskName, 'skip', 'No DB available'); return; }
+    if (!db) {
+      logTask(taskName, 'skip', 'No DB available');
+      return;
+    }
+
+    // Find orders stuck in processing or error state
     const staleOrders = db.prepare(`
       SELECT * FROM autods_orders
       WHERE autods_status IN ('processing', 'error')
       AND created_at > datetime('now', '-48 hours')
-      ORDER BY created_at DESC LIMIT 20
+      ORDER BY created_at DESC
+      LIMIT 20
     `).all();
-    if (staleOrders.length === 0) { logTask(taskName, 'ok', 'No stale orders'); return; }
+
+    if (staleOrders.length === 0) {
+      logTask(taskName, 'ok', 'No stale orders');
+      return;
+    }
+
     let reprocessed = 0;
     let failed = 0;
     for (const order of staleOrders) {
       try {
         const orderData = JSON.parse(order.items_json || '[]');
+        // Reconstruct minimal order data for reprocessing
         const fakeOrderData = {
           id: order.shopify_order_id,
           order_number: order.shopify_order_number,
@@ -148,6 +176,7 @@ async function taskReprocessStaleOrders() {
             email: order.customer_email
           }
         };
+
         await autods.processOrderWebhook(fakeOrderData);
         reprocessed++;
       } catch (e) {
@@ -155,6 +184,7 @@ async function taskReprocessStaleOrders() {
         logger.debug('cron', `[${taskName}] Failed to reprocess order ${order.shopify_order_id}: ${e.message}`);
       }
     }
+
     logger.info('cron', `[${taskName}] Reprocessed ${reprocessed}/${staleOrders.length} stale orders (${failed} failed)`);
     logTask(taskName, 'ok', { total: staleOrders.length, reprocessed, failed });
   } catch (e) {
@@ -164,11 +194,13 @@ async function taskReprocessStaleOrders() {
 }
 
 // ---- TASK 4: AutoDS Stats Snapshot ----
+// Logs periodic stats for monitoring
 async function taskAutodsStatsSnapshot() {
   const taskName = 'autods-stats-snapshot';
   try {
     const autods = require('./autods');
     const stats = autods.getAutodsStats();
+
     logger.info('cron', `[${taskName}] Products: ${stats.summary?.totalProducts || 0} (linked: ${stats.summary?.linkedProducts || 0}), Orders: ${stats.summary?.totalOrders || 0} (ready: ${stats.summary?.readyOrders || 0})`);
     logTask(taskName, 'ok', stats.summary || {});
   } catch (e) {
@@ -178,19 +210,34 @@ async function taskAutodsStatsSnapshot() {
 }
 
 // ---- TASK 5: DB Cleanup ----
+// Removes old sync logs and resolved failures
 async function taskDbCleanup() {
   const taskName = 'db-cleanup';
   try {
     const { getDb } = require('../utils/db');
     const db = getDb();
-    if (!db) { logTask(taskName, 'skip', 'No DB available'); return; }
-    const logsDeleted = db.prepare("DELETE FROM sync_logs WHERE created_at < datetime('now', '-7 days')").run().changes;
-    const failuresDeleted = db.prepare("DELETE FROM source_failures WHERE resolved = 1 AND created_at < datetime('now', '-7 days')").run().changes;
+    if (!db) {
+      logTask(taskName, 'skip', 'No DB available');
+      return;
+    }
+
+    // Delete sync logs older than 7 days
+    const logsDeleted = db.prepare(
+      "DELETE FROM sync_logs WHERE created_at < datetime('now', '-7 days')"
+    ).run().changes;
+
+    // Delete resolved failures older than 7 days
+    const failuresDeleted = db.prepare(
+      "DELETE FROM source_failures WHERE resolved = 1 AND created_at < datetime('now', '-7 days')"
+    ).run().changes;
+
+    // Delete old autods order items for processed orders older than 30 days
     const oldItemsDeleted = db.prepare(`
       DELETE FROM autods_order_items WHERE autods_order_id IN (
         SELECT id FROM autods_orders WHERE created_at < datetime('now', '-30 days')
       )
     `).run().changes;
+
     logger.info('cron', `[${taskName}] Cleaned: ${logsDeleted} sync logs, ${failuresDeleted} resolved failures, ${oldItemsDeleted} old order items`);
     logTask(taskName, 'ok', { logsDeleted, failuresDeleted, oldItemsDeleted });
   } catch (e) {
@@ -200,63 +247,90 @@ async function taskDbCleanup() {
 }
 
 // ---- TASK 6: Fetch recent Shopify orders and process any missed ones ----
+// In case a webhook was missed, this catches up by pulling recent orders from Shopify
 async function taskCatchUpMissedOrders() {
   const taskName = 'catch-up-missed-orders';
   try {
     const { getDb } = require('../utils/db');
     const autods = require('./autods');
     const db = getDb();
-    if (!db) { logTask(taskName, 'skip', 'No DB available'); return; }
+    if (!db) {
+      logTask(taskName, 'skip', 'No DB available');
+      return;
+    }
+
     const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
     const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
-    if (!shopifyDomain || !shopifyToken) { logTask(taskName, 'skip', 'Shopify not configured'); return; }
+    if (!shopifyDomain || !shopifyToken) {
+      logTask(taskName, 'skip', 'Shopify not configured');
+      return;
+    }
+
+    // Fetch last 10 orders from Shopify
     const resp = await fetch(
       `https://${shopifyDomain}/admin/api/2024-01/orders.json?status=any&limit=10&fields=id,name,order_number,email,total_price,currency,financial_status,fulfillment_status,line_items,shipping_address,customer,created_at`,
       {
-        headers: { 'X-Shopify-Access-Token': shopifyToken, 'Content-Type': 'application/json' },
+        headers: {
+          'X-Shopify-Access-Token': shopifyToken,
+          'Content-Type': 'application/json'
+        },
         signal: AbortSignal.timeout(15000)
       }
     );
-    if (!resp.ok) throw new Error(`Shopify API ${resp.status}`);
+
+    if (!resp.ok) {
+      throw new Error(`Shopify API ${resp.status}`);
+    }
+
     const data = await resp.json();
     const orders = data.orders || [];
     let newlyProcessed = 0;
     let alreadyProcessed = 0;
+
     for (const order of orders) {
-      const existing = db.prepare('SELECT id FROM autods_orders WHERE shopify_order_id = ?').get(order.id);
+      // Check if we already processed this order
+      const existing = db.prepare(
+        'SELECT id FROM autods_orders WHERE shopify_order_id = ?'
+      ).get(order.id);
+
       if (existing) {
-        // Sync status updates for already-processed orders (cancelled, refunded, fulfilled)
-        try {
-          const currentOrder = db.prepare(
-            'SELECT autods_status, financial_status, fulfillment_status FROM autods_orders WHERE shopify_order_id = ?'
-          ).get(order.id);
-          if (currentOrder) {
-            const shopifyStatus = order.financial_status || '';
-            const shopifyFulfillment = order.fulfillment_status || '';
-            let needsUpdate = false;
-            const updates = {};
-            if ((shopifyStatus === 'refunded' || shopifyStatus === 'voided' || order.cancelled_at) &&
-                currentOrder.autods_status !== 'cancelled') {
-              updates.autods_status = 'cancelled';
-              updates.financial_status = shopifyStatus;
-              needsUpdate = true;
-            }
-            if (shopifyFulfillment === 'fulfilled' && currentOrder.fulfillment_status !== 'fulfilled') {
-              updates.fulfillment_status = 'fulfilled';
-              needsUpdate = true;
-            }
-            if (needsUpdate) {
-              const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
-              const values = [...Object.values(updates), order.id];
-              db.prepare(`UPDATE autods_orders SET ${setClauses}, updated_at = datetime('now') WHERE shopify_order_id = ?`).run(...values);
-              logger.info('cron', `[${taskName}] Updated order ${order.name}: ${JSON.stringify(updates)}`);
-            }
+        // Sync status updates (cancelled, refunded, fulfilled) for already-processed orders
+        const shopifyStatus = order.financial_status || '';
+        const shopifyFulfillment = order.fulfillment_status || '';
+        const currentAutodsOrder = db.prepare(
+          'SELECT autods_status, financial_status, fulfillment_status FROM autods_orders WHERE shopify_order_id = ?'
+        ).get(order.id);
+
+        if (currentAutodsOrder) {
+          let needsUpdate = false;
+          const updates = {};
+
+          // Detect cancellation
+          if ((shopifyStatus === 'refunded' || shopifyStatus === 'voided' || order.cancelled_at) &&
+              currentAutodsOrder.autods_status !== 'cancelled') {
+            updates.autods_status = 'cancelled';
+            updates.financial_status = shopifyStatus;
+            needsUpdate = true;
           }
-        } catch (syncErr) {
-          logger.debug('cron', `[${taskName}] Status sync failed for ${order.name}: ${syncErr.message}`);
+          // Detect fulfillment
+          if (shopifyFulfillment === 'fulfilled' && currentAutodsOrder.fulfillment_status !== 'fulfilled') {
+            updates.fulfillment_status = 'fulfilled';
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            const setClauses = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+            const values = [...Object.values(updates), order.id];
+            db.prepare(`UPDATE autods_orders SET ${setClauses}, updated_at = datetime('now') WHERE shopify_order_id = ?`).run(...values);
+            logger.info('cron', `[${taskName}] Updated order ${order.name}: ${JSON.stringify(updates)}`);
+          }
         }
-        alreadyProcessed++; continue;
+
+        alreadyProcessed++;
+        continue;
       }
+
+      // Process the missed order
       try {
         await autods.processOrderWebhook(order);
         newlyProcessed++;
@@ -265,49 +339,41 @@ async function taskCatchUpMissedOrders() {
         logger.warn('cron', `[${taskName}] Failed to process order ${order.name}: ${e.message}`);
       }
     }
+
     logger.info('cron', `[${taskName}] Checked ${orders.length} orders: ${newlyProcessed} new, ${alreadyProcessed} already processed`);
     logTask(taskName, 'ok', { checked: orders.length, newlyProcessed, alreadyProcessed });
   } catch (e) {
     logger.error('cron', `[${taskName}] Failed: ${e.message}`);
     logTask(taskName, 'error', e.message);
   }
-      }
-
-// ---- TASK 7: Blog Post Generation ----
-async function taskGenerateBlogPost() {
-  const taskName = 'generate-blog-post';
-  try {
-    const blogEngine = require('./blog-engine');
-    if (!blogEngine || !blogEngine.generateAndPublish) {
-      logTask(taskName, 'skip', 'Blog engine not available');
-      return;
-    }
-    const result = await blogEngine.generateAndPublish();
-    logger.info('cron', `[${taskName}] ${result?.title ? 'Published: ' + result.title : 'Skipped or no post generated'}`);
-    logTask(taskName, 'ok', result?.title || 'completed');
-  } catch (e) {
-    logger.error('cron', `[${taskName}] Failed: ${e.message}`);
-    logTask(taskName, 'error', e.message);
-  }
 }
 
-// ---- TASK 8: Product Price/Stock Refresh ----
-async function taskRefreshProducts() {
-  const taskName = 'product-price-stock-refresh';
+// ---- TASK 7: AutoDS Auto-Sync (CSV generation + Puppeteer upload) ----
+// Generates CSV for pending products and uploads to AutoDS via browser automation
+async function taskAutodsCsvSync() {
+  const taskName = 'autods-csv-sync';
   try {
-    const { refreshProducts } = require('./product-refresh');
-    const result = await refreshProducts();
-    if (result.skipped) {
-      logTask(taskName, 'skip', result.reason);
+    const autodsSync = require('./autods-sync');
+
+    if (!autodsSync.CONFIG.enabled()) {
+      logTask(taskName, 'skip', 'AUTODS_SYNC_ENABLED != true');
       return;
     }
-    logger.info('cron', `[${taskName}] Checked ${result.checked || 0} products: ${result.priceUpdated || 0} price updates, ${result.setUnavailable || 0} unavailable, ${result.unchanged || 0} unchanged`);
-    logTask(taskName, 'ok', {
-      checked: result.checked,
-      priceUpdated: result.priceUpdated,
-      setUnavailable: result.setUnavailable,
-      unchanged: result.unchanged,
-      fetchFailed: result.fetchFailed
+
+    const result = await autodsSync.runAutodsSync();
+
+    logger.info('cron', `[${taskName}] Result: ${result.status}`, {
+      products: result.productsFound,
+      csvCount: result.csvCount,
+      uploaded: result.uploadSuccess,
+      duration: result.duration,
+    });
+
+    logTask(taskName, result.status === 'success' ? 'ok' : result.status, {
+      products: result.productsFound,
+      csvCount: result.csvCount || 0,
+      uploaded: result.uploadSuccess,
+      error: result.error,
     });
   } catch (e) {
     logger.error('cron', `[${taskName}] Failed: ${e.message}`);
@@ -321,10 +387,9 @@ const CRON_SCHEDULE = {
   healthCheck:      { fn: taskSourceHealthCheck,       interval: 30 * 60 * 1000,      name: 'Source Health Check',           delay: 60000 },
   reprocessOrders:  { fn: taskReprocessStaleOrders,    interval: 60 * 60 * 1000,      name: 'Reprocess Stale Orders',        delay: 120000 },
   catchUpOrders:    { fn: taskCatchUpMissedOrders,     interval: 20 * 60 * 1000,      name: 'Catch Up Missed Orders',        delay: 45000 },
+  autodsCsvSync:    { fn: taskAutodsCsvSync,           interval: 30 * 60 * 1000,      name: 'AutoDS CSV Sync',              delay: 90000 },
   statsSnapshot:    { fn: taskAutodsStatsSnapshot,     interval: 6 * 60 * 60 * 1000,  name: 'AutoDS Stats Snapshot',         delay: 180000 },
-  dbCleanup:        { fn: taskDbCleanup,               interval: 24 * 60 * 60 * 1000, name: 'DB Cleanup',                    delay: 300000 },
-  blogGeneration:   { fn: taskGenerateBlogPost,        interval: 12 * 60 * 60 * 1000, name: 'Blog Post Generation',          delay: 360000 },
-  productRefresh:   { fn: taskRefreshProducts,         interval: 4 * 60 * 60 * 1000,  name: 'Product Price/Stock Refresh',   delay: 420000 }
+  dbCleanup:        { fn: taskDbCleanup,               interval: 24 * 60 * 60 * 1000, name: 'DB Cleanup',                    delay: 300000 }
 };
 
 const runningIntervals = {};
@@ -336,26 +401,39 @@ function startCronJobs() {
     return;
   }
   cronStarted = true;
+
   logger.info('cron', '═══ Starting scheduled tasks ═══');
+
   for (const [key, config] of Object.entries(CRON_SCHEDULE)) {
     const { fn, interval, name, delay } = config;
     const intervalMin = Math.round(interval / 60000);
+
+    // Initial run after delay
     const initialTimer = setTimeout(async () => {
       logger.info('cron', `[${name}] Initial run`);
-      try { await fn(); } catch (e) {
+      try {
+        await fn();
+      } catch (e) {
         logger.error('cron', `[${name}] Initial run failed: ${e.message}`);
       }
+
+      // Then run on interval
       runningIntervals[key] = setInterval(async () => {
         logger.info('cron', `[${name}] Scheduled run`);
-        try { await fn(); } catch (e) {
+        try {
+          await fn();
+        } catch (e) {
           logger.error('cron', `[${name}] Scheduled run failed: ${e.message}`);
         }
       }, interval);
+
       logger.info('cron', `[${name}] Scheduled every ${intervalMin} min`);
     }, delay);
+
     runningIntervals[`${key}_init`] = initialTimer;
     logger.info('cron', `  ✓ ${name} — every ${intervalMin}min (first run in ${Math.round(delay / 1000)}s)`);
   }
+
   logger.info('cron', `═══ ${Object.keys(CRON_SCHEDULE).length} tasks scheduled ═══`);
 }
 
@@ -402,12 +480,12 @@ module.exports = {
   runTask,
   getCronStatus,
   taskHistory,
+  // Export individual tasks for testing
   taskSyncMappingsToAutods,
   taskSourceHealthCheck,
   taskReprocessStaleOrders,
   taskCatchUpMissedOrders,
+  taskAutodsCsvSync,
   taskAutodsStatsSnapshot,
-  taskDbCleanup,
-  taskGenerateBlogPost,
-  taskRefreshProducts
+  taskDbCleanup
 };

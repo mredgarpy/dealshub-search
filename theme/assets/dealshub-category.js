@@ -17,9 +17,35 @@
     baby:        {name: 'Baby', icon: '👶', amazonId: 'baby-products', gradient: 'linear-gradient(135deg,#f472b6 0%,#ec4899 100%)', searchTerms: 'baby kids children toys'}
   };
 
+  /* SEO: dynamic titles & meta descriptions per category */
+  var seoMap = {
+    electronics: {title: 'Electronics & Gadgets | Up to 70% Off | StyleHub Miami', desc: 'Shop the best deals on electronics, phones, laptops, headphones and smart home devices. Up to 70% off with free shipping on orders over $35.'},
+    fashion:     {title: 'Fashion | Best Deals on Clothing & Shoes | StyleHub Miami', desc: 'Discover trending fashion for men and women. Dresses, sneakers, accessories and more at unbeatable prices. Free shipping on $35+.'},
+    beauty:      {title: 'Beauty & Skincare | Best Deals | StyleHub Miami', desc: 'Shop top beauty brands, skincare, makeup and hair care products. Best prices guaranteed with free shipping on orders over $35.'},
+    home:        {title: 'Home & Kitchen | Best Deals | StyleHub Miami', desc: 'Transform your space with deals on home decor, kitchen appliances, organization and cleaning essentials. Free shipping on $35+.'},
+    sports:      {title: 'Sports & Outdoors | Best Deals | StyleHub Miami', desc: 'Gear up with top deals on workout equipment, activewear, running shoes and outdoor gear. Free shipping on orders over $35.'},
+    gaming:      {title: 'Gaming | Best Deals on Accessories | StyleHub Miami', desc: 'Level up with the best gaming deals. Consoles, accessories, headsets and more at unbeatable prices. Free shipping on $35+.'},
+    baby:        {title: 'Kids & Baby | Best Deals | StyleHub Miami', desc: 'Shop kids and baby essentials. Clothing, toys, strollers, safety gear and more at the best prices. Free shipping on $35+.'}
+  };
+
   var params = new URLSearchParams(window.location.search);
   var catSlug = (params.get('cat') || 'electronics').toLowerCase();
   var cat = categoryMap[catSlug] || categoryMap.electronics;
+
+  /* Apply dynamic SEO title + meta description */
+  var seo = seoMap[catSlug];
+  if (seo) {
+    document.title = seo.title;
+    var metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', seo.desc);
+    } else {
+      metaDesc = document.createElement('meta');
+      metaDesc.name = 'description';
+      metaDesc.content = seo.desc;
+      document.head.appendChild(metaDesc);
+    }
+  }
 
   var originFilter = 'all';
   var sortBy = 'relevance';
@@ -43,8 +69,7 @@
     var origPrice = typeof p.originalPrice === 'number' ? p.originalPrice : parseFloat(String(p.originalPrice||'0').replace(/[^0-9.]/g,''));
     var discount = origPrice > price ? Math.round((1 - price/origPrice)*100) : 0;
     var rating = p.rating ? parseFloat(p.rating) : 0;
-    var link = '/pages/product?id=' + encodeURIComponent(p.id || p.sourceId || '') + '&store=' + encodeURIComponent(source || 'amazon');
-    if(p.title) link += '&title=' + encodeURIComponent(p.title);
+    var link = '/pages/product?id=' + encodeURIComponent(p.id || p.sourceId || '') + '&store=' + encodeURIComponent(source || 'amazon') + (p.title ? '&title=' + encodeURIComponent(p.title) : '') + (p.image ? '&image=' + encodeURIComponent(p.image) : '');
 
     var h = '<a href="' + link + '" style="text-decoration:none;display:block;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;transition:box-shadow .2s,transform .2s" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.1)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.boxShadow=\'none\';this.style.transform=\'none\'">';
     h += '<div style="position:relative;aspect-ratio:1;background:#f8f9fa;overflow:hidden">';

@@ -16,8 +16,7 @@
     var origPrice = typeof p.originalPrice === 'number' ? p.originalPrice : parseFloat(String(p.originalPrice||'0').replace(/[^0-9.]/g,''));
     var discount = origPrice > price ? Math.round((1 - price/origPrice)*100) : 0;
     var rating = p.rating ? parseFloat(p.rating) : 0;
-    var link = '/pages/product?id=' + encodeURIComponent(p.id || p.sourceId || '') + '&store=' + encodeURIComponent(source || 'amazon');
-    if(p.title) link += '&title=' + encodeURIComponent(p.title);
+    var link = '/pages/product?id=' + encodeURIComponent(p.id || p.sourceId || '') + '&store=' + encodeURIComponent(source || 'amazon') + (p.title ? '&title=' + encodeURIComponent(p.title) : '') + (p.image ? '&image=' + encodeURIComponent(p.image) : '');
 
     var h = '<a href="' + link + '" style="text-decoration:none;display:block;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;transition:box-shadow .2s,transform .2s" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.1)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.boxShadow=\'none\';this.style.transform=\'none\'">';
     h += '<div style="position:relative;aspect-ratio:1;background:#f8f9fa;overflow:hidden">';
@@ -85,27 +84,10 @@
       .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()});
   }
 
-  // === SECTION: Category Navigation Pills ===
+  // === SECTION: Category Nav (disabled — now in dealshub-home.js) ===
   function buildCategoryNav(){
     var el = document.getElementById('dh-extra-categories');
-    if(!el) return;
-    var cats = [
-      {icon: '\ud83c\udfa7', name: 'Electronics', slug: 'electronics'},
-      {icon: '\ud83d\udc57', name: 'Fashion', slug: 'fashion'},
-      {icon: '\ud83d\udc84', name: 'Beauty', slug: 'beauty'},
-      {icon: '\ud83c\udfe0', name: 'Home', slug: 'home'},
-      {icon: '\u26bd', name: 'Sports', slug: 'sports'},
-      {icon: '\ud83c\udfae', name: 'Gaming', slug: 'gaming'},
-      {icon: '\ud83d\udc76', name: 'Baby', slug: 'baby'}
-    ];
-    var h = '<div style="display:flex;gap:10px;overflow-x:auto;padding:12px 0;-webkit-overflow-scrolling:touch" class="dh-cat-pills">';
-    cats.forEach(function(c){
-      h += '<a href="/pages/search-results?q=' + encodeURIComponent(c.name) + '" style="display:flex;align-items:center;gap:6px;padding:10px 20px;background:#fff;border:1px solid #e2e8f0;border-radius:50px;text-decoration:none;white-space:nowrap;font-size:14px;font-weight:500;color:#374151;transition:all .2s;flex-shrink:0" onmouseover="this.style.background=\'#1a1a2e\';this.style.color=\'#fff\';this.style.borderColor=\'#1a1a2e\'" onmouseout="this.style.background=\'#fff\';this.style.color=\'#374151\';this.style.borderColor=\'#e2e8f0\'">';
-      h += '<span style="font-size:18px">' + c.icon + '</span> ' + c.name;
-      h += '</a>';
-    });
-    h += '</div>';
-    el.innerHTML = h;
+    if(el) el.style.display='none';
   }
 
   // === SECTION: Best Value International ===
@@ -186,8 +168,10 @@
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  // Responsive styles
+  // Responsive styles + Shop by Category card styles
   var style = document.createElement('style');
-  style.textContent = '@media(max-width:768px){.dh-extra-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}.dh-cat-pills{padding:8px 0}.dh-cat-pills a{padding:8px 14px!important;font-size:13px!important}.dh-extra-carousel{gap:10px!important}.dh-extra-carousel>div{min-width:160px!important;max-width:180px!important}#dh-extra-categories,#dh-extra-best-value,#dh-extra-most-wished,#dh-extra-gift-ideas,#dh-extra-plus-banner{padding:0 10px!important}[id^="dh-extra-"] h2{font-size:18px!important}[id^="dh-extra-"] h3{font-size:18px!important}[id^="dh-extra-"]>div{margin-bottom:24px!important}.dh-plus-banner{padding:20px!important;gap:16px!important;flex-direction:column!important;text-align:center!important}.dh-plus-banner h3{font-size:18px!important}.dh-plus-banner p{font-size:13px!important}.dh-plus-banner a{padding:12px 24px!important;font-size:14px!important;width:100%!important;text-align:center!important;box-sizing:border-box!important}}@media(max-width:480px){.dh-extra-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}.dh-cat-pills a{padding:7px 12px!important;font-size:12px!important}.dh-extra-carousel>div{min-width:150px!important;max-width:165px!important}[id^="dh-extra-"] h2{font-size:16px!important}[id^="dh-extra-"] h3{font-size:16px!important}}';
+  style.textContent = '@media(max-width:992px){}'+
+    '@media(max-width:600px){}'+
+    '@media(max-width:768px){.dh-extra-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}.dh-extra-carousel{gap:10px!important}.dh-extra-carousel>div{min-width:160px!important;max-width:180px!important}#dh-extra-best-value,#dh-extra-most-wished,#dh-extra-gift-ideas,#dh-extra-plus-banner{padding:0 10px!important}[id^="dh-extra-"] h2{font-size:18px!important}[id^="dh-extra-"] h3{font-size:18px!important}[id^="dh-extra-"]>div{margin-bottom:24px!important}.dh-plus-banner{padding:20px!important;gap:16px!important;flex-direction:column!important;text-align:center!important}.dh-plus-banner h3{font-size:18px!important}.dh-plus-banner p{font-size:13px!important}.dh-plus-banner a{padding:12px 24px!important;font-size:14px!important;width:100%!important;text-align:center!important;box-sizing:border-box!important}}@media(max-width:480px){.dh-extra-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}.dh-extra-carousel>div{min-width:150px!important;max-width:165px!important}[id^="dh-extra-"] h2{font-size:16px!important}[id^="dh-extra-"] h3{font-size:16px!important}}';
   document.head.appendChild(style);
 })();

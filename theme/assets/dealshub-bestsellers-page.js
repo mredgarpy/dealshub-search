@@ -47,8 +47,7 @@
     var discount = origPrice > price ? Math.round((1 - price/origPrice)*100) : 0;
     var rating = p.rating ? parseFloat(p.rating) : 0;
     var rank = p.rank || (idx !== undefined ? idx + 1 : 0);
-    var link = '/pages/product?id=' + encodeURIComponent(p.id || p.sourceId || '') + '&store=' + encodeURIComponent(source || 'amazon');
-    if(p.title) link += '&title=' + encodeURIComponent(p.title);
+    var link = '/pages/product?id=' + encodeURIComponent(p.id || p.sourceId || '') + '&store=' + encodeURIComponent(source || 'amazon') + (p.title ? '&title=' + encodeURIComponent(p.title) : '') + (p.image ? '&image=' + encodeURIComponent(p.image) : '');
 
     var isTop10 = rank > 0 && rank <= 10;
     var cardStyle = isTop10

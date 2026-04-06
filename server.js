@@ -249,6 +249,18 @@ app.get('/api/search', async (req, res) => {
     };
 
     searchCache.set(cacheKey, response);
+
+    // v3.1: Cache individual search results by source+id for product detail fallback
+    // This solves AliExpress ID mismatch where search returns IDs that item_detail doesn't recognize
+    if (Array.isArray(pricedResults)) {
+      pricedResults.forEach(p => {
+        if (p && p.id && p.source) {
+          const itemKey = `searchitem:${p.source}:${p.id}`;
+          productCache.set(itemKey, p, 7200000); // 2h TTL
+        }
+      });
+    }
+
     res.json(response);
   } catch (e) {
     logger.error('search', 'Search failed', { error: e.message, query: q });
@@ -287,7 +299,60 @@ async function productDetailHandler(req, res) {
     if (!adapter) return res.status(400).json({ error: `Source ${source} not available` });
 
     step = 'getProduct';
-    const product = await adapter.getProduct(id, { title: req.query.title });
+    let product = await adapter.getProduct(id, { title: req.query.title });
+
+    // v3.1: If adapter returned null, try search result cache fallback
+    // This handles AliExpress new-format IDs (3256...) that item_detail doesn't recognize
+    if (!product) {
+      const searchItemKey = `searchitem:${source}:${id}`;
+      const cachedSearchItem = productCache.get(searchItemKey);
+      if (cachedSearchItem) {
+        logger.info('product', 'Using cached search item as fallback', { source, id });
+        // Convert search result card to full product shape
+        const { emptyProduct } = require('./src/adapters/base');
+        product = emptyProduct();
+        product.source = source;
+        product.sourceName = cachedSearchItem.sourceName || source;
+        product.sourceId = String(cachedSearchItem.id || id);
+        product.title = cachedSearchItem.title || '';
+        product.price = typeof cachedSearchItem.price === 'number' ? cachedSearchItem.price : null;
+        product.originalPrice = typeof cachedSearchItem.originalPrice === 'number' ? cachedSearchItem.originalPrice : null;
+        product.images = cachedSearchItem.image ? [cachedSearchItem.image] : [];
+        product.primaryImage = product.images[0] || '';
+        product.rating = cachedSearchItem.rating || null;
+        product.reviews = cachedSearchItem.reviews || 0;
+        product.badge = cachedSearchItem.badge || null;
+        product.availability = 'In Stock';
+        product.stockSignal = 'in_stock';
+        product.sourceUrl = cachedSearchItem.url || '';
+        product.normalizedHandle = (product.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 100);
+        product._fromSearchCache = true;
+        // Origin data from search cache
+        product.originType = cachedSearchItem.originType || 'INTL';
+        product.originBadge = cachedSearchItem.originBadge || "Int'l";
+        product.originFlag = cachedSearchItem.originFlag || '🌍';
+        product.originDelivery = cachedSearchItem.originDelivery || '10-25 days';
+      }
+    }
+
+    // v3.1: Last resort — build minimal product from URL params (title, image, price hints)
+    if (!product && req.query.title) {
+      logger.info('product', 'Building minimal product from URL params', { source, id, title: req.query.title });
+      const { emptyProduct } = require('./src/adapters/base');
+      product = emptyProduct();
+      product.source = source;
+      product.sourceName = source === 'aliexpress' ? 'AliExpress' : source;
+      product.sourceId = String(id);
+      product.title = decodeURIComponent(req.query.title);
+      product.primaryImage = req.query.image ? decodeURIComponent(req.query.image) : '';
+      product.images = product.primaryImage ? [product.primaryImage] : [];
+      const hintPrice = parseFloat(req.query.price);
+      product.price = !isNaN(hintPrice) && hintPrice > 0 ? hintPrice : null;
+      product.availability = 'In Stock';
+      product.stockSignal = 'in_stock';
+      product._fromUrlParams = true;
+    }
+
     if (!product) {
       return res.status(404).json({ error: 'Product not found', source, id });
     }

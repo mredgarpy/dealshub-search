@@ -254,9 +254,18 @@ async function launchBrowser() {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--disable-translate',
+      '--no-first-run',
+      '--single-process',
+      '--no-zygote',
       '--window-size=1280,800',
     ],
     defaultViewport: { width: 1280, height: 800 },
+    protocolTimeout: 120000,
   });
 
   return browser;
@@ -264,7 +273,8 @@ async function launchBrowser() {
 
 async function ensureLoggedIn(page) {
   // Navigate to AutoDS and check if already logged in
-  await page.goto(CONFIG.productsUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+  // Use 'domcontentloaded' instead of 'networkidle2' for faster loading on low-memory servers
+  await page.goto(CONFIG.productsUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
   // Check if we're on the login page
   const url = page.url();
@@ -278,8 +288,8 @@ async function ensureLoggedIn(page) {
       throw new Error('AUTODS_EMAIL and AUTODS_PASSWORD env vars required for auto-login');
     }
 
-    // Wait for login form
-    await page.waitForSelector('input[type="email"], input[name="email"], input[type="text"]', { timeout: 15000 });
+    // Wait for login form (generous timeout for Render free tier)
+    await page.waitForSelector('input[type="email"], input[name="email"], input[type="text"]', { timeout: 60000 });
 
     // Try to find and fill email field
     const emailInput = await page.$('input[type="email"]') || await page.$('input[name="email"]') || await page.$('input[type="text"]');
@@ -306,7 +316,7 @@ async function ensureLoggedIn(page) {
     }
 
     // Wait for navigation after login
-    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {});
 
     // Verify we're logged in
     const postLoginUrl = page.url();
@@ -322,11 +332,11 @@ async function ensureLoggedIn(page) {
 
 async function uploadCSVToAutoDS(page, csvFilePath) {
   // Navigate to untracked products page
-  await page.goto(CONFIG.untrackedUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-  await page.waitForTimeout(2000);
+  await page.goto(CONFIG.untrackedUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await page.waitForTimeout(5000);
 
   // Click "Import with CSV" button
-  const importBtn = await page.waitForSelector('button:has-text("Import with CSV"), button:has(img[alt="plus"])', { timeout: 10000 }).catch(() => null);
+  const importBtn = await page.waitForSelector('button:has-text("Import with CSV"), button:has(img[alt="plus"])', { timeout: 30000 }).catch(() => null);
 
   if (!importBtn) {
     // Try finding by text content
@@ -457,9 +467,9 @@ async function runAutodsSync() {
     try {
       const page = await browser.newPage();
 
-      // Set reasonable timeouts
-      page.setDefaultTimeout(30000);
-      page.setDefaultNavigationTimeout(30000);
+      // Generous timeouts for Render free tier (512MB RAM, slow cold starts)
+      page.setDefaultTimeout(90000);
+      page.setDefaultNavigationTimeout(90000);
 
       // Login
       await ensureLoggedIn(page);

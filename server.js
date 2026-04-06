@@ -280,16 +280,20 @@ async function productDetailHandler(req, res) {
   const cached = productCache.get(cacheKey);
   if (cached) return res.json(cached);
 
+  let step = 'init';
   try {
+    step = 'adapter';
     const adapter = getAdapter(source);
     if (!adapter) return res.status(400).json({ error: `Source ${source} not available` });
 
+    step = 'getProduct';
     const product = await adapter.getProduct(id, { title: req.query.title });
     if (!product) {
       return res.status(404).json({ error: 'Product not found', source, id });
     }
 
-    // v2.5: Recuperar precio desde bestOffer/allOffers si el adaptador devolvio null/0
+    // v2.5: Recuperar precio desde bestOffer/allOffers si el adaptador devolvió null/0
+    step = 'priceRecovery';
     if (!product.price || product.price <= 0) {
       const { parsePrice: pp } = require('./src/utils/pricing');
       // Intentar bestOffer.offerPrice
@@ -304,17 +308,15 @@ async function productDetailHandler(req, res) {
           if (op && op > 0) { product.price = op; break; }
         }
       }
-      // Si aun no hay precio, marcar como no disponible en vez de mostrar $0
+      // Si aún no hay precio, marcar como no disponible en vez de mostrar $0
       if (!product.price || product.price <= 0) {
         product.priceUnavailable = true;
         product.displayPrice = 'Price unavailable';
       }
     }
 
-    // Apply pricing engine markup — v1.6: overwrite product.price so frontend always shows final price
-    // v1.8: Do NOT include shippingCost in landed cost for displayed price —
-    // shipping is shown as a separate line on PDP, so including it here would double-charge.
-    // The shipping cost is still stored in shippingData for display and for prepareCart landed cost.
+    // Apply pricing engine markup
+    step = 'pricingEngine';
     if (product.price && product.price > 0) {
       const pricing = calculateFinalPrice(product.price, source, {
         originalPrice: product.originalPrice
@@ -336,7 +338,7 @@ async function productDetailHandler(req, res) {
       };
 
       // Also apply markup to variant prices so PDP shows consistent marked-up prices
-      // v1.8: No shippingCost in variant pricing either (shown separately on PDP)
+      step = 'variantPricing';
       if (product.variants && product.variants.length) {
         product.variants = product.variants.map(v => {
           if (v.price && typeof v.price === 'number' && v.price > 0) {
@@ -350,42 +352,57 @@ async function productDetailHandler(req, res) {
     }
 
     // v2.0: Calculate shipping using new shipping-rules engine
-    const { calculateShipping: calcShip } = require('./src/services/shipping-rules');
-    const shipResult = calcShip(source, product.sourcePrice || product.price, product, false);
-    product.shippingCalc = shipResult;
-    // Also update legacy shippingData/deliveryEstimate/returnPolicy for backward compat
-    product.shippingData = {
-      cost: shipResult.cost,
-      method: shipResult.method,
-      note: shipResult.label === 'FREE' ? `FREE ${shipResult.method}` : `Shipping: $${shipResult.cost.toFixed(2)}`,
-      isFBA: shipResult.isFBA || false,
-      shipsFrom: shipResult.shipsFrom || null,
-      isFree: shipResult.isFree || false,
-      seller: shipResult.seller || null
-    };
-    // Pass through shipping options for AliExpress (carrier-level data)
-    if (shipResult.shippingOptions?.length > 0) {
-      product.shippingOptions = shipResult.shippingOptions;
+    step = 'shippingCalc';
+    try {
+      const { calculateShipping: calcShip } = require('./src/services/shipping-rules');
+      const shipResult = calcShip(source, product.sourcePrice || product.price, product, false);
+      product.shippingCalc = shipResult;
+      product.shippingData = {
+        cost: shipResult.cost,
+        method: shipResult.method,
+        note: shipResult.label === 'FREE' ? `FREE ${shipResult.method}` : `Shipping: $${(shipResult.cost || 0).toFixed(2)}`,
+        isFBA: shipResult.isFBA || false,
+        shipsFrom: shipResult.shipsFrom || null,
+        isFree: shipResult.isFree || false,
+        seller: shipResult.seller || null
+      };
+      if (shipResult.shippingOptions?.length > 0) {
+        product.shippingOptions = shipResult.shippingOptions;
+      }
+      product.deliveryEstimate = shipResult.delivery;
+      product.returnPolicy = shipResult.returnWindow;
+    } catch (shipErr) {
+      logger.warn('product', 'Shipping calc failed, using defaults', { error: shipErr.message, source, id });
+      // Fallback: keep whatever shippingData the adapter already set
+      if (!product.shippingData) product.shippingData = { cost: 0, method: 'Standard', note: 'Standard shipping' };
+      if (!product.deliveryEstimate) product.deliveryEstimate = { label: '7-21 business days', minDays: 7, maxDays: 21 };
+      if (!product.returnPolicy) product.returnPolicy = { window: 30, summary: '30-day returns' };
     }
-    product.deliveryEstimate = shipResult.delivery;
-    product.returnPolicy = shipResult.returnWindow;
 
     // v3.0: Add origin classification (USA vs International)
-    const originInfo = classifyOrigin(product);
-    product.originType = originInfo.origin;
-    product.originBadge = originInfo.badge;
-    product.originFlag = originInfo.flag;
-    product.originDelivery = originInfo.deliveryEstimate;
+    step = 'originClassification';
+    try {
+      const originInfo = classifyOrigin(product);
+      product.originType = originInfo.origin;
+      product.originBadge = originInfo.badge;
+      product.originFlag = originInfo.flag;
+      product.originDelivery = originInfo.deliveryEstimate;
 
-    // Fix return policy based on origin: USA warehouse = 30 days, International = 15 days
-    if (originInfo.origin === 'USA' && product.source === 'aliexpress') {
-      const rpDays = product.returnPolicy?.window || product.returnPolicy?.days || 15;
-      if (rpDays < 30) {
-        product.returnPolicy = { window: 30, days: 30, summary: 'Returns accepted within 30 days' };
+      // Fix return policy based on origin: USA warehouse = 30 days, International = 15 days
+      if (originInfo.origin === 'USA' && product.source === 'aliexpress') {
+        const rpDays = product.returnPolicy?.window || product.returnPolicy?.days || 15;
+        if (rpDays < 30) {
+          product.returnPolicy = { window: 30, days: 30, summary: 'Returns accepted within 30 days' };
+        }
       }
+    } catch (originErr) {
+      logger.warn('product', 'Origin classification failed', { error: originErr.message, source, id });
+      product.originType = 'UNKNOWN';
+      product.originBadge = '—';
     }
 
     // Only cache if returned product matches requested ID (prevent stale fallback pollution)
+    step = 'cacheAndReturn';
     const returnedId = String(product.sourceId || '');
     const requestedId = String(id);
     if (returnedId && returnedId !== requestedId) {
@@ -397,8 +414,8 @@ async function productDetailHandler(req, res) {
     }
     res.json(product);
   } catch (e) {
-    logger.error('product', 'Product detail failed', { error: e.message, source, id });
-    res.status(500).json({ error: 'Failed to load product' });
+    logger.error('product', 'Product detail failed', { error: e.message, step, source, id, stack: e.stack?.split('\n').slice(0, 3).join(' | ') });
+    res.status(500).json({ error: 'Failed to load product', step, detail: e.message });
   }
 }
 
@@ -1408,6 +1425,55 @@ app.get('/api/debug/raw-product', async (req, res) => {
   }
 });
 
+// ---- DEBUG: Product pipeline step-by-step ----
+app.get('/api/debug/product-pipeline', async (req, res) => {
+  const { store, id } = req.query;
+  const source = (store || 'amazon').toLowerCase();
+  if (!id) return res.status(400).json({ error: 'Missing id param' });
+  const steps = {};
+  try {
+    steps.adapter = 'ok';
+    const adapter = getAdapter(source);
+    if (!adapter) return res.json({ steps, error: 'adapter not available' });
+
+    steps.getProduct = 'starting';
+    const product = await adapter.getProduct(id, { title: req.query.title });
+    steps.getProduct = product ? 'ok' : 'null';
+    if (!product) return res.json({ steps, error: 'getProduct returned null' });
+    steps.productFields = {
+      hasTitle: !!product.title,
+      hasPrice: !!product.price,
+      priceValue: product.price,
+      hasImages: (product.images || []).length,
+      hasVariants: (product.variants || []).length,
+      hasSpecifications: Array.isArray(product.specifications),
+      hasVideos: Array.isArray(product.videos),
+      hasShippingData: !!product.shippingData,
+      sourceId: product.sourceId
+    };
+
+    steps.pricingEngine = 'starting';
+    const pricing = calculateFinalPrice(product.price || 0, source, { originalPrice: product.originalPrice });
+    steps.pricingEngine = pricing ? 'ok' : 'null';
+
+    steps.shippingCalc = 'starting';
+    const { calculateShipping: calcShip } = require('./src/services/shipping-rules');
+    const shipResult = calcShip(source, product.price || 0, product, false);
+    steps.shippingCalc = shipResult ? 'ok' : 'null';
+
+    steps.originClassification = 'starting';
+    const originInfo = classifyOrigin(product);
+    steps.originClassification = originInfo ? 'ok' : 'null';
+
+    steps.allPassed = true;
+    res.json({ steps, pricing, shipping: shipResult, origin: originInfo });
+  } catch (e) {
+    steps.error = e.message;
+    steps.stack = e.stack?.split('\n').slice(0, 5);
+    res.json({ steps });
+  }
+});
+
 // ---- SHIPPING & RETURNS ----
 app.get('/api/shipping/:source', (req, res) => {
   const source = req.params.source.toLowerCase();
@@ -2346,7 +2412,7 @@ app.get('/webhooks/health', (req, res) => {
 });
 
 // ============================================================
-// CRON / SCHEDULED TASKS
+// CRON JOBS — Scheduled background tasks
 // ============================================================
 const cron = require('./src/services/cron');
 
@@ -2381,50 +2447,67 @@ app.get('/api/admin/cron/history', (req, res) => {
 app.post('/api/admin/autods/backfill-products', (req, res) => {
   const token = req.query.token || req.headers['x-admin-token'];
   if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+
   try {
     const { getDb } = require('./src/utils/db');
     const autods = require('./src/services/autods');
     const localDb = getDb();
     if (!localDb) return res.status(500).json({ error: 'DB not available' });
+
     const orphanItems = localDb.prepare(`
       SELECT DISTINCT oi.source_store, oi.source_product_id, oi.source_url,
              oi.shopify_product_id, oi.shopify_variant_id, oi.buy_id
       FROM autods_order_items oi
-      WHERE oi.source_store IS NOT NULL AND oi.source_product_id IS NOT NULL
+      WHERE oi.source_store IS NOT NULL
+        AND oi.source_product_id IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM autods_products ap
-          WHERE ap.source_store = oi.source_store AND ap.source_product_id = oi.source_product_id
+          WHERE ap.source_store = oi.source_store
+            AND ap.source_product_id = oi.source_product_id
         )
     `).all();
+
     let registered = 0;
     for (const item of orphanItems) {
       try {
         autods.registerProduct({
-          source: item.source_store, sourceId: item.source_product_id,
+          source: item.source_store,
+          sourceId: item.source_product_id,
           sourceUrl: item.source_url || item.buy_id || '',
           shopifyProductId: item.shopify_product_id,
-          shopifyVariantId: item.shopify_variant_id, shopifyHandle: ''
+          shopifyVariantId: item.shopify_variant_id,
+          shopifyHandle: ''
         });
         registered++;
-      } catch (e) { logger.warn('admin', `Backfill failed: ${e.message}`); }
+      } catch (e) {
+        logger.warn('admin', `Backfill failed: ${item.source_store}/${item.source_product_id}: ${e.message}`);
+      }
     }
+
     res.json({ success: true, orphanItems: orphanItems.length, registered });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// ---- ADMIN: Force-update order statuses from Shopify ----
+// ---- ADMIN: Force-update order status from Shopify ----
 app.post('/api/admin/autods/sync-order-status', async (req, res) => {
   const token = req.query.token || req.headers['x-admin-token'];
   if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+
   try {
     const { getDb } = require('./src/utils/db');
     const localDb = getDb();
     if (!localDb) return res.status(500).json({ error: 'DB not available' });
+
     const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN;
     const shopifyToken = process.env.SHOPIFY_ADMIN_TOKEN;
     if (!shopifyDomain || !shopifyToken) return res.status(500).json({ error: 'Shopify not configured' });
+
     const localOrders = localDb.prepare('SELECT shopify_order_id, autods_status, financial_status FROM autods_orders').all();
-    let updated = 0; const updates = [];
+    let updated = 0;
+    const updates = [];
+
     for (const local of localOrders) {
       try {
         const resp = await fetch(
@@ -2433,23 +2516,35 @@ app.post('/api/admin/autods/sync-order-status', async (req, res) => {
         );
         if (!resp.ok) continue;
         const { order } = await resp.json();
+
         let newStatus = local.autods_status;
-        if (order.cancelled_at || order.financial_status === 'refunded' || order.financial_status === 'voided') newStatus = 'cancelled';
-        if (newStatus !== local.autods_status || order.financial_status !== local.financial_status) {
-          localDb.prepare(`UPDATE autods_orders SET autods_status = ?, financial_status = ?, fulfillment_status = ?, updated_at = datetime('now') WHERE shopify_order_id = ?`)
-            .run(newStatus, order.financial_status, order.fulfillment_status || '', local.shopify_order_id);
-          updated++;
-          updates.push({ orderId: local.shopify_order_id, name: order.name, oldStatus: local.autods_status, newStatus });
+        if (order.cancelled_at || order.financial_status === 'refunded' || order.financial_status === 'voided') {
+          newStatus = 'cancelled';
         }
-      } catch (e) { logger.warn('admin', `Sync order ${local.shopify_order_id}: ${e.message}`); }
+
+        if (newStatus !== local.autods_status || order.financial_status !== local.financial_status) {
+          localDb.prepare(`
+            UPDATE autods_orders
+            SET autods_status = ?, financial_status = ?, fulfillment_status = ?, updated_at = datetime('now')
+            WHERE shopify_order_id = ?
+          `).run(newStatus, order.financial_status, order.fulfillment_status || '', local.shopify_order_id);
+          updated++;
+          updates.push({ orderId: local.shopify_order_id, name: order.name, oldStatus: local.autods_status, newStatus, financialStatus: order.financial_status });
+        }
+      } catch (e) {
+        logger.warn('admin', `Failed to sync order ${local.shopify_order_id}: ${e.message}`);
+      }
     }
+
     res.json({ success: true, checked: localOrders.length, updated, updates });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  logger.info('server', `StyleHub backend v2.3 running on port ${PORT}`);
+  logger.info('server', `StyleHub backend v2.4 running on port ${PORT}`);
   logger.info('server', `Sources: ${VALID_SOURCES.join(', ')}`);
   logger.info('server', `Shopify: ${process.env.SHOPIFY_STORE_DOMAIN ? 'configured' : 'NOT configured'}`);
   // Warm up cache after server starts (don't await â let it run in background)
@@ -2458,6 +2553,7 @@ app.listen(PORT, () => {
   // ---- START CRON JOBS ----
   try {
     cron.startCronJobs();
+    logger.info('server', 'Cron jobs started');
   } catch (e) {
     logger.warn('server', `Cron startup failed: ${e.message}`);
   }

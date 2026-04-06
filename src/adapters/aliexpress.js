@@ -147,8 +147,11 @@ class AliExpressAdapter extends BaseAdapter {
       }
       const statusData = data.result.status?.data;
       const statusCode = data.result.status?.code;
-      if (statusData === 'error' || (statusCode && statusCode >= 5000)) {
-        logger.warn('aliexpress', `${endpoint} API error`, { productId, statusCode });
+      const statusMsg = data.result.status?.msg || data.result.status?.message || '';
+      // Treat any non-success status as failure: 'error', code >= 5000, or codes like 205 (no results)
+      if (statusData === 'error' || (statusCode && statusCode >= 5000) ||
+          (statusCode && statusCode > 0 && !data.result.item && !data.result.itemId)) {
+        logger.warn('aliexpress', `${endpoint} API error`, { productId, statusCode, statusData, statusMsg });
         return null;
       }
       logger.info('aliexpress', `${endpoint} response OK`, { productId, keys: Object.keys(data.result).join(',') });
@@ -286,6 +289,12 @@ class AliExpressAdapter extends BaseAdapter {
   // Enrich a normalized product with data from item_detail_6
   _enrichFromDetail6(product, data6) {
     if (!data6) return;
+    // Safety: ensure enrichable fields exist (in case _normalizeProductFallback was used)
+    if (!Array.isArray(product.specifications)) product.specifications = [];
+    if (!Array.isArray(product.quickSpecs)) product.quickSpecs = [];
+    if (!Array.isArray(product.videos)) product.videos = [];
+    if (!Array.isArray(product.aplusImages)) product.aplusImages = [];
+    if (product.hasVideo === undefined) product.hasVideo = false;
     const item6 = data6.item || data6;
 
     // === Description HTML from item_detail_6 ===
@@ -962,6 +971,17 @@ class AliExpressAdapter extends BaseAdapter {
     p.sourceUrl = itemUrl ? (itemUrl.startsWith('//') ? 'https:' + itemUrl : itemUrl) :
                   `https://www.aliexpress.com/item/${p.sourceId}.html`;
     p.normalizedHandle = this._makeHandle(p.title);
+    // Ensure enrichable fields exist for _enrichFromDetail6
+    p.specifications = [];
+    p.quickSpecs = [];
+    p.aplusImages = [];
+    p.videos = [];
+    p.hasVideo = false;
+    p.topReviews = [];
+    p.ratingDistribution = null;
+    p.frequentlyBoughtTogether = [];
+    p.salesVolume = null;
+    p.productCondition = 'New';
     return p;
   }
 

@@ -289,11 +289,33 @@ async function productDetailHandler(req, res) {
       return res.status(404).json({ error: 'Product not found', source, id });
     }
 
+    // v2.5: Recuperar precio desde bestOffer/allOffers si el adaptador devolvio null/0
+    if (!product.price || product.price <= 0) {
+      const { parsePrice: pp } = require('./src/utils/pricing');
+      // Intentar bestOffer.offerPrice
+      if (product.bestOffer?.offerPrice) {
+        const bp = pp(product.bestOffer.offerPrice);
+        if (bp && bp > 0) product.price = bp;
+      }
+      // Intentar allOffers
+      if ((!product.price || product.price <= 0) && Array.isArray(product.allOffers)) {
+        for (const o of product.allOffers) {
+          const op = pp(o.price);
+          if (op && op > 0) { product.price = op; break; }
+        }
+      }
+      // Si aun no hay precio, marcar como no disponible en vez de mostrar $0
+      if (!product.price || product.price <= 0) {
+        product.priceUnavailable = true;
+        product.displayPrice = 'Price unavailable';
+      }
+    }
+
     // Apply pricing engine markup — v1.6: overwrite product.price so frontend always shows final price
     // v1.8: Do NOT include shippingCost in landed cost for displayed price —
     // shipping is shown as a separate line on PDP, so including it here would double-charge.
     // The shipping cost is still stored in shippingData for display and for prepareCart landed cost.
-    if (product.price) {
+    if (product.price && product.price > 0) {
       const pricing = calculateFinalPrice(product.price, source, {
         originalPrice: product.originalPrice
       });

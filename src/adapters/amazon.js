@@ -174,6 +174,26 @@ class AmazonAdapter extends BaseAdapter {
       const bestOffer = this.selectBestOffer(offers);
       const offerShipping = this.extractShippingFromOffer(bestOffer);
 
+      // v2.5: Si el precio del producto es null/0, usar precio de la mejor oferta
+      if ((!product.price || product.price <= 0) && bestOffer) {
+        const offerPrice = parsePrice(bestOffer.product_price);
+        if (offerPrice && offerPrice > 0) {
+          product.price = offerPrice;
+          logger.info('amazon', `Price recovered from best offer for ${asin}: $${offerPrice}`);
+        }
+      }
+      // v2.5: Ultimo fallback — recorrer todas las ofertas buscando un precio valido
+      if ((!product.price || product.price <= 0) && offers.length > 0) {
+        for (const offer of offers) {
+          const op = parsePrice(offer.product_price);
+          if (op && op > 0) {
+            product.price = op;
+            logger.info('amazon', `Price recovered from offer list for ${asin}: $${op}`);
+            break;
+          }
+        }
+      }
+
       if (bestOffer) {
         product.bestOffer = {
           seller: bestOffer.seller || null,
@@ -412,11 +432,19 @@ class AmazonAdapter extends BaseAdapter {
     }
     p.primaryImage = p.images[0] || '';
 
-    // Price
+    // Price — v2.5: fallback chain cuando product_price es null/0
     p.price = parsePrice(d.product_price);
     p.originalPrice = parsePrice(d.product_original_price);
     if (!p.originalPrice && d.product_original_price_raw) {
       p.originalPrice = parsePrice(d.product_original_price_raw);
+    }
+    // Fallback 1: product_minimum_offer_price (campo directo de Amazon API)
+    if (!p.price || p.price <= 0) {
+      p.price = parsePrice(d.product_minimum_offer_price);
+    }
+    // Fallback 2: buybox_price o typical_price (otros campos de Amazon API)
+    if (!p.price || p.price <= 0) {
+      p.price = parsePrice(d.buybox_price) || parsePrice(d.typical_price_lower) || parsePrice(d.typical_price_upper);
     }
 
     // Rating & reviews

@@ -1360,6 +1360,48 @@ app.get('/api/debug/raw-search', async (req, res) => {
 });
 
 // ---- DEBUG: Raw product API response (for shipping field discovery) ----
+// ---- DEBUG: Test multiple AliExpress detail endpoints for ID compatibility ----
+app.get('/api/debug/aliexpress-endpoints', async (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ error: 'Missing id param' });
+  const fetch = require('node-fetch');
+  const rapidApiKey = process.env.RAPIDAPI_KEY;
+  const host = 'aliexpress-datahub.p.rapidapi.com';
+  const headers = { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': host };
+  const endpoints = [
+    '/item_detail', '/item_detail_2', '/item_detail_3',
+    '/item_detail_4', '/item_detail_5', '/item_detail_6', '/item_detail_7'
+  ];
+  const results = {};
+  await Promise.allSettled(endpoints.map(async (ep) => {
+    const start = Date.now();
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      const url = `https://${host}${ep}?itemId=${encodeURIComponent(id)}&language=en&currency=USD`;
+      const resp = await fetch(url, { headers, signal: controller.signal });
+      clearTimeout(timer);
+      const text = await resp.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch(e) {}
+      const statusCode = json?.result?.status?.code;
+      const statusMsg = json?.result?.status?.msg || '';
+      const hasItem = !!(json?.result?.item);
+      const hasTitle = !!(json?.result?.item?.title);
+      results[ep] = {
+        httpStatus: resp.status, latencyMs: Date.now() - start,
+        apiStatusCode: statusCode, apiStatusMsg: statusMsg?.substring(0, 100),
+        hasItem, hasTitle,
+        topKeys: json?.result ? Object.keys(json.result).join(',') : null,
+        title: json?.result?.item?.title?.substring(0, 80) || null
+      };
+    } catch(e) {
+      results[ep] = { error: e.message, latencyMs: Date.now() - start };
+    }
+  }));
+  res.json({ id, results });
+});
+
 app.get('/api/debug/raw-product', async (req, res) => {
   const { store, id } = req.query;
   const source = (store || 'amazon').toLowerCase();

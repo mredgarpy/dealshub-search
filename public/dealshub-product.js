@@ -464,7 +464,8 @@
           }
 
           if(buyNow){
-            window.location.href = '/checkout';
+            // Use direct checkout URL with ONLY this variant — bypasses existing cart items
+            window.location.href = '/cart/' + savedVariantId + ':1';
           } else {
             // Update cart count in header (includes #dh-cart-count from dealshub header)
             fetch('/cart.js').then(function(r){return r.json()}).then(function(cart){

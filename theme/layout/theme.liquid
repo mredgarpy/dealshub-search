@@ -62,6 +62,20 @@
     .dh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
     @media(max-width:768px){.dh-grid{grid-template-columns:repeat(2,1fr);gap:10px}}
     @media(max-width:480px){.dh-grid{grid-template-columns:repeat(2,1fr);gap:8px}.dh-api-card h3{font-size:11px!important}}
+    /* Policy pages (native Shopify /policies/*) */
+    .shopify-policy__container{max-width:780px;margin:0 auto;padding:40px 20px 60px}
+    .shopify-policy__container .shopify-policy__title{font-size:28px;font-weight:700;color:#1a1a2e;margin-bottom:20px}
+    .shopify-policy__container .shopify-policy__body{font-size:14px;color:#4A5568;line-height:1.8}
+    .shopify-policy__container .shopify-policy__body h1,.shopify-policy__container .shopify-policy__body h2,.shopify-policy__container .shopify-policy__body h3{color:#1a1a2e;margin:24px 0 12px}
+    .shopify-policy__container .shopify-policy__body a{color:#e53e3e}
+    .shopify-policy__container .shopify-policy__body table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+    .shopify-policy__container .shopify-policy__body th,.shopify-policy__container .shopify-policy__body td{border:1px solid #e2e8f0;padding:10px 14px;text-align:left}
+    .shopify-policy__container .shopify-policy__body th{background:#f7fafc;font-weight:600;color:#1a1a2e}
+    @media(max-width:768px){
+      .shopify-policy__container{padding:24px 16px 40px}
+      .shopify-policy__container .shopify-policy__title{font-size:22px}
+      .shopify-policy__container .shopify-policy__body table{display:block;overflow-x:auto}
+    }
   </style>
   {{ 'stylehub-api.js' | asset_url | script_tag }}
 
@@ -152,8 +166,8 @@
   </script>
   {%- endif -%}
 
-  {%- comment -%} Google Search Console — Edgar: replace XXXXX with your verification code {%- endcomment -%}
-  <!-- <meta name="google-site-verification" content="XXXXX"> -->
+  {%- comment -%} Google Search Console verification {%- endcomment -%}
+  <meta name="google-site-verification" content="googled4a221a39184d512">
 
   {%- comment -%} StyleHub Plus — Server-side detection via customer tags {%- endcomment -%}
   {%- assign is_plus = false -%}

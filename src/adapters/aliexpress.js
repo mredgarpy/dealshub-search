@@ -139,7 +139,7 @@ class AliExpressAdapter extends BaseAdapter {
   // Fetch a single detail endpoint, return raw result or null
   async _fetchDetailEndpoint(endpoint, productId) {
     try {
-      const url = `https://${SEARCH_HOST}${endpoint}?itemId=${encodeURIComponent(productId)}`;
+      const url = `https://${SEARCH_HOST}${endpoint}?itemId=${encodeURIComponent(productId)}&language=en&currency=USD`;
       const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
       if (!data || !data.result) {
         logger.warn('aliexpress', `${endpoint} returned null/no result`, { productId });

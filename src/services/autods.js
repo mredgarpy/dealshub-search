@@ -328,6 +328,7 @@ async function processOrderWebhook(orderData) {
         });
 
         // ── AUTO-REGISTER product in autods_products if missing ──
+        // This ensures ALL sources (Amazon, AliExpress, etc.) appear in pending products
         try {
           registerProduct({
             source: sourceInfo.source,

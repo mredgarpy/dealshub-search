@@ -1,72 +1,123 @@
 {% comment %}
-  DealsHub — Category Tiles Section
+  DealsHub — Shop by Category (Image Cards)
 {% endcomment %}
 
 <div class="dh-cats page-width">
-  <h2 class="dh-cats__title">{{ section.settings.title | default: 'Popular Categories' }}</h2>
+  <h2 class="dh-cats__heading">{{ section.settings.title | default: 'SHOP BY CATEGORY' }}</h2>
   <div class="dh-cats__grid">
     {% for block in section.blocks %}
-      <a href="/pages/search?q={{ block.settings.search_query | url_encode }}" class="dh-cat-tile" style="background: {{ block.settings.bg_color | default: '#f8f9fa' }};">
-        <span class="dh-cat-tile__emoji">{{ block.settings.emoji | default: '🛍️' }}</span>
-        <span class="dh-cat-tile__name">{{ block.settings.name }}</span>
+      {% assign fallback_img = block.settings.fallback_url | default: '' %}
+      <a href="/pages/search-results?q={{ block.settings.search_query | url_encode }}" class="dh-cats__card" {{ block.shopify_attributes }}>
+        {% if block.settings.image != blank %}
+          {{ block.settings.image | image_url: width: 600 | image_tag: loading: 'lazy', class: 'dh-cats__img', alt: block.settings.name }}
+        {% elsif fallback_img != '' %}
+          <img src="{{ fallback_img }}" alt="{{ block.settings.name }}" loading="lazy" class="dh-cats__img">
+        {% else %}
+          <div class="dh-cats__placeholder">
+            <span>{{ block.settings.emoji | default: '🛍️' }}</span>
+          </div>
+        {% endif %}
+        <div class="dh-cats__overlay"></div>
+        <div class="dh-cats__label">{{ block.settings.name }}</div>
       </a>
     {% endfor %}
   </div>
 </div>
 
 <style>
-  .dh-cats { padding: 40px 0; }
-  .dh-cats__title {
-    font-size: 26px;
-    font-weight: 700;
-    color: #1a1a2e;
-    margin: 0 0 24px;
+  .dh-cats { padding: 40px 20px; max-width: 1200px; margin: 0 auto; }
+  .dh-cats__heading {
     text-align: center;
+    letter-spacing: 3px;
+    margin: 0 auto 32px;
+    background-color: #1A1A2E;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 6px;
+    max-width: 340px;
+    font-weight: 700;
+    font-size: 18px;
+    text-transform: uppercase;
   }
   .dh-cats__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 16px;
   }
-  .dh-cat-tile {
+  .dh-cats__card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    aspect-ratio: 1 / 1;
+  }
+  .dh-cats__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease;
+  }
+  .dh-cats__placeholder {
+    width: 100%;
+    height: 100%;
+    background: #e8edf2;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 24px 12px;
-    border-radius: 16px;
-    text-decoration: none;
-    transition: transform .2s, box-shadow .2s;
-    min-height: 120px;
+    font-size: 48px;
   }
-  .dh-cat-tile:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0,0,0,.1);
+  .dh-cats__overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 60%);
+    transition: opacity 0.3s ease;
   }
-  .dh-cat-tile__emoji { font-size: 36px; margin-bottom: 8px; }
-  .dh-cat-tile__name {
+  .dh-cats__card:hover .dh-cats__img {
+    transform: scale(1.08);
+  }
+  .dh-cats__card:hover .dh-cats__overlay {
+    background: rgba(0,0,0,0.3);
+  }
+  .dh-cats__label {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 1.5px;
     font-size: 13px;
-    font-weight: 600;
-    color: #1a1a2e;
-    text-align: center;
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    max-width: calc(100% - 24px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  @media (max-width: 992px) {
+    .dh-cats__grid { grid-template-columns: repeat(3, 1fr); gap: 14px; }
   }
   @media (max-width: 600px) {
-    .dh-cats__grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .dh-cat-tile { padding: 16px 8px; min-height: 100px; }
+    .dh-cats { padding: 24px 12px; }
+    .dh-cats__heading { font-size: 15px; padding: 10px 20px; margin-bottom: 20px; letter-spacing: 2px; }
+    .dh-cats__grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .dh-cats__label { font-size: 11px; padding: 5px 8px; bottom: 8px; left: 8px; letter-spacing: 1px; }
   }
 </style>
 
 {% schema %}
 {
-  "name": "DealsHub Categories",
+  "name": "Shop by Category",
   "tag": "section",
   "class": "dealshub-categories-section",
   "settings": [
     {
       "type": "text",
       "id": "title",
-      "label": "Title",
-      "default": "Popular Categories"
+      "label": "Section Title",
+      "default": "SHOP BY CATEGORY"
     }
   ],
   "blocks": [
@@ -75,22 +126,33 @@
       "name": "Category",
       "settings": [
         { "type": "text", "id": "name", "label": "Name", "default": "Category" },
-        { "type": "text", "id": "emoji", "label": "Emoji", "default": "🛍️" },
-        { "type": "text", "id": "search_query", "label": "Search Query", "default": "" },
-        { "type": "color", "id": "bg_color", "label": "Background Color", "default": "#f0f7ff" }
+        { "type": "image_picker", "id": "image", "label": "Category Image" },
+        { "type": "url", "id": "fallback_url", "label": "Fallback Image URL (if no upload)" },
+        { "type": "text", "id": "emoji", "label": "Emoji Fallback", "default": "🛍️" },
+        { "type": "text", "id": "search_query", "label": "Search Query", "default": "" }
       ]
     }
   ],
   "presets": [
     {
-      "name": "DealsHub Categories",
+      "name": "Shop by Category",
       "blocks": [
-        { "type": "category", "settings": { "name": "Fashion", "emoji": "👗", "search_query": "fashion dresses", "bg_color": "#fff0f5" } },
-        { "type": "category", "settings": { "name": "Beauty", "emoji": "💄", "search_query": "beauty skincare", "bg_color": "#f5f0ff" } },
-        { "type": "category", "settings": { "name": "Electronics", "emoji": "📱", "search_query": "electronics phone", "bg_color": "#f0f7ff" } },
-        { "type": "category", "settings": { "name": "Home", "emoji": "🏠", "search_query": "home decor", "bg_color": "#f0fff5" } },
-        { "type": "category", "settings": { "name": "Sneakers", "emoji": "👟", "search_query": "sneakers shoes", "bg_color": "#fff5f0" } },
-        { "type": "category", "settings": { "name": "Accessories", "emoji": "💍", "search_query": "jewelry accessories", "bg_color": "#f5f5f0" } }
+        { "type": "category", "settings": { "name": "Women", "emoji": "👗", "search_query": "women fashion" } },
+        { "type": "category", "settings": { "name": "Men", "emoji": "👔", "search_query": "men fashion" } },
+        { "type": "category", "settings": { "name": "Beauty", "emoji": "💄", "search_query": "beauty" } },
+        { "type": "category", "settings": { "name": "Skincare", "emoji": "✨", "search_query": "skincare" } },
+        { "type": "category", "settings": { "name": "Electronics", "emoji": "📱", "search_query": "electronics" } },
+        { "type": "category", "settings": { "name": "Phones", "emoji": "📲", "search_query": "phones" } },
+        { "type": "category", "settings": { "name": "Home", "emoji": "🏠", "search_query": "home garden" } },
+        { "type": "category", "settings": { "name": "Sports", "emoji": "⚽", "search_query": "sports" } },
+        { "type": "category", "settings": { "name": "Kids", "emoji": "🧸", "search_query": "kids" } },
+        { "type": "category", "settings": { "name": "Shoes", "emoji": "👟", "search_query": "shoes" } },
+        { "type": "category", "settings": { "name": "Accessories", "emoji": "💍", "search_query": "accessories" } },
+        { "type": "category", "settings": { "name": "Bags", "emoji": "👜", "search_query": "bags" } },
+        { "type": "category", "settings": { "name": "Jewelry", "emoji": "💎", "search_query": "jewelry" } },
+        { "type": "category", "settings": { "name": "Gaming", "emoji": "🎮", "search_query": "gaming" } },
+        { "type": "category", "settings": { "name": "Pets", "emoji": "🐾", "search_query": "pets" } },
+        { "type": "category", "settings": { "name": "Auto", "emoji": "🚗", "search_query": "auto" } }
       ]
     }
   ]

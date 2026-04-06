@@ -255,19 +255,23 @@
       });
       h+='</div></div>';
     }
-    // 2. A+ content images (from the manufacturer)
+    // 2. A+ content images (from the manufacturer) — filter out duplicates from main gallery
     var aplusImgs=p.aplusImages||p.aplus_images||[];
-    if(aplusImgs.length>0){
+    var mainImgs=p.images&&p.images.length?p.images:(p.primaryImage?[p.primaryImage]:(p.image?[p.image]:[]));
+    var mainImgSet={};
+    mainImgs.forEach(function(u){mainImgSet[u]=true});
+    var uniqueAplus=aplusImgs.filter(function(img){return !mainImgSet[img]});
+    if(uniqueAplus.length>0){
       h+='<div>';
       h+='<h3 style="font-size:14px;font-weight:600;color:#374151;margin:0 0 10px">From the manufacturer</h3>';
-      aplusImgs.slice(0,4).forEach(function(img){
+      uniqueAplus.slice(0,4).forEach(function(img){
         h+='<img src="'+esc(img)+'" alt="" loading="lazy" style="width:100%;border-radius:8px;margin-bottom:6px">';
       });
       h+='</div>';
     }
     h+='</div>';
     // Only show if there's content
-    if(reviewImgs.length===0&&aplusImgs.length===0)return '';
+    if(reviewImgs.length===0&&uniqueAplus.length===0)return '';
     return h;
   }
 
@@ -838,7 +842,7 @@
       if(r.avatar)h+='<img src="'+esc(r.avatar)+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover" onerror="this.style.display=\'none\'">';
       else h+='<div style="width:32px;height:32px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:14px;color:#9ca3af">'+esc((r.author||'B')[0])+'</div>';
       h+='<div>';
-      h+='<div style="font-size:13px;font-weight:600;color:#333">'+esc(r.author||'Verified Buyer')+'';
+      h+='<div style="font-size:13px;font-weight:600;color:#333">'+esc(r.author||'Verified Buyer');
       if(r.isVerified)h+=' <span style="color:#16a34a;font-size:11px;font-weight:400">&#10003; Verified Purchase</span>';
       h+='</div>';
       if(r.date)h+='<div style="font-size:11px;color:#9ca3af">'+esc(r.date)+'</div>';
@@ -1174,6 +1178,7 @@
       if(retryAttempt>0)body.forceResync=true;
       if(_pdpProductData&&retryAttempt===0)body.productData=_pdpProductData;
 
+      var savedVariantId=null;
       fetch(API+'/api/prepare-cart',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify(body),signal:AbortSignal.timeout(30000)
@@ -1181,6 +1186,7 @@
       .then(function(r){if(!r.ok)throw new Error('Sync error ('+r.status+')');return r.json()})
       .then(function(data){
         if(!data.shopifyVariantId)throw new Error(data.error||'Sync failed — no variant ID');
+        savedVariantId=data.shopifyVariantId;
         return fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({items:[{id:data.shopifyVariantId,quantity:qty,properties:{_source:store,_source_id:activeId}}]})
         });
@@ -1206,7 +1212,7 @@
         setTimeout(function(){
           btn.textContent=origText;btn.disabled=false;btn.style.opacity='1';btn.style.background=origBg;
           if(!buyNow&&stickyAtc){stickyAtc.textContent='Add to Cart';stickyAtc.style.background='#e53e3e';}
-          if(buyNow)window.location.href='/checkout';
+          if(buyNow)window.location.href='/cart/'+savedVariantId+':1';
           else fetch('/cart.js').then(function(r){return r.json()}).then(function(cart){
             document.querySelectorAll('#dh-cart-count,.cart-count,.cart-count-bubble,[data-cart-count],.header-cart-count').forEach(function(el){el.textContent=cart.item_count});
           }).catch(function(){});

@@ -182,7 +182,7 @@ class AmazonAdapter extends BaseAdapter {
           logger.info('amazon', `Price recovered from best offer for ${asin}: $${offerPrice}`);
         }
       }
-      // v2.5: Ultimo fallback — recorrer todas las ofertas buscando un precio valido
+      // v2.5: Último fallback — recorrer todas las ofertas buscando un precio válido
       if ((!product.price || product.price <= 0) && offers.length > 0) {
         for (const offer of offers) {
           const op = parsePrice(offer.product_price);

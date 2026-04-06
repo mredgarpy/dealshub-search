@@ -1,6 +1,15 @@
 {% comment %}StyleHub Category Landing Page v1.0 — Sprint 5
    Dynamic category page: /pages/category?cat=electronics|fashion|beauty|home|sports|gaming|baby
 {% endcomment %}
+<script>
+(function(){
+  var t={electronics:'Electronics & Gadgets | Up to 70% Off | StyleHub Miami',fashion:'Fashion | Best Deals on Clothing & Shoes | StyleHub Miami',beauty:'Beauty & Skincare | Best Deals | StyleHub Miami',home:'Home & Kitchen | Best Deals | StyleHub Miami',sports:'Sports & Outdoors | Best Deals | StyleHub Miami',gaming:'Gaming | Best Deals on Accessories | StyleHub Miami',baby:'Kids & Baby | Best Deals | StyleHub Miami'};
+  var d={electronics:'Shop the best deals on electronics, phones, laptops, headphones and smart home devices. Up to 70% off with free shipping on orders over $35.',fashion:'Discover trending fashion for men and women. Dresses, sneakers, accessories and more at unbeatable prices. Free shipping on $35+.',beauty:'Shop top beauty brands, skincare, makeup and hair care products. Best prices guaranteed with free shipping on orders over $35.',home:'Transform your space with deals on home decor, kitchen appliances, organization and cleaning essentials. Free shipping on $35+.',sports:'Gear up with top deals on workout equipment, activewear, running shoes and outdoor gear. Free shipping on orders over $35.',gaming:'Level up with the best gaming deals. Consoles, accessories, headsets and more at unbeatable prices. Free shipping on $35+.',baby:'Shop kids and baby essentials. Clothing, toys, strollers, safety gear and more at the best prices. Free shipping on $35+.'};
+  var c=(new URLSearchParams(window.location.search).get('cat')||'').toLowerCase();
+  if(t[c])document.title=t[c];
+  if(d[c]){var m=document.querySelector('meta[name="description"]');if(m)m.content=d[c];else{m=document.createElement('meta');m.name='description';m.content=d[c];document.head.appendChild(m);}}
+})();
+</script>
 <div id="dealshub-category" style="max-width:1280px;margin:0 auto;padding:0 20px 60px">
   <!-- Hero (dynamic) -->
   <div id="dh-cat-hero" style="border-radius:16px;padding:40px 32px;color:#fff;text-align:center;margin-bottom:32px;background:#1a1a2e">

@@ -1424,6 +1424,35 @@ app.get('/api/debug/raw-search', async (req, res) => {
   }
 });
 
+// ---- DEBUG: Test adapter.getProduct with step logging ----
+app.get('/api/debug/adapter-test', async (req, res) => {
+  const { id, store } = req.query;
+  const source = (store || 'aliexpress').toLowerCase();
+  if (!id) return res.status(400).json({ error: 'Missing id param' });
+  try {
+    const adapter = getAdapter(source);
+    if (!adapter) return res.json({ error: 'No adapter for ' + source });
+    // Call _fetchDetailEndpoint directly to test
+    const detail2 = await adapter._fetchDetailEndpoint('/item_detail_2', id);
+    const detail2Info = detail2 ? {
+      hasItem: !!detail2.item, hasItemId: !!detail2.itemId,
+      title: (detail2.item?.title || detail2.title || '?').substring(0, 80),
+      statusCode: detail2.status?.code, statusData: detail2.status?.data,
+      keys: Object.keys(detail2).join(',')
+    } : null;
+    // Also test the full getProduct
+    const product = await adapter.getProduct(id, {});
+    const productInfo = product ? {
+      sourceId: product.sourceId, title: (product.title || '?').substring(0, 80),
+      price: product.price, images: (product.images || []).length,
+      variants: (product.variants || []).length
+    } : null;
+    res.json({ id, source, detail2: detail2Info, product: productInfo });
+  } catch (e) {
+    res.json({ id, source, error: e.message, stack: e.stack?.split('\n').slice(0, 3) });
+  }
+});
+
 // ---- DEBUG: Raw product API response (for shipping field discovery) ----
 // ---- DEBUG: Test multiple AliExpress detail endpoints for ID compatibility ----
 app.get('/api/debug/aliexpress-endpoints', async (req, res) => {

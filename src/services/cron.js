@@ -348,46 +348,12 @@ async function taskCatchUpMissedOrders() {
   }
 }
 
-// ---- TASK 7: AutoDS Auto-Sync (CSV generation + Puppeteer upload) ----
-// Generates CSV for pending products and uploads to AutoDS via browser automation
-async function taskAutodsCsvSync() {
-  const taskName = 'autods-csv-sync';
-  try {
-    const autodsSync = require('./autods-sync');
-
-    if (!autodsSync.CONFIG.enabled()) {
-      logTask(taskName, 'skip', 'AUTODS_SYNC_ENABLED != true');
-      return;
-    }
-
-    const result = await autodsSync.runAutodsSync();
-
-    logger.info('cron', `[${taskName}] Result: ${result.status}`, {
-      products: result.productsFound,
-      csvCount: result.csvCount,
-      uploaded: result.uploadSuccess,
-      duration: result.duration,
-    });
-
-    logTask(taskName, result.status === 'success' ? 'ok' : result.status, {
-      products: result.productsFound,
-      csvCount: result.csvCount || 0,
-      uploaded: result.uploadSuccess,
-      error: result.error,
-    });
-  } catch (e) {
-    logger.error('cron', `[${taskName}] Failed: ${e.message}`);
-    logTask(taskName, 'error', e.message);
-  }
-}
-
 // ---- SCHEDULE CONFIGURATION ----
 const CRON_SCHEDULE = {
   syncMappings:     { fn: taskSyncMappingsToAutods,   interval: 15 * 60 * 1000,      name: 'Sync Mappings → AutoDS',       delay: 30000 },
   healthCheck:      { fn: taskSourceHealthCheck,       interval: 30 * 60 * 1000,      name: 'Source Health Check',           delay: 60000 },
   reprocessOrders:  { fn: taskReprocessStaleOrders,    interval: 60 * 60 * 1000,      name: 'Reprocess Stale Orders',        delay: 120000 },
   catchUpOrders:    { fn: taskCatchUpMissedOrders,     interval: 20 * 60 * 1000,      name: 'Catch Up Missed Orders',        delay: 45000 },
-  autodsCsvSync:    { fn: taskAutodsCsvSync,           interval: 30 * 60 * 1000,      name: 'AutoDS CSV Sync',              delay: 90000 },
   statsSnapshot:    { fn: taskAutodsStatsSnapshot,     interval: 6 * 60 * 60 * 1000,  name: 'AutoDS Stats Snapshot',         delay: 180000 },
   dbCleanup:        { fn: taskDbCleanup,               interval: 24 * 60 * 60 * 1000, name: 'DB Cleanup',                    delay: 300000 }
 };
@@ -485,7 +451,6 @@ module.exports = {
   taskSourceHealthCheck,
   taskReprocessStaleOrders,
   taskCatchUpMissedOrders,
-  taskAutodsCsvSync,
   taskAutodsStatsSnapshot,
   taskDbCleanup
 };

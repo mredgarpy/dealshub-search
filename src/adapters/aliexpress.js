@@ -940,10 +940,13 @@ class AliExpressAdapter extends BaseAdapter {
     // Product condition (AliExpress items are generally new)
     p.productCondition = 'New';
 
-    // Videos
+    // Videos — item.video can be a string URL or an object {id, url, ...}
     p.videos = [];
-    const videoUrl = item.video || d.imageModule?.videoUrl || d.videoModule?.videoUrl || null;
-    if (videoUrl) {
+    let videoUrl = item.video || d.imageModule?.videoUrl || d.videoModule?.videoUrl || null;
+    if (videoUrl && typeof videoUrl === 'object') {
+      videoUrl = videoUrl.url || videoUrl.videoUrl || null;
+    }
+    if (videoUrl && typeof videoUrl === 'string') {
       p.videos.push(videoUrl.startsWith('//') ? 'https:' + videoUrl : videoUrl);
     }
     p.hasVideo = p.videos.length > 0;

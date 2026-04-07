@@ -556,20 +556,22 @@ class AliExpressAdapter extends BaseAdapter {
     // Also check item.sku (some API responses nest sku inside item)
     const skuDef = skuData.def || item.sku?.def || {};
 
-    // Log price diagnostic info
+    // Log price diagnostic info — include raw sku.def values and first 2 sku.base entries
+    const _firstBase = skuData.base?.[0] || {};
+    const _secondBase = skuData.base?.[1] || {};
     logger.info('aliexpress', 'Price extraction debug', {
       productId: p.sourceId,
       hasSkuData: !!d.sku,
       hasItemSku: !!item.sku,
-      skuDefKeys: Object.keys(skuDef).join(',') || 'empty',
+      skuDefPrice: skuDef.price,
+      skuDefPromoPrice: skuDef.promotionPrice,
+      skuDefPriceType: typeof skuDef.price,
+      skuDefPromoPriceType: typeof skuDef.promotionPrice,
       skuBaseCount: (skuData.base || []).length,
-      skuPropsCount: (skuData.props || []).length,
-      itemKeys: Object.keys(item).slice(0, 20).join(','),
-      dKeys: Object.keys(d).slice(0, 20).join(','),
+      firstBase: { price: _firstBase.price, promotionPrice: _firstBase.promotionPrice, skuId: _firstBase.skuId, propMap: _firstBase.propMap, quantity: _firstBase.quantity },
+      secondBase: { price: _secondBase.price, promotionPrice: _secondBase.promotionPrice, skuId: _secondBase.skuId },
       itemPrice: item.price || item.salePrice || item.promotionPrice || 'none',
       dPrice: d.price || 'none',
-      settingsPrice: d.settings?.price || 'none',
-      firstSkuBasePrice: skuData.base?.[0]?.price || skuData.base?.[0]?.promotionPrice || 'none'
     });
 
     const defPrice = typeof skuDef.price === 'string' && skuDef.price.includes('-')

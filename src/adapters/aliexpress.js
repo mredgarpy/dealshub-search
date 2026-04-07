@@ -809,6 +809,26 @@ class AliExpressAdapter extends BaseAdapter {
       p.deliveryEstimate.earliestDate=_af(_ami); p.deliveryEstimate.latestDate=_af(_amx);
       p.deliveryEstimate.formattedRange=`${_af(_ami)} – ${_af(_amx)}`; }
 
+    // Weight & dimensions from delivery.packageDetail
+    const pkgDetail = deliveryData.packageDetail || d.packageDetail || {};
+    if (pkgDetail.weight && pkgDetail.weight > 0) {
+      const wKg = parseFloat(pkgDetail.weight);
+      if (wKg < 1) {
+        p.weight = Math.round(wKg * 1000); p.weightUnit = 'g';
+      } else {
+        p.weight = parseFloat(wKg.toFixed(2)); p.weightUnit = 'kg';
+      }
+      logger.info('aliexpress', 'Extracted package weight', { productId: p.sourceId, weight: p.weight, unit: p.weightUnit });
+    }
+    if (pkgDetail.length || pkgDetail.width || pkgDetail.height) {
+      p.dimensions = {
+        length: pkgDetail.length || null,
+        width: pkgDetail.width || null,
+        height: pkgDetail.height || null,
+        unit: 'cm'
+      };
+    }
+
     // Return policy
     p.returnPolicy = { window: 15, summary: 'Returns accepted within 15 days' };
     if (d.buyerProtectionModule?.freightCommitment) {

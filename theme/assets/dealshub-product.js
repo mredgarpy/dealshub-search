@@ -447,10 +447,24 @@
         h+='</div>';
 
       }else if(isSize){
-        /* SIZE — pills */
+        /* SIZE — pills (sorted small→large) */
+        var sizeOrder={'XXS':1,'XS':2,'S':3,'M':4,'L':5,'XL':6,'XXL':7,'XXXL':8,'2XL':7,'3XL':8,'4XL':9,'5XL':10,
+          'US 4':4,'US 5':5,'US 6':6,'US 7':7,'US 8':8,'US 9':9,'US 10':10,'US 11':11,'US 12':12,'US 13':13,'US 14':14,
+          '0':0,'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'11':11,'12':12,'13':13,'14':14,'15':15,'16':16,
+          '24':24,'25':25,'26':26,'27':27,'28':28,'29':29,'30':30,'31':31,'32':32,'33':33,'34':34,'36':36,'38':38,'40':40,'42':42,'44':44,'46':46};
+        var sortedSizes=(opt.values||[]).slice().sort(function(a,b){
+          var va=a.value.toUpperCase().trim(), vb=b.value.toUpperCase().trim();
+          var oa=sizeOrder[va], ob=sizeOrder[vb];
+          if(oa!==undefined&&ob!==undefined)return oa-ob;
+          if(oa!==undefined)return -1;
+          if(ob!==undefined)return 1;
+          var na=parseFloat(va),nb=parseFloat(vb);
+          if(!isNaN(na)&&!isNaN(nb))return na-nb;
+          return va.localeCompare(vb);
+        });
         h+='<div class="sh-size-options" style="display:flex;flex-wrap:wrap;gap:6px">';
-        for(var si=0;si<(opt.values||[]).length;si++){
-          var sv2=opt.values[si];
+        for(var si=0;si<sortedSizes.length;si++){
+          var sv2=sortedSizes[si];
           var isSel2=sv2.value===selectedVal;
           var isAvail2=sv2.is_available!==false;
           var cls2='dhpdp-opt sh-size-pill'+(isSel2?' dhpdp-opt-sel':'')+(isAvail2?'':' dhpdp-opt-unavail');
@@ -534,10 +548,32 @@
   function renderProductSpecs(p){
     var pi=p.productInformation||{};
     var specs=[];
+    // Amazon-style productInformation
     if(pi['Item Weight'])specs.push(['Weight',pi['Item Weight']]);
     if(pi['Package Dimensions'])specs.push(['Dimensions',pi['Package Dimensions'].split(';')[0]]);
     if(pi['Product Dimensions'])specs.push(['Dimensions',pi['Product Dimensions'].split(';')[0]]);
+    // Universal weight/dimensions (AliExpress, etc.)
+    if(!specs.some(function(s){return s[0]==='Weight'}) && p.weight){
+      specs.push(['Weight', p.weight + ' ' + (p.weightUnit||'g')]);
+    }
+    if(!specs.some(function(s){return s[0]==='Dimensions'}) && p.dimensions){
+      var d=p.dimensions;
+      var parts=[];
+      if(d.length)parts.push(d.length);
+      if(d.width)parts.push(d.width);
+      if(d.height)parts.push(d.height);
+      if(parts.length)specs.push(['Dimensions', parts.join(' x ') + ' ' + (d.unit||'cm')]);
+    }
+    // Material from quickSpecs or specifications
     if(pi['Material']||pi['Material Type'])specs.push(['Material',pi['Material']||pi['Material Type']]);
+    if(!specs.some(function(s){return s[0]==='Material'})){
+      var qs=p.quickSpecs||p.specifications||[];
+      for(var qi=0;qi<qs.length;qi++){
+        if(qs[qi]&&qs[qi].name&&/material/i.test(qs[qi].name)&&qs[qi].value){
+          specs.push(['Material',qs[qi].value]);break;
+        }
+      }
+    }
     if(pi['Sole Material'])specs.push(['Sole',pi['Sole Material']]);
     if(pi['Closure Type'])specs.push(['Closure',pi['Closure Type']]);
     if(pi['Fabric Type'])specs.push(['Fabric',pi['Fabric Type']]);

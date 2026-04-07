@@ -177,6 +177,7 @@ function emptyProduct() {
     deliveryEstimate: { minDays: null, maxDays: null, label: null },
     sellerData: { name: null, rating: null },
     sourceUrl: '', normalizedHandle: '',
+    weight: null, weightUnit: null, dimensions: null,
     lastSyncedAt: null, rawSourceMeta: {}
   };
 }

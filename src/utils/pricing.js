@@ -35,11 +35,21 @@ const TIER_RANGES = [
   { min: 500, max: 999999 }
 ];
 
-// Sources that use MSRP-discount model: price = MSRP, sourceCost = wholesale
+// Sources that use MSRP-based pricing: API returns MSRP as "price".
+// For these sources, the cost base is estimated as MSRP × RETAIL_FACTOR.
+// AliExpress API's "promotionPrice" is a wholesale/dropship rate ($2-$5),
+// NOT the actual AliExpress retail price ($11-$15). The real AliExpress
+// customer price is approximately MSRP × 0.42.
+// We use this estimated retail as cost base, then apply tier multiplier.
 const MSRP_SOURCES = new Set(['aliexpress']);
 
+// Factor to estimate the real AliExpress retail price from MSRP.
+// Based on observed data: AliExpress retail ≈ MSRP × 0.40-0.45
+// Using 0.42 as conservative estimate to stay above AliExpress prices.
+const MSRP_RETAIL_FACTOR = 0.42;
+
 // Price floors per source (minimum selling price)
-const PRICE_FLOORS = { aliexpress: 2.99 };
+const PRICE_FLOORS = { aliexpress: 4.99 };
 
 // Cache DB tiers in memory (refreshed every 5 min)
 let _tiersCache = null;
@@ -114,15 +124,16 @@ function calculateFinalPrice(sourcePrice, source, opts = {}) {
   const shippingCost = opts.shippingCost || 0;
   const fees = opts.fees || 0;
 
-  // Determine the actual cost to apply the multiplier to
+  // Determine the actual cost to apply the multiplier to.
+  // For AliExpress: sourcePrice is MSRP (~$28). The API's promotionPrice (~$5)
+  // is wholesale, NOT the AliExpress retail price (~$11). We estimate the real
+  // AliExpress retail as MSRP × MSRP_RETAIL_FACTOR and use THAT as cost base.
+  // This ensures our price is ALWAYS above what AliExpress charges customers.
   let cost;
-  if (isMSRP && opts.sourceCost && opts.sourceCost > 0) {
-    // AliExpress: sourceCost is wholesale price, sourcePrice is MSRP
-    cost = opts.sourceCost + shippingCost + fees;
-  } else if (isMSRP) {
-    // AliExpress without explicit sourceCost: use MSRP × 0.55 as estimated cost
-    // (MSRP-discount model: sell at ~55% of MSRP)
-    cost = sourcePrice * 0.40 + shippingCost + fees;
+  if (isMSRP) {
+    // AliExpress: estimate real retail price from MSRP
+    // MSRP $28 × 0.42 = $11.76 (≈ AliExpress retail $11.26)
+    cost = sourcePrice * MSRP_RETAIL_FACTOR + shippingCost + fees;
   } else {
     // Amazon, Sephora, Macys, SHEIN: sourcePrice IS the cost
     cost = sourcePrice + shippingCost + fees;

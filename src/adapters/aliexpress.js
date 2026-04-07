@@ -387,12 +387,15 @@ class AliExpressAdapter extends BaseAdapter {
     // New shape from item_search_3:
     // { itemId, title, sales, itemUrl, image, sku: { def: { price, promotionPrice } },
     //   averageStarRate, type, delivery: { freeShipping, shippingFee }, sellingPoints: [] }
+    // IMPORTANT: Prefer sku.def.price (MSRP/retail ~$28) over promotionPrice (wholesale ~$2)
+    // This matches the detail adapter so search and PDP prices are consistent.
+    // The pricing engine applies -45% discount to MSRP to arrive at final selling price.
     const price = parsePrice(
-      p.sku?.def?.promotionPrice || p.sku?.def?.price ||
+      p.sku?.def?.price || p.sku?.def?.promotionPrice ||
       p.price?.minPrice || p.price?.minAmount?.value || p.salePrice
     );
     const origPrice = parsePrice(
-      p.sku?.def?.price || p.price?.maxPrice || p.price?.maxAmount?.value || p.originalPrice
+      p.price?.maxPrice || p.price?.maxAmount?.value || p.originalPrice
     );
     // If promo and orig are the same, no original
     const finalOrigPrice = origPrice && origPrice > (price || 0) ? origPrice : null;

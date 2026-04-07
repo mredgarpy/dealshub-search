@@ -159,9 +159,9 @@ function initSchema() {
     const aliRule = db.prepare(
       "SELECT * FROM pricing_rules WHERE source_store = 'aliexpress' AND category IS NULL AND brand IS NULL"
     ).get();
-    if (aliRule && aliRule.markup_pct > 0) {
+    if (aliRule && (aliRule.markup_pct > 0 || !aliRule.price_floor)) {
       db.prepare(
-        "UPDATE pricing_rules SET markup_pct = -45, min_margin_pct = 0 WHERE id = ?"
+        "UPDATE pricing_rules SET markup_pct = -45, min_margin_pct = 0, price_floor = 2.99 WHERE id = ?"
       ).run(aliRule.id);
       logger.info('db', 'Migrated AliExpress pricing rule to MSRP-discount model (-45% markup)', {
         oldMarkup: aliRule.markup_pct, newMarkup: -45

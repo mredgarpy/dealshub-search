@@ -97,10 +97,13 @@ function calculateFinalPrice(sourcePrice, source, opts = {}) {
   const markupMultiplier = 1 + (effectiveMarkupPct / 100);
   let finalPrice = landedCost * markupMultiplier;
 
-  // Ensure minimum margin
-  const minMargin = landedCost * (rule.minMarginPct / 100);
-  if (finalPrice - landedCost < minMargin) {
-    finalPrice = landedCost + minMargin;
+  // Ensure minimum margin (skip for MSRP-discount models where markup is negative,
+  // because "landedCost" is actually MSRP, not our purchase cost)
+  if (rule.markupPct >= 0) {
+    const minMargin = landedCost * (rule.minMarginPct / 100);
+    if (finalPrice - landedCost < minMargin) {
+      finalPrice = landedCost + minMargin;
+    }
   }
 
   // Apply price floor

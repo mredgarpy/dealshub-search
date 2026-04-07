@@ -135,7 +135,7 @@ function initSchema() {
     if (pricingCount === 0) {
       const defaults = [
         { source: 'amazon', category: null, brand: null, markup: 12, margin: 8 },
-        { source: 'aliexpress', category: null, brand: null, markup: 25, margin: 15 },
+        { source: 'aliexpress', category: null, brand: null, markup: -45, margin: 0 },
         { source: 'sephora', category: null, brand: null, markup: 10, margin: 5 },
         { source: 'macys', category: null, brand: null, markup: 10, margin: 5 },
         { source: 'shein', category: null, brand: null, markup: 30, margin: 18 }
@@ -151,6 +151,24 @@ function initSchema() {
     }
   } catch (e) {
     logger.warn('db', 'Failed to seed pricing rules', { error: e.message });
+  }
+
+  // Migration: AliExpress uses MSRP-discount model (-45% markup, 0% min margin)
+  // The old seed had +25% markup which produced prices 3x above AliExpress retail.
+  try {
+    const aliRule = db.prepare(
+      "SELECT * FROM pricing_rules WHERE source_store = 'aliexpress' AND category IS NULL AND brand IS NULL"
+    ).get();
+    if (aliRule && aliRule.markup_pct > 0) {
+      db.prepare(
+        "UPDATE pricing_rules SET markup_pct = -45, min_margin_pct = 0 WHERE id = ?"
+      ).run(aliRule.id);
+      logger.info('db', 'Migrated AliExpress pricing rule to MSRP-discount model (-45% markup)', {
+        oldMarkup: aliRule.markup_pct, newMarkup: -45
+      });
+    }
+  } catch (e) {
+    logger.warn('db', 'Failed to migrate AliExpress pricing rule', { error: e.message });
   }
 
   // Seed default shipping rules if empty

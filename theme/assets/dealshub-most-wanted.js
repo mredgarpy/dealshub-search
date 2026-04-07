@@ -33,7 +33,7 @@
     var discount=origPrice>price?Math.round((1-price/origPrice)*100):0;
     var rating=p.rating?parseFloat(p.rating):0;
     var rank=p.rank||(idx!==undefined?idx+1:0);
-    var link='/pages/product?id='+encodeURIComponent(p.id||p.sourceId||'')+'&store='+encodeURIComponent(source||'amazon')+(p.title?'&title='+encodeURIComponent(p.title):'')+(p.image?'&image='+encodeURIComponent(p.image):'');
+    var link='/pages/product?id='+encodeURIComponent(p.id||p.sourceId||'')+'&store='+encodeURIComponent(source||'amazon')+(p.title?'&title='+encodeURIComponent(p.title):'')+(p.image?'&image='+encodeURIComponent(p.image):'')+(p.price?'&price='+encodeURIComponent(p.price):'')+(p.originalPrice?'&originalPrice='+encodeURIComponent(p.originalPrice):'');
     var wishCount=rank>0?Math.max(50,Math.floor(500/Math.max(rank,1))+Math.floor(Math.random()*80)):0;
 
     var h='<a href="'+link+'" style="text-decoration:none;display:block;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;transition:box-shadow .2s,transform .2s" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.1)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.boxShadow=\'none\';this.style.transform=\'none\'">';

@@ -357,26 +357,50 @@ async function productDetailHandler(req, res) {
       return res.status(404).json({ error: 'Product not found', source, id });
     }
 
-    // v2.5: Recuperar precio desde bestOffer/allOffers si el adaptador devolvió null/0
+    // v3.2: Price recovery cascade — multiple fallback sources
     step = 'priceRecovery';
     if (!product.price || product.price <= 0) {
       const { parsePrice: pp } = require('./src/utils/pricing');
-      // Intentar bestOffer.offerPrice
+
+      // SOURCE 1: bestOffer/allOffers from adapter raw data
       if (product.bestOffer?.offerPrice) {
         const bp = pp(product.bestOffer.offerPrice);
-        if (bp && bp > 0) product.price = bp;
+        if (bp && bp > 0) { product.price = bp; logger.info('product', 'Price recovered from bestOffer', { id, price: bp }); }
       }
-      // Intentar allOffers
       if ((!product.price || product.price <= 0) && Array.isArray(product.allOffers)) {
         for (const o of product.allOffers) {
           const op = pp(o.price);
-          if (op && op > 0) { product.price = op; break; }
+          if (op && op > 0) { product.price = op; logger.info('product', 'Price recovered from allOffers', { id, price: op }); break; }
         }
       }
-      // Si aún no hay precio, marcar como no disponible en vez de mostrar $0
+
+      // SOURCE 2: Search result cache (user came from search which had prices)
+      if (!product.price || product.price <= 0) {
+        const searchItemKey = `searchitem:${source}:${id}`;
+        const cachedSearchItem = productCache.get(searchItemKey);
+        if (cachedSearchItem && cachedSearchItem.price && cachedSearchItem.price > 0) {
+          product.price = cachedSearchItem.price;
+          if (!product.originalPrice && cachedSearchItem.originalPrice) product.originalPrice = cachedSearchItem.originalPrice;
+          logger.info('product', 'Price recovered from search cache', { id, price: product.price });
+        }
+      }
+
+      // SOURCE 3: Price hint from URL params (passed from search result cards)
+      if (!product.price || product.price <= 0) {
+        const hintPrice = parseFloat(req.query.price);
+        if (!isNaN(hintPrice) && hintPrice > 0) {
+          product.price = hintPrice;
+          const hintOrig = parseFloat(req.query.originalPrice);
+          if (!isNaN(hintOrig) && hintOrig > product.price) product.originalPrice = hintOrig;
+          logger.info('product', 'Price recovered from URL hint', { id, price: product.price });
+        }
+      }
+
+      // If still no price after all fallbacks, mark as unavailable
       if (!product.price || product.price <= 0) {
         product.priceUnavailable = true;
         product.displayPrice = 'Price unavailable';
+        logger.warn('product', 'No price available after all fallbacks', { id, source });
       }
     }
 

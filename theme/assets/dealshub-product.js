@@ -115,7 +115,7 @@
     html+=renderVariants(p);
 
     // ═══ SECTION 5: BUY BUTTONS ═══
-    html+=renderBuyButtons();
+    html+=renderBuyButtons(p);
 
     // ═══ SECTION 6: SHIPPING & DELIVERY ═══
     html+=renderShipping(p);
@@ -555,8 +555,9 @@
   }
 
   // ═══ SECTION 5: BUY BUTTONS ═══
-  function renderBuyButtons(){
+  function renderBuyButtons(p){
     var h='';
+    var noPrice=p&&(p.priceUnavailable||(!p.price&&p.price!==0));
     // Trust strip
     h+='<div style="display:flex;gap:16px;margin-bottom:20px;padding:12px 16px;background:#f8fafc;border-radius:8px;flex-wrap:wrap">';
     h+='<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#666"><svg width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Secure Checkout</div>';
@@ -564,10 +565,18 @@
     h+='<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#666"><svg width="16" height="16" fill="none" stroke="#8b5cf6" stroke-width="2" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>Fast Shipping</div>';
     h+='</div>';
     // CTA Buttons
-    h+='<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">';
-    h+='<button id="dhpdp-atc" style="width:100%;padding:16px;background:#e53e3e;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background=\'#c53030\'" onmouseout="this.style.background=\'#e53e3e\'">Add to Cart</button>';
-    h+='<button id="dhpdp-buy" style="width:100%;padding:16px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#1a1a1a\'">Buy Now</button>';
-    h+='</div>';
+    if(noPrice){
+      h+='<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;padding:16px;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;text-align:center">';
+      h+='<div style="font-size:15px;font-weight:600;color:#92400e">This product is currently unavailable for purchase</div>';
+      h+='<div style="font-size:13px;color:#a16207">Price could not be verified. Please try again later or search for similar products.</div>';
+      h+='<a href="/" style="display:inline-block;margin-top:8px;padding:12px 24px;background:#1a1a1a;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">Browse Products</a>';
+      h+='</div>';
+    }else{
+      h+='<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">';
+      h+='<button id="dhpdp-atc" style="width:100%;padding:16px;background:#e53e3e;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background=\'#c53030\'" onmouseout="this.style.background=\'#e53e3e\'">Add to Cart</button>';
+      h+='<button id="dhpdp-buy" style="width:100%;padding:16px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#1a1a1a\'">Buy Now</button>';
+      h+='</div>';
+    }
     return h;
   }
 
@@ -1437,7 +1446,7 @@
     var origPrice=p.originalPrice||p.displayCompareAt||null;
     if(typeof origPrice==='string')origPrice=parseFloat(origPrice.replace(/[^0-9.]/g,''))||0;
     var discount=origPrice&&origPrice>price?Math.round((1-price/origPrice)*100):0;
-    var link='/pages/product?id='+encodeURIComponent(p.sourceId||p.asin||p.id)+'&store='+(p.source||'amazon');
+    var link='/pages/product?id='+encodeURIComponent(p.sourceId||p.asin||p.id)+'&store='+(p.source||'amazon')+(p.title?'&title='+encodeURIComponent(p.title):'')+(p.price?'&price='+encodeURIComponent(p.price):'')+(p.originalPrice?'&originalPrice='+encodeURIComponent(p.originalPrice):'');
     var img=p.primaryImage||p.image||p.product_photo||'';
     var title=unesc(p.title||p.product_title||'');
 

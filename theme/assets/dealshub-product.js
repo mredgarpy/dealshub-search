@@ -229,9 +229,12 @@
       h+='</div>';
     }
 
-    // Video button (separate row below thumbs)
+    // Video button — only show if there are playable videos (not Amazon HLS)
     if(p.hasVideo&&p.videos&&p.videos.length){
-      h+='<div style="margin-top:10px;clear:both"><button class="dhpdp-video-btn" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">&#9654; Watch Video</button></div>';
+      var hasPlayable=p.videos.some(function(u){return u&&!/\.m3u8/i.test(u)&&!/vse-vms-transcoding/i.test(u)});
+      if(hasPlayable){
+        h+='<div style="margin-top:10px;clear:both"><button class="dhpdp-video-btn" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer">&#9654; Watch Video</button></div>';
+      }
     }
     h+='</div>'; // end dhpdp-gallery
     return h;
@@ -1328,39 +1331,26 @@
       }
     }
 
-    // Video button — supports HLS (.m3u8) via hls.js + MP4
+    // Video button — MP4 plays inline; Amazon HLS (.m3u8) is CORS-blocked, so skip
     var vidBtn=container.querySelector('.dhpdp-video-btn');
     if(vidBtn&&p.videos&&p.videos.length){
-      vidBtn.addEventListener('click',function(){
-        var url=p.videos[0];
-        var isHLS=/\.m3u8/i.test(url);
-        var overlay=document.createElement('div');
-        overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;cursor:pointer';
-        overlay.innerHTML='<div style="position:relative;max-width:90%;max-height:80%"><button onclick="this.parentElement.parentElement.remove()" style="position:absolute;top:-12px;right:-12px;width:32px;height:32px;border-radius:50%;background:#fff;border:none;font-size:18px;cursor:pointer;z-index:1;box-shadow:0 2px 8px rgba(0,0,0,.3)">&times;</button><video id="sh-vid-player" controls autoplay playsinline style="max-width:100%;max-height:80vh;border-radius:12px;background:#000"></video></div>';
-        overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove()});
-        document.body.appendChild(overlay);
-        var video=document.getElementById('sh-vid-player');
-        if(!video)return;
-        if(!isHLS){
-          video.src=url;
-        }else if(video.canPlayType&&video.canPlayType('application/vnd.apple.mpegurl')){
-          /* Safari supports HLS natively */
-          video.src=url;
-        }else{
-          /* Load hls.js for Chrome/Firefox/Edge */
-          var sc=document.createElement('script');
-          sc.src='https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js';
-          sc.onload=function(){
-            if(window.Hls&&Hls.isSupported()){
-              var hls=new Hls();
-              hls.loadSource(url);
-              hls.attachMedia(video);
-              hls.on(Hls.Events.MANIFEST_PARSED,function(){video.play()});
-            }
-          };
-          document.head.appendChild(sc);
-        }
-      });
+      // Filter: only keep playable videos (MP4, WebM). Amazon HLS streams are CORS-blocked.
+      var playableVideos=p.videos.filter(function(u){return u&&!/\.m3u8/i.test(u)&&!/vse-vms-transcoding/i.test(u)});
+      if(playableVideos.length>0){
+        vidBtn.addEventListener('click',function(){
+          var url=playableVideos[0];
+          var overlay=document.createElement('div');
+          overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;cursor:pointer';
+          overlay.innerHTML='<div style="position:relative;max-width:90%;max-height:80%"><button onclick="this.parentElement.parentElement.remove()" style="position:absolute;top:-12px;right:-12px;width:32px;height:32px;border-radius:50%;background:#fff;border:none;font-size:18px;cursor:pointer;z-index:1;box-shadow:0 2px 8px rgba(0,0,0,.3)">&times;</button><video id="sh-vid-player" controls autoplay playsinline style="max-width:100%;max-height:80vh;border-radius:12px;background:#000"></video></div>';
+          overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove()});
+          document.body.appendChild(overlay);
+          var video=document.getElementById('sh-vid-player');
+          if(video)video.src=url;
+        });
+      }else{
+        // No playable videos — hide the button entirely
+        vidBtn.style.display='none';
+      }
     }
   }
 

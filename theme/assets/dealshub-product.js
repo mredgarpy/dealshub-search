@@ -340,14 +340,21 @@
 
     // Price
     h+='<div style="margin-bottom:16px">';
-    h+='<span style="font-size:32px;font-weight:700;color:#e53e3e" id="dhpdp-price">$'+price.toFixed(2)+'</span>';
-    if(origPrice>price)h+=' <span id="dhpdp-orig" style="font-size:18px;color:#999;text-decoration:line-through;margin-left:8px">$'+origPrice.toFixed(2)+'</span>';
-    else h+='<span id="dhpdp-orig" style="display:none"></span>';
-    if(discount>0){
-      var saved=(origPrice-price).toFixed(2);
-      h+=' <span id="dhpdp-discount" style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600;margin-left:4px">-'+discount+'% Save $'+saved+'</span>';
-    }else{
+    if(p.priceUnavailable || price <= 0){
+      h+='<span style="font-size:24px;font-weight:600;color:#6b7280" id="dhpdp-price">Price temporarily unavailable</span>';
+      h+='<span id="dhpdp-orig" style="display:none"></span>';
       h+='<span id="dhpdp-discount" style="display:none"></span>';
+      h+='<div style="font-size:13px;color:#9ca3af;margin-top:4px">Add to cart to check the latest price</div>';
+    } else {
+      h+='<span style="font-size:32px;font-weight:700;color:#e53e3e" id="dhpdp-price">$'+price.toFixed(2)+'</span>';
+      if(origPrice>price)h+=' <span id="dhpdp-orig" style="font-size:18px;color:#999;text-decoration:line-through;margin-left:8px">$'+origPrice.toFixed(2)+'</span>';
+      else h+='<span id="dhpdp-orig" style="display:none"></span>';
+      if(discount>0){
+        var saved=(origPrice-price).toFixed(2);
+        h+=' <span id="dhpdp-discount" style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600;margin-left:4px">-'+discount+'% Save $'+saved+'</span>';
+      }else{
+        h+='<span id="dhpdp-discount" style="display:none"></span>';
+      }
     }
     h+='</div>';
 
@@ -735,6 +742,10 @@
     var plainLines=desc.split('\n').filter(function(l){return l.trim()});
     var kvCount=plainLines.filter(function(l){return /^[A-Za-z][^:]{2,30}:\s/.test(l)}).length;
     if(kvCount>plainLines.length*0.5&&plainLines.length>3)return '';
+
+    // DEDUP: If aplusImages already shown, strip those same images from HTML description
+    var aplusShown=p.aplusImages&&p.aplusImages.length>0;
+
     var h='<div class="dhpdp-section">';
     h+='<h2 class="dhpdp-section-title">Product Description</h2>';
     // Detect HTML content (from AliExpress item_detail_6) vs plain text
@@ -749,6 +760,16 @@
       // Fix protocol-relative image URLs
       clean=clean.replace(/src="\/\//g,'src="https://');
       clean=clean.replace(/src='\/\//g,"src='https://");
+      // DEDUP: If A+ images already shown above, remove ALL img tags from description HTML
+      // to avoid showing the same product images twice
+      if(aplusShown){
+        clean=clean.replace(/<img[^>]*>/gi,'');
+        // Also remove empty wrapper divs/paragraphs left behind
+        clean=clean.replace(/<(p|div)\s*>\s*<\/(p|div)>/gi,'');
+      }
+      // Check if anything meaningful remains after stripping images
+      var textOnly=clean.replace(/<[^>]*>/g,'').trim();
+      if(textOnly.length<10){return '';} // Only had images, skip whole section
       h+='<div style="font-size:14px;line-height:1.6;color:#444;max-width:900px;overflow:hidden">'+clean+'</div>';
     }else{
       // Plain text — escape and render with expand/collapse

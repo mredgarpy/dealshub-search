@@ -129,39 +129,48 @@ app.get('/api/debug-price/:id', async (req, res) => {
     const { id } = req.params;
     const adapter = getAdapter('aliexpress');
     if (!adapter) return res.status(500).json({ error: 'No AliExpress adapter' });
-    // Fetch raw data from item_detail_2
-    const rawData = await adapter._fetchDetailEndpoint('/item_detail_2', id);
-    if (!rawData) return res.status(404).json({ error: 'No data from API' });
-    // Extract ALL price-related fields
-    const item = rawData.item || rawData;
-    const skuData = rawData.sku || item.sku || {};
+
+    // Call item_detail_2 (main) AND item_sku_price in parallel
+    const [rawData, skuPriceData] = await Promise.all([
+      adapter._fetchDetailEndpoint('/item_detail_2', id),
+      adapter._fetchDetailEndpoint('/item_sku_price', id)
+    ]);
+
+    // Extract from item_detail_2
+    const item = rawData?.item || rawData || {};
+    const skuData = rawData?.sku || item.sku || {};
     const skuDef = skuData.def || {};
-    const priceFields = {
+
+    const detail2Prices = {
       'sku.def.price': skuDef.price,
       'sku.def.promotionPrice': skuDef.promotionPrice,
       'item.price': item.price,
       'item.salePrice': item.salePrice,
       'item.promotionPrice': item.promotionPrice,
       'item.originalPrice': item.originalPrice,
-      'item.currentPrice': item.currentPrice,
-      'd.price': rawData.price,
-      'd.salePrice': rawData.salePrice,
-      'd.currentPrice': rawData.currentPrice,
-      'd.priceModule': rawData.priceModule,
-      'd.price_minPrice': rawData.price?.minPrice,
-      'd.price_minAmount': rawData.price?.minAmount,
-      'd.price_maxPrice': rawData.price?.maxPrice,
-      'd.price_maxAmount': rawData.price?.maxAmount,
     };
-    // First 3 SKU base variants
-    const variants = (skuData.base || []).slice(0, 5).map(v => ({
+
+    // Variants from item_detail_2
+    const detail2Variants = (skuData.base || []).slice(0, 5).map(v => ({
       skuId: v.skuId,
       price: v.price,
       promotionPrice: v.promotionPrice,
       quantity: v.quantity,
       propMap: v.propMap,
     }));
-    res.json({ priceFields, variants, allTopKeys: Object.keys(rawData), allItemKeys: Object.keys(item) });
+
+    // SKU Price endpoint — might have the REAL AliExpress selling price
+    const skuPriceRaw = skuPriceData || {};
+
+    res.json({
+      detail2Prices,
+      detail2Variants,
+      skuPriceEndpoint: {
+        available: !!skuPriceData,
+        rawKeys: Object.keys(skuPriceRaw),
+        fullData: skuPriceRaw
+      }
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

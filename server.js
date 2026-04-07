@@ -357,6 +357,14 @@ async function productDetailHandler(req, res) {
     step = 'getProduct';
     let product = await adapter.getProduct(id, { title: req.query.title });
 
+    // DEBUG: If ?skuPrice=1, also fetch item_sku_price endpoint to investigate real prices
+    let _skuPriceDebug = null;
+    if (req.query.skuPrice === '1' && source === 'aliexpress' && adapter._fetchDetailEndpoint) {
+      try {
+        _skuPriceDebug = await adapter._fetchDetailEndpoint('/item_sku_price', id);
+      } catch (e) { _skuPriceDebug = { error: e.message }; }
+    }
+
     // v3.1: If adapter returned null, try search result cache fallback
     // This handles AliExpress new-format IDs (3256...) that item_detail doesn't recognize
     if (!product) {
@@ -570,6 +578,10 @@ async function productDetailHandler(req, res) {
     }
     if (!product._mismatch) {
       productCache.set(cacheKey, product);
+    }
+    // Attach debug data if requested
+    if (_skuPriceDebug) {
+      product._skuPriceDebug = _skuPriceDebug;
     }
     res.json(product);
   } catch (e) {

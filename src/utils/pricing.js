@@ -1,141 +1,176 @@
 // ============================================================
-// DealsHub — Pricing Engine v2.0
+// DealsHub — Pricing Engine v3.0 (Tiered Multiplier System)
 // ============================================================
-// Controls markup, margins, rounding, compare-at logic
-// Now reads from DB rules with fallback to hardcoded defaults
-// Supports: source rules, category rules, brand rules, price floors
+// Controls markup via multiplier tiers per source & price range.
+// Admin panel controls multipliers in real-time.
+// Fallback chain: DB tiers → hardcoded default tiers.
+//
+// HOW IT WORKS:
+// - Each source (amazon, aliexpress, sephora, macys, shein) has
+//   multiplier tiers by price range (e.g., $0-$3 = 2.50x, $3-$10 = 1.70x).
+// - For most sources: finalPrice = cost × multiplier (rounded to .99)
+// - For AliExpress: the API returns MSRP as "price" and wholesale as "sourceCost".
+//   The multiplier applies to sourceCost (wholesale), and MSRP becomes compare-at.
+// - Price floor of $2.99 for AliExpress prevents selling below shipping cost.
 
 const logger = require('./logger');
 
-// Markup rules per source.
-// AliExpress uses MSRP-based pricing: the API returns MSRP (retail price) as the base,
-// so we apply a NEGATIVE markup (discount from MSRP) to arrive at a competitive selling price.
-// -45% markup = sell at 55% of MSRP, which is slightly above AliExpress retail prices.
-// Amazon/Sephora/Macys APIs return actual selling prices, so they use positive markup.
-const DEFAULT_RULES = {
-  amazon:     { markupPct: 40, minMarginPct: 25, roundTo: 0.99, priceFloor: null },
-  aliexpress: { markupPct: -45, minMarginPct: 0, roundTo: 0.99, priceFloor: 2.99 },
-  sephora:    { markupPct: 35, minMarginPct: 20, roundTo: 0.99, priceFloor: null },
-  macys:      { markupPct: 35, minMarginPct: 20, roundTo: 0.99, priceFloor: null },
-  shein:      { markupPct: 50, minMarginPct: 30, roundTo: 0.99, priceFloor: null }
+// Hardcoded default tiers (used when DB is empty or unavailable)
+const DEFAULT_TIERS = {
+  amazon:     [1.70, 1.35, 1.25, 1.20, 1.15, 1.10, 1.07, 1.05],
+  aliexpress: [2.50, 1.70, 1.50, 1.40, 1.30, 1.22, 1.15, 1.10],
+  sephora:    [1.50, 1.30, 1.22, 1.18, 1.12, 1.08, 1.06, 1.05],
+  macys:      [1.50, 1.30, 1.22, 1.18, 1.12, 1.08, 1.06, 1.05],
+  shein:      [2.50, 1.70, 1.50, 1.40, 1.30, 1.22, 1.15, 1.10],
+  default:    [1.70, 1.35, 1.25, 1.20, 1.15, 1.10, 1.07, 1.05]
 };
+const TIER_RANGES = [
+  { min: 0, max: 3 },
+  { min: 3, max: 10 },
+  { min: 10, max: 25 },
+  { min: 25, max: 50 },
+  { min: 50, max: 100 },
+  { min: 100, max: 200 },
+  { min: 200, max: 500 },
+  { min: 500, max: 999999 }
+];
 
-// Cache DB rules in memory (refreshed every 5 minutes)
-let _dbRulesCache = null;
-let _dbRulesCacheTime = 0;
-const DB_RULES_TTL = 300000; // 5 min
+// Sources that use MSRP-discount model: price = MSRP, sourceCost = wholesale
+const MSRP_SOURCES = new Set(['aliexpress']);
 
-function _loadDbRules() {
-  if (_dbRulesCache && Date.now() - _dbRulesCacheTime < DB_RULES_TTL) {
-    return _dbRulesCache;
+// Price floors per source (minimum selling price)
+const PRICE_FLOORS = { aliexpress: 2.99 };
+
+// Cache DB tiers in memory (refreshed every 5 min)
+let _tiersCache = null;
+let _tiersCacheTime = 0;
+const TIERS_TTL = 300000;
+
+function _loadTiers() {
+  if (_tiersCache && Date.now() - _tiersCacheTime < TIERS_TTL) {
+    return _tiersCache;
   }
   try {
-    const { getPricingRules } = require('./db');
-    const rules = getPricingRules();
-    if (rules && rules.length > 0) {
-      _dbRulesCache = rules.filter(r => r.is_active);
-      _dbRulesCacheTime = Date.now();
-      return _dbRulesCache;
+    const { getTierMultiplier } = require('./db');
+    // Test if DB is working by fetching one tier
+    const test = getTierMultiplier('default', 10);
+    if (test !== null) {
+      _tiersCache = 'db'; // marker that DB is available
+      _tiersCacheTime = Date.now();
+      return 'db';
     }
   } catch (e) {
-    // DB not available — use defaults
+    // DB not available
   }
   return null;
 }
 
 /**
- * Get the best pricing rule for a product.
- * Priority: brand+source > category+source > source-only > hardcoded default
+ * Get the multiplier for a source at a given cost.
+ * Tries DB first, then falls back to hardcoded defaults.
  */
-function getPricingRule(source, opts = {}) {
-  const dbRules = _loadDbRules();
-  if (dbRules && dbRules.length > 0) {
-    const { category, brand } = opts;
-    // Priority 1: brand + source match
-    if (brand) {
-      const brandRule = dbRules.find(r =>
-        r.source_store === source && r.brand && r.brand.toLowerCase() === brand.toLowerCase()
-      );
-      if (brandRule) return _dbToRule(brandRule);
+function getMultiplier(source, cost) {
+  const tiersAvailable = _loadTiers();
+
+  if (tiersAvailable === 'db') {
+    try {
+      const { getTierMultiplier } = require('./db');
+      const mult = getTierMultiplier(source, cost);
+      if (mult !== null) return mult;
+    } catch (e) {
+      // Fall through to defaults
     }
-    // Priority 2: category + source match
-    if (category) {
-      const catRule = dbRules.find(r =>
-        r.source_store === source && r.category && r.category.toLowerCase() === category.toLowerCase() && !r.brand
-      );
-      if (catRule) return _dbToRule(catRule);
-    }
-    // Priority 3: source-only match (no category/brand)
-    const sourceRule = dbRules.find(r =>
-      r.source_store === source && !r.category && !r.brand
-    );
-    if (sourceRule) return _dbToRule(sourceRule);
   }
-  return DEFAULT_RULES[source] || { markupPct: 15, minMarginPct: 10, roundTo: 0.99, priceFloor: null };
+
+  // Fallback to hardcoded defaults
+  const sourceTiers = DEFAULT_TIERS[source] || DEFAULT_TIERS['default'];
+  for (let i = 0; i < TIER_RANGES.length; i++) {
+    if (cost >= TIER_RANGES[i].min && cost < TIER_RANGES[i].max) {
+      return sourceTiers[i];
+    }
+  }
+  return sourceTiers[sourceTiers.length - 1];
 }
 
-function _dbToRule(r) {
-  return {
-    markupPct: r.markup_pct,
-    minMarginPct: r.min_margin_pct,
-    roundTo: r.round_to || 0.99,
-    priceFloor: r.price_floor || null,
-    ruleId: r.id,
-    ruleType: r.brand ? 'brand' : (r.category ? 'category' : 'source')
-  };
-}
-
+/**
+ * Calculate final price using the tiered multiplier system.
+ *
+ * @param {number} sourcePrice - The price from source API.
+ *   For most sources: this is the selling price (= cost).
+ *   For AliExpress: this is the MSRP (retail price).
+ * @param {string} source - Source store name.
+ * @param {object} opts - Options:
+ *   - sourceCost: wholesale/actual cost (for AliExpress). If not provided, uses sourcePrice.
+ *   - originalPrice: original/list price for compare-at (for non-MSRP sources).
+ *   - shippingCost: supplier shipping cost.
+ *   - fees: additional fees.
+ *   - category: product category (for future use).
+ *   - brand: product brand (for future use).
+ */
 function calculateFinalPrice(sourcePrice, source, opts = {}) {
   if (!sourcePrice || sourcePrice <= 0) return { price: null, compareAt: null };
-  const rule = getPricingRule(source, { category: opts.category, brand: opts.brand });
+
+  const isMSRP = MSRP_SOURCES.has(source);
   const shippingCost = opts.shippingCost || 0;
   const fees = opts.fees || 0;
-  const landedCost = sourcePrice + shippingCost + fees;
-  // Impulse buys under $5 get higher markup (60%) to maintain margin on cheap items
-  // Skip impulse override for negative markup (MSRP-discount model like AliExpress)
-  const effectiveMarkupPct = (sourcePrice < 5 && rule.markupPct >= 0) ? Math.max(rule.markupPct, 60) : rule.markupPct;
-  const markupMultiplier = 1 + (effectiveMarkupPct / 100);
-  let finalPrice = landedCost * markupMultiplier;
 
-  // Ensure minimum margin (skip for MSRP-discount models where markup is negative,
-  // because "landedCost" is actually MSRP, not our purchase cost)
-  if (rule.markupPct >= 0) {
-    const minMargin = landedCost * (rule.minMarginPct / 100);
-    if (finalPrice - landedCost < minMargin) {
-      finalPrice = landedCost + minMargin;
-    }
+  // Determine the actual cost to apply the multiplier to
+  let cost;
+  if (isMSRP && opts.sourceCost && opts.sourceCost > 0) {
+    // AliExpress: sourceCost is wholesale price, sourcePrice is MSRP
+    cost = opts.sourceCost + shippingCost + fees;
+  } else if (isMSRP) {
+    // AliExpress without explicit sourceCost: use MSRP × 0.55 as estimated cost
+    // (MSRP-discount model: sell at ~55% of MSRP)
+    cost = sourcePrice * 0.40 + shippingCost + fees;
+  } else {
+    // Amazon, Sephora, Macys, SHEIN: sourcePrice IS the cost
+    cost = sourcePrice + shippingCost + fees;
   }
+
+  // Look up tier multiplier
+  const multiplier = getMultiplier(source, cost);
+
+  // Calculate raw price
+  let finalPrice = cost * multiplier;
 
   // Apply price floor
-  if (rule.priceFloor && finalPrice < rule.priceFloor) {
-    finalPrice = rule.priceFloor;
+  const floor = PRICE_FLOORS[source] || null;
+  if (floor && finalPrice < floor) {
+    finalPrice = floor;
   }
 
-  // Apply rounding (e.g., $24.99)
-  if (rule.roundTo) {
-    finalPrice = Math.floor(finalPrice) + rule.roundTo;
+  // Apply .99 rounding
+  finalPrice = Math.floor(finalPrice) + 0.99;
+
+  // Safety: never sell below cost
+  if (finalPrice <= cost) {
+    finalPrice = Math.floor(cost) + 1.99;
   }
 
-  // Compare-at price: show the original/MSRP price crossed out
+  // Compare-at price (crossed-out price)
   let compareAt = null;
-  if (rule.markupPct < 0) {
-    // MSRP-discount model: sourcePrice IS the MSRP, use it directly as compare-at
-    compareAt = Math.floor(sourcePrice) + (rule.roundTo || 0.99);
-    if (compareAt <= finalPrice) compareAt = null; // Don't show if not higher
+  if (isMSRP) {
+    // MSRP model: sourcePrice is MSRP → show it as compare-at
+    compareAt = Math.floor(sourcePrice) + 0.99;
+    if (compareAt <= finalPrice) compareAt = null;
   } else if (opts.originalPrice && opts.originalPrice > sourcePrice) {
-    compareAt = (opts.originalPrice * markupMultiplier * 1.05).toFixed(2);
-    compareAt = Math.floor(parseFloat(compareAt)) + (rule.roundTo || 0.99);
+    // Other sources: if there's an original/list price higher than selling price
+    compareAt = Math.floor(opts.originalPrice * multiplier * 1.05) + 0.99;
+    if (compareAt <= finalPrice) compareAt = null;
   }
+
+  const landedCost = parseFloat(cost.toFixed(2));
 
   return {
     price: parseFloat(finalPrice.toFixed(2)),
     compareAt: compareAt ? parseFloat(compareAt.toFixed(2)) : null,
-    landedCost: parseFloat(landedCost.toFixed(2)),
+    landedCost,
     margin: parseFloat((finalPrice - landedCost).toFixed(2)),
     marginPct: parseFloat(((1 - landedCost / finalPrice) * 100).toFixed(1)),
+    multiplier: parseFloat(multiplier.toFixed(2)),
     rule: source,
-    ruleId: rule.ruleId || null,
-    ruleType: rule.ruleType || 'default'
+    ruleType: 'tier'
   };
 }
 
@@ -147,10 +182,10 @@ function parsePrice(priceStr) {
   return isNaN(num) ? null : num;
 }
 
-// Invalidate DB rules cache (call after admin updates pricing rules)
+// Invalidate cache (call after admin updates markup tiers)
 function invalidatePricingCache() {
-  _dbRulesCache = null;
-  _dbRulesCacheTime = 0;
+  _tiersCache = null;
+  _tiersCacheTime = 0;
 }
 
-module.exports = { calculateFinalPrice, parsePrice, getPricingRule, invalidatePricingCache };
+module.exports = { calculateFinalPrice, parsePrice, getMultiplier, invalidatePricingCache };

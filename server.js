@@ -87,9 +87,12 @@ function applySearchPricing(products) {
     if (!rawPrice || rawPrice <= 0) return p;
     const source = (p.source || p.sourceName || 'amazon').toLowerCase();
     const rawOrig = p.originalPrice ? (typeof p.originalPrice === 'number' ? p.originalPrice : parseFloat(String(p.originalPrice).replace(/[^0-9.]/g, ''))) : null;
-    const pricing = calculateFinalPrice(rawPrice, source, { originalPrice: rawOrig });
+    // Pass sourceCost (wholesale price) for AliExpress tier-based pricing
+    const rawSourceCost = p.sourceCost ? (typeof p.sourceCost === 'number' ? p.sourceCost : parseFloat(String(p.sourceCost).replace(/[^0-9.]/g, ''))) : null;
+    const pricing = calculateFinalPrice(rawPrice, source, { originalPrice: rawOrig, sourceCost: rawSourceCost });
     if (pricing.price) {
       p.sourcePrice = rawPrice;
+      p.sourceCost = rawSourceCost;
       p.price = pricing.price;
       if (pricing.compareAt) {
         p.sourceOriginalPrice = rawOrig;
@@ -415,11 +418,13 @@ async function productDetailHandler(req, res) {
     step = 'pricingEngine';
     if (product.price && product.price > 0) {
       const pricing = calculateFinalPrice(product.price, source, {
-        originalPrice: product.originalPrice
+        originalPrice: product.originalPrice,
+        sourceCost: product.sourceCost || null
       });
       // Save original source prices before overwriting
       product.sourcePrice = product.price;
       product.sourceOriginalPrice = product.originalPrice;
+      product.sourceCostRaw = product.sourceCost || null;
       // Overwrite with final marked-up prices so PDP displays what customer pays
       product.price = pricing.price;
       product.originalPrice = pricing.compareAt || product.originalPrice;
@@ -430,7 +435,10 @@ async function productDetailHandler(req, res) {
         compareAt: pricing.compareAt,
         sourcePrice: product.sourcePrice,
         sourceOriginalPrice: product.sourceOriginalPrice,
-        margin: pricing.marginPct
+        sourceCost: product.sourceCostRaw,
+        multiplier: pricing.multiplier,
+        margin: pricing.marginPct,
+        ruleType: pricing.ruleType
       };
 
       // Also apply markup to variant prices so PDP shows consistent marked-up prices
@@ -438,7 +446,9 @@ async function productDetailHandler(req, res) {
       if (product.variants && product.variants.length) {
         product.variants = product.variants.map(v => {
           if (v.price && typeof v.price === 'number' && v.price > 0) {
-            const vPricing = calculateFinalPrice(v.price, source, {});
+            const vPricing = calculateFinalPrice(v.price, source, {
+              sourceCost: v.sourceCost || product.sourceCostRaw || null
+            });
             v.sourcePrice = v.price;
             v.price = vPricing.price;
           }
@@ -1620,7 +1630,10 @@ app.get('/api/debug/product-pipeline', async (req, res) => {
     };
 
     steps.pricingEngine = 'starting';
-    const pricing = calculateFinalPrice(product.price || 0, source, { originalPrice: product.originalPrice });
+    const pricing = calculateFinalPrice(product.price || 0, source, {
+      originalPrice: product.originalPrice,
+      sourceCost: product.sourceCost || null
+    });
     steps.pricingEngine = pricing ? 'ok' : 'null';
 
     steps.shippingCalc = 'starting';

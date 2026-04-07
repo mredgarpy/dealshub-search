@@ -11,6 +11,10 @@ const {
   getPricingRuleById,
   upsertPricingRule,
   deletePricingRule,
+  getMarkupTiers,
+  getMarkupTiersGrouped,
+  bulkUpsertMarkupTiers,
+  getTierMultiplier,
   getShippingRules,
   getShippingRuleById,
   upsertShippingRule,
@@ -149,6 +153,80 @@ router.delete('/pricing-rules/:id', (req, res) => {
       success: false,
       error: 'Failed to delete pricing rule'
     });
+  }
+});
+
+// ============================================================
+// MARKUP TIERS (Multiplier by Source & Price Range)
+// ============================================================
+
+/**
+ * GET /admin/markup-tiers
+ * Get all markup tiers grouped for the admin UI table
+ */
+router.get('/markup-tiers', (req, res) => {
+  try {
+    const grouped = getMarkupTiersGrouped();
+    res.json({
+      success: true,
+      data: grouped
+    });
+  } catch (e) {
+    logger.error('admin', 'GET /markup-tiers failed', { error: e.message });
+    res.status(500).json({ success: false, error: 'Failed to retrieve markup tiers' });
+  }
+});
+
+/**
+ * POST /admin/markup-tiers
+ * Bulk update all markup tiers from admin UI
+ * Body: { tiers: [{max, amazon, aliexpress, sephora, macys, shein, default}, ...] }
+ */
+router.post('/markup-tiers', (req, res) => {
+  try {
+    const { tiers } = req.body;
+    if (!tiers || !Array.isArray(tiers) || tiers.length === 0) {
+      return res.status(400).json({ success: false, error: 'tiers array required' });
+    }
+
+    const result = bulkUpsertMarkupTiers(tiers);
+    if (!result) {
+      return res.status(500).json({ success: false, error: 'Failed to save markup tiers' });
+    }
+
+    // Invalidate pricing cache so changes take effect immediately
+    invalidatePricingCache();
+
+    logger.info('admin', 'Updated markup tiers', { tierCount: tiers.length });
+    res.json({ success: true, message: 'Markup tiers updated successfully' });
+  } catch (e) {
+    logger.error('admin', 'POST /markup-tiers failed', { error: e.message });
+    res.status(500).json({ success: false, error: 'Failed to save markup tiers' });
+  }
+});
+
+/**
+ * GET /admin/markup-tiers/preview
+ * Preview pricing with current tiers for sample products
+ */
+router.get('/markup-tiers/preview', (req, res) => {
+  try {
+    const { calculateFinalPrice } = require('../utils/pricing');
+    const samples = [
+      { name: 'iPhone Case', source: 'aliexpress', cost: 2.20 },
+      { name: 'Leggings', source: 'shein', cost: 5.50 },
+      { name: 'CeraVe Moisturizer', source: 'amazon', cost: 12.99 },
+      { name: 'Lipstick', source: 'sephora', cost: 22 },
+      { name: 'AirPods Pro', source: 'amazon', cost: 109 },
+      { name: 'Dyson Vacuum', source: 'amazon', cost: 450 }
+    ];
+    const previews = samples.map(s => {
+      const result = calculateFinalPrice(s.cost, s.source, { sourceCost: s.cost });
+      return { ...s, finalPrice: result.price, margin: result.margin, marginPct: result.marginPct, multiplier: result.multiplier };
+    });
+    res.json({ success: true, data: previews });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 

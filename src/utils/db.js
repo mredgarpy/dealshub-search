@@ -127,6 +127,20 @@ function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_failures_resolved
       ON source_failures(resolved);
+
+    CREATE TABLE IF NOT EXISTS markup_tiers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_store TEXT NOT NULL,
+      min_price REAL NOT NULL DEFAULT 0,
+      max_price REAL NOT NULL DEFAULT 999999,
+      multiplier REAL NOT NULL DEFAULT 1.20,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tiers_source
+      ON markup_tiers(source_store, min_price);
   `);
 
   // Seed default pricing rules if empty
@@ -169,6 +183,44 @@ function initSchema() {
     }
   } catch (e) {
     logger.warn('db', 'Failed to migrate AliExpress pricing rule', { error: e.message });
+  }
+
+  // Seed default markup tiers if empty
+  try {
+    const tiersCount = db.prepare('SELECT COUNT(*) as c FROM markup_tiers').get().c;
+    if (tiersCount === 0) {
+      const ranges = [
+        { min: 0,   max: 3 },
+        { min: 3,   max: 10 },
+        { min: 10,  max: 25 },
+        { min: 25,  max: 50 },
+        { min: 50,  max: 100 },
+        { min: 100, max: 200 },
+        { min: 200, max: 500 },
+        { min: 500, max: 999999 }
+      ];
+      // Default multipliers per source per range
+      const sourceMultipliers = {
+        amazon:     [1.70, 1.35, 1.25, 1.20, 1.15, 1.10, 1.07, 1.05],
+        aliexpress: [2.50, 1.70, 1.50, 1.40, 1.30, 1.22, 1.15, 1.10],
+        sephora:    [1.50, 1.30, 1.22, 1.18, 1.12, 1.08, 1.06, 1.05],
+        macys:      [1.50, 1.30, 1.22, 1.18, 1.12, 1.08, 1.06, 1.05],
+        shein:      [2.50, 1.70, 1.50, 1.40, 1.30, 1.22, 1.15, 1.10],
+        default:    [1.70, 1.35, 1.25, 1.20, 1.15, 1.10, 1.07, 1.05]
+      };
+      const stmt = db.prepare(`
+        INSERT INTO markup_tiers (source_store, min_price, max_price, multiplier, is_active)
+        VALUES (?, ?, ?, ?, 1)
+      `);
+      for (const [source, mults] of Object.entries(sourceMultipliers)) {
+        ranges.forEach((r, i) => {
+          stmt.run(source, r.min, r.max, mults[i]);
+        });
+      }
+      logger.info('db', 'Seeded default markup tiers (6 sources × 8 ranges)');
+    }
+  } catch (e) {
+    logger.warn('db', 'Failed to seed markup tiers', { error: e.message });
   }
 
   // Seed default shipping rules if empty
@@ -589,6 +641,106 @@ function getAdvancedStats() {
   }
 }
 
+// ---- MARKUP TIERS ----
+
+function getMarkupTiers() {
+  const d = getDb();
+  if (!d) return [];
+  try {
+    return d.prepare('SELECT * FROM markup_tiers WHERE is_active = 1 ORDER BY source_store, min_price').all();
+  } catch (e) {
+    logger.error('db', 'getMarkupTiers failed', { error: e.message });
+    return [];
+  }
+}
+
+function getMarkupTiersGrouped() {
+  const tiers = getMarkupTiers();
+  // Group by range index for admin UI: [{max, amazon, aliexpress, sephora, macys, shein, default}, ...]
+  const ranges = [3, 10, 25, 50, 100, 200, 500, 999999];
+  return ranges.map((max, i) => {
+    const min = i === 0 ? 0 : ranges[i - 1];
+    const row = { max };
+    const sources = ['amazon', 'aliexpress', 'sephora', 'macys', 'shein', 'default'];
+    sources.forEach(src => {
+      const tier = tiers.find(t => t.source_store === src && t.min_price === min && t.max_price === max);
+      row[src] = tier ? tier.multiplier : 1.20;
+    });
+    return row;
+  });
+}
+
+function bulkUpsertMarkupTiers(tiersData) {
+  // tiersData = array of {max, amazon, aliexpress, sephora, macys, shein, default}
+  const d = getDb();
+  if (!d) return false;
+  try {
+    const ranges = [3, 10, 25, 50, 100, 200, 500, 999999];
+    const sources = ['amazon', 'aliexpress', 'sephora', 'macys', 'shein', 'default'];
+
+    const upsert = d.prepare(`
+      INSERT INTO markup_tiers (source_store, min_price, max_price, multiplier, is_active, updated_at)
+      VALUES (?, ?, ?, ?, 1, datetime('now'))
+      ON CONFLICT(id) DO UPDATE SET multiplier = excluded.multiplier, updated_at = datetime('now')
+    `);
+
+    const findTier = d.prepare(
+      'SELECT id FROM markup_tiers WHERE source_store = ? AND min_price = ? AND max_price = ?'
+    );
+    const updateTier = d.prepare(
+      'UPDATE markup_tiers SET multiplier = ?, updated_at = datetime(\'now\') WHERE id = ?'
+    );
+    const insertTier = d.prepare(
+      'INSERT INTO markup_tiers (source_store, min_price, max_price, multiplier, is_active) VALUES (?, ?, ?, ?, 1)'
+    );
+
+    const transaction = d.transaction(() => {
+      tiersData.forEach((row, i) => {
+        const max = row.max || ranges[i] || 999999;
+        const min = i === 0 ? 0 : (ranges[i - 1] || 0);
+        sources.forEach(src => {
+          const mult = parseFloat(row[src]) || 1.20;
+          const existing = findTier.get(src, min, max);
+          if (existing) {
+            updateTier.run(mult, existing.id);
+          } else {
+            insertTier.run(src, min, max, mult);
+          }
+        });
+      });
+    });
+
+    transaction();
+    logger.info('db', 'Bulk updated markup tiers', { rowCount: tiersData.length });
+    return true;
+  } catch (e) {
+    logger.error('db', 'bulkUpsertMarkupTiers failed', { error: e.message });
+    return false;
+  }
+}
+
+/**
+ * Get the multiplier for a given source and price.
+ * Used by the pricing engine.
+ */
+function getTierMultiplier(source, price) {
+  const d = getDb();
+  if (!d) return null;
+  try {
+    const tier = d.prepare(
+      'SELECT multiplier FROM markup_tiers WHERE source_store = ? AND min_price <= ? AND max_price > ? AND is_active = 1 LIMIT 1'
+    ).get(source, price, price);
+    if (tier) return tier.multiplier;
+    // Fallback to 'default' source
+    const defTier = d.prepare(
+      'SELECT multiplier FROM markup_tiers WHERE source_store = \'default\' AND min_price <= ? AND max_price > ? AND is_active = 1 LIMIT 1'
+    ).get(price, price);
+    return defTier ? defTier.multiplier : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 module.exports = {
   getDb,
   findMapping,
@@ -614,5 +766,9 @@ module.exports = {
   getSourceFailures,
   getSourceFailureById,
   resolveSourceFailure,
-  getAdvancedStats
+  getAdvancedStats,
+  getMarkupTiers,
+  getMarkupTiersGrouped,
+  bulkUpsertMarkupTiers,
+  getTierMultiplier
 };

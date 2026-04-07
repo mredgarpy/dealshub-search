@@ -893,21 +893,49 @@ function setupCRMApi(app) {
 
   app.get('/api/crm/settings', auth, function(req, res) {
     try {
-      const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+      // Load base settings from file
+      let settings = {};
+      try { settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')); } catch(e) {
+        settings = {
+          pricing: { round_to_99: true, free_shipping_threshold: 35 },
+          shipping: { freeThreshold: 35 },
+          returns: { windowAmazon: 30, windowAliexpress: 15, windowSephora: 30, windowMacys: 30, windowShein: 15 },
+          notifications: { newOrder: true, returnRequest: true, apiDown: true }
+        };
+      }
+      // Override markup_tiers with DB tiers (source of truth)
+      try {
+        const { getMarkupTiersGrouped } = require('./utils/db');
+        const dbTiers = getMarkupTiersGrouped();
+        if (dbTiers && dbTiers.length > 0) {
+          settings.markup_tiers = dbTiers;
+        }
+      } catch(e) {
+        logger.warn('crm', 'Could not load markup tiers from DB', { error: e.message });
+      }
       res.json(settings);
     } catch(e) {
-      res.json({
-        markup: { amazon: 40, aliexpress: 50, sephora: 35, macys: 35, shein: 50, default: 40 }, markup_rules: { under_3: 100, under_5: 60 }, pricing: { round_to_99: true, free_shipping_threshold: 35 },
-        shipping: { freeThreshold: 35 },
-        returns: { windowAmazon: 30, windowAliexpress: 15 },
-        notifications: { newOrder: true, returnRequest: true, apiDown: true }
-      });
+      res.status(500).json({ error: e.message });
     }
   });
 
   app.post('/api/crm/settings', auth, function(req, res) {
     try {
-      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(req.body, null, 2));
+      // Save markup_tiers to DB (source of truth for pricing)
+      if (req.body.markup_tiers && Array.isArray(req.body.markup_tiers)) {
+        try {
+          const { bulkUpsertMarkupTiers } = require('./utils/db');
+          bulkUpsertMarkupTiers(req.body.markup_tiers);
+          logger.info('crm', 'Markup tiers saved to DB', { count: req.body.markup_tiers.length });
+        } catch(e) {
+          logger.error('crm', 'Failed to save markup tiers to DB', { error: e.message });
+        }
+      }
+      // Save the rest to settings.json (non-pricing settings)
+      const settingsToSave = { ...req.body };
+      // Don't duplicate tiers in the JSON file — DB is source of truth
+      delete settingsToSave.markup_tiers;
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settingsToSave, null, 2));
       // Invalidate pricing cache so new markup takes effect immediately
       try { const { invalidatePricingCache } = require('./utils/pricing'); invalidatePricingCache(); } catch(e) {}
       res.json({ success: true });
@@ -921,13 +949,15 @@ function setupCRMApi(app) {
   app.get('/api/crm/pricing-preview', auth, function(req, res) {
     try {
       const { calculateFinalPrice } = require('./utils/pricing');
-      const testPrices = [2.50, 4.00, 7.99, 11.99, 19.99, 29.99, 49.99];
+      const testPrices = [2.50, 4.00, 7.99, 11.99, 19.99, 29.99, 49.99, 109, 450];
       const sources = ['amazon', 'aliexpress', 'sephora', 'macys', 'shein'];
       const previews = [];
       for (const source of sources) {
         for (const price of testPrices) {
-          const result = calculateFinalPrice(price, source, {});
-          previews.push({ source, sourcePrice: price, finalPrice: result.price, margin: result.margin, marginPct: result.marginPct, markupApplied: result.markupPctApplied, ruleType: result.ruleType });
+          // For AliExpress, simulate: price=MSRP, sourceCost=wholesale (~40% of MSRP)
+          const opts = source === 'aliexpress' ? { sourceCost: price * 0.40 } : {};
+          const result = calculateFinalPrice(price, source, opts);
+          previews.push({ source, sourcePrice: price, sourceCost: opts.sourceCost || price, finalPrice: result.price, multiplier: result.multiplier, margin: result.margin, marginPct: result.marginPct, ruleType: result.ruleType });
         }
       }
       res.json({ previews });

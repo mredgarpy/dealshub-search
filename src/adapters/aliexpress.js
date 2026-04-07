@@ -418,6 +418,9 @@ class AliExpressAdapter extends BaseAdapter {
     const shipFee = deliv.shippingFee ? parseFloat(deliv.shippingFee) : null;
     const isFreeShip = deliv.freeShipping === true || shipFee === 0;
 
+    // sourceCost: wholesale/dropship price (promotionPrice) — used by tier pricing engine
+    const sourceCost = parsePrice(p.sku?.def?.promotionPrice || p.salePrice);
+
     const discount = finalOrigPrice && price ? Math.round((1 - price / finalOrigPrice) * 100) : 0;
     const savingsAmount = finalOrigPrice && price ? (finalOrigPrice - price).toFixed(2) : null;
 
@@ -426,6 +429,7 @@ class AliExpressAdapter extends BaseAdapter {
       title: p.title || p.displayTitle || '',
       price: price ? `$${price.toFixed(2)}` : null,
       originalPrice: finalOrigPrice ? `$${finalOrigPrice.toFixed(2)}` : null,
+      sourceCost: sourceCost && price && sourceCost < price ? sourceCost : null,
       discount: discount || null,
       savingsAmount: savingsAmount,
       image: imageUrl,
@@ -606,6 +610,18 @@ class AliExpressAdapter extends BaseAdapter {
     );
     if (p.originalPrice && p.price && p.originalPrice <= p.price) p.originalPrice = null;
 
+    // sourceCost: the actual wholesale/dropship cost (promotionPrice).
+    // This is what we pay — used by the tiered pricing engine to calculate final price.
+    // p.price above is MSRP (retail), p.sourceCost is wholesale.
+    p.sourceCost = parsePrice(
+      defPromoPrice || skuDef.promotionPrice ||
+      item.sku?.def?.promotionPrice || item.promotionPrice ||
+      item.salePrice || d.salePrice ||
+      d.priceModule?.actMinPrice || d.price?.minAmount?.value
+    );
+    // If sourceCost equals or exceeds MSRP, it's not really wholesale — clear it
+    if (p.sourceCost && p.price && p.sourceCost >= p.price) p.sourceCost = null;
+
     // Rating
     p.rating = item.averageStarRate ? parseFloat(item.averageStarRate) :
                d.evaluation?.starRating ? parseFloat(d.evaluation.starRating) :
@@ -724,6 +740,7 @@ class AliExpressAdapter extends BaseAdapter {
         id: String(sku.skuId || ''),
         title: resolvePropMap(sku.propMap),
         price: parsePrice(sku.price) || parsePrice(sku.promotionPrice) || p.price,
+        sourceCost: parsePrice(sku.promotionPrice) || p.sourceCost || null,
         sourcePromotionPrice: parsePrice(sku.promotionPrice) || null,
         image: resolveVariantImage(sku.propMap),
         available: (sku.quantity || 0) > 0

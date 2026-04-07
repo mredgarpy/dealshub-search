@@ -1084,6 +1084,29 @@
           }
           /* Update availability */
           if(np.availability)p.availability=np.availability;
+          var isOutOfStock=np.stockSignal==='out_of_stock'||
+            (np.availability&&/unavailable|out\s*of\s*stock/i.test(np.availability));
+          /* Update availability display */
+          var availDots=container.querySelectorAll('[style*="border-radius:50%"]');
+          /* Update current color button if out of stock */
+          if(isOutOfStock&&btnEl){
+            btnEl.classList.add('dhpdp-opt-unavail');
+            btnEl.classList.remove('dhpdp-opt-sel');
+            btnEl.style.opacity='0.5';
+            btnEl.style.borderColor='#eee';
+            btnEl.disabled=true;
+            btnEl.title=(btnEl.dataset.valtitle||'')+' - Unavailable';
+            /* Add strikethrough line */
+            if(!btnEl.querySelector('.dhpdp-oos-line')){
+              var line=document.createElement('span');
+              line.className='dhpdp-oos-line';
+              line.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center';
+              line.innerHTML='<span style="width:120%;height:2px;background:#999;transform:rotate(-45deg)"></span>';
+              btnEl.appendChild(line);
+            }
+          }
+          /* Update stock text */
+          var stockEls=container.querySelectorAll('.dhpdp-info span');
           /* Update active ASIN */
           _currentAsin=newAsin;
           _pdpProductData=np;

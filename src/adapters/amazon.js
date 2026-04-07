@@ -512,6 +512,22 @@ class AmazonAdapter extends BaseAdapter {
           return true;
         });
       }
+
+      // Mark the current product's own variant as unavailable if the product itself is out of stock
+      const currentAsin = String(d.asin || asin || '');
+      const isCurrentOutOfStock = p.stockSignal === 'out_of_stock' ||
+        (p.availability && /unavailable|out\s*of\s*stock/i.test(p.availability));
+      if (isCurrentOutOfStock && currentAsin) {
+        for (const g of Object.values(groups)) {
+          g.values.forEach(v => {
+            if (v.asin === currentAsin) {
+              v.is_available = false;
+              logger.info('amazon', `Marked variant ${currentAsin} as unavailable (product out of stock)`);
+            }
+          });
+        }
+      }
+
       p.options = Object.values(groups);
       p.variants = allVariants.filter(v => v && typeof v === 'object').map(v => ({
         id: v.asin || '',

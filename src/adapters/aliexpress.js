@@ -238,6 +238,14 @@ class AliExpressAdapter extends BaseAdapter {
         if (product.price) return product;
         const priceProduct = await this._fillPriceFromSearch(product, productId);
         if (priceProduct.price) return priceProduct;
+        // CRITICAL FIX: If we have a valid product from detail API with title/images
+        // but no price, return it anyway instead of falling through to search fallback
+        // that returns a WRONG product. The PDP will show "Price unavailable".
+        if (product.title && product.title.length > 3) {
+          logger.warn('aliexpress', 'Returning product without price (detail API had no price)', { productId, title: product.title });
+          product.priceUnavailable = true;
+          return product;
+        }
       }
     }
 
@@ -250,13 +258,20 @@ class AliExpressAdapter extends BaseAdapter {
         if (product.price) return product;
         const priceProduct = await this._fillPriceFromSearch(product, productId);
         if (priceProduct.price) return priceProduct;
+        // Same fix: return valid product even without price
+        if (product.title && product.title.length > 3) {
+          logger.warn('aliexpress', 'Returning detail6 product without price', { productId, title: product.title });
+          product.priceUnavailable = true;
+          return product;
+        }
       }
     }
 
-    // Final fallback: search by productId
+    // Final fallback: search by productId — ONLY if detail endpoints failed completely
     logger.warn('aliexpress', `All detail endpoints failed for ${productId}, trying search fallback`);
     const searchResults = await this.search(productId, 5);
     if (searchResults.length > 0) {
+      // ONLY use exact ID match — never return a random product
       const exact = searchResults.find(r => String(r.id) === String(productId));
       if (exact) {
         logger.info('aliexpress', `Search fallback found exact match for ${productId}`);
@@ -264,23 +279,15 @@ class AliExpressAdapter extends BaseAdapter {
       }
     }
 
-    // Title-based search fallback
+    // Title-based search fallback — ONLY use exact ID match
     if (opts.title) {
       const titleResults = await this.search(opts.title, 5);
       if (titleResults.length > 0) {
         const exactById = titleResults.find(r => String(r.id) === String(productId));
         if (exactById) return this._searchResultToProduct(exactById);
-        const result = this._searchResultToProduct(titleResults[0]);
-        if (result) result.sourceId = String(productId);
-        return result;
+        // DO NOT return first random result — it will be the WRONG product
+        logger.warn('aliexpress', 'Title search found results but no ID match, skipping', { productId, title: opts.title });
       }
-    }
-
-    // Last resort
-    if (searchResults && searchResults.length > 0) {
-      const result = this._searchResultToProduct(searchResults[0]);
-      if (result) result.sourceId = String(productId);
-      return result;
     }
 
     return null;

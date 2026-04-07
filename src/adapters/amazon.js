@@ -755,10 +755,16 @@ class AmazonAdapter extends BaseAdapter {
     // Product condition
     p.productCondition = d.product_condition || null;
 
-    // Videos
+    // Videos — normalize to flat array of URL strings
     p.videos = [];
     if (Array.isArray(d.product_videos)) {
-      p.videos = d.product_videos.filter(Boolean);
+      p.videos = d.product_videos
+        .map(v => {
+          if (typeof v === 'string') return v;
+          if (v && typeof v === 'object' && v.video_url) return v.video_url;
+          return null;
+        })
+        .filter(Boolean);
     }
     p.hasVideo = d.has_video || p.videos.length > 0;
 

@@ -125,15 +125,17 @@ function calculateFinalPrice(sourcePrice, source, opts = {}) {
   const fees = opts.fees || 0;
 
   // Determine the actual cost to apply the multiplier to.
-  // For AliExpress: sourcePrice is MSRP (~$28). The API's promotionPrice (~$5)
-  // is wholesale, NOT the AliExpress retail price (~$11). We estimate the real
-  // AliExpress retail as MSRP × MSRP_RETAIL_FACTOR and use THAT as cost base.
-  // This ensures our price is ALWAYS above what AliExpress charges customers.
+  // For AliExpress: sourcePrice is MSRP (~$28). The API returns two other prices:
+  //   - promotionPrice: sometimes wholesale ($2), sometimes near retail ($11)
+  //   - estimated retail: MSRP × 0.42 ≈ real AliExpress price
+  // We use max(promotionPrice, MSRP × 0.42) to always pick the most accurate/safest value.
+  // When promotionPrice IS the real retail → we use it (more precise).
+  // When promotionPrice is wholesale → MSRP × 0.42 protects us from selling too low.
   let cost;
   if (isMSRP) {
-    // AliExpress: estimate real retail price from MSRP
-    // MSRP $28 × 0.42 = $11.76 (≈ AliExpress retail $11.26)
-    cost = sourcePrice * MSRP_RETAIL_FACTOR + shippingCost + fees;
+    const msrpEstimate = sourcePrice * MSRP_RETAIL_FACTOR; // ~$11.76 for $28 MSRP
+    const promoPrice = opts.sourceCost || 0;
+    cost = Math.max(promoPrice, msrpEstimate) + shippingCost + fees;
   } else {
     // Amazon, Sephora, Macys, SHEIN: sourcePrice IS the cost
     cost = sourcePrice + shippingCost + fees;

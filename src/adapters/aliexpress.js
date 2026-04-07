@@ -199,26 +199,13 @@ class AliExpressAdapter extends BaseAdapter {
     // item_detail_6: description HTML, description images, specs, reviews, video
     // Merge both for a complete PDP
 
-    const [res2, res6, resSkuPrice] = await Promise.allSettled([
+    const [res2, res6] = await Promise.allSettled([
       this._fetchDetailEndpoint(DETAIL_PRIMARY, productId),
-      this._fetchDetailEndpoint(DETAIL_ENRICHMENT, productId),
-      this._fetchDetailEndpoint('/item_sku_price', productId)
+      this._fetchDetailEndpoint(DETAIL_ENRICHMENT, productId)
     ]);
 
     const data2 = res2.status === 'fulfilled' ? res2.value : null;
     const data6 = res6.status === 'fulfilled' ? res6.value : null;
-    const skuPriceData = resSkuPrice.status === 'fulfilled' ? resSkuPrice.value : null;
-
-    // Log SKU Price data for investigation
-    if (skuPriceData) {
-      logger.info('aliexpress', 'item_sku_price response', {
-        productId,
-        keys: Object.keys(skuPriceData),
-        raw: JSON.stringify(skuPriceData).slice(0, 1500)
-      });
-    } else {
-      logger.warn('aliexpress', 'item_sku_price unavailable', { productId, reason: resSkuPrice.reason?.message || 'null' });
-    }
 
     // If item_detail_2 failed, try fallback endpoint
     let primaryData = data2;
@@ -233,11 +220,6 @@ class AliExpressAdapter extends BaseAdapter {
       if (product) {
         // Enrich with item_detail_6 data
         this._enrichFromDetail6(product, data6);
-
-        // Attach SKU Price data for investigation (temporary)
-        if (skuPriceData) {
-          product._skuPriceData = skuPriceData;
-        }
 
         // Fetch seller rating from store_info (async, non-blocking)
         const sellerId = primaryData.seller?.sellerId || product.sellerData?.id;

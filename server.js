@@ -401,6 +401,13 @@ async function productDetailHandler(req, res) {
         product.priceUnavailable = true;
         product.displayPrice = 'Price unavailable';
         logger.warn('product', 'No price available after all fallbacks', { id, source });
+      } else {
+        // Price WAS recovered by the cascade — clear any priceUnavailable flag set by the adapter
+        if (product.priceUnavailable) {
+          delete product.priceUnavailable;
+          delete product.displayPrice;
+          logger.info('product', 'Price recovered via cascade, cleared priceUnavailable', { id, source, price: product.price });
+        }
       }
     }
 

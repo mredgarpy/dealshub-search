@@ -562,10 +562,14 @@ class AliExpressAdapter extends BaseAdapter {
       hasSkuData: !!d.sku,
       hasItemSku: !!item.sku,
       skuDefKeys: Object.keys(skuDef).join(',') || 'empty',
-      itemKeys: Object.keys(item).slice(0, 15).join(','),
+      skuBaseCount: (skuData.base || []).length,
+      skuPropsCount: (skuData.props || []).length,
+      itemKeys: Object.keys(item).slice(0, 20).join(','),
+      dKeys: Object.keys(d).slice(0, 20).join(','),
       itemPrice: item.price || item.salePrice || item.promotionPrice || 'none',
       dPrice: d.price || 'none',
-      settingsPrice: d.settings?.price || 'none'
+      settingsPrice: d.settings?.price || 'none',
+      firstSkuBasePrice: skuData.base?.[0]?.price || skuData.base?.[0]?.promotionPrice || 'none'
     });
 
     const defPrice = typeof skuDef.price === 'string' && skuDef.price.includes('-')
@@ -721,6 +725,26 @@ class AliExpressAdapter extends BaseAdapter {
         image: resolveVariantImage(sku.skuAttr || sku.skuPropIds || ''),
         available: (sku.skuVal?.availQuantity || 0) > 0
       }));
+    }
+
+    // === PRICE RECOVERY FROM VARIANTS ===
+    // When sku.def has no price but individual variants DO have prices,
+    // derive the product price from the cheapest available variant
+    if ((!p.price || p.price <= 0) && p.variants.length > 0) {
+      const variantPrices = p.variants
+        .filter(v => v.price && v.price > 0 && v.available !== false)
+        .map(v => v.price)
+        .sort((a, b) => a - b);
+      if (variantPrices.length > 0) {
+        p.price = variantPrices[0]; // cheapest available variant
+        const maxVariantPrice = variantPrices[variantPrices.length - 1];
+        if (maxVariantPrice > p.price && !p.originalPrice) {
+          p.originalPrice = maxVariantPrice; // show range via compare-at
+        }
+        logger.info('aliexpress', 'Price derived from variant prices', {
+          productId: p.sourceId, price: p.price, variantCount: variantPrices.length
+        });
+      }
     }
 
     // Shipping — item_detail_2 returns delivery.shippingList[] with per-carrier data

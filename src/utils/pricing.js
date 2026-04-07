@@ -7,12 +7,14 @@
 
 const logger = require('./logger');
 
-// Markup raised 2026-04-02 to support Meta Ads profitability
-// Amazon 12→40%, AliExpress 25→50%, Sephora 10→35%, Macys 10→35%, Shein 30→50%
-// Under-$5 impulse buys get 60% markup (handled in calculateFinalPrice)
+// Markup rules per source.
+// AliExpress uses MSRP-based pricing: the API returns MSRP (retail price) as the base,
+// so we apply a NEGATIVE markup (discount from MSRP) to arrive at a competitive selling price.
+// -45% markup = sell at 55% of MSRP, which is slightly above AliExpress retail prices.
+// Amazon/Sephora/Macys APIs return actual selling prices, so they use positive markup.
 const DEFAULT_RULES = {
   amazon:     { markupPct: 40, minMarginPct: 25, roundTo: 0.99, priceFloor: null },
-  aliexpress: { markupPct: 50, minMarginPct: 30, roundTo: 0.99, priceFloor: null },
+  aliexpress: { markupPct: -45, minMarginPct: 0, roundTo: 0.99, priceFloor: 2.99 },
   sephora:    { markupPct: 35, minMarginPct: 20, roundTo: 0.99, priceFloor: null },
   macys:      { markupPct: 35, minMarginPct: 20, roundTo: 0.99, priceFloor: null },
   shein:      { markupPct: 50, minMarginPct: 30, roundTo: 0.99, priceFloor: null }
@@ -90,7 +92,8 @@ function calculateFinalPrice(sourcePrice, source, opts = {}) {
   const fees = opts.fees || 0;
   const landedCost = sourcePrice + shippingCost + fees;
   // Impulse buys under $5 get higher markup (60%) to maintain margin on cheap items
-  const effectiveMarkupPct = (sourcePrice < 5) ? Math.max(rule.markupPct, 60) : rule.markupPct;
+  // Skip impulse override for negative markup (MSRP-discount model like AliExpress)
+  const effectiveMarkupPct = (sourcePrice < 5 && rule.markupPct >= 0) ? Math.max(rule.markupPct, 60) : rule.markupPct;
   const markupMultiplier = 1 + (effectiveMarkupPct / 100);
   let finalPrice = landedCost * markupMultiplier;
 
@@ -110,9 +113,13 @@ function calculateFinalPrice(sourcePrice, source, opts = {}) {
     finalPrice = Math.floor(finalPrice) + rule.roundTo;
   }
 
-  // Compare-at price: original retail price with higher markup for perceived discount
+  // Compare-at price: show the original/MSRP price crossed out
   let compareAt = null;
-  if (opts.originalPrice && opts.originalPrice > sourcePrice) {
+  if (rule.markupPct < 0) {
+    // MSRP-discount model: sourcePrice IS the MSRP, use it directly as compare-at
+    compareAt = Math.floor(sourcePrice) + (rule.roundTo || 0.99);
+    if (compareAt <= finalPrice) compareAt = null; // Don't show if not higher
+  } else if (opts.originalPrice && opts.originalPrice > sourcePrice) {
     compareAt = (opts.originalPrice * markupMultiplier * 1.05).toFixed(2);
     compareAt = Math.floor(parseFloat(compareAt)) + (rule.roundTo || 0.99);
   }

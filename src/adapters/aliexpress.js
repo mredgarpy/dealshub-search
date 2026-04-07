@@ -581,9 +581,13 @@ class AliExpressAdapter extends BaseAdapter {
       ? skuDef.promotionPrice.split('-')[0].trim()
       : skuDef.promotionPrice;
 
+    // IMPORTANT: Prefer defPrice (MSRP/retail) over defPromoPrice (wholesale/dropship).
+    // AliExpress promotionPrice is a deeply discounted wholesale rate ($1-5) that doesn't
+    // reflect actual retail prices ($11-30). Using price (MSRP) as base with negative
+    // markup in the pricing engine produces prices competitive with AliExpress retail.
     p.price = parsePrice(
-      defPromoPrice || defPrice ||
-      item.sku?.def?.promotionPrice || item.sku?.def?.price ||
+      defPrice || defPromoPrice ||
+      item.sku?.def?.price || item.sku?.def?.promotionPrice ||
       item.price || item.salePrice || item.promotionPrice ||
       d.price?.minPrice || d.price?.minAmount?.value || d.currentPrice ||
       d.salePrice || d.priceModule?.minPrice || d.priceModule?.actMinPrice
@@ -711,11 +715,13 @@ class AliExpressAdapter extends BaseAdapter {
     }
 
     // SKU variants — resolve coded titles to human-readable names
+    // Use sku.price (MSRP) as base, NOT sku.promotionPrice (wholesale/dropship rate)
     if (skuData.base?.length) {
       p.variants = skuData.base.map(sku => ({
         id: String(sku.skuId || ''),
         title: resolvePropMap(sku.propMap),
-        price: parsePrice(sku.promotionPrice || sku.price) || p.price,
+        price: parsePrice(sku.price) || parsePrice(sku.promotionPrice) || p.price,
+        sourcePromotionPrice: parsePrice(sku.promotionPrice) || null,
         image: resolveVariantImage(sku.propMap),
         available: (sku.quantity || 0) > 0
       }));

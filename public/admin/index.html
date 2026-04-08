@@ -26,7 +26,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hid
 ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:var(--border2)}
 
-/* âââââââââââ LOGIN SCREEN âââââââââââ */
+/* ─────────── LOGIN SCREEN ─────────── */
 .login-screen{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg)}
 .login-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:32px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 .login-title{font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text)}
@@ -40,7 +40,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hid
 .btn-login{width:100%;background:var(--red);color:#fff;border:none;border-radius:var(--radius-sm);padding:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;margin-top:8px}
 .btn-login:hover{background:var(--red2)}
 
-/* âââââââââââ APP LAYOUT âââââââââââ */
+/* ─────────── APP LAYOUT ─────────── */
 .app{display:grid;grid-template-columns:210px 1fr;grid-template-rows:52px 1fr;height:100vh;gap:0}
 .topbar{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;gap:16px;z-index:10}
 .topbar-logo{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-weight:700;font-size:13px}
@@ -80,7 +80,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hid
 .page-title{font-size:18px;font-weight:700;color:var(--text)}
 .page-subtitle{font-size:11px;color:var(--text3);margin-top:4px}
 
-/* âââââââââââ CARDS & LAYOUT âââââââââââ */
+/* ─────────── CARDS & LAYOUT ─────────── */
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
 .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
@@ -97,7 +97,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hid
 .action-label{font-size:11px;color:var(--text2);margin-bottom:4px}
 .action-count{font-size:16px;font-weight:700;color:var(--red);font-family:var(--mono)}
 
-/* âââââââââââ TABLES âââââââââââ */
+/* ─────────── TABLES ─────────── */
 .table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
 table{width:100%;border-collapse:collapse;font-size:11px}
 thead tr{border-bottom:1px solid var(--border);background:var(--bg3)}
@@ -107,7 +107,7 @@ tbody tr:hover{background:var(--bg3)}
 tbody tr:last-child td{border-bottom:none}
 .mono-text{font-family:var(--mono);font-size:10px}
 
-/* âââââââââââ BADGES âââââââââââ */
+/* ─────────── BADGES ─────────── */
 .bdg{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600}
 .bdg-gr{background:rgba(34,197,94,.1);color:var(--green)}
 .bdg-re{background:rgba(229,62,62,.1);color:var(--red)}
@@ -122,7 +122,7 @@ tbody tr:last-child td{border-bottom:none}
 .s-macy{background:rgba(229,62,62,.65)}
 .s-shein{background:rgba(139,92,246,.65)}
 
-/* âââââââââââ BUTTONS âââââââââââ */
+/* ─────────── BUTTONS ─────────── */
 .btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:4px}
 .btn-r{background:var(--red);color:#fff}
 .btn-r:hover{background:var(--red2)}
@@ -131,13 +131,13 @@ tbody tr:last-child td{border-bottom:none}
 .btn-sm{padding:4px 8px;font-size:10px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
-/* âââââââââââ TABS âââââââââââ */
+/* ─────────── TABS ─────────── */
 .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;gap:0}
 .tab-btn{padding:8px 16px;font-size:12px;color:var(--text2);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
 .tab-btn:hover{color:var(--text)}
 .tab-btn.active{color:var(--red);border-bottom-color:var(--red)}
 
-/* âââââââââââ FILTERS & SEARCH âââââââââââ */
+/* ─────────── FILTERS & SEARCH ─────────── */
 .toolbar{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
 .filter-btn{padding:5px 12px;border-radius:20px;font-size:11px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;transition:all .15s}
 .filter-btn:hover{border-color:var(--red);color:var(--text)}
@@ -145,13 +145,13 @@ tbody tr:last-child td{border-bottom:none}
 .search-input{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:11px;color:var(--text);outline:none}
 .search-input:focus{border-color:var(--red)}
 
-/* âââââââââââ CHARTS (CSS BARS) âââââââââââ */
+/* ─────────── CHARTS (CSS BARS) ─────────── */
 .chart-bar{display:flex;align-items:flex-end;gap:6px;height:120px;margin-bottom:16px}
 .bar{flex:1;background:var(--red);border-radius:2px 2px 0 0;min-height:8px;cursor:pointer;transition:background .15s;position:relative}
 .bar:hover{background:var(--red2)}
 .bar-label{font-size:9px;color:var(--text3);text-align:center;margin-top:4px}
 
-/* âââââââââââ LOADING & STATES âââââââââââ */
+/* ─────────── LOADING & STATES ─────────── */
 .loading{color:var(--text3);font-size:12px;padding:20px;text-align:center}
 .empty-state{color:var(--text3);font-size:12px;padding:30px;text-align:center}
 .error-msg{background:rgba(229,62,62,.1);border:1px solid var(--red);color:var(--red);padding:10px 12px;border-radius:var(--radius-sm);font-size:11px;margin-bottom:16px}
@@ -160,13 +160,13 @@ tbody tr:last-child td{border-bottom:none}
 .pulse{animation:pulse-anim 2s infinite}
 @keyframes pulse-anim{0%,100%{opacity:1}50%{opacity:.5}}
 
-/* âââââââââââ MODALS âââââââââââ */
+/* ─────────── MODALS ─────────── */
 .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
 .modal.active{display:flex}
 .modal-content{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
 .modal-close{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px}
 
-/* âââââââââââ RESPONSIVE âââââââââââ */
+/* ─────────── RESPONSIVE ─────────── */
 @media(max-width:768px){
   .app{grid-template-columns:50px 1fr}
   .sidebar{padding:8px 0}
@@ -209,7 +209,7 @@ tbody tr:last-child td{border-bottom:none}
     </div>
     <div class="topbar-alerts">
       <div class="alert-bell" onclick="toggleAlerts()">
-        ð
+        🔔
         <div class="alert-badge" id="alertCount">0</div>
       </div>
       <div class="topbar-avatar" onclick="logout()">
@@ -231,64 +231,52 @@ tbody tr:last-child td{border-bottom:none}
       <div class="nav-section">
         <div class="nav-section-label">Dashboard</div>
         <div class="nav-item active" data-page="overview" onclick="switchPage('overview')">
-          <span class="icon">â</span>
+          <span class="icon">◉</span>
           <span class="text">Overview</span>
         </div>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">Commerce</div>
         <div class="nav-item" data-page="orders" onclick="switchPage('orders')">
-          <span class="icon">ð¦</span>
+          <span class="icon">📦</span>
           <span class="text">Orders</span>
           <span class="badge" id="ordersBadge">0</span>
         </div>
         <div class="nav-item" data-page="customers" onclick="switchPage('customers')">
-          <span class="icon">ð¥</span>
+          <span class="icon">👥</span>
           <span class="text">Customers</span>
         </div>
         <div class="nav-item" data-page="returns" onclick="switchPage('returns')">
-          <span class="icon">â©</span>
+          <span class="icon">↩</span>
           <span class="text">Returns</span>
           <span class="badge" id="returnsBadge">0</span>
         </div>
         <div class="nav-item" data-page="reviews" onclick="switchPage('reviews')">
-          <span class="icon">â­</span>
+          <span class="icon">⭐</span>
           <span class="text">Reviews</span>
           <span class="badge" id="reviewsBadge">0</span>
         </div>
         <div class="nav-item" data-page="tickets" onclick="switchPage('tickets')">
-          <span class="icon">ð«</span>
+          <span class="icon">🎫</span>
           <span class="text">Tickets</span>
           <span class="badge" id="ticketsBadge">0</span>
         </div>
       </div>
       <div class="nav-section">
-        <div class="nav-section-label">Operations</div>
-        <div class="nav-item" data-page="autods" onclick="switchPage('autods')">
-          <span class="icon">ð¤</span>
-          <span class="text">AutoDS</span>
-          <span class="badge" id="autodsBadge" style="background:var(--purple)">0</span>
-        </div>
-        <div class="nav-item" data-page="cron" onclick="switchPage('cron')">
-          <span class="icon">â±</span>
-          <span class="text">Cron Jobs</span>
-        </div>
-      </div>
-      <div class="nav-section">
         <div class="nav-section-label">Insights</div>
         <div class="nav-item" data-page="analytics" onclick="switchPage('analytics')">
-          <span class="icon">ð</span>
+          <span class="icon">📈</span>
           <span class="text">Analytics</span>
         </div>
         <div class="nav-item" data-page="suppliers" onclick="switchPage('suppliers')">
-          <span class="icon">ð</span>
+          <span class="icon">🌐</span>
           <span class="text">Suppliers</span>
         </div>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">System</div>
         <div class="nav-item" data-page="settings" onclick="switchPage('settings')">
-          <span class="icon">â</span>
+          <span class="icon">⚙</span>
           <span class="text">Settings</span>
         </div>
       </div>
@@ -300,18 +288,15 @@ tbody tr:last-child td{border-bottom:none}
 
     <!-- PAGE: OVERVIEW -->
     <div id="page-overview" class="page active" style="padding:20px">
-      <div class="page-header" style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div class="page-title">Dashboard Overview</div>
-          <div class="page-subtitle">Real-time metrics and alerts â synced from Shopify</div>
-        </div>
-        <button class="btn btn-g" onclick="refreshOrdersFromShopify()">ð Refresh from Shopify</button>
+      <div class="page-header">
+        <div class="page-title">Dashboard Overview</div>
+        <div class="page-subtitle">Real-time metrics and alerts</div>
       </div>
 
       <!-- ALERTS BAR -->
       <div id="alertBar" style="display:none;margin-bottom:16px">
         <div class="error-msg">
-          <span style="font-size:8px;color:var(--red)" class="pulse">â </span>
+          <span style="font-size:8px;color:var(--red)" class="pulse">● </span>
           <span id="alertMsg">Loading alerts...</span>
         </div>
       </div>
@@ -355,22 +340,22 @@ tbody tr:last-child td{border-bottom:none}
         <div class="page-subtitle" style="margin-bottom:12px">Quick Actions</div>
         <div class="quick-actions">
           <div class="action-card" onclick="switchPage('orders')">
-            <div class="action-icon">ð¦</div>
+            <div class="action-icon">📦</div>
             <div class="action-label">Orders</div>
             <div class="action-count" id="qa-orders">0</div>
           </div>
           <div class="action-card" onclick="switchPage('returns')">
-            <div class="action-icon">â©</div>
+            <div class="action-icon">↩</div>
             <div class="action-label">Returns</div>
             <div class="action-count" id="qa-returns">0</div>
           </div>
           <div class="action-card" onclick="switchPage('reviews')">
-            <div class="action-icon">â­</div>
+            <div class="action-icon">⭐</div>
             <div class="action-label">Reviews</div>
             <div class="action-count" id="qa-reviews">0</div>
           </div>
           <div class="action-card" onclick="switchPage('suppliers')">
-            <div class="action-icon">ð</div>
+            <div class="action-icon">🌐</div>
             <div class="action-label">Suppliers</div>
             <div class="action-count" id="qa-suppliers">0</div>
           </div>
@@ -549,125 +534,74 @@ tbody tr:last-child td{border-bottom:none}
       <div id="suppliersTable" class="loading">Loading supplier data...</div>
     </div>
 
-    <!-- PAGE: AUTODS -->
-    <div id="page-autods" class="page" style="padding:20px">
-      <div class="page-header">
-        <div class="page-title">AutoDS Integration</div>
-        <div class="page-subtitle">Order fulfillment automation and product tracking</div>
-      </div>
-
-      <!-- AutoDS KPIs -->
-      <div class="card-grid" id="autodsKPIs">
-        <div class="stat-card">
-          <div class="stat-label">Tracked Products</div>
-          <div class="stat-value" id="ad-products">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Linked to AutoDS</div>
-          <div class="stat-value" id="ad-linked">0</div>
-          <div class="stat-sub" id="ad-linkrate">0% link rate</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Orders</div>
-          <div class="stat-value" id="ad-orders">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Ready for AutoDS</div>
-          <div class="stat-value" id="ad-ready" style="color:var(--green)">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Pending Review</div>
-          <div class="stat-value" id="ad-pending" style="color:var(--amber)">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Errors</div>
-          <div class="stat-value" id="ad-errors" style="color:var(--red)">0</div>
-        </div>
-      </div>
-
-      <!-- AutoDS Actions -->
-      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
-        <button class="btn btn-r" onclick="autodsDownloadCSV()">Download CSV for AutoDS</button>
-        <button class="btn btn-g" onclick="autodsSyncExisting()">Sync All Mappings</button>
-        <button class="btn btn-g" onclick="autodsRefresh()">Refresh Stats</button>
-      </div>
-
-      <!-- AutoDS Orders -->
-      <div class="card" style="margin-bottom:20px">
-        <div class="page-subtitle" style="margin-bottom:12px">Recent AutoDS Orders</div>
-        <div id="autodsOrdersTable" class="loading">Loading AutoDS orders...</div>
-      </div>
-
-      <!-- AutoDS Pending Products -->
-      <div class="card">
-        <div class="page-subtitle" style="margin-bottom:12px">Pending Products (Not Linked)</div>
-        <div id="autodsPendingTable" class="loading">Loading pending products...</div>
-      </div>
-    </div>
-
-    <!-- PAGE: CRON JOBS -->
-    <div id="page-cron" class="page" style="padding:20px">
-      <div class="page-header">
-        <div class="page-title">Cron Jobs</div>
-        <div class="page-subtitle">Automated scheduled tasks</div>
-      </div>
-
-      <div class="card" style="margin-bottom:20px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div class="page-subtitle">Task Schedule</div>
-          <span class="bdg" id="cronStatusBadge">Loading...</span>
-        </div>
-        <div id="cronTasksTable" class="loading">Loading cron tasks...</div>
-      </div>
-
-      <div class="card">
-        <div class="page-subtitle" style="margin-bottom:12px">Recent Task History</div>
-        <div id="cronHistoryTable" class="loading">Loading history...</div>
-      </div>
-    </div>
-
     <!-- PAGE: SETTINGS -->
     <div id="page-settings" class="page" style="padding:20px">
       <div class="page-header">
         <div class="page-title">Settings</div>
-        <div class="page-subtitle">System configuration</div>
+        <div class="page-subtitle">System configuration &amp; pricing</div>
       </div>
       <div id="settingsLoading" class="empty-state">Loading settings...</div>
       <div id="settingsContent" style="display:none">
+
+        <!-- MARKUP TIERS TABLE -->
         <div class="card" style="margin-bottom:20px">
-          <div class="page-subtitle" style="margin-bottom:16px">Markup Tiers (Multiplier by Source &amp; Price Range)</div>
-          <p style="color:#888;font-size:12px;margin-bottom:16px">Each cell is a multiplier: cost &times; multiplier = final price (rounded to .99). Lower = competitive, higher = more profit.</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div>
+              <div class="page-subtitle" style="margin-bottom:4px">Markup Tiers (Multiplier by Source &amp; Price Range)</div>
+              <div style="font-size:11px;color:#888">These multipliers control the final customer price for all products. Changes apply to new searches instantly.</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span id="repriceCount" style="font-size:11px;color:#888"></span>
+              <button class="btn btn-r" onclick="repriceAll()" id="btnRepriceAll" style="font-size:12px;padding:6px 14px;background:#e74c3c;color:#fff;border:none;border-radius:6px;cursor:pointer">
+                Reprice All Shopify Products
+              </button>
+            </div>
+          </div>
           <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:12px" id="tiersTable">
+            <table style="width:100%;border-collapse:collapse;font-size:13px" id="tiersTable">
               <thead>
-                <tr style="border-bottom:2px solid var(--border)">
-                  <th style="text-align:left;padding:8px;color:var(--text3)">Price Range</th>
-                  <th style="text-align:center;padding:8px;color:#f59e0b">Amazon</th>
-                  <th style="text-align:center;padding:8px;color:#ef4444">AliExpress</th>
-                  <th style="text-align:center;padding:8px;color:#ec4899">Sephora</th>
-                  <th style="text-align:center;padding:8px;color:#8b5cf6">Macy's</th>
-                  <th style="text-align:center;padding:8px;color:#22c55e">SHEIN</th>
-                  <th style="text-align:center;padding:8px;color:var(--text3)">Default</th>
+                <tr style="background:#f8f9fa">
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;color:#666;border-bottom:2px solid #e0e0e0">Price Range</th>
+                  <th style="padding:8px 10px;text-align:center;font-size:11px;color:#666;border-bottom:2px solid #e0e0e0">Amazon</th>
+                  <th style="padding:8px 10px;text-align:center;font-size:11px;color:#666;border-bottom:2px solid #e0e0e0">AliExpress</th>
+                  <th style="padding:8px 10px;text-align:center;font-size:11px;color:#666;border-bottom:2px solid #e0e0e0">Sephora</th>
+                  <th style="padding:8px 10px;text-align:center;font-size:11px;color:#666;border-bottom:2px solid #e0e0e0">Macy's</th>
+                  <th style="padding:8px 10px;text-align:center;font-size:11px;color:#666;border-bottom:2px solid #e0e0e0">SHEIN</th>
+                  <th style="padding:8px 10px;text-align:center;font-size:11px;color:#666;border-bottom:2px solid #e0e0e0">Default</th>
                 </tr>
               </thead>
-              <tbody id="tiersTableBody"></tbody>
+              <tbody id="tiersBody"></tbody>
             </table>
           </div>
-          <div style="margin-top:16px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius)">
-            <div style="font-weight:600;font-size:12px;color:var(--text);margin-bottom:12px">Live Preview: Sample Products</div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="previewGrid"></div>
-          </div>
+          <div id="repriceStatus" style="margin-top:10px;font-size:12px;display:none"></div>
         </div>
-          <div class="form-group"><label class="form-label">Free Shipping Threshold ($)</label><input type="number" id="freeShipThreshold" class="form-input" value="35"></div>
+
+        <!-- LIVE PREVIEW -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="page-subtitle" style="margin-bottom:12px">Live Preview: Sample Products</div>
+          <div id="pricingPreview" style="font-size:12px;color:#666">Loading preview...</div>
+        </div>
+
+        <!-- AUTO-REPRICE TOGGLE -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="page-subtitle" style="margin-bottom:12px">Auto-Reprice</div>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="autoRepriceToggle">
+            <span>Automatically update all Shopify product prices when markup tiers are saved</span>
+          </label>
+          <div style="font-size:11px;color:#999;margin-top:6px">When enabled, saving settings will also update prices of all previously synced products in Shopify. This may take a few minutes for large catalogs.</div>
+        </div>
+
+        <!-- SHIPPING / RETURNS / NOTIFICATIONS / EMAIL (existing) -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="page-subtitle" style="margin-bottom:16px">Shipping Rules</div>
+          <div class="form-group"><label class="form-label">Free Shipping Threshold ($)</label><input type="number" id="freeShippingThreshold" class="form-input" value="35"></div>
         </div>
         <div class="card" style="margin-bottom:20px">
           <div class="page-subtitle" style="margin-bottom:16px">Return Windows</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div class="form-group"><label class="form-label">Amazon Return Days</label><input type="number" id="returnAmazon" class="form-input" value="30"></div>
             <div class="form-group"><label class="form-label">AliExpress Return Days</label><input type="number" id="returnAliexpress" class="form-input" value="15"></div>
-            <div class="form-group"><label class="form-label">Sephora Return Days</label><input type="number" id="returnSephora" class="form-input" value="30"></div>
-            <div class="form-group"><label class="form-label">Macy's Return Days</label><input type="number" id="returnMacys" class="form-input" value="30"></div>
-            <div class="form-group"><label class="form-label">SHEIN Return Days</label><input type="number" id="returnShein" class="form-input" value="15"></div>
           </div>
         </div>
         <div class="card" style="margin-bottom:20px">
@@ -687,7 +621,7 @@ tbody tr:last-child td{border-bottom:none}
             <div class="form-group"><label class="form-label">Reply-To Address</label><input type="email" id="emailReplyTo" class="form-input" value="support@stylehubmiami.com"></div>
           </div>
         </div>
-        <button class="btn btn-r" onclick="saveSettings()">Save Settings</button>
+        <button class="btn btn-r" onclick="saveSettings()" style="background:#e74c3c;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer">Save Settings</button>
         <div id="settingsMsg" style="margin-top:8px"></div>
       </div>
     </div>
@@ -696,13 +630,13 @@ tbody tr:last-child td{border-bottom:none}
 </div>
 
 <script>
-// ââââââââââââââââââââ INIT & STATE ââââââââââââââââââââ
+// ──────────────────── INIT & STATE ────────────────────
 let token = localStorage.getItem('sh_crm_token') || 'stylehub-admin-2026';
 let currentPage = 'overview';
 let currentFilter = { orders: 'all', customers: 'all', reviews: 'pending', tickets: 'all' };
 let cacheData = {};
 
-// ââââââââââââââââââââ LOGIN ââââââââââââââââââââ
+// ──────────────────── LOGIN ────────────────────
 function handleLogin() {
   const tokenInput = document.getElementById('tokenInput').value.trim();
   if (!tokenInput) {
@@ -727,7 +661,7 @@ function showApp() {
   loadDashboard();
 }
 
-// ââââââââââââââââââââ API CALLS ââââââââââââââââââââ
+// ──────────────────── API CALLS ────────────────────
 async function apiCall(endpoint) {
   try {
     const sep = endpoint.includes('?') ? '&' : '?';
@@ -775,7 +709,7 @@ async function apiCallPut(endpoint, data) {
   }
 }
 
-// ââââââââââââââââââââ PAGE NAVIGATION ââââââââââââââââââââ
+// ──────────────────── PAGE NAVIGATION ────────────────────
 function switchPage(pageName) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -792,11 +726,9 @@ function switchPage(pageName) {
   else if (pageName === 'analytics') loadAnalytics();
   else if (pageName === 'suppliers') loadSuppliers();
   else if (pageName === 'settings') loadSettings();
-  else if (pageName === 'autods') loadAutoDS();
-  else if (pageName === 'cron') loadCronJobs();
 }
 
-// ââââââââââââââââââââ DASHBOARD (OVERVIEW) ââââââââââââââââââââ
+// ──────────────────── DASHBOARD (OVERVIEW) ────────────────────
 async function loadDashboard() {
   const data = await apiCall('dashboard');
   if (!data) {
@@ -845,7 +777,7 @@ async function loadDashboard() {
       for (const [key, val] of Object.entries(health.sources)) {
         const status = val.status || 'unknown';
         const latency = val.latencyMs || 0;
-        const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">â Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">â Paused</span>' : '<span class="bdg bdg-re">â Down</span>';
+        const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">● Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">● Paused</span>' : '<span class="bdg bdg-re">● Down</span>';
         html += `<div style="display:flex;justify-content:space-between;font-size:11px;padding:6px;border-bottom:1px solid var(--border)"><span>${key}</span><span>${statusBadge}</span><span class="mono-text">${latency}ms</span></div>`;
       }
       html += '</div>';
@@ -854,27 +786,17 @@ async function loadDashboard() {
   } catch (e) {}
 
   // Activity feed
-  if (data.recent && data.recent.length > 0) {
+  if (data.recent) {
     let html = '<div style="display:grid;gap:8px;font-size:11px">';
     data.recent.forEach(item => {
-      const action = item.action || `Order ${item.number} â $${(item.total||0).toFixed(2)}`;
-      const ts = item.timestamp || item.createdAt;
-      html += `<div style="padding:6px;border-bottom:1px solid var(--border)"><div style="color:var(--text)">${action}</div><div style="color:var(--text3);font-size:9px">${ts ? new Date(ts).toLocaleString() : 'N/A'}</div></div>`;
+      html += `<div style="padding:6px;border-bottom:1px solid var(--border)"><div style="color:var(--text)">${item.action}</div><div style="color:var(--text3);font-size:9px">${new Date(item.timestamp).toLocaleString()}</div></div>`;
     });
     html += '</div>';
     document.getElementById('activityFeed').innerHTML = html;
-  } else {
-    document.getElementById('activityFeed').innerHTML = '<div class="empty-state">No recent activity</div>';
-  }
-
-  // AutoDS badge
-  if (data.autods && data.autods.summary) {
-    const pending = (data.autods.summary.totalProducts || 0) - (data.autods.summary.linkedProducts || 0);
-    document.getElementById('autodsBadge').textContent = pending.toString();
   }
 }
 
-// ââââââââââââââââââââ ORDERS ââââââââââââââââââââ
+// ──────────────────── ORDERS ────────────────────
 async function loadOrders() {
   const filter = currentFilter.orders;
   const data = await apiCall(`orders?status=${filter}`);
@@ -885,36 +807,28 @@ async function loadOrders() {
 
   const orders = data.orders || [];
   if (orders.length === 0) {
-    document.getElementById('ordersTable').innerHTML = '<div class="empty-state">No orders yet â orders will appear here after your first sale.</div>';
+    document.getElementById('ordersTable').innerHTML = '<div class="empty-state">No orders yet — orders will appear here after your first sale.</div>';
     return;
   }
 
   let html = '<div class="table-wrap"><table><thead><tr><th>Order #</th><th>Customer</th><th>Items</th><th>Total</th><th>Source</th><th>Status</th><th>Profit</th><th>Date</th><th>Action</th></tr></thead><tbody>';
 
   orders.forEach(order => {
-    const source = order.source || 'unknown';
-    const fulfillment = order.fulfillmentStatus || order.fulfillment_status;
-    const financial = order.financialStatus || order.financial_status || 'pending';
-    let status = 'pending';
-    let statusColor = 'var(--amber)';
-    if (financial === 'cancelled') { status = 'cancelled'; statusColor = 'var(--red)'; }
-    else if (financial === 'refunded') { status = 'refunded'; statusColor = 'var(--red)'; }
-    else if (fulfillment === 'fulfilled') { status = 'shipped'; statusColor = 'var(--green)'; }
-    else if (order.requiresManual) { status = 'manual'; statusColor = 'var(--purple)'; }
-    const sourceBadge = `<span class="src s-${source.substring(0,4).toLowerCase()}">${source.substring(0,3).toUpperCase()}</span>`;
-    const statusBadge = `<span class="bdg" style="background:rgba(${statusColor === 'var(--green)' ? '34,197,94' : statusColor === 'var(--red)' ? '229,62,62' : statusColor === 'var(--purple)' ? '139,92,246' : '245,158,11'}, .1);color:${statusColor}">â ${status}</span>`;
+    const source = order.source || 'N/A';
+    const status = order.status || 'pending';
+    const sourceBadge = `<span class="src s-${source.toLowerCase()}">${source.substring(0,3).toUpperCase()}</span>`;
+    const statusBadge = `<span class="bdg" style="background:rgba(${status === 'shipped' ? '34,197,94' : '229,62,62'}, .1);color:${status === 'shipped' ? 'var(--green)' : 'var(--red)'}">● ${status}</span>`;
 
-    const profit = order.estimatedProfit || order.profit || 0;
     html += `<tr>
-      <td class="mono-text">${order.number || '#' + order.id}</td>
+      <td class="mono-text">#${order.id}</td>
       <td><div style="font-size:11px">${order.customerName || order.customer_name || 'N/A'}</div><div style="font-size:9px;color:var(--text3)">${order.email || order.customer_email || ''}</div></td>
       <td class="mono-text">${order.items?.length || order.item_count || 1}</td>
       <td class="mono-text">$${(order.total || 0).toFixed(2)}</td>
       <td>${sourceBadge}</td>
       <td>${statusBadge}</td>
-      <td class="mono-text" style="color:var(--green)">$${profit.toFixed(2)}</td>
+      <td class="mono-text" style="color:var(--green)">$${(order.profit || 0).toFixed(2)}</td>
       <td style="font-size:9px">${new Date(order.createdAt || order.created_at).toLocaleDateString()}</td>
-      <td>${status === 'pending' || status === 'manual' ? `<button class="btn btn-g btn-sm" onclick="fulfillOrder('${order.id}')">Fulfill</button>` : ''}</td>
+      <td><button class="btn btn-g btn-sm" onclick="fulfillOrder('${order.id}')">Fulfill</button></td>
     </tr>`;
   });
 
@@ -937,7 +851,7 @@ async function fulfillOrder(orderId) {
   }
 }
 
-// ââââââââââââââââââââ CUSTOMERS ââââââââââââââââââââ
+// ──────────────────── CUSTOMERS ────────────────────
 async function loadCustomers() {
   const filter = currentFilter.customers;
   const data = await apiCall(`customers?segment=${filter}`);
@@ -951,7 +865,7 @@ async function loadCustomers() {
   (data.customers || []).forEach(cust => {
     const initials = (cust.name || 'XX').split(' ').map(n => n[0]).join('').toUpperCase();
     const segment = cust.segment || 'standard';
-    const segmentBadge = `<span class="bdg bdg-bl">â ${segment}</span>`;
+    const segmentBadge = `<span class="bdg bdg-bl">● ${segment}</span>`;
 
     html += `<tr>
       <td><div style="width:28px;height:28px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">${initials}</div></td>
@@ -974,7 +888,7 @@ function filterCustomers(filter) {
   loadCustomers();
 }
 
-// ââââââââââââââââââââ RETURNS ââââââââââââââââââââ
+// ──────────────────── RETURNS ────────────────────
 async function loadReturns() {
   const data = await apiCall('returns');
   if (!data) {
@@ -1001,7 +915,7 @@ async function loadReturns() {
       <td style="font-size:10px">${ret.reason || 'N/A'}</td>
       <td class="mono-text">$${(ret.amount || 0).toFixed(2)}</td>
       <td>${sourceBadge}</td>
-      <td><span class="bdg bdg-am">â ${ret.status || 'pending'}</span></td>
+      <td><span class="bdg bdg-am">● ${ret.status || 'pending'}</span></td>
     </tr>`;
   });
 
@@ -1009,7 +923,7 @@ async function loadReturns() {
   document.getElementById('returnsTable').innerHTML = html;
 }
 
-// ââââââââââââââââââââ REVIEWS ââââââââââââââââââââ
+// ──────────────────── REVIEWS ────────────────────
 async function loadReviews() {
   const filter = currentFilter.reviews;
   const data = await apiCall(`reviews?status=${filter}`);
@@ -1020,14 +934,14 @@ async function loadReviews() {
 
   const reviews = data.reviews || [];
   if (reviews.length === 0) {
-    document.getElementById('reviewsTable').innerHTML = '<div class="empty-state">No reviews yet â reviews appear when customers rate their purchases.</div>';
+    document.getElementById('reviewsTable').innerHTML = '<div class="empty-state">No reviews yet — reviews appear when customers rate their purchases.</div>';
     return;
   }
 
   let html = '<div class="table-wrap"><table><thead><tr><th>Product</th><th>Customer</th><th>Rating</th><th>Review</th><th>Date</th><th>Action</th></tr></thead><tbody>';
 
   reviews.forEach(rev => {
-    const stars = 'â'.repeat(rev.rating || 5);
+    const stars = '★'.repeat(rev.rating || 5);
 
     html += `<tr>
       <td style="font-size:10px">${rev.productTitle || rev.product_name || 'N/A'}</td>
@@ -1058,7 +972,7 @@ async function approveReview(reviewId) {
   }
 }
 
-// ââââââââââââââââââââ TICKETS ââââââââââââââââââââ
+// ──────────────────── TICKETS ────────────────────
 async function loadTickets() {
   const filter = currentFilter.tickets;
   const stats = await apiCall('tickets/stats');
@@ -1078,7 +992,7 @@ async function loadTickets() {
 
   const tickets = data.tickets || [];
   if (tickets.length === 0) {
-    document.getElementById('ticketsTable').innerHTML = '<div class="empty-state">No tickets yet â tickets appear when customers contact support.</div>';
+    document.getElementById('ticketsTable').innerHTML = '<div class="empty-state">No tickets yet — tickets appear when customers contact support.</div>';
     return;
   }
 
@@ -1097,7 +1011,7 @@ async function loadTickets() {
       <td>${tick.customerName || tick.customer_name || 'N/A'}</td>
       <td style="font-size:11px">${tick.subject || 'N/A'}</td>
       <td style="font-size:10px">${tick.category || 'general'}</td>
-      <td><span class="bdg ${statusBadge}">â ${tick.status || 'open'}</span></td>
+      <td><span class="bdg ${statusBadge}">● ${tick.status || 'open'}</span></td>
       <td style="font-size:9px">${new Date(tick.createdAt || tick.created_at).toLocaleDateString()}</td>
     </tr>`;
   });
@@ -1113,7 +1027,7 @@ function filterTickets(filter) {
   loadTickets();
 }
 
-// ââââââââââââââââââââ ANALYTICS ââââââââââââââââââââ
+// ──────────────────── ANALYTICS ────────────────────
 async function loadAnalytics() {
   const data = await apiCall('analytics?period=30');
   if (!data) {
@@ -1149,7 +1063,7 @@ async function loadAnalytics() {
     html += '</div>';
     document.getElementById('topProducts').innerHTML = html;
   } else {
-    document.getElementById('topProducts').innerHTML = '<div class="empty-state">No data yet â analytics populate after your first orders.</div>';
+    document.getElementById('topProducts').innerHTML = '<div class="empty-state">No data yet — analytics populate after your first orders.</div>';
   }
 
   // Top returns
@@ -1171,7 +1085,7 @@ function setPeriod(period) {
   loadAnalytics();
 }
 
-// ââââââââââââââââââââ SUPPLIERS ââââââââââââââââââââ
+// ──────────────────── SUPPLIERS ────────────────────
 async function loadSuppliers() {
   try {
     const data = await fetch('/api/source-health').then(r => r.json());
@@ -1181,7 +1095,7 @@ async function loadSuppliers() {
 
     for (const [key, val] of Object.entries(data.sources)) {
       const status = val.status || 'unknown';
-      const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">â Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">â Paused</span>' : '<span class="bdg bdg-re">â Down</span>';
+      const statusBadge = (status === 'ok' || status === 'healthy') ? '<span class="bdg bdg-gr">● Healthy</span>' : (status === 'paused' || status === 'slow') ? '<span class="bdg bdg-am">● Paused</span>' : '<span class="bdg bdg-re">● Down</span>';
       const sourceName = { amazon: 'Amazon', aliexpress: 'AliExpress', sephora: 'Sephora', macys: "Macy's", shein: 'SHEIN' }[key] || key;
 
       html += `<tr>
@@ -1201,371 +1115,233 @@ async function loadSuppliers() {
   }
 }
 
-// ââââââââââââââââââââ SETTINGS ââââââââââââââââââââ
-// ===== TIERED MARKUP SYSTEM =====
-    const TIER_LABELS = ['$0-$3','$3-$10','$10-$25','$25-$50','$50-$100','$100-$200','$200-$500','$500+'];
-    const TIER_MAXES = [3, 10, 25, 50, 100, 200, 500, 999999];
-    const TIER_SOURCES = ['amazon','aliexpress','sephora','macys','shein','default'];
-    const SAMPLE_PRODUCTS = [
-      {name:'CeraVe Moisturizer',source:'amazon',cost:12.99},
-      {name:'AirPods Pro',source:'amazon',cost:109},
-      {name:'Leggings',source:'shein',cost:5.50},
-      {name:'iPhone Case',source:'aliexpress',cost:2.20},
-      {name:'Dyson Vacuum',source:'amazon',cost:450},
-      {name:'Lipstick',source:'sephora',cost:22}
-    ];
+// ──────────────────── SETTINGS ────────────────────
+const TIER_RANGES = ['$0-$3','$3-$10','$10-$25','$25-$50','$50-$100','$100-$200','$200-$500','$500+'];
+const TIER_MAXES = [3, 10, 25, 50, 100, 200, 500, 999999];
+const TIER_SOURCES = ['amazon','aliexpress','sephora','macys','shein','default'];
+let currentTiers = [];
 
-    function buildTiersTable(tiers) {
-      const tbody = document.getElementById('tiersTableBody');
-      if (!tbody) return;
-      tbody.innerHTML = '';
-      TIER_LABELS.forEach((label, i) => {
-        const tier = tiers[i] || {};
-        let row = '<tr style="border-bottom:1px solid var(--border)">';
-        row += '<td style="padding:8px;color:var(--text3);font-weight:500;white-space:nowrap">' + label + '</td>';
-        TIER_SOURCES.forEach(src => {
-          const val = (tier[src] || 1.20).toFixed(2);
-          row += '<td style="padding:6px;text-align:center"><input type="number" step="0.01" min="1" max="5" value="' + val + '" data-tier="' + i + '" data-src="' + src + '" class="form-input" style="width:68px;text-align:center;padding:6px" oninput="updateTierPreview()"></td>';
-        });
-        row += '</tr>';
-        tbody.insertAdjacentHTML('beforeend', row);
-      });
-      updateTierPreview();
-    }
-
-    function collectTiers() {
-      const tiers = [];
-      TIER_MAXES.forEach((max, i) => {
-        const t = { max: max };
-        TIER_SOURCES.forEach(src => {
-          const inp = document.querySelector('input[data-tier="' + i + '"][data-src="' + src + '"]');
-          t[src] = inp ? parseFloat(inp.value) || 1.20 : 1.20;
-        });
-        tiers.push(t);
-      });
-      return tiers;
-    }
-
-    function calcTierPrice(cost, source, tiers) {
-      const tier = tiers.find(t => cost < t.max) || tiers[tiers.length - 1];
-      const mult = tier[source] || tier['default'] || 1.20;
-      let price = cost * mult;
-      price = Math.floor(price) + 0.99;
-      if (price <= cost) price = Math.floor(cost) + 1.99;
-      return { price, mult, margin: ((price - cost) / price * 100).toFixed(1) };
-    }
-
-    function updateTierPreview() {
-      const grid = document.getElementById('previewGrid');
-      if (!grid) return;
-      const tiers = collectTiers();
-      grid.innerHTML = '';
-      SAMPLE_PRODUCTS.forEach(p => {
-        const r = calcTierPrice(p.cost, p.source, tiers);
-        grid.insertAdjacentHTML('beforeend',
-          '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;font-size:11px">' +
-          '<div style="font-weight:600;color:var(--text);margin-bottom:4px">' + p.name + '</div>' +
-          '<div style="color:var(--text3);margin-bottom:6px">' + p.source + ' &bull; ' + r.mult.toFixed(2) + '&times;</div>' +
-          '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
-          '<span style="color:var(--text3)">$' + p.cost.toFixed(2) + ' &rarr;</span>' +
-          '<span style="font-weight:700;font-size:14px;color:var(--text)">$' + r.price.toFixed(2) + '</span>' +
-          '</div>' +
-          '<div style="color:#4ade80;font-size:10px;margin-top:4px">Margin: ' + r.margin + '%</div>' +
-          '</div>'
-        );
-      });
-    }
-
-    async function loadSettings() {
-      document.getElementById('settingsLoading').style.display = 'block';
-      document.getElementById('settingsContent').style.display = 'none';
-      try {
-        const data = await apiCall('settings');
-        if (data) {
-          // New tiered system
-          if (data.markup_tiers && data.markup_tiers.length > 0) {
-            buildTiersTable(data.markup_tiers);
-          } else if (data.markup) {
-            // Legacy flat markup - build default tiers
-            buildTiersTable([
-              {max:3,amazon:1.70,aliexpress:2.50,sephora:1.50,macys:1.50,shein:2.50,default:1.70},
-              {max:10,amazon:1.35,aliexpress:1.70,sephora:1.30,macys:1.30,shein:1.70,default:1.35},
-              {max:25,amazon:1.25,aliexpress:1.50,sephora:1.22,macys:1.22,shein:1.50,default:1.25},
-              {max:50,amazon:1.20,aliexpress:1.40,sephora:1.18,macys:1.18,shein:1.40,default:1.20},
-              {max:100,amazon:1.15,aliexpress:1.30,sephora:1.12,macys:1.12,shein:1.30,default:1.15},
-              {max:200,amazon:1.10,aliexpress:1.22,sephora:1.08,macys:1.08,shein:1.22,default:1.10},
-              {max:500,amazon:1.07,aliexpress:1.15,sephora:1.06,macys:1.06,shein:1.15,default:1.07},
-              {max:999999,amazon:1.05,aliexpress:1.10,sephora:1.05,macys:1.05,shein:1.10,default:1.05}
-            ]);
-          }
-          // Shipping
-          if (data.pricing) {
-            const fst = document.getElementById('freeShipThreshold');
-            if (fst) fst.value = data.pricing.free_shipping_threshold || data.shipping?.freeThreshold || 35;
-          }
-          // Returns
-          if (data.returns) {
-            const ra = document.getElementById('returnAmazon'); if (ra) ra.value = data.returns.windowAmazon || 30;
-            const ral = document.getElementById('returnAliexpress'); if (ral) ral.value = data.returns.windowAliexpress || 15;
-            const rs = document.getElementById('returnSephora'); if (rs) rs.value = data.returns.windowSephora || 30;
-            const rm = document.getElementById('returnMacys'); if (rm) rm.value = data.returns.windowMacys || 30;
-            const rsh = document.getElementById('returnShein'); if (rsh) rsh.value = data.returns.windowShein || 15;
-          }
-          // Notifications
-          if (data.notifications) {
-            const n1 = document.getElementById('notifNewOrder'); if (n1) n1.checked = data.notifications.newOrder !== false;
-            const n2 = document.getElementById('notifManualRequired'); if (n2) n2.checked = data.notifications.manualRequired !== false;
-            const n3 = document.getElementById('notifReturnRequest'); if (n3) n3.checked = data.notifications.returnRequest !== false;
-            const n4 = document.getElementById('notifApiDown'); if (n4) n4.checked = data.notifications.apiDown !== false;
-            const n5 = document.getElementById('notifLowProfit'); if (n5) n5.checked = data.notifications.lowProfit === true;
-          }
-          // Emails
-          if (data.emails) {
-            const ef = document.getElementById('emailFromName'); if (ef) ef.value = data.emails.fromName || 'StyleHub Miami';
-            const er = document.getElementById('emailReplyTo'); if (er) er.value = data.emails.replyTo || 'support@stylehubmiami.com';
-          }
-        }
-      } catch(e) { console.error('Settings load error:', e); }
-      document.getElementById('settingsLoading').style.display = 'none';
-      document.getElementById('settingsContent').style.display = 'block';
-    }
-
-    async function saveSettings() {
-      const tiers = collectTiers();
-      const fst = document.getElementById('freeShipThreshold');
-      const settings = {
-        markup_tiers: tiers,
-        pricing: { round_to_99: true, free_shipping_threshold: parseFloat(fst?.value) || 35 },
-        shipping: { freeThreshold: parseFloat(fst?.value) || 35, plusFreeShipping: true },
-        returns: {
-          windowAmazon: parseInt(document.getElementById('returnAmazon')?.value) || 30,
-          windowAliexpress: parseInt(document.getElementById('returnAliexpress')?.value) || 15,
-          windowSephora: parseInt(document.getElementById('returnSephora')?.value) || 30,
-          windowMacys: parseInt(document.getElementById('returnMacys')?.value) || 30,
-          windowShein: parseInt(document.getElementById('returnShein')?.value) || 15
-        },
-        notifications: {
-          newOrder: document.getElementById('notifNewOrder')?.checked !== false,
-          manualRequired: document.getElementById('notifManualRequired')?.checked !== false,
-          returnRequest: document.getElementById('notifReturnRequest')?.checked !== false,
-          apiDown: document.getElementById('notifApiDown')?.checked !== false,
-          lowProfit: document.getElementById('notifLowProfit')?.checked === true
-        },
-        emails: {
-          fromName: document.getElementById('emailFromName')?.value || 'StyleHub Miami',
-          replyTo: document.getElementById('emailReplyTo')?.value || 'support@stylehubmiami.com'
-        }
-      };
-      try {
-        const result = await apiCallPost('settings', settings);
-        if (result && result.success) {
-          showToast('Settings saved! Markup changes take effect immediately.');
-        } else {
-          showToast('Error saving settings', 'error');
-        }
-      } catch(e) { showToast('Error: ' + e.message, 'error'); }
-    }
-
-// ââââââââââââââââââââ AUTODS ââââââââââââââââââââ
-async function loadAutoDS() {
-  try {
-    const resp = await fetch(`/api/admin/autods/stats?token=${encodeURIComponent(token)}`);
-    const stats = await resp.json();
-
-    if (stats.summary) {
-      document.getElementById('ad-products').textContent = stats.summary.totalProducts || 0;
-      document.getElementById('ad-linked').textContent = stats.summary.linkedProducts || 0;
-      document.getElementById('ad-linkrate').textContent = (stats.summary.linkRate || 0) + '% link rate';
-      document.getElementById('ad-orders').textContent = stats.summary.totalOrders || 0;
-      document.getElementById('ad-ready').textContent = stats.summary.readyOrders || 0;
-      document.getElementById('ad-pending').textContent = stats.summary.pendingOrders || 0;
-      document.getElementById('ad-errors').textContent = stats.summary.errorOrders || 0;
-    }
-  } catch (e) {
-    console.error('AutoDS stats error:', e);
-  }
-
-  // Load orders
-  try {
-    const resp = await fetch(`/api/admin/autods/orders?token=${encodeURIComponent(token)}`);
-    const data = await resp.json();
-    const orders = data.orders || [];
-
-    if (orders.length === 0) {
-      document.getElementById('autodsOrdersTable').innerHTML = '<div class="empty-state">No AutoDS orders yet â orders appear when customers purchase synced products.</div>';
-    } else {
-      let html = '<div class="table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th></tr></thead><tbody>';
-      orders.slice(0, 20).forEach(o => {
-        const statusColor = o.autods_status === 'ready' ? 'var(--green)' : o.autods_status === 'error' ? 'var(--red)' : 'var(--amber)';
-        html += `<tr>
-          <td class="mono-text">${o.shopify_order_name || '#' + o.shopify_order_id}</td>
-          <td><div style="font-size:11px">${o.customer_name || 'N/A'}</div><div style="font-size:9px;color:var(--text3)">${o.customer_email || ''}</div></td>
-          <td class="mono-text">${o.items?.length || 0}</td>
-          <td class="mono-text">$${parseFloat(o.total_price || 0).toFixed(2)}</td>
-          <td><span class="bdg" style="background:rgba(${o.autods_status === 'ready' ? '34,197,94' : o.autods_status === 'error' ? '229,62,62' : '245,158,11'},.1);color:${statusColor}">â ${o.autods_status}</span></td>
-          <td style="font-size:9px">${new Date(o.created_at).toLocaleDateString()}</td>
-        </tr>`;
-      });
-      html += '</tbody></table></div>';
-      document.getElementById('autodsOrdersTable').innerHTML = html;
-    }
-  } catch (e) {
-    document.getElementById('autodsOrdersTable').innerHTML = '<div class="empty-state">Failed to load AutoDS orders</div>';
-  }
-
-  // Load pending products
-  try {
-    const resp = await fetch(`/api/admin/autods/pending?token=${encodeURIComponent(token)}`);
-    const data = await resp.json();
-    const products = data.products || [];
-
-    if (products.length === 0) {
-      document.getElementById('autodsPendingTable').innerHTML = '<div class="empty-state">All products are linked! No pending items.</div>';
-    } else {
-      let html = '<div class="table-wrap"><table><thead><tr><th>Source</th><th>Source ID</th><th>Shopify Handle</th><th>Source URL</th><th>Action</th></tr></thead><tbody>';
-      products.slice(0, 30).forEach(p => {
-        const sourceBadge = `<span class="src s-${(p.source||'').toLowerCase()}">${(p.source||'N/A').substring(0,3).toUpperCase()}</span>`;
-        html += `<tr>
-          <td>${sourceBadge}</td>
-          <td class="mono-text" style="font-size:9px">${(p.source_id || '').substring(0, 20)}</td>
-          <td style="font-size:10px">${p.shopify_handle || 'N/A'}</td>
-          <td style="font-size:9px"><a href="${p.source_url || '#'}" target="_blank" style="color:var(--blue)">${p.source_url ? 'View' : 'N/A'}</a></td>
-          <td><button class="btn btn-g btn-sm" onclick="autodsMarkLinked('${p.source}','${p.source_id}')">Mark Linked</button></td>
-        </tr>`;
-      });
-      html += '</tbody></table></div>';
-      document.getElementById('autodsPendingTable').innerHTML = html;
-    }
-  } catch (e) {
-    document.getElementById('autodsPendingTable').innerHTML = '<div class="empty-state">Failed to load pending products</div>';
-  }
-}
-
-async function autodsDownloadCSV() {
-  window.open(`/api/admin/autods/csv?download=true&token=${encodeURIComponent(token)}`, '_blank');
-}
-
-async function autodsSyncExisting() {
-  try {
-    const resp = await fetch(`/api/admin/autods/sync-existing?token=${encodeURIComponent(token)}`, { method: 'POST' });
-    const data = await resp.json();
-    alert(`Synced ${data.registered || 0} products to AutoDS tracking`);
-    loadAutoDS();
-  } catch (e) {
-    alert('Sync failed: ' + e.message);
-  }
-}
-
-async function autodsRefresh() {
-  loadAutoDS();
-}
-
-async function autodsMarkLinked(source, sourceId) {
-  try {
-    const resp = await fetch(`/api/admin/autods/mark-linked?token=${encodeURIComponent(token)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source, sourceId })
+function renderTiersTable(tiers) {
+  currentTiers = tiers || [];
+  const tbody = document.getElementById('tiersBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  TIER_RANGES.forEach((label, i) => {
+    const row = tiers[i] || {};
+    let tr = '<tr style="border-bottom:1px solid #eee">';
+    tr += '<td style="padding:8px 10px;font-weight:600;font-size:12px;color:#333;white-space:nowrap">' + label + '</td>';
+    TIER_SOURCES.forEach(src => {
+      const val = row[src] || 1.20;
+      tr += '<td style="padding:6px 4px;text-align:center"><input type="number" step="0.01" min="1" max="5" value="' + val.toFixed(2) + '" ' +
+        'data-tier="' + i + '" data-source="' + src + '" ' +
+        'style="width:70px;text-align:center;padding:5px;border:1px solid #ddd;border-radius:4px;font-size:13px" ' +
+        'onchange="onTierChange(this)"></td>';
     });
-    const data = await resp.json();
-    if (data.success) {
-      alert('Product marked as linked in AutoDS');
-      loadAutoDS();
-    }
-  } catch (e) {
-    alert('Failed: ' + e.message);
-  }
+    tr += '</tr>';
+    tbody.innerHTML += tr;
+  });
 }
 
-// ââââââââââââââââââââ CRON JOBS ââââââââââââââââââââ
-async function loadCronJobs() {
+function onTierChange(input) {
+  const i = parseInt(input.dataset.tier);
+  const src = input.dataset.source;
+  if (!currentTiers[i]) {
+    currentTiers[i] = { max: TIER_MAXES[i] };
+    TIER_SOURCES.forEach(s => { currentTiers[i][s] = 1.20; });
+  }
+  currentTiers[i][src] = parseFloat(input.value) || 1.20;
+  loadPricingPreview();
+}
+
+function collectTiersFromUI() {
+  const tiers = [];
+  TIER_RANGES.forEach((_, i) => {
+    const row = { max: TIER_MAXES[i] };
+    TIER_SOURCES.forEach(src => {
+      const input = document.querySelector('input[data-tier="' + i + '"][data-source="' + src + '"]');
+      row[src] = input ? parseFloat(input.value) || 1.20 : (currentTiers[i] ? currentTiers[i][src] || 1.20 : 1.20);
+    });
+    tiers.push(row);
+  });
+  return tiers;
+}
+
+async function loadPricingPreview() {
+  const el = document.getElementById('pricingPreview');
+  if (!el) return;
   try {
-    const resp = await fetch(`/api/admin/cron/status?token=${encodeURIComponent(token)}`);
-    const data = await resp.json();
-
-    const badge = document.getElementById('cronStatusBadge');
-    if (data.started) {
-      badge.className = 'bdg bdg-gr';
-      badge.textContent = 'â Running';
-    } else {
-      badge.className = 'bdg bdg-re';
-      badge.textContent = 'â Stopped';
-    }
-
-    // Tasks table
-    const tasks = data.tasks || [];
-    if (tasks.length === 0) {
-      document.getElementById('cronTasksTable').innerHTML = '<div class="empty-state">No cron tasks configured</div>';
-    } else {
-      let html = '<div class="table-wrap"><table><thead><tr><th>Task</th><th>Interval</th><th>Status</th><th>Action</th></tr></thead><tbody>';
-      tasks.forEach(t => {
-        const running = t.running;
-        html += `<tr>
-          <td style="font-size:11px">${t.name}</td>
-          <td class="mono-text">${t.intervalMin} min</td>
-          <td><span class="bdg ${running ? 'bdg-gr' : 'bdg-am'}">â ${running ? 'Active' : 'Waiting'}</span></td>
-          <td><button class="btn btn-g btn-sm" onclick="cronRunTask('${t.key}')">Run Now</button></td>
-        </tr>`;
-      });
-      html += '</tbody></table></div>';
-      document.getElementById('cronTasksTable').innerHTML = html;
-    }
-
-    // History
-    const history = data.recentHistory || [];
-    if (history.length === 0) {
-      document.getElementById('cronHistoryTable').innerHTML = '<div class="empty-state">No task history yet</div>';
-    } else {
-      let html = '<div class="table-wrap"><table><thead><tr><th>Task</th><th>Status</th><th>Details</th><th>Time</th></tr></thead><tbody>';
-      history.slice(0, 30).forEach(h => {
-        const statusBadge = h.status === 'ok' ? 'bdg-gr' : h.status === 'error' ? 'bdg-re' : 'bdg-am';
-        const details = typeof h.details === 'string' ? h.details : JSON.stringify(h.details || '').substring(0, 60);
-        html += `<tr>
-          <td style="font-size:11px">${h.task}</td>
-          <td><span class="bdg ${statusBadge}">â ${h.status}</span></td>
-          <td style="font-size:9px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${details}</td>
-          <td style="font-size:9px">${h.at ? new Date(h.at).toLocaleString() : 'N/A'}</td>
-        </tr>`;
-      });
-      html += '</tbody></table></div>';
-      document.getElementById('cronHistoryTable').innerHTML = html;
-    }
-  } catch (e) {
-    document.getElementById('cronTasksTable').innerHTML = '<div class="empty-state">Failed to load cron status</div>';
-  }
+    const data = await apiCall('pricing-preview');
+    if (!data || !data.previews) { el.textContent = 'No preview available'; return; }
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f8f9fa">' +
+      '<th style="padding:6px 8px;text-align:left">Source</th><th style="padding:6px 8px;text-align:right">Cost</th>' +
+      '<th style="padding:6px 8px;text-align:right">Final Price</th><th style="padding:6px 8px;text-align:right">Multiplier</th>' +
+      '<th style="padding:6px 8px;text-align:right">Margin</th></tr></thead><tbody>';
+    data.previews.slice(0, 15).forEach(p => {
+      html += '<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 8px">' +
+        '<span style="background:#' + sourceColor(p.source) + ';color:#fff;padding:2px 6px;border-radius:3px;font-size:10px">' + p.source + '</span></td>' +
+        '<td style="padding:5px 8px;text-align:right">$' + p.sourcePrice.toFixed(2) + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;font-weight:600">$' + p.finalPrice.toFixed(2) + '</td>' +
+        '<td style="padding:5px 8px;text-align:right">' + p.multiplier.toFixed(2) + 'x</td>' +
+        '<td style="padding:5px 8px;text-align:right;color:' + (p.marginPct > 15 ? '#27ae60' : '#e74c3c') + '">' + p.marginPct.toFixed(1) + '%</td></tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch(e) { el.textContent = 'Preview error'; }
 }
 
-async function cronRunTask(taskKey) {
+function sourceColor(s) {
+  const colors = { amazon: 'ff9900', aliexpress: 'e43225', sephora: '000000', macys: 'e21a2c', shein: '222' };
+  return colors[s] || '666';
+}
+
+async function loadRepriceCount() {
   try {
-    const resp = await fetch(`/api/admin/cron/run/${taskKey}?token=${encodeURIComponent(token)}`, { method: 'POST' });
-    const data = await resp.json();
-    alert(`Task "${taskKey}" executed: ${data.result?.status || 'done'}`);
-    loadCronJobs();
-  } catch (e) {
-    alert('Task failed: ' + e.message);
-  }
+    const data = await apiCall('reprice-preview');
+    if (data && data.total > 0) {
+      const el = document.getElementById('repriceCount');
+      if (el) el.textContent = data.total + ' products in Shopify';
+    }
+  } catch(e) {}
 }
 
-// ââââââââââââââââââââ REFRESH ORDERS FROM SHOPIFY ââââââââââââââââââââ
-async function refreshOrdersFromShopify() {
+async function repriceAll() {
+  const btn = document.getElementById('btnRepriceAll');
+  const status = document.getElementById('repriceStatus');
+  if (!confirm('This will recalculate and update prices for ALL synced products in Shopify using current markup tiers. Continue?')) return;
+  btn.disabled = true;
+  btn.textContent = 'Repricing...';
+  status.style.display = 'block';
+  status.style.color = '#666';
+  status.textContent = 'Processing... This may take a few minutes for large catalogs.';
   try {
-    const resp = await fetch(`/api/crm/refresh-orders?token=${encodeURIComponent(token)}`, { method: 'POST' });
-    const data = await resp.json();
-    alert(`Synced ${data.orderCount || 0} orders from Shopify`);
-    loadDashboard();
-    if (currentPage === 'orders') loadOrders();
-  } catch (e) {
-    alert('Refresh failed: ' + e.message);
+    const result = await apiCallPost('reprice-all', {});
+    if (result && result.success) {
+      status.style.color = '#27ae60';
+      let msg = 'Done! ' + result.updated + ' updated, ' + result.skipped + ' unchanged';
+      if (result.failed > 0) msg += ', ' + result.failed + ' failed';
+      msg += ' (total: ' + result.total + ')';
+      status.textContent = msg;
+      // Show changes detail
+      if (result.changes && result.changes.length > 0) {
+        let detail = '<div style="margin-top:8px;max-height:200px;overflow-y:auto;font-size:11px;border:1px solid #e0e0e0;border-radius:4px;padding:8px">';
+        detail += '<strong>Price Changes:</strong><br>';
+        result.changes.forEach(c => {
+          detail += '<span style="color:#888">' + c.source + '</span> ' + c.sourceId.substring(0,20) + ': $' + c.oldPrice.toFixed(2) + ' → <strong>$' + c.newPrice.toFixed(2) + '</strong><br>';
+        });
+        if (result.changes.length < result.updated) detail += '... and ' + (result.updated - result.changes.length) + ' more';
+        detail += '</div>';
+        status.innerHTML = status.textContent + detail;
+      }
+    } else {
+      status.style.color = '#e74c3c';
+      status.textContent = 'Error: ' + (result?.error || 'Unknown error');
+    }
+  } catch(e) {
+    status.style.color = '#e74c3c';
+    status.textContent = 'Error: ' + e.message;
   }
+  btn.disabled = false;
+  btn.textContent = 'Reprice All Shopify Products';
 }
 
-// ââââââââââââââââââââ UTILITIES ââââââââââââââââââââ
+async function loadSettings() {
+  document.getElementById('settingsLoading').style.display = 'block';
+  document.getElementById('settingsContent').style.display = 'none';
+  try {
+    const data = await apiCall('settings');
+    if (data) {
+      // Render markup tiers table
+      if (data.markup_tiers && data.markup_tiers.length > 0) {
+        renderTiersTable(data.markup_tiers);
+      } else {
+        // Build default tiers if none returned
+        const defaults = [];
+        const defMults = { amazon: [1.70,1.35,1.25,1.20,1.15,1.10,1.07,1.05], aliexpress: [2.50,1.70,1.50,1.40,1.30,1.22,1.15,1.10],
+          sephora: [1.50,1.30,1.22,1.18,1.12,1.08,1.06,1.05], macys: [1.50,1.30,1.22,1.18,1.12,1.08,1.06,1.05],
+          shein: [2.50,1.70,1.50,1.40,1.30,1.22,1.15,1.10], 'default': [1.70,1.35,1.25,1.20,1.15,1.10,1.07,1.05] };
+        TIER_MAXES.forEach((max, i) => {
+          const row = { max };
+          TIER_SOURCES.forEach(src => { row[src] = defMults[src][i]; });
+          defaults.push(row);
+        });
+        renderTiersTable(defaults);
+      }
+      if (data.shipping) {
+        document.getElementById('freeShippingThreshold').value = data.shipping.freeThreshold ?? 35;
+      }
+      if (data.returns) {
+        document.getElementById('returnAmazon').value = data.returns.windowAmazon ?? 30;
+        document.getElementById('returnAliexpress').value = data.returns.windowAliexpress ?? 15;
+      }
+      if (data.notifications) {
+        document.getElementById('notifNewOrder').checked = data.notifications.newOrder !== false;
+        document.getElementById('notifManualRequired').checked = data.notifications.manualRequired !== false;
+        document.getElementById('notifReturnRequest').checked = data.notifications.returnRequest !== false;
+        document.getElementById('notifApiDown').checked = data.notifications.apiDown !== false;
+        document.getElementById('notifLowProfit').checked = data.notifications.lowProfit === true;
+      }
+      if (data.emails) {
+        document.getElementById('emailFromName').value = data.emails.fromName || 'StyleHub Miami';
+        document.getElementById('emailReplyTo').value = data.emails.replyTo || '';
+      }
+      // Load preview and reprice count
+      loadPricingPreview();
+      loadRepriceCount();
+    }
+  } catch (e) { console.error('Failed to load settings:', e); }
+  document.getElementById('settingsLoading').style.display = 'none';
+  document.getElementById('settingsContent').style.display = 'block';
+}
+
+async function saveSettings() {
+  const settings = {
+    markup_tiers: collectTiersFromUI(),
+    auto_reprice: document.getElementById('autoRepriceToggle').checked,
+    shipping: {
+      freeThreshold: parseInt(document.getElementById('freeShippingThreshold').value) || 35,
+      plusFreeShipping: true
+    },
+    returns: {
+      windowAmazon: parseInt(document.getElementById('returnAmazon').value) || 30,
+      windowAliexpress: parseInt(document.getElementById('returnAliexpress').value) || 15
+    },
+    notifications: {
+      newOrder: document.getElementById('notifNewOrder').checked,
+      manualRequired: document.getElementById('notifManualRequired').checked,
+      returnRequest: document.getElementById('notifReturnRequest').checked,
+      apiDown: document.getElementById('notifApiDown').checked,
+      lowProfit: document.getElementById('notifLowProfit').checked
+    },
+    emails: {
+      fromName: document.getElementById('emailFromName').value,
+      replyTo: document.getElementById('emailReplyTo').value
+    }
+  };
+
+  const result = await apiCallPost('settings', settings);
+  const msg = document.getElementById('settingsMsg');
+  if (result && result.success) {
+    msg.style.color = '#27ae60';
+    let text = 'Settings saved!';
+    if (result.tiersChanged) text += ' Markup tiers updated.';
+    if (result.autoRepriceTriggered) text += ' Auto-repricing started in background...';
+    msg.textContent = text;
+    // Refresh preview with new tiers
+    setTimeout(() => loadPricingPreview(), 500);
+  } else {
+    msg.style.color = '#e74c3c';
+    msg.textContent = 'Failed to save settings';
+  }
+  setTimeout(() => msg.textContent = '', 6000);
+}
+
+// ──────────────────── UTILITIES ────────────────────
 function toggleAlerts() {
   const alertBar = document.getElementById('alertBar');
   alertBar.style.display = alertBar.style.display === 'none' ? 'block' : 'none';
 }
 
-// ââââââââââââââââââââ INIT ââââââââââââââââââââ
+// ──────────────────── INIT ────────────────────
 window.addEventListener('load', () => {
   if (token && token !== 'stylehub-admin-2026') {
     showApp();

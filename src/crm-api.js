@@ -921,11 +921,13 @@ function setupCRMApi(app) {
 
   app.post('/api/crm/settings', auth, function(req, res) {
     try {
+      let tiersChanged = false;
       // Save markup_tiers to DB (source of truth for pricing)
       if (req.body.markup_tiers && Array.isArray(req.body.markup_tiers)) {
         try {
           const { bulkUpsertMarkupTiers } = require('./utils/db');
           bulkUpsertMarkupTiers(req.body.markup_tiers);
+          tiersChanged = true;
           logger.info('crm', 'Markup tiers saved to DB', { count: req.body.markup_tiers.length });
         } catch(e) {
           logger.error('crm', 'Failed to save markup tiers to DB', { error: e.message });
@@ -935,10 +937,60 @@ function setupCRMApi(app) {
       const settingsToSave = { ...req.body };
       // Don't duplicate tiers in the JSON file — DB is source of truth
       delete settingsToSave.markup_tiers;
+      delete settingsToSave.auto_reprice; // Don't persist flag
       fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settingsToSave, null, 2));
       // Invalidate pricing cache so new markup takes effect immediately
       try { const { invalidatePricingCache } = require('./utils/pricing'); invalidatePricingCache(); } catch(e) {}
-      res.json({ success: true });
+
+      // Auto-reprice: if tiers changed AND auto_reprice is enabled, run repricing in background
+      if (tiersChanged && req.body.auto_reprice === true) {
+        logger.info('crm', 'Auto-repricing triggered after markup tier change');
+        // Fire and forget — don't block the settings save response
+        (async () => {
+          try {
+            const { getAllMappingsForRepricing, updateMappingPrice, logSync: logSyncDb } = require('./utils/db');
+            const { calculateFinalPrice } = require('./utils/pricing');
+            const mappings = getAllMappingsForRepricing();
+            let updated = 0, failed = 0;
+            const BATCH_SIZE = 4;
+            for (let i = 0; i < mappings.length; i += BATCH_SIZE) {
+              const batch = mappings.slice(i, i + BATCH_SIZE);
+              await Promise.allSettled(batch.map(async (m) => {
+                try {
+                  const variantResp = await shopifyAdmin('GET', `/variants/${m.shopify_variant_id}.json`);
+                  const variant = variantResp?.variant;
+                  if (!variant) return;
+                  let landedCost = null;
+                  try {
+                    const metaResp = await shopifyAdmin('GET', `/products/${m.shopify_product_id}/metafields.json?namespace=dealshub`);
+                    const lcMeta = (metaResp?.metafields || []).find(mf => mf.key === 'landed_cost');
+                    if (lcMeta) landedCost = parseFloat(lcMeta.value);
+                  } catch(e) {}
+                  if (!landedCost || landedCost <= 0) return;
+                  let sourcePrice = m.source_store === 'aliexpress' ? landedCost / 0.42 : landedCost;
+                  const newPricing = calculateFinalPrice(sourcePrice, m.source_store, {});
+                  if (!newPricing || !newPricing.price) return;
+                  const oldPrice = parseFloat(variant.price);
+                  if (Math.abs(oldPrice - newPricing.price) < 0.01) return;
+                  await shopifyAdmin('PUT', `/variants/${m.shopify_variant_id}.json`, {
+                    variant: { id: m.shopify_variant_id, price: newPricing.price.toFixed(2), compare_at_price: newPricing.compareAt ? newPricing.compareAt.toFixed(2) : null }
+                  });
+                  updateMappingPrice(m.id, newPricing.price, newPricing.compareAt);
+                  logSyncDb(m.source_store, m.source_product_id, 'auto-reprice', 'success',
+                    JSON.stringify({ oldPrice, newPrice: newPricing.price }));
+                  updated++;
+                } catch(e) { failed++; }
+              }));
+              if (i + BATCH_SIZE < mappings.length) await new Promise(r => setTimeout(r, 1000));
+            }
+            logger.info('crm', `Auto-repricing complete: ${updated} updated, ${failed} failed out of ${mappings.length}`);
+          } catch(e) {
+            logger.error('crm', 'Auto-repricing background job failed', { error: e.message });
+          }
+        })();
+      }
+
+      res.json({ success: true, tiersChanged, autoRepriceTriggered: tiersChanged && req.body.auto_reprice === true });
     } catch(e) {
       res.status(500).json({ error: e.message });
     }
@@ -964,6 +1016,198 @@ function setupCRMApi(app) {
     } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
+  // ─── REPRICE ALL: Update all synced Shopify products with current markup tiers ───
+
+  app.post('/api/crm/reprice-all', auth, async function(req, res) {
+    try {
+      const { getAllMappingsForRepricing, updateMappingPrice, logSync } = require('./utils/db');
+      const { calculateFinalPrice, invalidatePricingCache } = require('./utils/pricing');
+
+      // Ensure we use fresh tiers
+      invalidatePricingCache();
+
+      const mappings = getAllMappingsForRepricing();
+      if (!mappings || mappings.length === 0) {
+        return res.json({ success: true, message: 'No synced products to reprice', updated: 0, failed: 0, total: 0 });
+      }
+
+      logger.info('crm', `Starting mass repricing for ${mappings.length} products`);
+
+      let updated = 0;
+      let failed = 0;
+      let skipped = 0;
+      const errors = [];
+      const changes = [];
+
+      // Process in batches of 4 to respect Shopify rate limits (2 calls/sec bucket)
+      const BATCH_SIZE = 4;
+      const BATCH_DELAY = 1000; // 1s between batches
+
+      for (let i = 0; i < mappings.length; i += BATCH_SIZE) {
+        const batch = mappings.slice(i, i + BATCH_SIZE);
+
+        const results = await Promise.allSettled(batch.map(async (m) => {
+          try {
+            // We need the sourcePrice (original source price) to recalculate.
+            // last_price is already the marked-up price, and last_original_price is compareAt.
+            // We need to fetch the current variant from Shopify to get the current price,
+            // then find the source product's original cost.
+            // Strategy: Fetch the Shopify product metafields to get landed_cost,
+            // then back-calculate or use the source store info.
+
+            // First: Get the current Shopify variant to know the current price
+            const variantResp = await shopifyAdmin('GET', `/variants/${m.shopify_variant_id}.json`);
+            const variant = variantResp?.variant;
+            if (!variant) {
+              return { mapping: m, status: 'skipped', reason: 'variant_not_found' };
+            }
+
+            // Get product metafields to find landed_cost (= original source cost)
+            let landedCost = null;
+            try {
+              const metaResp = await shopifyAdmin('GET', `/products/${m.shopify_product_id}/metafields.json?namespace=dealshub`);
+              const metafields = metaResp?.metafields || [];
+              const lcMeta = metafields.find(mf => mf.key === 'landed_cost');
+              if (lcMeta) landedCost = parseFloat(lcMeta.value);
+            } catch(e) {
+              // metafields not available - try to estimate from last_price
+            }
+
+            // If no landed_cost metafield, we can't accurately reprice
+            // Use a fallback: estimate source price from the current variant price
+            // For AliExpress (MSRP model): we stored landed_cost = MSRP * 0.42
+            // For others: landed_cost = sourcePrice
+            if (!landedCost || landedCost <= 0) {
+              return { mapping: m, status: 'skipped', reason: 'no_landed_cost' };
+            }
+
+            // For AliExpress, landedCost is already MSRP * 0.42, so we need to reverse it
+            // to get the "sourcePrice" that calculateFinalPrice expects (which is MSRP for AliExpress)
+            let sourcePrice;
+            if (m.source_store === 'aliexpress') {
+              // landedCost = MSRP * 0.42 → MSRP = landedCost / 0.42
+              sourcePrice = landedCost / 0.42;
+            } else {
+              // For Amazon etc: landedCost = sourcePrice (+ shipping + fees)
+              sourcePrice = landedCost;
+            }
+
+            // Recalculate with current tiers
+            const newPricing = calculateFinalPrice(sourcePrice, m.source_store, {});
+
+            if (!newPricing || !newPricing.price) {
+              return { mapping: m, status: 'skipped', reason: 'pricing_failed' };
+            }
+
+            const oldPrice = parseFloat(variant.price);
+            const newPrice = newPricing.price;
+            const oldCompareAt = variant.compare_at_price ? parseFloat(variant.compare_at_price) : null;
+            const newCompareAt = newPricing.compareAt;
+
+            // Skip if price hasn't changed (within $0.01)
+            if (Math.abs(oldPrice - newPrice) < 0.01 &&
+                ((!oldCompareAt && !newCompareAt) || (oldCompareAt && newCompareAt && Math.abs(oldCompareAt - newCompareAt) < 0.01))) {
+              return { mapping: m, status: 'unchanged' };
+            }
+
+            // Update the variant price in Shopify
+            const updatePayload = {
+              variant: {
+                id: m.shopify_variant_id,
+                price: newPrice.toFixed(2),
+                compare_at_price: newCompareAt ? newCompareAt.toFixed(2) : null
+              }
+            };
+
+            await shopifyAdmin('PUT', `/variants/${m.shopify_variant_id}.json`, updatePayload);
+
+            // Update DB mapping
+            updateMappingPrice(m.id, newPrice, newCompareAt);
+
+            // Log the change
+            logSync(m.source_store, m.source_product_id, 'reprice', 'success',
+              JSON.stringify({ oldPrice, newPrice, oldCompareAt, newCompareAt, multiplier: newPricing.multiplier }));
+
+            return {
+              mapping: m,
+              status: 'updated',
+              oldPrice,
+              newPrice,
+              oldCompareAt,
+              newCompareAt
+            };
+          } catch (e) {
+            return { mapping: m, status: 'error', error: e.message };
+          }
+        }));
+
+        // Process results
+        for (const r of results) {
+          if (r.status === 'fulfilled') {
+            const val = r.value;
+            if (val.status === 'updated') {
+              updated++;
+              changes.push({
+                source: val.mapping.source_store,
+                sourceId: val.mapping.source_product_id,
+                shopifyVariantId: val.mapping.shopify_variant_id,
+                oldPrice: val.oldPrice,
+                newPrice: val.newPrice
+              });
+            } else if (val.status === 'unchanged') {
+              skipped++;
+            } else if (val.status === 'skipped') {
+              skipped++;
+            } else if (val.status === 'error') {
+              failed++;
+              errors.push({ source: val.mapping.source_store, id: val.mapping.source_product_id, error: val.error });
+            }
+          } else {
+            failed++;
+            errors.push({ error: r.reason?.message || 'Unknown error' });
+          }
+        }
+
+        // Rate limit delay between batches (skip on last batch)
+        if (i + BATCH_SIZE < mappings.length) {
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+        }
+      }
+
+      logger.info('crm', `Mass repricing complete: ${updated} updated, ${skipped} unchanged, ${failed} failed out of ${mappings.length} total`);
+
+      res.json({
+        success: true,
+        message: `Repricing complete`,
+        total: mappings.length,
+        updated,
+        skipped,
+        failed,
+        changes: changes.slice(0, 50), // Limit response size
+        errors: errors.slice(0, 20)
+      });
+    } catch (e) {
+      logger.error('crm', 'Mass repricing failed', { error: e.message });
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // ─── REPRICE STATUS: Get count of products that would be repriced ───
+
+  app.get('/api/crm/reprice-preview', auth, function(req, res) {
+    try {
+      const { getAllMappingsForRepricing } = require('./utils/db');
+      const mappings = getAllMappingsForRepricing();
+      const bySource = {};
+      for (const m of mappings) {
+        bySource[m.source_store] = (bySource[m.source_store] || 0) + 1;
+      }
+      res.json({ success: true, total: mappings.length, bySource });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   app.post('/api/crm/refresh-orders', auth, async function(req, res) {
     try {
       await hydrateOrdersFromShopify(true);
@@ -973,7 +1217,7 @@ function setupCRMApi(app) {
     }
   });
 
-  logger.info('crm', 'CRM Pro endpoints loaded (customers, analytics, settings, hydration)');
+  logger.info('crm', 'CRM Pro endpoints loaded (customers, analytics, settings, hydration, repricing)');
 }
 
 module.exports = { setupCRMApi, hydrateOrdersFromShopify };

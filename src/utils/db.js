@@ -741,6 +741,43 @@ function getTierMultiplier(source, price) {
   }
 }
 
+// ---- REPRICING: Get all mappings that have a Shopify variant to reprice ----
+
+function getAllMappingsForRepricing() {
+  const d = getDb();
+  if (!d) return [];
+  try {
+    return d.prepare(`
+      SELECT id, source_store, source_product_id, source_variant_id,
+             shopify_product_id, shopify_variant_id, shopify_handle,
+             last_price, last_original_price, sync_status
+      FROM product_mappings
+      WHERE shopify_variant_id IS NOT NULL
+        AND sync_status = 'synced'
+      ORDER BY source_store, updated_at DESC
+    `).all();
+  } catch (e) {
+    logger.error('db', 'getAllMappingsForRepricing failed', { error: e.message });
+    return [];
+  }
+}
+
+function updateMappingPrice(id, newPrice, newOriginalPrice) {
+  const d = getDb();
+  if (!d) return false;
+  try {
+    const stmt = d.prepare(`
+      UPDATE product_mappings
+      SET last_price = ?, last_original_price = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `);
+    return stmt.run(newPrice, newOriginalPrice, id).changes > 0;
+  } catch (e) {
+    logger.error('db', 'updateMappingPrice failed', { error: e.message });
+    return false;
+  }
+}
+
 module.exports = {
   getDb,
   findMapping,
@@ -770,5 +807,7 @@ module.exports = {
   getMarkupTiers,
   getMarkupTiersGrouped,
   bulkUpsertMarkupTiers,
-  getTierMultiplier
+  getTierMultiplier,
+  getAllMappingsForRepricing,
+  updateMappingPrice
 };

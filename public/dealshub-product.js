@@ -115,30 +115,79 @@
       html+='<div class="dhpdp-stock-status" style="display:flex;align-items:center;gap:6px;margin-bottom:16px"><span style="width:8px;height:8px;border-radius:50%;background:'+(isInStock?'#22c55e':'#f59e0b')+'"></span><span style="font-size:14px;color:'+(isInStock?'#16a34a':'#d97706')+'">'+(isInStock?'In Stock':'Limited Availability')+'</span></div>';
     }
 
-    // Variant selector — FIX v1.2: Disable unavailable variants, pre-select first available
-    // Build a lookup: option value name → variant availability
-    var variantAvailMap = {};
-    if(p.variants && p.variants.length > 0){
+    // Variant selector — FIX v1.3: Multi-option availability (Color+Size combos)
+    // For single-option products: disable values with no available variant
+    // For multi-option products: disable values where NO combination is available
+    //   and dynamically update when user changes selection
+
+    // Parse variant titles into option parts for combo matching
+    var variantParts = []; // [{parts: ['Black','M'], available: true, variant: v}, ...]
+    if(p.variants && p.variants.length > 0 && p.options && p.options.length > 0){
       p.variants.forEach(function(v){
-        // Map variant title (e.g. "TG392 Black") to availability
-        variantAvailMap[v.title] = v.available !== false;
+        var title = v.title || '';
+        var parts;
+        // Multi-option: "Black / M" or "Color: Black / Size: M"
+        if(title.indexOf(' / ') >= 0){
+          parts = title.split(' / ').map(function(s){ return s.replace(/^[^:]+:\s*/, '').trim(); });
+        } else {
+          // Single option: "TG392 Black" or "Black"
+          parts = [title.trim()];
+        }
+        variantParts.push({ parts: parts, available: v.available !== false, variant: v });
       });
     }
 
-    function isOptionValueAvailable(optionValues, valueIndex){
-      if(!p.variants || p.variants.length === 0) return true; // no variant data, assume available
-      var val = optionValues[valueIndex];
-      if(!val) return true;
-      var valName = val.value;
-      // Direct match: variant title === value name
-      if(variantAvailMap.hasOwnProperty(valName)) return variantAvailMap[valName];
-      // Partial match: variant title contains value name
-      for(var vTitle in variantAvailMap){
-        if(vTitle.indexOf(valName) >= 0 || valName.indexOf(vTitle) >= 0){
-          return variantAvailMap[vTitle];
+    // Check if an option value has ANY available variant (globally, ignoring other selections)
+    function isValueGloballyAvailable(optionIndex, valueName){
+      if(variantParts.length === 0) return true;
+      for(var i=0;i<variantParts.length;i++){
+        var vp = variantParts[i];
+        if(!vp.available) continue;
+        var part = vp.parts[optionIndex] || '';
+        if(part === valueName || part.indexOf(valueName) >= 0 || valueName.indexOf(part) >= 0){
+          return true;
         }
       }
-      return true; // default to available if no match found
+      return false;
+    }
+
+    // Check if an option value is available GIVEN current selections in other options
+    function isValueAvailableWithSelections(optionIndex, valueName){
+      if(variantParts.length === 0) return true;
+      // Get current selections for all OTHER options
+      var otherSelections = {};
+      if(container){
+        container.querySelectorAll('.dhpdp-variants > div').forEach(function(group){
+          var sel = group.querySelector('.dhpdp-opt-sel');
+          if(sel){
+            var oi = parseInt(sel.dataset.option);
+            if(oi !== optionIndex){
+              otherSelections[oi] = sel.dataset.valtitle || '';
+            }
+          }
+        });
+      }
+      var hasOtherSelections = Object.keys(otherSelections).length > 0;
+      if(!hasOtherSelections) return isValueGloballyAvailable(optionIndex, valueName);
+
+      for(var i=0;i<variantParts.length;i++){
+        var vp = variantParts[i];
+        if(!vp.available) continue;
+        var part = vp.parts[optionIndex] || '';
+        var matchesThis = (part === valueName || part.indexOf(valueName) >= 0 || valueName.indexOf(part) >= 0);
+        if(!matchesThis) continue;
+        // Check if all other selections match
+        var allMatch = true;
+        for(var oi in otherSelections){
+          var otherPart = vp.parts[parseInt(oi)] || '';
+          var otherVal = otherSelections[oi];
+          if(otherPart !== otherVal && otherPart.indexOf(otherVal) < 0 && otherVal.indexOf(otherPart) < 0){
+            allMatch = false; break;
+          }
+        }
+        if(allMatch) return true;
+      }
+      return false;
     }
 
     if(p.options&&p.options.length){
@@ -147,23 +196,23 @@
         var opt=p.options[oi];
         html+='<div style="margin-bottom:12px"><label style="font-size:14px;font-weight:600;color:#333;display:block;margin-bottom:6px">'+escHTML(opt.name)+': <span class="dhpdp-opt-label" data-option="'+oi+'" style="color:#e53e3e;font-weight:700"></span></label>';
         html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
-        // Find first available index for pre-selection
+        // Find first globally available index for pre-selection
         var firstAvailIdx = -1;
         for(var fi=0;fi<(opt.values||[]).length;fi++){
-          if(isOptionValueAvailable(opt.values, fi)){ firstAvailIdx=fi; break; }
+          if(isValueGloballyAvailable(oi, opt.values[fi].value)){ firstAvailIdx=fi; break; }
         }
         for(var vi=0;vi<(opt.values||[]).length;vi++){
           var val=opt.values[vi];
-          var isAvail = isOptionValueAvailable(opt.values, vi);
+          var isAvail = isValueGloballyAvailable(oi, val.value);
           // Pre-select first AVAILABLE value (not first overall)
           var isSelected = isAvail && (val.selected || (firstAvailIdx === vi && !opt.values.some(function(v){return v.selected})));
           var sel=isSelected?' dhpdp-opt-sel':'';
-          var unavailStyle = !isAvail ? 'opacity:0.4;cursor:not-allowed;position:relative;' : '';
+          var unavailCls = !isAvail ? ' dhpdp-opt-unavail' : '';
           var unavailAttr = !isAvail ? ' data-unavailable="1" title="Sold Out"' : '';
           if(val.image){
-            html+='<button class="dhpdp-opt'+sel+'"'+unavailAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="width:40px;height:40px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';padding:2px;cursor:'+(isAvail?'pointer':'not-allowed')+';background:#fff;'+unavailStyle+'"><img src="'+escHTML(val.image)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px">'+(isAvail?'':'<span style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.5)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"/></svg></span>')+'</button>';
+            html+='<button class="dhpdp-opt'+sel+unavailCls+'"'+unavailAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="width:40px;height:40px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';padding:2px;cursor:'+(isAvail?'pointer':'not-allowed')+';background:#fff;'+(isAvail?'':'opacity:0.4;position:relative;')+'"><img src="'+escHTML(val.image)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px">'+(isAvail?'':'<span style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.5)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"/></svg></span>')+'</button>';
           }else{
-            html+='<button class="dhpdp-opt'+sel+'"'+unavailAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="padding:8px 16px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';cursor:'+(isAvail?'pointer':'not-allowed')+';background:'+(isSelected?'#fef2f2':'#fff')+';font-size:13px;color:'+(isAvail?'#333':'#bbb')+';'+unavailStyle+(isAvail?'':'text-decoration:line-through;')+'">'+escHTML(val.value)+'</button>';
+            html+='<button class="dhpdp-opt'+sel+unavailCls+'"'+unavailAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="padding:8px 16px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';cursor:'+(isAvail?'pointer':'not-allowed')+';background:'+(isSelected?'#fef2f2':'#fff')+';font-size:13px;color:'+(isAvail?'#333':'#bbb')+';'+(isAvail?'':'opacity:0.4;text-decoration:line-through;')+'">'+escHTML(val.value)+'</button>';
           }
         }
         html+='</div></div>';
@@ -322,14 +371,13 @@
     var initialVariant = findVariantBySelection();
     if(initialVariant) updatePriceDisplay(initialVariant);
 
-    // FIX v1.2: Update stock status display and Add to Cart button based on variant availability
+    // FIX v1.3: Update stock status, buttons, and cross-option availability
     function updateAvailabilityUI(variant){
       var atcBtnEl = document.getElementById('dhpdp-atc');
       var buyBtnEl = document.getElementById('dhpdp-buy');
       var stickyAtcEl = container.querySelector('.dhpdp-sticky-atc');
       var stockEl = container.querySelector('.dhpdp-stock-status');
       var isAvail = !variant || variant.available !== false;
-      // Update stock indicator
       if(stockEl){
         if(isAvail){
           stockEl.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block"></span> <span style="font-size:14px;color:#16a34a">In Stock</span>';
@@ -337,17 +385,14 @@
           stockEl.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block"></span> <span style="font-size:14px;color:#ef4444">Sold Out</span>';
         }
       }
-      // Update Add to Cart / Buy Now buttons
       [atcBtnEl, stickyAtcEl].forEach(function(b){
         if(!b) return;
         if(isAvail){
           b.disabled = false; b.style.opacity = '1'; b.style.cursor = 'pointer';
-          b.textContent = b === stickyAtcEl ? 'Add to Cart' : 'Add to Cart';
-          b.style.background = '#e53e3e';
+          b.textContent = 'Add to Cart'; b.style.background = '#e53e3e';
         } else {
           b.disabled = true; b.style.opacity = '0.5'; b.style.cursor = 'not-allowed';
-          b.textContent = 'Sold Out';
-          b.style.background = '#999';
+          b.textContent = 'Sold Out'; b.style.background = '#999';
         }
       });
       if(buyBtnEl){
@@ -361,9 +406,41 @@
       }
     }
 
+    // FIX v1.3: After selecting an option, update OTHER option groups to reflect cross-availability
+    function refreshOptionAvailability(){
+      if(!p.options || p.options.length <= 1) return; // Only needed for multi-option
+      container.querySelectorAll('.dhpdp-variants > div').forEach(function(group){
+        var btns = group.querySelectorAll('.dhpdp-opt');
+        btns.forEach(function(btn){
+          var oi = parseInt(btn.dataset.option);
+          var vi = parseInt(btn.dataset.value);
+          if(!p.options[oi] || !p.options[oi].values[vi]) return;
+          var valName = p.options[oi].values[vi].value;
+          var isSel = btn.classList.contains('dhpdp-opt-sel');
+          var avail = isValueAvailableWithSelections(oi, valName);
+          // Update visual state
+          if(avail){
+            btn.removeAttribute('data-unavailable');
+            btn.removeAttribute('title');
+            btn.classList.remove('dhpdp-opt-unavail');
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+            if(!isSel){ btn.style.color = '#333'; btn.style.textDecoration = 'none'; }
+          } else {
+            btn.setAttribute('data-unavailable', '1');
+            btn.setAttribute('title', 'Sold Out');
+            btn.classList.add('dhpdp-opt-unavail');
+            btn.style.opacity = '0.4';
+            btn.style.cursor = 'not-allowed';
+            if(!isSel){ btn.style.color = '#bbb'; btn.style.textDecoration = 'line-through'; }
+          }
+        });
+      });
+    }
+
     container.querySelectorAll('.dhpdp-opt').forEach(function(btn){
       btn.addEventListener('click',function(){
-        // FIX v1.2: Block clicks on unavailable variants
+        // Block clicks on unavailable variants
         if(this.dataset.unavailable === '1') return;
 
         var optIdx=this.dataset.option;
@@ -374,15 +451,19 @@
         });
         this.style.borderColor='#e53e3e';this.style.background='#fef2f2';this.classList.add('dhpdp-opt-sel');
 
-        // Update label, price, image and availability
+        // Update label, price, image and cross-option availability
         updateOptionLabels();
+        refreshOptionAvailability(); // Update other option groups based on new selection
         var variant = findVariantBySelection();
         if(variant){
           updatePriceDisplay(variant);
           updateMainImage(variant);
           updateAvailabilityUI(variant);
+        } else {
+          // If no exact variant match (happens in multi-option when combo doesn't exist)
+          updateAvailabilityUI({ available: false });
         }
-        // Fallback: if variant has no image, use option value image from the clicked button
+        // Fallback image from clicked button
         if(!variant || !variant.image){
           var btnImg = this.querySelector('img');
           if(btnImg && btnImg.src){

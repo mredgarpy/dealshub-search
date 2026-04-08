@@ -265,21 +265,22 @@ class AliExpressAdapter extends BaseAdapter {
   }
 
   async getProduct(productId, opts = {}) {
-    // ==== STRATEGY: Call item_detail_2 + item_detail_6 + item_review in PARALLEL ====
+    // ==== STRATEGY: Call item_detail_2 + item_detail_6 in PARALLEL, then item_review after ====
     // item_detail_2: shipping, origin, seller, sku, images, title
     // item_detail_6: description HTML, description images, specs, reviews, video
-    // item_review: customer reviews with text, rating, images
-    // Merge all for a complete PDP
+    // item_review: fetched after to avoid RapidAPI rate limits
 
-    const [res2, res6, resReviews] = await Promise.allSettled([
+    const [res2, res6] = await Promise.allSettled([
       this._fetchDetailEndpoint(DETAIL_PRIMARY, productId),
-      this._fetchDetailEndpoint(DETAIL_ENRICHMENT, productId),
-      this._fetchReviews(productId)
+      this._fetchDetailEndpoint(DETAIL_ENRICHMENT, productId)
     ]);
 
     const data2 = res2.status === 'fulfilled' ? res2.value : null;
     const data6 = res6.status === 'fulfilled' ? res6.value : null;
-    const reviewsData = resReviews.status === 'fulfilled' ? resReviews.value : null;
+
+    // Fetch reviews after detail endpoints to avoid rate limiting
+    let reviewsData = null;
+    try { reviewsData = await this._fetchReviews(productId); } catch (e) { /* non-critical */ }
 
     // If item_detail_2 failed, try fallback endpoint
     let primaryData = data2;

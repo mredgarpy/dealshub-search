@@ -1,0 +1,14 @@
+{
+  "version": "3.3.0",
+  "lastBackup": "v3.3.0_2026-04-08T15-13-57",
+  "backups": [
+    {
+      "name": "v3.3.0_2026-04-08T15-13-57",
+      "version": "3.3.0",
+      "timestamp": "2026-04-08T17:13:57.000Z",
+      "tag": "Post-audit: 4 critical fixes + paused stores hidden + redirects + full working state",
+      "themeAssets": 138,
+      "backendFiles": 11
+    }
+  ]
+}

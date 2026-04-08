@@ -148,14 +148,18 @@ class AmazonAdapter extends BaseAdapter {
   }
 
   async getProduct(asin) {
-    // Fetch product details AND offers in parallel (Option B from spec)
+    // Fetch product details, offers AND reviews in parallel
     const detailsPromise = this.fetchWithRetry(
       `https://${API_HOST}/product-details?asin=${encodeURIComponent(asin)}&country=US`,
       { headers: this.rapidHeaders(API_HOST) }
     );
     const offersPromise = this.getProductOffers(asin);
+    const reviewsPromise = this.getReviews(asin, 8).catch(e => {
+      logger.warn('amazon', `Reviews fetch failed for ${asin}: ${e.message}`);
+      return { reviews: [], summary: null };
+    });
 
-    const [data, offers] = await Promise.all([detailsPromise, offersPromise]);
+    const [data, offers, reviewsData] = await Promise.all([detailsPromise, offersPromise, reviewsPromise]);
 
     if (!data || !data.data) {
       logger.warn('amazon', `Product not found: ${asin}`);
@@ -249,6 +253,36 @@ class AmazonAdapter extends BaseAdapter {
       product.rawSourceMeta.bestOfferDeliveryTime = bestOffer?.delivery_time || null;
       product.rawSourceMeta.bestOfferSeller = bestOffer?.seller || null;
       product.rawSourceMeta.bestOfferSellerRating = bestOffer?.seller_star_rating || null;
+    }
+
+    // Enrich product with reviews data from /product-reviews endpoint
+    if (product && reviewsData) {
+      // Top reviews — only fill if normalizeProduct didn't already get them from product-details
+      if ((!product.topReviews || product.topReviews.length === 0) && reviewsData.reviews && reviewsData.reviews.length > 0) {
+        product.topReviews = reviewsData.reviews.map(r => ({
+          title: r.title || '',
+          comment: r.body || '',
+          rating: r.rating || 0,
+          date: r.date || '',
+          author: r.author || '',
+          avatar: null,
+          images: Array.isArray(r.images) ? r.images : [],
+          isVerified: r.verified || false,
+          helpfulVotes: r.helpful ? `${r.helpful} people found this helpful` : '',
+          variant: null
+        })).filter(r => r.comment || r.title);
+        logger.info('amazon', `Enriched topReviews from /product-reviews for ${asin}: ${product.topReviews.length} reviews`);
+      }
+      // Rating distribution from summary
+      if (!product.ratingDistribution && reviewsData.summary && reviewsData.summary.starsBreakdown) {
+        const sb = reviewsData.summary.starsBreakdown;
+        product.ratingDistribution = {};
+        for (let i = 1; i <= 5; i++) {
+          const val = sb[String(i)] || sb[i] || sb[`${i}_star`] || 0;
+          product.ratingDistribution[i] = typeof val === 'string' ? parseInt(val) : val;
+        }
+        logger.info('amazon', `Enriched ratingDistribution from /product-reviews for ${asin}`);
+      }
     }
 
     return product;

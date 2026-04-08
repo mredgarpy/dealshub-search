@@ -21,6 +21,7 @@ const SEARCH_ENDPOINTS = [
 const DETAIL_PRIMARY = '/item_detail_2';
 const DETAIL_ENRICHMENT = '/item_detail_6';
 const DETAIL_FALLBACK = '/item_detail_3';
+const ITEM_DESC_ENDPOINT = '/item_desc';
 const STORE_INFO_ENDPOINT = '/store_info';
 
 // In-memory cache for store_info (24h TTL)
@@ -158,6 +159,51 @@ class AliExpressAdapter extends BaseAdapter {
       return data.result;
     } catch (e) {
       logger.warn('aliexpress', `${endpoint} failed`, { error: e.message, productId });
+      return null;
+    }
+  }
+
+  // Fetch item_desc — dedicated description endpoint (fallback when item_detail_6 has no description)
+  // Returns { html, images[] } or null
+  async _fetchItemDesc(productId) {
+    try {
+      const url = `https://${SEARCH_HOST}${ITEM_DESC_ENDPOINT}?itemId=${encodeURIComponent(productId)}&language=en`;
+      const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
+      if (!data || !data.result) {
+        logger.warn('aliexpress', 'item_desc returned no result', { productId });
+        return null;
+      }
+      const item = data.result.item || data.result;
+      const desc = item.description || item.desc || data.result.description;
+      if (!desc) {
+        logger.warn('aliexpress', 'item_desc has no description field', { productId, keys: Object.keys(data.result).join(',') });
+        return null;
+      }
+      // description can be { html, images } or a string
+      if (typeof desc === 'object') {
+        const images = (desc.images || [])
+          .filter(img => typeof img === 'string' && img.length > 5)
+          .map(img => img.startsWith('//') ? 'https:' + img : img);
+        const html = desc.html || '';
+        logger.info('aliexpress', 'item_desc returned description object', { productId, imageCount: images.length, htmlLen: html.length });
+        return { html, images };
+      }
+      if (typeof desc === 'string' && desc.length > 20) {
+        // Extract images from HTML string
+        const imgMatches = desc.match(/<img[^>]+src=["']([^"' ]+)/gi) || [];
+        const images = imgMatches.map(m => {
+          const src = m.match(/src=["']([^"' ]+)/);
+          if (!src) return null;
+          let url = src[1];
+          if (url.startsWith('//')) url = 'https:' + url;
+          return url;
+        }).filter(Boolean);
+        logger.info('aliexpress', 'item_desc returned HTML string', { productId, htmlLen: desc.length, extractedImages: images.length });
+        return { html: desc, images };
+      }
+      return null;
+    } catch (e) {
+      logger.warn('aliexpress', 'item_desc failed', { error: e.message, productId });
       return null;
     }
   }
@@ -370,6 +416,28 @@ class AliExpressAdapter extends BaseAdapter {
         // Enrich with item_detail_6 data
         this._enrichFromDetail6(product, data6);
 
+        // FALLBACK: If item_detail_6 didn't provide description images, try item_desc
+        if ((!product.aplusImages || product.aplusImages.length === 0) &&
+            (!product.description || product.description.length < 100 || !/<img/i.test(product.description))) {
+          try {
+            const descData = await this._fetchItemDesc(productId);
+            if (descData) {
+              if (descData.images && descData.images.length > 0) {
+                product.aplusImages = descData.images;
+                logger.info('aliexpress', 'Recovered description images from item_desc fallback', {
+                  productId, imageCount: descData.images.length
+                });
+              }
+              if (descData.html && descData.html.length > (product.description || '').length) {
+                product.description = descData.html;
+                logger.info('aliexpress', 'Recovered HTML description from item_desc fallback', {
+                  productId, htmlLen: descData.html.length
+                });
+              }
+            }
+          } catch (e) { logger.warn('aliexpress', 'item_desc fallback failed', { error: e.message }); }
+        }
+
         // Enrich with item_review data
         this._enrichFromReviews(product, reviewsData);
 
@@ -407,6 +475,17 @@ class AliExpressAdapter extends BaseAdapter {
       const product = this.normalizeProduct(data6);
       if (product) {
         this._enrichFromDetail6(product, data6);
+        // item_desc fallback for this path too
+        if ((!product.aplusImages || product.aplusImages.length === 0) &&
+            (!product.description || product.description.length < 100 || !/<img/i.test(product.description))) {
+          try {
+            const descData = await this._fetchItemDesc(productId);
+            if (descData) {
+              if (descData.images?.length > 0) product.aplusImages = descData.images;
+              if (descData.html && descData.html.length > (product.description || '').length) product.description = descData.html;
+            }
+          } catch (e) { /* non-critical */ }
+        }
         this._enrichFromReviews(product, reviewsData);
         if (product.price) return product;
         const priceProduct = await this._fillPriceFromSearch(product, productId);

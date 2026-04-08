@@ -850,6 +850,8 @@ class AliExpressAdapter extends BaseAdapter {
 
     // Filter "Ships From" / "Shipped From" out of visible options — use it for origin classification instead
     const shipsFromOption = p.options.find(o => /ships?\s*from/i.test(o.name));
+    // Collect "Ships From" value names so we can strip them from variant titles later
+    const shipsFromValues = new Set();
     if (shipsFromOption) {
       // Extract the US warehouse info for origin classification
       const usValue = shipsFromOption.values.find(v => /united\s*states|US\b/i.test(v.value));
@@ -859,10 +861,14 @@ class AliExpressAdapter extends BaseAdapter {
         p.rawSourceMeta.shipsFrom = usValue.value;
         if (!p.shippingData.shipsFrom) p.shippingData.shipsFrom = usValue.value;
       }
+      // Collect all "Ships From" values for variant title cleanup
+      shipsFromOption.values.forEach(v => {
+        if (v.value) shipsFromValues.add(v.value.trim().toLowerCase());
+      });
       // Remove "Ships From" from customer-visible options
       p.options = p.options.filter(o => !/ships?\s*from/i.test(o.name));
       logger.info('aliexpress', 'Filtered "Ships From" from variant options', {
-        productId: p.sourceId, hadUSValue: !!usValue
+        productId: p.sourceId, hadUSValue: !!usValue, filteredValues: [...shipsFromValues]
       });
     }
 
@@ -906,6 +912,23 @@ class AliExpressAdapter extends BaseAdapter {
         image: resolveVariantImage(sku.skuAttr || sku.skuPropIds || ''),
         available: (sku.skuVal?.availQuantity || 0) > 0
       }));
+    }
+
+    // === CLEAN VARIANT TITLES: Remove "Ships From" values ===
+    // After filtering "Ships From" from options, also strip those values from variant titles
+    // e.g. "S / Brown / United States" → "S / Brown"
+    if (shipsFromValues.size > 0 && p.variants.length > 0) {
+      p.variants = p.variants.map(v => {
+        if (!v.title) return v;
+        const parts = v.title.split(' / ').filter(part =>
+          !shipsFromValues.has(part.trim().toLowerCase())
+        );
+        v.title = parts.join(' / ');
+        return v;
+      });
+      logger.info('aliexpress', 'Cleaned Ships From from variant titles', {
+        productId: p.sourceId, sampleTitle: p.variants[0]?.title
+      });
     }
 
     // === PRICE RECOVERY FROM VARIANTS ===

@@ -257,7 +257,6 @@ class AmazonAdapter extends BaseAdapter {
 
     // Enrich product with reviews data from /product-reviews endpoint
     if (product && reviewsData) {
-      // Top reviews — only fill if normalizeProduct didn't already get them from product-details
       if ((!product.topReviews || product.topReviews.length === 0) && reviewsData.reviews && reviewsData.reviews.length > 0) {
         product.topReviews = reviewsData.reviews.map(r => ({
           title: r.title || '',
@@ -273,7 +272,6 @@ class AmazonAdapter extends BaseAdapter {
         })).filter(r => r.comment || r.title);
         logger.info('amazon', `Enriched topReviews from /product-reviews for ${asin}: ${product.topReviews.length} reviews`);
       }
-      // Rating distribution from summary
       if (!product.ratingDistribution && reviewsData.summary && reviewsData.summary.starsBreakdown) {
         const sb = reviewsData.summary.starsBreakdown;
         product.ratingDistribution = {};

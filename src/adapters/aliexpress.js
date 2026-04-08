@@ -206,6 +206,64 @@ class AliExpressAdapter extends BaseAdapter {
     }
   }
 
+  // Enrich product with data from /item_review endpoint
+  _enrichFromReviews(product, reviewsData) {
+    if (!reviewsData) return;
+
+    const reviewList = reviewsData.reviews || reviewsData.evaViewList || reviewsData.list || [];
+
+    if (Array.isArray(reviewList) && reviewList.length > 0 && (!product.topReviews || product.topReviews.length === 0)) {
+      product.topReviews = reviewList.slice(0, 8).map(r => {
+        const comment = r.reviewContent || r.buyerFeedback || r.content || r.review || r.evaContent || '';
+        const rating = r.reviewStar || r.buyerEval || r.starRating || r.rating || 0;
+        const author = r.buyerName || r.reviewerName || (r.anonymous === true ? 'Buyer' : (r.name || 'Buyer'));
+        const date = r.reviewDate || r.evalDate || r.date || r.gmtCreate || '';
+        const avatar = r.buyerHeadPortrait || r.avatar || r.reviewerAvatar || null;
+        const images = r.reviewImages || r.images || r.buyerPhotos || [];
+        const country = r.buyerCountry || r.country || null;
+        const variant = r.skuInfo || r.sku || null;
+
+        return {
+          title: '',
+          comment: typeof comment === 'string' ? comment : '',
+          rating: typeof rating === 'number' ? rating : parseFloat(rating) || 0,
+          date: typeof date === 'string' ? date : '',
+          author: typeof author === 'string' ? author : 'Buyer',
+          avatar: avatar,
+          images: Array.isArray(images) ? images.map(img => typeof img === 'string' ? img : (img.url || img.image || '')).filter(Boolean) : [],
+          isVerified: true,
+          helpfulVotes: '',
+          variant: variant,
+          country: country
+        };
+      }).filter(r => r.comment);
+
+      if (product.topReviews.length > 0) {
+        logger.info('aliexpress', `Enriched topReviews from /item_review: ${product.topReviews.length} reviews`, { productId: product.sourceId });
+      }
+    }
+
+    const stats = reviewsData.statistics || reviewsData.ratingDistribution || reviewsData.starDistribution || null;
+    if (stats && !product.ratingDistribution) {
+      product.ratingDistribution = {};
+      for (let i = 1; i <= 5; i++) {
+        const val = stats[i] || stats[String(i)] || stats[`star${i}`] || stats[`${i}Star`] || 0;
+        product.ratingDistribution[i] = typeof val === 'string' ? parseInt(val) : (typeof val === 'number' ? val : 0);
+      }
+      const total = Object.values(product.ratingDistribution).reduce((s, v) => s + v, 0);
+      if (total === 0) product.ratingDistribution = null;
+    }
+
+    const totalNum = reviewsData.totalNum || reviewsData.totalCount || reviewsData.total || 0;
+    if (totalNum > 0 && (!product.reviews || totalNum > product.reviews)) {
+      product.reviews = totalNum;
+    }
+    const avgStar = reviewsData.averageStar || reviewsData.avgStar || reviewsData.averageRating || null;
+    if (avgStar && (!product.rating || parseFloat(avgStar) > 0)) {
+      product.rating = parseFloat(avgStar);
+    }
+  }
+
   async getProduct(productId, opts = {}) {
     // ==== STRATEGY: Call item_detail_2 + item_detail_6 + item_review in PARALLEL ====
     // item_detail_2: shipping, origin, seller, sku, images, title
@@ -397,70 +455,6 @@ class AliExpressAdapter extends BaseAdapter {
         product.hasVideo = true;
         logger.info('aliexpress', 'Enriched video from item_detail_6', { productId: product.sourceId });
       }
-    }
-  }
-
-  // Enrich product with data from /item_review endpoint
-  _enrichFromReviews(product, reviewsData) {
-    if (!reviewsData) return;
-
-    // The item_review endpoint can return different shapes depending on API version
-    // Common shapes: { reviews: [...], totalNum, ... } or { evaViewList: [...], statistics: {...} }
-    const reviewList = reviewsData.reviews || reviewsData.evaViewList || reviewsData.list || [];
-
-    if (Array.isArray(reviewList) && reviewList.length > 0 && (!product.topReviews || product.topReviews.length === 0)) {
-      product.topReviews = reviewList.slice(0, 8).map(r => {
-        // Handle different field names across API versions
-        const comment = r.reviewContent || r.buyerFeedback || r.content || r.review || r.evaContent || '';
-        const rating = r.reviewStar || r.buyerEval || r.starRating || r.rating || 0;
-        const author = r.buyerName || r.reviewerName || r.anonymous === true ? 'Buyer' : (r.name || 'Buyer');
-        const date = r.reviewDate || r.evalDate || r.date || r.gmtCreate || '';
-        const avatar = r.buyerHeadPortrait || r.avatar || r.reviewerAvatar || null;
-        const images = r.reviewImages || r.images || r.buyerPhotos || [];
-        const country = r.buyerCountry || r.country || null;
-        const variant = r.skuInfo || r.sku || null;
-
-        return {
-          title: '',
-          comment: typeof comment === 'string' ? comment : '',
-          rating: typeof rating === 'number' ? rating : parseFloat(rating) || 0,
-          date: typeof date === 'string' ? date : '',
-          author: typeof author === 'string' ? author : 'Buyer',
-          avatar: avatar,
-          images: Array.isArray(images) ? images.map(img => typeof img === 'string' ? img : (img.url || img.image || '')).filter(Boolean) : [],
-          isVerified: true,
-          helpfulVotes: '',
-          variant: variant,
-          country: country
-        };
-      }).filter(r => r.comment);
-
-      if (product.topReviews.length > 0) {
-        logger.info('aliexpress', `Enriched topReviews from /item_review: ${product.topReviews.length} reviews`, { productId: product.sourceId });
-      }
-    }
-
-    // Rating distribution from statistics if available
-    const stats = reviewsData.statistics || reviewsData.ratingDistribution || reviewsData.starDistribution || null;
-    if (stats && !product.ratingDistribution) {
-      product.ratingDistribution = {};
-      for (let i = 1; i <= 5; i++) {
-        const val = stats[i] || stats[String(i)] || stats[`star${i}`] || stats[`${i}Star`] || 0;
-        product.ratingDistribution[i] = typeof val === 'string' ? parseInt(val) : (typeof val === 'number' ? val : 0);
-      }
-      // Only keep if we actually got meaningful data
-      const total = Object.values(product.ratingDistribution).reduce((s, v) => s + v, 0);
-      if (total === 0) product.ratingDistribution = null;
-    }
-
-    // Update review count and rating from reviewsData if better
-    const totalNum = reviewsData.totalNum || reviewsData.totalCount || reviewsData.total || 0;
-    if (totalNum > 0 && (!product.reviews || totalNum > product.reviews)) {
-      product.reviews = totalNum;
-    }
-    const avgStar = reviewsData.averageStar || reviewsData.avgStar || reviewsData.averageRating || null;
-    if (avgStar && (!product.rating || parseFloat(avgStar) > 0)) {
-      product.rating = parseFloat(avgStar);
     }
   }
 

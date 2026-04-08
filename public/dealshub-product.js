@@ -112,25 +112,58 @@
     var avail=p.availability||p.stockSignal||'';
     if(avail){
       var isInStock=avail.toLowerCase().indexOf('in stock')>=0||avail==='in_stock';
-      html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:16px"><span style="width:8px;height:8px;border-radius:50%;background:'+(isInStock?'#22c55e':'#f59e0b')+'"></span><span style="font-size:14px;color:'+(isInStock?'#16a34a':'#d97706')+'">'+(isInStock?'In Stock':'Limited Availability')+'</span></div>';
+      html+='<div class="dhpdp-stock-status" style="display:flex;align-items:center;gap:6px;margin-bottom:16px"><span style="width:8px;height:8px;border-radius:50%;background:'+(isInStock?'#22c55e':'#f59e0b')+'"></span><span style="font-size:14px;color:'+(isInStock?'#16a34a':'#d97706')+'">'+(isInStock?'In Stock':'Limited Availability')+'</span></div>';
     }
 
-    // Variant selector — FIX v1.1: Pre-select first option value
+    // Variant selector — FIX v1.2: Disable unavailable variants, pre-select first available
+    // Build a lookup: option value name → variant availability
+    var variantAvailMap = {};
+    if(p.variants && p.variants.length > 0){
+      p.variants.forEach(function(v){
+        // Map variant title (e.g. "TG392 Black") to availability
+        variantAvailMap[v.title] = v.available !== false;
+      });
+    }
+
+    function isOptionValueAvailable(optionValues, valueIndex){
+      if(!p.variants || p.variants.length === 0) return true; // no variant data, assume available
+      var val = optionValues[valueIndex];
+      if(!val) return true;
+      var valName = val.value;
+      // Direct match: variant title === value name
+      if(variantAvailMap.hasOwnProperty(valName)) return variantAvailMap[valName];
+      // Partial match: variant title contains value name
+      for(var vTitle in variantAvailMap){
+        if(vTitle.indexOf(valName) >= 0 || valName.indexOf(vTitle) >= 0){
+          return variantAvailMap[vTitle];
+        }
+      }
+      return true; // default to available if no match found
+    }
+
     if(p.options&&p.options.length){
       html+='<div class="dhpdp-variants" style="margin-bottom:20px">';
       for(var oi=0;oi<p.options.length;oi++){
         var opt=p.options[oi];
         html+='<div style="margin-bottom:12px"><label style="font-size:14px;font-weight:600;color:#333;display:block;margin-bottom:6px">'+escHTML(opt.name)+': <span class="dhpdp-opt-label" data-option="'+oi+'" style="color:#e53e3e;font-weight:700"></span></label>';
         html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+        // Find first available index for pre-selection
+        var firstAvailIdx = -1;
+        for(var fi=0;fi<(opt.values||[]).length;fi++){
+          if(isOptionValueAvailable(opt.values, fi)){ firstAvailIdx=fi; break; }
+        }
         for(var vi=0;vi<(opt.values||[]).length;vi++){
           var val=opt.values[vi];
-          // Pre-select first value, or if source marked one as selected
-          var isSelected = val.selected || (!opt.values.some(function(v){return v.selected}) && vi===0);
+          var isAvail = isOptionValueAvailable(opt.values, vi);
+          // Pre-select first AVAILABLE value (not first overall)
+          var isSelected = isAvail && (val.selected || (firstAvailIdx === vi && !opt.values.some(function(v){return v.selected})));
           var sel=isSelected?' dhpdp-opt-sel':'';
+          var unavailStyle = !isAvail ? 'opacity:0.4;cursor:not-allowed;position:relative;' : '';
+          var unavailAttr = !isAvail ? ' data-unavailable="1" title="Sold Out"' : '';
           if(val.image){
-            html+='<button class="dhpdp-opt'+sel+'" data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="width:40px;height:40px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';padding:2px;cursor:pointer;background:#fff"><img src="'+escHTML(val.image)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px"></button>';
+            html+='<button class="dhpdp-opt'+sel+'"'+unavailAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="width:40px;height:40px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';padding:2px;cursor:'+(isAvail?'pointer':'not-allowed')+';background:#fff;'+unavailStyle+'"><img src="'+escHTML(val.image)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px">'+(isAvail?'':'<span style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.5)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"/></svg></span>')+'</button>';
           }else{
-            html+='<button class="dhpdp-opt'+sel+'" data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="padding:8px 16px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';cursor:pointer;background:'+(isSelected?'#fef2f2':'#fff')+';font-size:13px;color:#333">'+escHTML(val.value)+'</button>';
+            html+='<button class="dhpdp-opt'+sel+'"'+unavailAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="padding:8px 16px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';cursor:'+(isAvail?'pointer':'not-allowed')+';background:'+(isSelected?'#fef2f2':'#fff')+';font-size:13px;color:'+(isAvail?'#333':'#bbb')+';'+unavailStyle+(isAvail?'':'text-decoration:line-through;')+'">'+escHTML(val.value)+'</button>';
           }
         }
         html+='</div></div>';
@@ -284,23 +317,70 @@
       });
     }
 
-    // Initialize option labels
+    // Initialize option labels and availability state for pre-selected variant
     updateOptionLabels();
+    var initialVariant = findVariantBySelection();
+    if(initialVariant) updatePriceDisplay(initialVariant);
+
+    // FIX v1.2: Update stock status display and Add to Cart button based on variant availability
+    function updateAvailabilityUI(variant){
+      var atcBtnEl = document.getElementById('dhpdp-atc');
+      var buyBtnEl = document.getElementById('dhpdp-buy');
+      var stickyAtcEl = container.querySelector('.dhpdp-sticky-atc');
+      var stockEl = container.querySelector('.dhpdp-stock-status');
+      var isAvail = !variant || variant.available !== false;
+      // Update stock indicator
+      if(stockEl){
+        if(isAvail){
+          stockEl.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block"></span> <span style="font-size:14px;color:#16a34a">In Stock</span>';
+        } else {
+          stockEl.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block"></span> <span style="font-size:14px;color:#ef4444">Sold Out</span>';
+        }
+      }
+      // Update Add to Cart / Buy Now buttons
+      [atcBtnEl, stickyAtcEl].forEach(function(b){
+        if(!b) return;
+        if(isAvail){
+          b.disabled = false; b.style.opacity = '1'; b.style.cursor = 'pointer';
+          b.textContent = b === stickyAtcEl ? 'Add to Cart' : 'Add to Cart';
+          b.style.background = '#e53e3e';
+        } else {
+          b.disabled = true; b.style.opacity = '0.5'; b.style.cursor = 'not-allowed';
+          b.textContent = 'Sold Out';
+          b.style.background = '#999';
+        }
+      });
+      if(buyBtnEl){
+        if(isAvail){
+          buyBtnEl.disabled = false; buyBtnEl.style.opacity = '1'; buyBtnEl.style.cursor = 'pointer';
+          buyBtnEl.textContent = 'Buy Now'; buyBtnEl.style.background = '#1a1a1a';
+        } else {
+          buyBtnEl.disabled = true; buyBtnEl.style.opacity = '0.5'; buyBtnEl.style.cursor = 'not-allowed';
+          buyBtnEl.textContent = 'Unavailable'; buyBtnEl.style.background = '#999';
+        }
+      }
+    }
 
     container.querySelectorAll('.dhpdp-opt').forEach(function(btn){
       btn.addEventListener('click',function(){
+        // FIX v1.2: Block clicks on unavailable variants
+        if(this.dataset.unavailable === '1') return;
+
         var optIdx=this.dataset.option;
         container.querySelectorAll('.dhpdp-opt[data-option="'+optIdx+'"]').forEach(function(b){
-          b.style.borderColor='#ddd';b.style.background='#fff';b.classList.remove('dhpdp-opt-sel');
+          b.style.borderColor='#ddd';
+          if(b.dataset.unavailable !== '1') b.style.background='#fff';
+          b.classList.remove('dhpdp-opt-sel');
         });
         this.style.borderColor='#e53e3e';this.style.background='#fef2f2';this.classList.add('dhpdp-opt-sel');
 
-        // Update label, price, and image
+        // Update label, price, image and availability
         updateOptionLabels();
         var variant = findVariantBySelection();
         if(variant){
           updatePriceDisplay(variant);
           updateMainImage(variant);
+          updateAvailabilityUI(variant);
         }
         // Fallback: if variant has no image, use option value image from the clicked button
         if(!variant || !variant.image){
@@ -312,6 +392,9 @@
         }
       });
     });
+
+    // FIX v1.2: Initialize availability state for pre-selected variant on page load
+    if(initialVariant) updateAvailabilityUI(initialVariant);
 
     // Add to Cart — FIX v1.1: Improved retry logic with exponential backoff
     var atcBtn=document.getElementById('dhpdp-atc');
@@ -367,6 +450,14 @@
 
     function doAddToCart(buyNow, retryAttempt){
       retryAttempt = retryAttempt || 0;
+
+      // FIX v1.2: Block add to cart for unavailable variants
+      var currentVariant = findVariantBySelection();
+      if(currentVariant && currentVariant.available === false){
+        alert('This variant is currently sold out. Please select a different option.');
+        return;
+      }
+
       var btn = buyNow ? buyBtn : atcBtn;
       var origText = btn.textContent;
       var origBg = buyNow ? '#1a1a1a' : '#e53e3e';

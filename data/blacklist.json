@@ -1,0 +1,57 @@
+{
+  "products": [
+    {
+      "source": "amazon",
+      "id": "B0973L1NVT",
+      "reason": "DMCA - Freeman Flirty Feet Instant Foot Peeling Spray",
+      "addedAt": "2026-04-08"
+    },
+    {
+      "source": "aliexpress",
+      "id": "3256805039654552",
+      "reason": "DMCA - Summer Women's Sexy Sleeveless Beach Dress",
+      "addedAt": "2026-04-08"
+    },
+    {
+      "source": "aliexpress",
+      "id": "3256801206484120",
+      "reason": "DMCA - Fashion Female Cross Pendants Necklace",
+      "addedAt": "2026-04-08"
+    },
+    {
+      "source": "aliexpress",
+      "id": "3256811679480338",
+      "reason": "DMCA - Nasal Dilator Outdoor Fitness Equipment",
+      "addedAt": "2026-04-08"
+    }
+  ],
+  "brands": [],
+  "keywords": [],
+  "sellers": [],
+  "dmcaTickets": [
+    {
+      "ticketId": "d4584549-d76b-4b46-89c4-485885861a27",
+      "products": ["amazon:B0973L1NVT"],
+      "date": "2026-04-08",
+      "note": "Freeman Flirty Feet"
+    },
+    {
+      "ticketId": "c995ba6f-ab0f-4c65-8d6d-5627cf8d6d0b",
+      "products": ["aliexpress:3256805039654552"],
+      "date": "2026-04-08",
+      "note": "Summer Beach Dress"
+    },
+    {
+      "ticketId": "4419e0dc-687b-4653-9051-a2f7745b6868",
+      "products": ["aliexpress:3256801206484120"],
+      "date": "2026-04-08",
+      "note": "Cross Pendants Necklace"
+    },
+    {
+      "ticketId": "0744f947-8ef1-4caf-9c02-d201aff6b0ca",
+      "products": ["aliexpress:3256811679480338"],
+      "date": "2026-04-08",
+      "note": "Nasal Dilator"
+    }
+  ]
+}

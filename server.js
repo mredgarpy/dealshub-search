@@ -8,6 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
+const blacklist = require('./src/blacklist');
 const app = express();
 
 // ---- MIDDLEWARE ----
@@ -241,22 +242,29 @@ app.get('/api/search', async (req, res) => {
     }
 
     const pricedResults = applySearchPricing(allResults.slice(0, limitNum));
+
+    // ── BLACKLIST FILTER — Remove DMCA blocked products ──
+    const filteredResults = blacklist.filterProducts(pricedResults);
+    if (filteredResults.length < pricedResults.length) {
+      logger.info('search', `Blacklist filtered ${pricedResults.length - filteredResults.length} products from "${q}"`);
+    }
+
     const response = {
       query: q,
       store: store || 'all',
       page: pageNum,
       limit: limitNum,
-      total: pricedResults.length,
-      hasMore: pricedResults.length >= Math.floor(limitNum * 0.5),
-      results: pricedResults
+      total: filteredResults.length,
+      hasMore: filteredResults.length >= Math.floor(limitNum * 0.5),
+      results: filteredResults
     };
 
     searchCache.set(cacheKey, response);
 
     // v3.1: Cache individual search results by source+id for product detail fallback
     // This solves AliExpress ID mismatch where search returns IDs that item_detail doesn't recognize
-    if (Array.isArray(pricedResults)) {
-      pricedResults.forEach(p => {
+    if (Array.isArray(filteredResults)) {
+      filteredResults.forEach(p => {
         if (p && p.id && p.source) {
           const itemKey = `searchitem:${p.source}:${p.id}`;
           productCache.set(itemKey, p, 7200000); // 2h TTL
@@ -269,6 +277,14 @@ app.get('/api/search', async (req, res) => {
     logger.error('search', 'Search failed', { error: e.message, query: q });
     res.status(500).json({ error: 'Search failed' });
   }
+});
+
+// ---- BLACKLIST CHECK (PDP pre-flight) ----
+app.get('/api/product/check', (req, res) => {
+  const { source, id } = req.query;
+  if (!source || !id) return res.status(400).json({ error: 'source and id required' });
+  const result = blacklist.checkProduct({ store: source, id });
+  res.json({ source, id, allowed: !result.blocked, reason: result.reason });
 });
 
 // ---- UNIFIED PRODUCT DETAIL ----
@@ -289,6 +305,12 @@ async function productDetailHandler(req, res) {
 
   if (!VALID_SOURCES.includes(source)) {
     return res.status(400).json({ error: `Invalid source: ${source}. Valid: ${VALID_SOURCES.join(', ')}` });
+  }
+
+  // ── BLACKLIST CHECK — Block DMCA products from loading ──
+  if (blacklist.isProductBlocked(source, id)) {
+    logger.info('product', `Blocked DMCA product: ${source}:${id}`);
+    return res.status(403).json({ error: 'This product is not available', blocked: true });
   }
 
   const cacheKey = `product:${source}:${id}`;
@@ -627,8 +649,9 @@ VALID_SOURCES.forEach(source => {
       const adapter = getAdapter(source);
       const results = adapter ? await adapter.search(q, parseInt(limit)) : [];
       const priced = applySearchPricing(results);
-      searchCache.set(cacheKey, priced);
-      res.json(priced);
+      const filtered = blacklist.filterProducts(priced);
+      searchCache.set(cacheKey, filtered);
+      res.json(filtered);
     } catch (e) {
       logger.error('search', `${source} search failed`, { error: e.message });
       res.json([]);
@@ -693,7 +716,7 @@ app.get('/api/trending', async (req, res) => {
       })
     );
     const all = interleaveFromSettled(results, 20);
-    const response = { results: applySearchPricing(all), section: 'trending' };
+    const response = { results: blacklist.filterProducts(applySearchPricing(all)), section: 'trending' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
@@ -722,7 +745,7 @@ app.get('/api/bestsellers', async (req, res) => {
       return revCount >= 50;
     });
     const all = filtered.length >= 5 ? filtered.slice(0, 20) : raw.slice(0, 20);
-    const response = { results: applySearchPricing(all), section: 'bestsellers' };
+    const response = { results: blacklist.filterProducts(applySearchPricing(all)), section: 'bestsellers' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
@@ -798,7 +821,7 @@ app.get('/api/new-arrivals', async (req, res) => {
       })
     );
     const all = interleaveFromSettled(results, 20);
-    const response = { results: applySearchPricing(all), section: 'new-arrivals' };
+    const response = { results: blacklist.filterProducts(applySearchPricing(all)), section: 'new-arrivals' };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
@@ -830,7 +853,7 @@ app.get('/api/featured', async (req, res) => {
       })
     );
     const all = interleaveFromSettled(results, 12);
-    const response = { results: applySearchPricing(all), section: 'featured', category };
+    const response = { results: blacklist.filterProducts(applySearchPricing(all)), section: 'featured', category };
     searchCache.set(cacheKey, response, 21600000); // 6 hours
     res.json(response);
   } catch (e) {
@@ -1263,6 +1286,12 @@ app.post('/api/prepare-cart', async (req, res) => {
 
   if (!VALID_SOURCES.includes(source.toLowerCase())) {
     return res.status(400).json({ error: `Invalid source: ${source}` });
+  }
+
+  // ── BLACKLIST CHECK — Block DMCA products from cart sync ──
+  if (blacklist.isProductBlocked(source.toLowerCase(), String(sourceId))) {
+    logger.info('prepare-cart', `Blocked DMCA product from cart: ${source}:${sourceId}`);
+    return res.status(403).json({ error: 'This product is not available for purchase', blocked: true });
   }
 
   try {

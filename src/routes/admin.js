@@ -897,4 +897,52 @@ router.post('/autods/mark-linked', (req, res) => {
   }
 });
 
+// ---- THEME ASSET SYNC ----
+// Push local JS assets to Shopify theme (for keeping storefront code in sync)
+router.post('/theme-sync', async (req, res) => {
+  try {
+    const { shopifyAdmin } = require('../shopify-admin');
+    const fs = require('fs');
+    const path = require('path');
+
+    // Get active theme ID
+    const themes = await shopifyAdmin('GET', '/themes.json');
+    const mainTheme = (themes.themes || []).find(t => t.role === 'main');
+    if (!mainTheme) return res.status(500).json({ error: 'No main theme found' });
+
+    const themeId = mainTheme.id;
+
+    // Files to sync from public/ to Shopify theme assets/
+    const filesToSync = req.body.files || ['dealshub-product.js', 'dealshub-search.js', 'dealshub-home.js', 'dealshub-api.js', 'dealshub-header.js', 'dealshub-cart.js'];
+    const results = [];
+
+    for (const filename of filesToSync) {
+      const localPath = path.join(__dirname, '../../public', filename);
+      if (!fs.existsSync(localPath)) {
+        results.push({ file: filename, status: 'skipped', reason: 'file not found locally' });
+        continue;
+      }
+
+      const content = fs.readFileSync(localPath, 'utf8');
+      const assetKey = `assets/${filename}`;
+
+      try {
+        await shopifyAdmin('PUT', `/themes/${themeId}/assets.json`, {
+          asset: { key: assetKey, value: content }
+        });
+        results.push({ file: filename, status: 'synced', themeId, assetKey });
+        logger.info('admin', 'Theme asset synced', { filename, themeId });
+      } catch (e) {
+        results.push({ file: filename, status: 'error', error: e.message });
+        logger.error('admin', 'Theme asset sync failed', { filename, error: e.message });
+      }
+    }
+
+    res.json({ success: true, theme: mainTheme.name, themeId, results });
+  } catch (e) {
+    logger.error('admin', 'Theme sync failed', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

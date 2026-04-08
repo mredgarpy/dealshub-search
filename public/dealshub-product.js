@@ -251,18 +251,31 @@
     html+='</div>'; // end info
     html+='</div>'; // end grid
 
-    // Description / Features tabs
+    // Description / Features tabs + A+ images
     var desc=p.description||'';
     var bullets=p.bullets||[];
-    if(desc||bullets.length){
+    var aplusImgs=p.aplusImages||p.descriptionImages||[];
+    var hasDesc=desc||bullets.length||aplusImgs.length;
+    if(hasDesc){
       html+='<div style="margin-top:40px;border-top:1px solid #eee;padding-top:32px">';
       html+='<div class="dhpdp-tabs" style="display:flex;gap:0;border-bottom:2px solid #eee;margin-bottom:20px">';
-      if(desc)html+='<button class="dhpdp-tab dhpdp-tab-active" data-tab="desc" style="padding:12px 24px;background:none;border:none;border-bottom:2px solid #e53e3e;margin-bottom:-2px;font-size:15px;font-weight:600;color:#e53e3e;cursor:pointer">Description</button>';
-      if(bullets.length)html+='<button class="dhpdp-tab'+(desc?'':' dhpdp-tab-active')+'" data-tab="features" style="padding:12px 24px;background:none;border:none;border-bottom:2px solid '+(desc?'transparent':'#e53e3e')+';margin-bottom:-2px;font-size:15px;font-weight:600;color:'+(desc?'#888':'#e53e3e')+';cursor:pointer">Features</button>';
+      if(desc||aplusImgs.length)html+='<button class="dhpdp-tab dhpdp-tab-active" data-tab="desc" style="padding:12px 24px;background:none;border:none;border-bottom:2px solid #e53e3e;margin-bottom:-2px;font-size:15px;font-weight:600;color:#e53e3e;cursor:pointer">Description</button>';
+      if(bullets.length)html+='<button class="dhpdp-tab'+((desc||aplusImgs.length)?'':' dhpdp-tab-active')+'" data-tab="features" style="padding:12px 24px;background:none;border:none;border-bottom:2px solid '+((desc||aplusImgs.length)?'transparent':'#e53e3e')+';margin-bottom:-2px;font-size:15px;font-weight:600;color:'+((desc||aplusImgs.length)?'#888':'#e53e3e')+';cursor:pointer">Features</button>';
       html+='</div>';
-      if(desc)html+='<div id="dhpdp-tab-desc" class="dhpdp-tabcontent" style="font-size:15px;line-height:1.7;color:#444">'+escHTML(desc).replace(/\n/g,'<br>')+'</div>';
+      if(desc||aplusImgs.length){
+        html+='<div id="dhpdp-tab-desc" class="dhpdp-tabcontent" style="font-size:15px;line-height:1.7;color:#444">';
+        if(desc)html+=escHTML(desc).replace(/\n/g,'<br>');
+        if(aplusImgs.length){
+          html+='<div style="margin-top:20px">';
+          for(var ai=0;ai<aplusImgs.length;ai++){
+            html+='<img src="'+escHTML(aplusImgs[ai])+'" style="width:100%;height:auto;display:block;margin-bottom:8px;border-radius:4px" loading="lazy" alt="Product detail '+(ai+1)+'">';
+          }
+          html+='</div>';
+        }
+        html+='</div>';
+      }
       if(bullets.length){
-        html+='<div id="dhpdp-tab-features" class="dhpdp-tabcontent" style="'+(desc?'display:none':'')+'"><ul style="list-style:none;padding:0;margin:0">';
+        html+='<div id="dhpdp-tab-features" class="dhpdp-tabcontent" style="'+((desc||aplusImgs.length)?'display:none':'')+'"><ul style="list-style:none;padding:0;margin:0">';
         for(var bi=0;bi<bullets.length;bi++){
           html+='<li style="padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:14px;color:#444;display:flex;align-items:flex-start;gap:8px"><span style="color:#22c55e;font-weight:700;flex-shrink:0">&#10003;</span>'+escHTML(bullets[bi])+'</li>';
         }

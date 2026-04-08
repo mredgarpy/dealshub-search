@@ -357,7 +357,27 @@ async function productDetailHandler(req, res) {
     }
 
     if (!product) {
-      return res.status(404).json({ error: 'Product not found', source, id });
+      // FIX: Return helpful 404 with suggested alternatives
+      let alternatives = [];
+      try {
+        const adapter = getAdapter(source);
+        if (adapter) {
+          // Search using the product ID as query (works for ASINs and sometimes AliExpress IDs)
+          const altResults = await adapter.search(id, 6);
+          if (altResults && altResults.length > 0) {
+            alternatives = applySearchPricing(altResults.slice(0, 6));
+          }
+        }
+      } catch (altErr) {
+        // Non-critical — just return empty alternatives
+      }
+      return res.status(404).json({
+        error: 'Product not found',
+        message: 'This product may no longer be available.',
+        source,
+        id,
+        alternatives
+      });
     }
 
     // v3.2: Price recovery cascade — multiple fallback sources
@@ -820,7 +840,7 @@ app.get('/api/featured', async (req, res) => {
 
 // ---- RECOMMENDATIONS ----
 app.get('/api/recommendations', async (req, res) => {
-  const { id, title = '', category = '' } = req.query;
+  const { id, title = '', category = '', source: sourceParam = 'amazon' } = req.query;
   if (!id) return res.status(400).json({ error: 'Missing product id' });
 
   function extractKeywords(t) {
@@ -830,18 +850,37 @@ app.get('/api/recommendations', async (req, res) => {
     return words.slice(0, 4).join(' ');
   }
 
-  const keywords = extractKeywords(title);
+  let keywords = extractKeywords(title);
+
+  // FIX: If no keywords from title, try to recover from product cache
+  if (!keywords) {
+    const source = (sourceParam).toLowerCase();
+    const cachedProduct = productCache.get(`product:${source}:${id}`);
+    if (cachedProduct && cachedProduct.title) {
+      keywords = extractKeywords(cachedProduct.title);
+      console.log(`[recommendations] Recovered keywords from product cache for ${id}: "${keywords}"`);
+    }
+  }
+
+  // FIX: If still no keywords, use the product ID as search query (works for Amazon ASINs)
+  if (!keywords) {
+    keywords = id;
+    console.log(`[recommendations] Using product ID as search query: "${id}"`);
+  }
+
   const cacheKey = `recs:${id}:${keywords}`;
   const cached = searchCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
-    const amazon = getAdapter('amazon');
-    if (!amazon) throw new Error('Amazon adapter not available');
+    // FIX: Use the correct source adapter instead of always Amazon
+    const source = (sourceParam).toLowerCase();
+    const adapter = getAdapter(source) || getAdapter('amazon');
+    if (!adapter) throw new Error('No adapter available');
 
     const [similarRes, dealsRes] = await Promise.allSettled([
-      keywords ? amazon.search(keywords, 15) : Promise.resolve([]),
-      category ? amazon.search(category + ' deals best sellers', 15) : (keywords ? amazon.search(keywords + ' best rated', 15) : Promise.resolve([]))
+      adapter.search(keywords, 15),
+      category ? adapter.search(category + ' deals best sellers', 15) : adapter.search(keywords + ' best rated', 15)
     ]);
 
     const similar = (similarRes.status === 'fulfilled' ? similarRes.value || [] : [])
@@ -1394,6 +1433,264 @@ app.get('/api/admin/source-health', async (req, res) => {
     })
   );
   res.json({ sources: health, cache: { search: searchCache.size, product: productCache.size } });
+});
+
+// ---- DEBUG: Raw API Response Diagnostic ----
+app.get('/api/debug/raw-search', async (req, res) => {
+  const { store, q = 'shoes' } = req.query;
+  const source = (store || 'aliexpress').toLowerCase();
+  if (!VALID_SOURCES.includes(source)) {
+    return res.status(400).json({ error: `Invalid source: ${source}` });
+  }
+
+  const fetch = require('node-fetch');
+  const rapidApiKey = process.env.RAPIDAPI_KEY;
+
+  const hosts = {
+    aliexpress: 'aliexpress-datahub.p.rapidapi.com',
+    macys: 'macys4.p.rapidapi.com',
+    amazon: 'real-time-amazon-data.p.rapidapi.com',
+    sephora: 'sephora.p.rapidapi.com',
+    shein: 'unofficial-shein.p.rapidapi.com'
+  };
+
+  const urls = {
+    aliexpress: `https://${hosts.aliexpress}/item_search_3?q=${encodeURIComponent(q)}&page=1&sort=default`,
+    macys: `https://${hosts.macys}/search?keyword=${encodeURIComponent(q)}&pageSize=3&requestType=search`,
+    amazon: `https://${hosts.amazon}/search?query=${encodeURIComponent(q)}&page=1&country=US&sort_by=RELEVANCE`,
+    sephora: `https://${hosts.sephora}/us/products/v2/search?q=${encodeURIComponent(q)}&pageIndex=0&pageSize=3`,
+    shein: `https://${hosts.shein}/products/search?keywords=${encodeURIComponent(q)}&language=en&country=US&currency=USD&page=1&limit=3&_t=${Date.now()}`
+  };
+
+  const url = urls[source];
+  const host = hosts[source];
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const start = Date.now();
+    const resp = await fetch(url, {
+      headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': host },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    const latency = Date.now() - start;
+    const text = await resp.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch (e) { /* not json */ }
+
+    res.json({
+      source,
+      query: q,
+      url: url.replace(rapidApiKey, 'REDACTED'),
+      status: resp.status,
+      statusText: resp.statusText,
+      latencyMs: latency,
+      headers: Object.fromEntries([...resp.headers.entries()].filter(([k]) =>
+        ['content-type', 'x-ratelimit-remaining', 'x-ratelimit-limit', 'x-ratelimit-reset',
+         'x-rapidapi-proxy-response', 'x-rapidapi-subscription'].some(h => k.toLowerCase().includes(h))
+      )),
+      responsePreview: json ? {
+        topLevelKeys: Object.keys(json),
+        hasProducts: !!(json.data?.products || json.products || json.result?.resultList ||
+                       json.searchresultgroups || json.info?.products || json.items),
+        sampleData: JSON.stringify(json).substring(0, 3000)
+      } : {
+        rawText: text.substring(0, 2000)
+      }
+    });
+  } catch (e) {
+    res.json({ source, error: e.message, type: e.name });
+  }
+});
+
+// ---- DEBUG: Test adapter.getProduct with step logging ----
+app.get('/api/debug/adapter-test', async (req, res) => {
+  const { id, store } = req.query;
+  const source = (store || 'aliexpress').toLowerCase();
+  if (!id) return res.status(400).json({ error: 'Missing id param' });
+  try {
+    const adapter = getAdapter(source);
+    if (!adapter) return res.json({ error: 'No adapter for ' + source });
+    // Call _fetchDetailEndpoint directly to test
+    const detail2 = await adapter._fetchDetailEndpoint('/item_detail_2', id);
+    const detail2Info = detail2 ? {
+      hasItem: !!detail2.item, hasItemId: !!detail2.itemId,
+      title: (detail2.item?.title || detail2.title || '?').substring(0, 80),
+      statusCode: detail2.status?.code, statusData: detail2.status?.data,
+      keys: Object.keys(detail2).join(',')
+    } : null;
+    // Also test the full getProduct
+    const product = await adapter.getProduct(id, {});
+    const productInfo = product ? {
+      sourceId: product.sourceId, title: (product.title || '?').substring(0, 80),
+      price: product.price, images: (product.images || []).length,
+      variants: (product.variants || []).length
+    } : null;
+    res.json({ id, source, detail2: detail2Info, product: productInfo });
+  } catch (e) {
+    res.json({ id, source, error: e.message, stack: e.stack?.split('\n').slice(0, 3) });
+  }
+});
+
+// ---- DEBUG: Raw product API response (for shipping field discovery) ----
+// ---- DEBUG: Test multiple AliExpress detail endpoints for ID compatibility ----
+app.get('/api/debug/aliexpress-endpoints', async (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ error: 'Missing id param' });
+  const fetch = require('node-fetch');
+  const rapidApiKey = process.env.RAPIDAPI_KEY;
+  const host = 'aliexpress-datahub.p.rapidapi.com';
+  const headers = { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': host };
+  const endpoints = [
+    '/item_detail', '/item_detail_2', '/item_detail_3',
+    '/item_detail_4', '/item_detail_5', '/item_detail_6', '/item_detail_7'
+  ];
+  const results = {};
+  await Promise.allSettled(endpoints.map(async (ep) => {
+    const start = Date.now();
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      const url = `https://${host}${ep}?itemId=${encodeURIComponent(id)}&language=en&currency=USD`;
+      const resp = await fetch(url, { headers, signal: controller.signal });
+      clearTimeout(timer);
+      const text = await resp.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch(e) {}
+      const statusCode = json?.result?.status?.code;
+      const statusMsg = json?.result?.status?.msg || '';
+      const hasItem = !!(json?.result?.item);
+      const hasTitle = !!(json?.result?.item?.title);
+      results[ep] = {
+        httpStatus: resp.status, latencyMs: Date.now() - start,
+        apiStatusCode: statusCode, apiStatusMsg: statusMsg?.substring(0, 100),
+        hasItem, hasTitle,
+        topKeys: json?.result ? Object.keys(json.result).join(',') : null,
+        title: json?.result?.item?.title?.substring(0, 80) || null
+      };
+    } catch(e) {
+      results[ep] = { error: e.message, latencyMs: Date.now() - start };
+    }
+  }));
+  res.json({ id, results });
+});
+
+app.get('/api/debug/raw-product', async (req, res) => {
+  const { store, id } = req.query;
+  const source = (store || 'amazon').toLowerCase();
+  if (!id) return res.status(400).json({ error: 'Missing id param' });
+  if (!VALID_SOURCES.includes(source)) return res.status(400).json({ error: `Invalid source: ${source}` });
+
+  const fetch = require('node-fetch');
+  const rapidApiKey = process.env.RAPIDAPI_KEY;
+  const hosts = {
+    amazon: 'real-time-amazon-data.p.rapidapi.com',
+    aliexpress: 'aliexpress-datahub.p.rapidapi.com',
+    macys: 'macys4.p.rapidapi.com',
+    sephora: 'sephora.p.rapidapi.com',
+    shein: 'unofficial-shein.p.rapidapi.com'
+  };
+  const urls = {
+    amazon: `https://${hosts.amazon}/product-details?asin=${encodeURIComponent(id)}&country=US`,
+    aliexpress: `https://${hosts.aliexpress}/item_detail_2?itemId=${encodeURIComponent(id)}&language=en&currency=USD`,
+    macys: `https://${hosts.macys}/api/products/${encodeURIComponent(id)}`,
+    sephora: `https://${hosts.sephora}/us/products/v2/detail?productId=${encodeURIComponent(id)}`,
+    shein: `https://${hosts.shein}/products/detail?goods_id=${encodeURIComponent(id)}&language=en&country=US&currency=USD`
+  };
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const start = Date.now();
+    const resp = await fetch(urls[source], {
+      headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': hosts[source] },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    const text = await resp.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch (e) {}
+
+    // Extract shipping-related fields from the raw response
+    const shippingFields = {};
+    function findShippingFields(obj, path = '') {
+      if (!obj || typeof obj !== 'object') return;
+      for (const [k, v] of Object.entries(obj)) {
+        const fp = path ? `${path}.${k}` : k;
+        if (/ship|deliver|freight|prime|fulfil|carrier|tracking|dispatch|transit/i.test(k)) {
+          shippingFields[fp] = v;
+        }
+        if (typeof v === 'object' && v !== null && !Array.isArray(v) && fp.split('.').length < 4) {
+          findShippingFields(v, fp);
+        }
+      }
+    }
+    if (json) findShippingFields(json);
+
+    res.json({
+      source, id,
+      status: resp.status,
+      latencyMs: Date.now() - start,
+      shippingRelatedFields: shippingFields,
+      topLevelKeys: json ? Object.keys(json) : null,
+      dataKeys: json?.data ? Object.keys(json.data) : null,
+      fullResponse: json ? JSON.stringify(json).substring(0, 8000) : text.substring(0, 5000)
+    });
+  } catch (e) {
+    res.json({ source, id, error: e.message });
+  }
+});
+
+// ---- DEBUG: Product pipeline step-by-step ----
+app.get('/api/debug/product-pipeline', async (req, res) => {
+  const { store, id } = req.query;
+  const source = (store || 'amazon').toLowerCase();
+  if (!id) return res.status(400).json({ error: 'Missing id param' });
+  const steps = {};
+  try {
+    steps.adapter = 'ok';
+    const adapter = getAdapter(source);
+    if (!adapter) return res.json({ steps, error: 'adapter not available' });
+
+    steps.getProduct = 'starting';
+    const product = await adapter.getProduct(id, { title: req.query.title });
+    steps.getProduct = product ? 'ok' : 'null';
+    if (!product) return res.json({ steps, error: 'getProduct returned null' });
+    steps.productFields = {
+      hasTitle: !!product.title,
+      hasPrice: !!product.price,
+      priceValue: product.price,
+      hasImages: (product.images || []).length,
+      hasVariants: (product.variants || []).length,
+      hasSpecifications: Array.isArray(product.specifications),
+      hasVideos: Array.isArray(product.videos),
+      hasShippingData: !!product.shippingData,
+      sourceId: product.sourceId
+    };
+
+    steps.pricingEngine = 'starting';
+    const pricing = calculateFinalPrice(product.price || 0, source, {
+      originalPrice: product.originalPrice,
+      sourceCost: product.sourceCost || null
+    });
+    steps.pricingEngine = pricing ? 'ok' : 'null';
+
+    steps.shippingCalc = 'starting';
+    const { calculateShipping: calcShip } = require('./src/services/shipping-rules');
+    const shipResult = calcShip(source, product.price || 0, product, false);
+    steps.shippingCalc = shipResult ? 'ok' : 'null';
+
+    steps.originClassification = 'starting';
+    const originInfo = classifyOrigin(product);
+    steps.originClassification = originInfo ? 'ok' : 'null';
+
+    steps.allPassed = true;
+    res.json({ steps, pricing, shipping: shipResult, origin: originInfo });
+  } catch (e) {
+    steps.error = e.message;
+    steps.stack = e.stack?.split('\n').slice(0, 5);
+    res.json({ steps });
+  }
 });
 
 // ---- SHIPPING & RETURNS ----

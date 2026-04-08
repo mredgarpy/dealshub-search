@@ -167,7 +167,26 @@ class AmazonAdapter extends BaseAdapter {
       return null;
     }
 
-    const product = this.normalizeProduct(data.data);
+    let product = this.normalizeProduct(data.data);
+
+    // FIX: Detect when product-details returned structure but empty content
+    // (API returned data.data but title/images are empty — common with certain ASINs)
+    if (product && (!product.title || product.title.trim() === '') && (!product.images || product.images.length === 0)) {
+      logger.warn('amazon', `product-details returned empty content for ${asin}, trying search fallback`);
+      try {
+        const searchUrl = `https://${API_HOST}/search?query=${encodeURIComponent(asin)}&page=1&country=US`;
+        const searchData = await this.fetchJSON(searchUrl, { headers: this.rapidHeaders(API_HOST) });
+        if (searchData?.data?.products?.length > 0) {
+          const searchProduct = this.normalizeProductFromSearch(searchData.data.products[0]);
+          if (searchProduct && searchProduct.title && searchProduct.title.trim() !== '') {
+            logger.info('amazon', `Recovered product from search fallback for ${asin}: "${searchProduct.title.substring(0, 60)}"`);
+            product = searchProduct;
+          }
+        }
+      } catch (searchErr) {
+        logger.warn('amazon', `Search fallback also failed for ${asin}: ${searchErr.message}`);
+      }
+    }
 
     // Enrich product with real offers data
     if (product && offers && offers.length > 0) {

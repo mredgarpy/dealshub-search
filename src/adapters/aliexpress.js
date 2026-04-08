@@ -198,19 +198,88 @@ class AliExpressAdapter extends BaseAdapter {
     try {
       const url = `https://${SEARCH_HOST}/item_review?itemId=${encodeURIComponent(productId)}&page=1&language=en`;
       const data = await this.fetchJSON(url, { headers: this.rapidHeaders(SEARCH_HOST) });
-      if (!data || !data.result) return null;
-      return data.result;
+
+      // FIX: Log actual response shape for debugging
+      if (!data) {
+        logger.warn('aliexpress', `item_review returned null for ${productId}`);
+        return null;
+      }
+
+      // Handle multiple response structures
+      // Shape 1: { result: { reviews: [...], statistics: {...} } }
+      if (data.result) {
+        logger.info('aliexpress', `item_review response shape: result keys=[${Object.keys(data.result).join(',')}]`, { productId });
+        return data.result;
+      }
+
+      // Shape 2: { data: { reviews: [...] } } or { data: { evaViewList: [...] } }
+      if (data.data) {
+        logger.info('aliexpress', `item_review response shape: data keys=[${Object.keys(data.data).join(',')}]`, { productId });
+        return data.data;
+      }
+
+      // Shape 3: Direct { reviews: [...] } or { evaViewList: [...] }
+      if (data.reviews || data.evaViewList || data.list) {
+        logger.info('aliexpress', `item_review response shape: direct keys=[${Object.keys(data).join(',')}]`, { productId });
+        return data;
+      }
+
+      logger.warn('aliexpress', `item_review unknown shape for ${productId}: keys=[${Object.keys(data).join(',')}]`);
+      return null;
     } catch (e) {
       logger.warn('aliexpress', `item_review failed for ${productId}: ${e.message}`);
       return null;
     }
   }
 
+  // Public getReviews method (for standalone /api/reviews/:id endpoint)
+  async getReviews(productId, limit = 10) {
+    const reviewsData = await this._fetchReviews(productId);
+    if (!reviewsData) return { reviews: [], summary: null };
+
+    const reviewList = reviewsData.reviews || reviewsData.evaViewList || reviewsData.list ||
+      reviewsData.data?.reviews || reviewsData.data?.evaViewList || [];
+    const reviews = (Array.isArray(reviewList) ? reviewList : []).slice(0, limit).map(r => {
+      const comment = r.reviewContent || r.buyerFeedback || r.content || r.review || r.evaContent || '';
+      return {
+        id: r.id || r.reviewId || '',
+        title: '',
+        body: typeof comment === 'string' ? comment : '',
+        rating: parseFloat(r.reviewStar || r.buyerEval || r.starRating || r.rating || 0) || 0,
+        author: r.buyerName || r.reviewerName || 'Buyer',
+        date: r.reviewDate || r.evalDate || r.date || r.gmtCreate || '',
+        verified: true,
+        helpful: 0,
+        images: Array.isArray(r.reviewImages || r.images || r.buyerPhotos || [])
+          ? (r.reviewImages || r.images || r.buyerPhotos || []).map(img => typeof img === 'string' ? img : (img.url || img.image || '')).filter(Boolean)
+          : []
+      };
+    }).filter(r => r.body);
+
+    const stats = reviewsData.statistics || reviewsData.ratingDistribution || reviewsData.starDistribution || null;
+    return {
+      summary: {
+        rating: parseFloat(reviewsData.averageStar || reviewsData.avgStar || reviewsData.averageRating || 0) || null,
+        totalRatings: reviewsData.totalNum || reviewsData.totalCount || reviewsData.total || 0,
+        totalReviews: reviews.length,
+        starsBreakdown: stats || null
+      },
+      reviews
+    };
+  }
+
   // Enrich product with data from /item_review endpoint
   _enrichFromReviews(product, reviewsData) {
     if (!reviewsData) return;
 
-    const reviewList = reviewsData.reviews || reviewsData.evaViewList || reviewsData.list || [];
+    // FIX: Handle deeply nested response shapes
+    const reviewList = reviewsData.reviews || reviewsData.evaViewList || reviewsData.list ||
+      reviewsData.data?.reviews || reviewsData.data?.evaViewList || reviewsData.data?.list || [];
+
+    // Log what we found for debugging
+    if ((!Array.isArray(reviewList) || reviewList.length === 0) && product.sourceId) {
+      logger.warn('aliexpress', `_enrichFromReviews: no review list found for ${product.sourceId}. reviewsData keys=[${Object.keys(reviewsData).join(',')}]`);
+    }
 
     if (Array.isArray(reviewList) && reviewList.length > 0 && (!product.topReviews || product.topReviews.length === 0)) {
       product.topReviews = reviewList.slice(0, 8).map(r => {
@@ -243,7 +312,10 @@ class AliExpressAdapter extends BaseAdapter {
       }
     }
 
-    const stats = reviewsData.statistics || reviewsData.ratingDistribution || reviewsData.starDistribution || null;
+    // FIX: Handle nested data shapes for statistics
+    const rd = reviewsData.data || reviewsData;
+    const stats = rd.statistics || rd.ratingDistribution || rd.starDistribution ||
+      reviewsData.statistics || reviewsData.ratingDistribution || null;
     if (stats && !product.ratingDistribution) {
       product.ratingDistribution = {};
       for (let i = 1; i <= 5; i++) {
@@ -254,11 +326,13 @@ class AliExpressAdapter extends BaseAdapter {
       if (total === 0) product.ratingDistribution = null;
     }
 
-    const totalNum = reviewsData.totalNum || reviewsData.totalCount || reviewsData.total || 0;
+    const totalNum = rd.totalNum || rd.totalCount || rd.total ||
+      reviewsData.totalNum || reviewsData.totalCount || reviewsData.total || 0;
     if (totalNum > 0 && (!product.reviews || totalNum > product.reviews)) {
       product.reviews = totalNum;
     }
-    const avgStar = reviewsData.averageStar || reviewsData.avgStar || reviewsData.averageRating || null;
+    const avgStar = rd.averageStar || rd.avgStar || rd.averageRating ||
+      reviewsData.averageStar || reviewsData.avgStar || reviewsData.averageRating || null;
     if (avgStar && (!product.rating || parseFloat(avgStar) > 0)) {
       product.rating = parseFloat(avgStar);
     }

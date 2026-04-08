@@ -264,7 +264,22 @@
       html+='</div>';
       if(desc||aplusImgs.length){
         html+='<div id="dhpdp-tab-desc" class="dhpdp-tabcontent" style="font-size:15px;line-height:1.7;color:#444">';
-        if(desc)html+=escHTML(desc).replace(/\n/g,'<br>');
+        if(desc){
+          // If description contains HTML tags, render as HTML (sanitized); otherwise escape
+          var isHTML = /<[a-z][\s\S]*>/i.test(desc);
+          if(isHTML){
+            // Sanitize: strip <script>, <iframe>, <object>, <embed>, on* attributes
+            var safeDesc = desc.replace(/<script[\s\S]*?<\/script>/gi,'')
+              .replace(/<iframe[\s\S]*?<\/iframe>/gi,'')
+              .replace(/<object[\s\S]*?<\/object>/gi,'')
+              .replace(/<embed[^>]*>/gi,'')
+              .replace(/\son\w+\s*=\s*["'][^"']*["']/gi,'')
+              .replace(/\son\w+\s*=\s*[^\s>]*/gi,'');
+            html+='<div class="dhpdp-desc-html" style="max-width:100%;overflow:hidden">'+safeDesc+'</div>';
+          } else {
+            html+=escHTML(desc).replace(/\n/g,'<br>');
+          }
+        }
         if(aplusImgs.length){
           html+='<div style="margin-top:20px">';
           for(var ai=0;ai<aplusImgs.length;ai++){

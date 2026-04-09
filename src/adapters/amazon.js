@@ -590,6 +590,94 @@ class AmazonAdapter extends BaseAdapter {
       }));
     }
 
+    // ---- v2.6: Enrich with multi-dimensional variants from all_product_variations ----
+    // Amazon product-details often returns product_variations with only one dimension (e.g., Size)
+    // but all_product_variations contains the full matrix (e.g., Color × Size) as {asin: {color, size}}
+    // We use this to build the missing Color (or other) option for the PDP selector
+    if (d.all_product_variations && typeof d.all_product_variations === 'object') {
+      const allVarMap = d.all_product_variations;
+      // Detect dimension keys from the first few entries
+      const sampleEntries = Object.values(allVarMap).slice(0, 20);
+      const dimensionKeys = new Set();
+      for (const entry of sampleEntries) {
+        if (entry && typeof entry === 'object') {
+          Object.keys(entry).forEach(k => dimensionKeys.add(k));
+        }
+      }
+
+      // Get existing option names in lowercase
+      const existingOptionNames = new Set((p.options || []).map(o => o.name.toLowerCase()));
+
+      // Find dimensions NOT already in p.options
+      const missingDimensions = [];
+      for (const dimKey of dimensionKeys) {
+        const displayName = this._formatGroupName(dimKey);
+        if (!existingOptionNames.has(displayName.toLowerCase()) && !existingOptionNames.has(dimKey.toLowerCase())) {
+          missingDimensions.push({ key: dimKey, displayName });
+        }
+      }
+
+      if (missingDimensions.length > 0) {
+        logger.info('amazon', `Found ${missingDimensions.length} missing variant dimensions from all_product_variations: ${missingDimensions.map(d => d.displayName).join(', ')}`);
+
+        const currentAsin = String(d.asin || '');
+        // Get current product's dimension values (to mark selected)
+        const currentEntry = allVarMap[currentAsin] || {};
+
+        for (const dim of missingDimensions) {
+          // Collect unique values for this dimension, picking a representative ASIN for each
+          // For colors: we want the ASIN that has the same size as current product (for smooth navigation)
+          const currentSizeKey = Object.keys(currentEntry).find(k => k !== dim.key);
+          const currentSizeValue = currentSizeKey ? currentEntry[currentSizeKey] : null;
+
+          const valueMap = new Map(); // value -> {asin, image}
+          for (const [asin, entry] of Object.entries(allVarMap)) {
+            if (!entry || !entry[dim.key]) continue;
+            const val = entry[dim.key];
+            if (!valueMap.has(val)) {
+              // Prefer an ASIN that matches the current size selection
+              valueMap.set(val, { asin, image: null, matchesCurrentSize: false });
+            }
+            // If this ASIN matches current size, prefer it as representative
+            if (currentSizeValue && currentSizeKey && entry[currentSizeKey] === currentSizeValue) {
+              valueMap.set(val, { asin, image: null, matchesCurrentSize: true });
+            }
+          }
+
+          const currentDimValue = currentEntry[dim.key] || null;
+          const values = [];
+          for (const [val, info] of valueMap) {
+            values.push({
+              value: val,
+              image: info.image,
+              asin: info.asin,
+              selected: val === currentDimValue,
+              is_available: true,
+              isColorNav: true // Flag for frontend: clicking navigates to this ASIN
+            });
+          }
+
+          // Sort: selected first, then alphabetical
+          values.sort((a, b) => {
+            if (a.selected && !b.selected) return -1;
+            if (!a.selected && b.selected) return 1;
+            return a.value.localeCompare(b.value);
+          });
+
+          // Insert Color-type options BEFORE Size options for better UX
+          const colorLike = /color|colour|style|pattern/i.test(dim.displayName);
+          if (colorLike && p.options && p.options.length > 0) {
+            p.options.unshift({ name: dim.displayName, values, isColorNav: true });
+          } else {
+            p.options = p.options || [];
+            p.options.push({ name: dim.displayName, values, isColorNav: true });
+          }
+
+          logger.info('amazon', `Added ${dim.displayName} option with ${values.length} values (current: ${currentDimValue})`);
+        }
+      }
+    }
+
     // Shipping & delivery — v1.7b: use d.delivery and d.primary_delivery_time from Amazon API
     // d.delivery contains text like "$14.99 delivery April 10 - 24. Details" or "FREE delivery Tue, Apr 1"
     // d.primary_delivery_time contains "April 10 - 24" or similar date range

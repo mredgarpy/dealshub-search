@@ -194,25 +194,42 @@
       html+='<div class="dhpdp-variants" style="margin-bottom:20px">';
       for(var oi=0;oi<p.options.length;oi++){
         var opt=p.options[oi];
-        html+='<div style="margin-bottom:12px"><label style="font-size:14px;font-weight:600;color:#333;display:block;margin-bottom:6px">'+escHTML(opt.name)+': <span class="dhpdp-opt-label" data-option="'+oi+'" style="color:#e53e3e;font-weight:700"></span></label>';
-        html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
-        // Find first globally available index for pre-selection
+        var isNavOpt = opt.isColorNav || false;
+        html+='<div style="margin-bottom:12px" data-optgroup="'+oi+'"'+(isNavOpt?' data-colornav="1"':'')+'><label style="font-size:14px;font-weight:600;color:#333;display:block;margin-bottom:6px">'+escHTML(opt.name)+': <span class="dhpdp-opt-label" data-option="'+oi+'" style="color:#e53e3e;font-weight:700"></span></label>';
+        // For color-nav options with many values, use scrollable container
+        var isLargeSet = (opt.values||[]).length > 8;
+        if(isNavOpt && isLargeSet){
+          html+='<div style="display:flex;flex-wrap:wrap;gap:8px;max-height:180px;overflow-y:auto;padding:4px 0">';
+        } else {
+          html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+        }
+        // Find first globally available index for pre-selection (skip for nav options)
         var firstAvailIdx = -1;
-        for(var fi=0;fi<(opt.values||[]).length;fi++){
-          if(isValueGloballyAvailable(oi, opt.values[fi].value)){ firstAvailIdx=fi; break; }
+        if(!isNavOpt){
+          for(var fi=0;fi<(opt.values||[]).length;fi++){
+            if(isValueGloballyAvailable(oi, opt.values[fi].value)){ firstAvailIdx=fi; break; }
+          }
         }
         for(var vi=0;vi<(opt.values||[]).length;vi++){
           var val=opt.values[vi];
-          var isAvail = isValueGloballyAvailable(oi, val.value);
-          // Pre-select first AVAILABLE value (not first overall)
-          var isSelected = isAvail && (val.selected || (firstAvailIdx === vi && !opt.values.some(function(v){return v.selected})));
+          // For nav options (Color), availability is always true (navigation reloads page)
+          var isAvail = isNavOpt ? true : isValueGloballyAvailable(oi, val.value);
+          // Pre-select: for nav options use val.selected, for others use availability logic
+          var isSelected;
+          if(isNavOpt){
+            isSelected = val.selected || false;
+          } else {
+            isSelected = isAvail && (val.selected || (firstAvailIdx === vi && !opt.values.some(function(v){return v.selected})));
+          }
           var sel=isSelected?' dhpdp-opt-sel':'';
           var unavailCls = !isAvail ? ' dhpdp-opt-unavail' : '';
           var unavailAttr = !isAvail ? ' data-unavailable="1" title="Sold Out"' : '';
+          // data-navasin for color navigation
+          var navAttr = (isNavOpt && val.asin) ? ' data-navasin="'+escHTML(val.asin)+'"' : '';
           if(val.image){
-            html+='<button class="dhpdp-opt'+sel+unavailCls+'"'+unavailAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="width:40px;height:40px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';padding:2px;cursor:'+(isAvail?'pointer':'not-allowed')+';background:#fff;'+(isAvail?'':'opacity:0.4;position:relative;')+'"><img src="'+escHTML(val.image)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px">'+(isAvail?'':'<span style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.5)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"/></svg></span>')+'</button>';
+            html+='<button class="dhpdp-opt'+sel+unavailCls+'"'+unavailAttr+navAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="width:40px;height:40px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';padding:2px;cursor:'+(isAvail?'pointer':'not-allowed')+';background:#fff;'+(isAvail?'':'opacity:0.4;position:relative;')+'"><img src="'+escHTML(val.image)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px">'+(isAvail?'':'<span style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.5)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"/></svg></span>')+'</button>';
           }else{
-            html+='<button class="dhpdp-opt'+sel+unavailCls+'"'+unavailAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="padding:8px 16px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';cursor:'+(isAvail?'pointer':'not-allowed')+';background:'+(isSelected?'#fef2f2':'#fff')+';font-size:13px;color:'+(isAvail?'#333':'#bbb')+';'+(isAvail?'':'opacity:0.4;text-decoration:line-through;')+'">'+escHTML(val.value)+'</button>';
+            html+='<button class="dhpdp-opt'+sel+unavailCls+'"'+unavailAttr+navAttr+' data-option="'+oi+'" data-value="'+vi+'" data-valtitle="'+escHTML(val.value)+'" style="padding:8px 16px;border-radius:8px;border:2px solid '+(isSelected?'#e53e3e':'#ddd')+';cursor:'+(isAvail?'pointer':'not-allowed')+';background:'+(isSelected?'#fef2f2':'#fff')+';font-size:13px;color:'+(isAvail?'#333':'#bbb')+';white-space:nowrap;'+(isAvail?'':'opacity:0.4;text-decoration:line-through;')+'">'+escHTML(val.value)+'</button>';
           }
         }
         html+='</div></div>';
@@ -344,6 +361,8 @@
     function findVariantBySelection(){
       var parts=[];
       container.querySelectorAll('.dhpdp-variants > div').forEach(function(group){
+        // v2.6: Skip color-nav groups (they navigate to different ASINs, not local variants)
+        if(group.dataset.colornav === '1') return;
         var sel=group.querySelector('.dhpdp-opt-sel');
         if(sel){
           var optIdx=parseInt(sel.dataset.option);
@@ -438,6 +457,8 @@
     function refreshOptionAvailability(){
       if(!p.options || p.options.length <= 1) return; // Only needed for multi-option
       container.querySelectorAll('.dhpdp-variants > div').forEach(function(group){
+        // v2.6: Skip color-nav groups (always navigable, not affected by size selection)
+        if(group.dataset.colornav === '1') return;
         var btns = group.querySelectorAll('.dhpdp-opt');
         btns.forEach(function(btn){
           var oi = parseInt(btn.dataset.option);
@@ -468,6 +489,13 @@
 
     container.querySelectorAll('.dhpdp-opt').forEach(function(btn){
       btn.addEventListener('click',function(){
+        // v2.6: Color navigation — if this button navigates to a different ASIN, redirect
+        var navAsin = this.dataset.navasin;
+        if(navAsin && !this.classList.contains('dhpdp-opt-sel')){
+          window.location.href = window.location.pathname + '?id=' + encodeURIComponent(navAsin) + '&store=' + encodeURIComponent(store);
+          return;
+        }
+
         // Block clicks on unavailable variants
         if(this.dataset.unavailable === '1') return;
 
@@ -522,6 +550,8 @@
     function getSelectedVariant(){
       var parts=[];
       container.querySelectorAll('.dhpdp-variants > div').forEach(function(group){
+        // v2.6: Skip color-nav groups for variant selection (they're handled by page navigation)
+        if(group.dataset.colornav === '1') return;
         var sel=group.querySelector('.dhpdp-opt-sel');
         if(sel){
           var optIdx=parseInt(sel.dataset.option);

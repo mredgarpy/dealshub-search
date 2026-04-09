@@ -1217,6 +1217,23 @@ function setupCRMApi(app) {
     }
   });
 
+  // ---- Theme Asset Upload (for deploying JS/CSS to Shopify theme) ----
+  app.put('/api/crm/theme-asset', auth, async function(req, res) {
+    try {
+      const { key, value } = req.body;
+      if (!key || !value) return res.status(400).json({ success: false, error: 'key and value required' });
+      const themeId = req.body.themeId || process.env.SHOPIFY_THEME_ID || '157178462339';
+      const result = await shopifyAdmin('PUT', `/themes/${themeId}/assets.json`, {
+        asset: { key, value }
+      });
+      logger.info('crm', `Theme asset updated: ${key} (${value.length} chars)`);
+      res.json({ success: true, asset: result?.asset?.key, size: value.length });
+    } catch (e) {
+      logger.error('crm', `Theme asset update failed: ${e.message}`);
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
   logger.info('crm', 'CRM Pro endpoints loaded (customers, analytics, settings, hydration, repricing)');
 }
 

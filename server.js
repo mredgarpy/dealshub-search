@@ -2824,3 +2824,4 @@ app.listen(PORT, () => {
   logger.info('server', `Keep-alive enabled: self-ping every ${KEEP_ALIVE_INTERVAL / 60000}min`);
 });
 
+// v2.6 forced rebuild

@@ -1,7 +1,7 @@
 {
   "name": "stylehub-backend",
   "version": "2.1.0",
-  "description": "StyleHub Miami — Hybrid Commerce Backend",
+  "description": "StyleHub Miami \u2014 Hybrid Commerce Backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -17,5 +17,6 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "buildTimestamp": "2026-04-09T16:00:00Z"
 }

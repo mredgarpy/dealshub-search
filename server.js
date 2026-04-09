@@ -2792,7 +2792,7 @@ app.post('/api/admin/autods/sync-order-status', async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  logger.info('server', `StyleHub backend v2.4 running on port ${PORT}`);
+  logger.info('server', `StyleHub backend v2.5 running on port ${PORT}`);
   logger.info('server', `Sources: ${VALID_SOURCES.join(', ')}`);
   logger.info('server', `Shopify: ${process.env.SHOPIFY_STORE_DOMAIN ? 'configured' : 'NOT configured'}`);
   // Warm up cache after server starts (don't await â let it run in background)

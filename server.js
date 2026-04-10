@@ -1107,7 +1107,12 @@ app.get('/api/banners', async (req, res) => {
 
 // ---- HOME CARDS (Amazon-style 2x2 grid cards) ----
 const HOME_CARD_POOL = [
-  { title:'Shop by category', type:'static', items:[{label:'Fashion',img:'',q:'fashion'},{label:'Home',img:'',q:'home decor'},{label:'Beauty',img:'',q:'beauty'},{label:'Electronics',img:'',q:'electronics'}], link:'/collections/all', linkText:'See all categories' },
+  { title:'Shop by category', type:'static', items:[
+    {label:'Fashion',img:'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&auto=format&fit=crop&q=80',q:'fashion'},
+    {label:'Home',img:'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&auto=format&fit=crop&q=80',q:'home decor'},
+    {label:'Beauty',img:'https://images.unsplash.com/photo-1522335789203-aaa99ac2b523?w=400&auto=format&fit=crop&q=80',q:'beauty'},
+    {label:'Electronics',img:'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=400&auto=format&fit=crop&q=80',q:'electronics'}
+  ], link:'/collections/all', linkText:'See all categories' },
   { title:'Deals under $10', type:'search', query:'deals under 10 dollars', maxPrice:10, link:'/pages/search-results?q=deals+under+10', linkText:'Shop all' },
   { title:'Deals under $25', type:'search', query:'deals under 25 dollars', maxPrice:25, link:'/pages/search-results?q=deals+under+25', linkText:'Shop all' },
   { title:'New arrivals', type:'search', query:'new releases 2026', link:'/pages/search-results?q=new+arrivals', linkText:'See more' },
@@ -1143,7 +1148,7 @@ app.get('/api/home-cards', async (req, res) => {
       selected.map(async (card) => {
         let products = [];
         if (card.type === 'static') {
-          return { title: card.title, link: card.link, linkText: card.linkText, products: card.items.map(it => ({ image: '', title: it.label, link: '/pages/search-results?q=' + encodeURIComponent(it.q), isCategory: true })) };
+          return { title: card.title, link: card.link, linkText: card.linkText, products: card.items.map(it => ({ image: it.img || '', title: it.label, link: '/pages/search-results?q=' + encodeURIComponent(it.q), isCategory: !it.img })) };
         }
         if (amazonAdapter) {
           const raw = await amazonAdapter.search(card.query || 'deals', 6);

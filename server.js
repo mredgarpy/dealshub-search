@@ -1110,7 +1110,7 @@ const HOME_CARD_POOL = [
   { title:'Shop by category', type:'static', items:[
     {label:'Fashion',img:'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&auto=format&fit=crop&q=80',q:'fashion'},
     {label:'Home',img:'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&auto=format&fit=crop&q=80',q:'home decor'},
-    {label:'Beauty',img:'https://images.unsplash.com/photo-1522335789203-aaa99ac2b523?w=400&auto=format&fit=crop&q=80',q:'beauty'},
+    {label:'Beauty',img:'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&auto=format&fit=crop&q=80',q:'beauty'},
     {label:'Electronics',img:'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=400&auto=format&fit=crop&q=80',q:'electronics'}
   ], link:'/collections/all', linkText:'See all categories' },
   { title:'Deals under $10', type:'search', query:'deals under 10 dollars', maxPrice:10, link:'/pages/search-results?q=deals+under+10', linkText:'Shop all' },

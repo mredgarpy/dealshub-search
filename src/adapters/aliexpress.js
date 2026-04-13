@@ -973,6 +973,16 @@ class AliExpressAdapter extends BaseAdapter {
 
     // SKU variants — resolve coded titles to human-readable names
     // Use sku.price (MSRP) as base, NOT sku.promotionPrice (wholesale/dropship rate)
+    // FIX: availability defaults to TRUE when quantity field is missing from API response
+    // (common case: item_detail_2 doesn't always include quantity per SKU).
+    // Only mark as unavailable when the API explicitly returns quantity = 0.
+    const parseAvailability = (q) => {
+      if (q === undefined || q === null || q === '') return true; // assume available
+      const n = Number(q);
+      if (Number.isNaN(n)) return true;
+      return n > 0;
+    };
+
     if (skuData.base?.length) {
       p.variants = skuData.base.map(sku => ({
         id: String(sku.skuId || ''),
@@ -981,15 +991,20 @@ class AliExpressAdapter extends BaseAdapter {
         sourceCost: parsePrice(sku.promotionPrice) || p.sourceCost || null,
         sourcePromotionPrice: parsePrice(sku.promotionPrice) || null,
         image: resolveVariantImage(sku.propMap),
-        available: (sku.quantity || 0) > 0
+        available: parseAvailability(sku.quantity)
       }));
+      // Log when quantity field is missing across the board
+      const missingQty = skuData.base.filter(s => s.quantity === undefined || s.quantity === null).length;
+      if (missingQty === skuData.base.length) {
+        logger.warn('aliexpress', 'SKU quantity missing from all variants, defaulting to available=true', { productId: p.sourceId, variants: skuData.base.length });
+      }
     } else if (d.skuModule?.skuPriceList) {
       p.variants = d.skuModule.skuPriceList.map(sku => ({
         id: String(sku.skuId || ''),
         title: resolvePropMap(sku.skuAttr || sku.skuPropIds || ''),
         price: parsePrice(sku.skuVal?.actSkuCalPrice || sku.skuVal?.skuCalPrice) || p.price,
         image: resolveVariantImage(sku.skuAttr || sku.skuPropIds || ''),
-        available: (sku.skuVal?.availQuantity || 0) > 0
+        available: parseAvailability(sku.skuVal?.availQuantity)
       }));
     }
 

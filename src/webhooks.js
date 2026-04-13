@@ -11,7 +11,16 @@ const PLUS_PRODUCT_ID = 8982486155395;
 function verifyHmac(req) {
   const hmac = req.headers['x-shopify-hmac-sha256'];
   const secret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
-  if (!hmac || !secret || !req.rawBody) return true; // Skip if not configured
+  // If secret is not configured, allow in dev but log warning
+  if (!secret) {
+    logger.warn('webhook', 'HMAC secret not configured — skipping verification (configure SHOPIFY_WEBHOOK_SECRET in production)');
+    return true;
+  }
+  // If request has no HMAC header or raw body, reject (possible forgery)
+  if (!hmac || !req.rawBody) {
+    logger.warn('webhook', 'Missing HMAC header or raw body — rejecting request');
+    return false;
+  }
   const hash = crypto.createHmac('sha256', secret)
     .update(req.rawBody, 'utf8').digest('base64');
   try {
@@ -45,6 +54,7 @@ function setupWebhooks(app) {
     try {
       if (!verifyHmac(req)) {
         logger.warn('webhook', 'HMAC verification failed for order-created');
+        return res.status(401).send('Unauthorized');
       }
 
       const o = req.body;
@@ -174,6 +184,7 @@ function setupWebhooks(app) {
     try {
       if (!verifyHmac(req)) {
         logger.warn('webhook', 'HMAC verification failed for order-fulfilled');
+        return res.status(401).send('Unauthorized');
       }
 
       const o = req.body;
@@ -213,6 +224,7 @@ function setupWebhooks(app) {
     try {
       if (!verifyHmac(req)) {
         logger.warn('webhook', 'HMAC verification failed for order-cancelled');
+        return res.status(401).send('Unauthorized');
       }
 
       const o = req.body;
@@ -260,6 +272,7 @@ function setupWebhooks(app) {
     try {
       if (!verifyHmac(req)) {
         logger.warn('webhook', 'HMAC verification failed for refund-created');
+        return res.status(401).send('Unauthorized');
       }
 
       const r = req.body;

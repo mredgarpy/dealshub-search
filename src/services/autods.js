@@ -273,107 +273,116 @@ async function processOrderWebhook(orderData) {
         updated_at = datetime('now')
     `);
 
-    orderStmt.run(
-      shopifyOrderId,
-      String(orderNumber || ''),
-      orderName || '',
-      email || '',
-      customerName,
-      parseFloat(totalPrice) || 0,
-      currency || 'USD',
-      financialStatus || '',
-      fulfillmentStatus || '',
-      JSON.stringify(lineItems || []),
-      JSON.stringify(shippingAddress || {}),
-    );
-
-    // 2. Get the autods_order record
-    const autodsOrder = db.prepare('SELECT id FROM autods_orders WHERE shopify_order_id = ?').get(shopifyOrderId);
-    if (!autodsOrder) throw new Error('Failed to create autods_order record');
-
-    // 3. Process each line item — extract source info
+    // ── WRAP ALL DB OPERATIONS IN A TRANSACTION ──
     const itemResults = [];
-    for (const item of (lineItems || [])) {
-      const sourceInfo = extractSourceInfo(item, db);
+    let autodsOrderId = null;
+    let finalStatus = 'no_mapping';
 
-      if (sourceInfo) {
-        const itemStmt = db.prepare(`
-          INSERT OR REPLACE INTO autods_order_items (
-            autods_order_id, shopify_line_item_id, shopify_product_id,
-            shopify_variant_id, source_store, source_product_id, source_url,
-            buy_id, quantity, price, variant_title, autods_item_status, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', datetime('now'))
-        `);
+    const runTransaction = db.transaction(() => {
+      orderStmt.run(
+        shopifyOrderId,
+        String(orderNumber || ''),
+        orderName || '',
+        email || '',
+        customerName,
+        parseFloat(totalPrice) || 0,
+        currency || 'USD',
+        financialStatus || '',
+        fulfillmentStatus || '',
+        JSON.stringify(lineItems || []),
+        JSON.stringify(shippingAddress || {}),
+      );
 
-        itemStmt.run(
-          autodsOrder.id,
-          item.id,
-          item.product_id,
-          item.variant_id,
-          sourceInfo.source,
-          sourceInfo.sourceId,
-          sourceInfo.sourceUrl,
-          sourceInfo.buyId,
-          item.quantity || 1,
-          parseFloat(item.price) || 0,
-          item.variant_title || '',
-        );
+      // 2. Get the autods_order record
+      const autodsOrder = db.prepare('SELECT id FROM autods_orders WHERE shopify_order_id = ?').get(shopifyOrderId);
+      if (!autodsOrder) throw new Error('Failed to create autods_order record');
+      autodsOrderId = autodsOrder.id;
 
-        itemResults.push({
-          lineItemId: item.id,
-          source: sourceInfo.source,
-          sourceId: sourceInfo.sourceId,
-          buyId: sourceInfo.buyId,
-          status: 'ready'
-        });
+      // 3. Process each line item — extract source info
+      for (const item of (lineItems || [])) {
+        const sourceInfo = extractSourceInfo(item, db);
 
-        // ── AUTO-REGISTER product in autods_products if missing ──
-        // This ensures ALL sources (Amazon, AliExpress, etc.) appear in pending products
-        try {
-          registerProduct({
+        if (sourceInfo) {
+          const itemStmt = db.prepare(`
+            INSERT OR REPLACE INTO autods_order_items (
+              autods_order_id, shopify_line_item_id, shopify_product_id,
+              shopify_variant_id, source_store, source_product_id, source_url,
+              buy_id, quantity, price, variant_title, autods_item_status, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', datetime('now'))
+          `);
+
+          itemStmt.run(
+            autodsOrder.id,
+            item.id,
+            item.product_id,
+            item.variant_id,
+            sourceInfo.source,
+            sourceInfo.sourceId,
+            sourceInfo.sourceUrl,
+            sourceInfo.buyId,
+            item.quantity || 1,
+            parseFloat(item.price) || 0,
+            item.variant_title || '',
+          );
+
+          itemResults.push({
+            lineItemId: item.id,
             source: sourceInfo.source,
             sourceId: sourceInfo.sourceId,
-            sourceUrl: sourceInfo.sourceUrl || '',
-            shopifyProductId: item.product_id,
-            shopifyVariantId: item.variant_id,
-            shopifyHandle: ''
+            buyId: sourceInfo.buyId,
+            status: 'ready'
           });
-          logger.info('autods', `Auto-registered product from order: ${sourceInfo.source}/${sourceInfo.sourceId}`);
-        } catch (regErr) {
-          logger.debug('autods', `Product registration from order failed (non-blocking): ${regErr.message}`);
+
+          // ── AUTO-REGISTER product in autods_products if missing ──
+          try {
+            registerProduct({
+              source: sourceInfo.source,
+              sourceId: sourceInfo.sourceId,
+              sourceUrl: sourceInfo.sourceUrl || '',
+              shopifyProductId: item.product_id,
+              shopifyVariantId: item.variant_id,
+              shopifyHandle: ''
+            });
+            logger.info('autods', `Auto-registered product from order: ${sourceInfo.source}/${sourceInfo.sourceId}`);
+          } catch (regErr) {
+            logger.debug('autods', `Product registration from order failed (non-blocking): ${regErr.message}`);
+          }
+
+          // Also create order_routing entry for the operations layer
+          const { createOrderRouting } = require('../utils/db');
+          createOrderRouting({
+            shopify_order_id: shopifyOrderId,
+            shopify_order_number: orderName || String(orderNumber),
+            source_store: sourceInfo.source,
+            source_product_id: sourceInfo.sourceId,
+            source_variant_id: sourceInfo.sourceVariantId || null,
+            status: 'pending',
+            notes: `AutoDS Buy ID: ${sourceInfo.buyId}`
+          });
+        } else {
+          itemResults.push({
+            lineItemId: item.id,
+            productId: item.product_id,
+            status: 'no_source_mapping',
+            title: item.title
+          });
+          logger.warn('autods', 'No source mapping found for line item', {
+            lineItemId: item.id, productId: item.product_id, title: item.title
+          });
         }
-
-        // Also create order_routing entry for the operations layer
-        const { createOrderRouting } = require('../utils/db');
-        createOrderRouting({
-          shopify_order_id: shopifyOrderId,
-          shopify_order_number: orderName || String(orderNumber),
-          source_store: sourceInfo.source,
-          source_product_id: sourceInfo.sourceId,
-          source_variant_id: sourceInfo.sourceVariantId || null,
-          status: 'pending',
-          notes: `AutoDS Buy ID: ${sourceInfo.buyId}`
-        });
-      } else {
-        itemResults.push({
-          lineItemId: item.id,
-          productId: item.product_id,
-          status: 'no_source_mapping',
-          title: item.title
-        });
-        logger.warn('autods', 'No source mapping found for line item', {
-          lineItemId: item.id, productId: item.product_id, title: item.title
-        });
       }
-    }
 
-    // 4. Determine overall order status
-    const allReady = itemResults.every(r => r.status === 'ready');
-    const someReady = itemResults.some(r => r.status === 'ready');
-    const finalStatus = allReady ? 'ready' : someReady ? 'partial' : 'no_mapping';
+      // 4. Determine overall order status
+      const allReady = itemResults.every(r => r.status === 'ready');
+      const someReady = itemResults.some(r => r.status === 'ready');
+      finalStatus = allReady ? 'ready' : someReady ? 'partial' : 'no_mapping';
 
-    db.prepare('UPDATE autods_orders SET autods_status = ?, processed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
-      .run(finalStatus, autodsOrder.id);
+      db.prepare('UPDATE autods_orders SET autods_status = ?, processed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
+        .run(finalStatus, autodsOrder.id);
+    });
+
+    // Execute the transaction
+    runTransaction();
 
     logger.info('autods', 'Order processed', {
       orderId: shopifyOrderId,
@@ -404,17 +413,26 @@ async function processOrderWebhook(orderData) {
 
 // ---- EXTRACT SOURCE INFO FROM LINE ITEM ----
 function extractSourceInfo(lineItem, db) {
+  // Guard: validate input
+  if (!lineItem || typeof lineItem !== 'object') {
+    logger.warn('autods', 'extractSourceInfo called with invalid lineItem');
+    return null;
+  }
+
   // Strategy 1: Line item properties (set during add-to-cart)
   const props = {};
-  if (lineItem.properties) {
+  if (Array.isArray(lineItem.properties)) {
     for (const prop of lineItem.properties) {
-      props[prop.name] = prop.value;
+      if (prop && prop.name != null) {
+        props[prop.name] = prop.value;
+      }
     }
   }
 
   if (props._source_store && props._source_id) {
-    const source = props._source_store;
-    const sourceId = props._source_id;
+    const source = String(props._source_store).trim();
+    const sourceId = String(props._source_id).trim();
+    if (!source || !sourceId) return null; // Empty after trim = invalid
     const sourceUrl = buildSourceUrl(source, sourceId);
     return {
       source,

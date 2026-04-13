@@ -11,32 +11,46 @@
   var params=new URLSearchParams(window.location.search);
   var productId=params.get('id');
   var store=params.get('store')||'amazon';
-  var titleHint=params.get('title')||'';
+  var titleHint=params.get('title')||'';h
   var _pdpProductData=null;
   if(!productId){container.innerHTML='<div style="text-align:center;padding:60px 20px"><h2>Product Not Found</h2><p>No product ID specified.</p><a href="/" style="color:#e53e3e">Back to Home</a></div>';return}
 
   container.innerHTML=skeletonHTML();
 
-  fetch(API+'/api/product/'+encodeURIComponent(productId)+'?store='+encodeURIComponent(store)+(titleHint?'&title='+encodeURIComponent(titleHint):''),{signal:AbortSignal.timeout(20000)})
-    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
-    .then(function(data){
-      var p=data;
-      _pdpProductData=p;
-      if(p&&!p.title&&titleHint)p.title=decodeURIComponent(titleHint);
-      if(p&&(!p.image&&!p.primaryImage)&&params.get('image'))p.primaryImage=params.get('image');
-      if(!p||!p.title)throw new Error('No product data');
-      /* Frontend safety: clean badge + salesVolume */
-      if(p.badge)p.badge=(p.badge||'').replace(/Amazon'?s?\s*Choice/gi,'Popular Choice');
-      if(p.salesVolume)p.salesVolume=(p.salesVolume||'').replace(/on Amazon\s*/gi,'').replace(/New\s+in past month/i,'New this month').trim();
-      renderProduct(p);
-      updateSEO(p);
-      addToRecentlyViewed(p);
-      setTimeout(function(){loadRecommendations(p)},200);
-    })
-    .catch(function(err){
-      console.error('PDP fetch error:',err);
-      container.innerHTML='<div style="text-align:center;padding:60px 20px"><h2>Unable to Load Product</h2><p>'+esc(err.message)+'</p><p style="margin-top:16px"><a href="/" style="color:#e53e3e;text-decoration:underline">Back to Home</a> &middot; <a href="javascript:location.reload()" style="color:#e53e3e;text-decoration:underline">Retry</a></p></div>';
-    });
+  var _pdpUrl=API+'/api/product/'+encodeURIComponent(productId)+'?store='+encodeURIComponent(store)+(titleHint?'&title='+encodeURIComponent(titleHint):'');
+  var _pdpMaxRetries=1;
+
+  function fetchProduct(attempt){
+    var timeout=attempt===0?25000:35000;
+    return fetch(_pdpUrl,{signal:AbortSignal.timeout(timeout)})
+      .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
+      .then(function(data){
+        var p=data;
+        _pdpProductData=p;
+        if(p&&!p.title&&titleHint)p.title=decodeURIComponent(titleHint);
+        if(p&&(!p.image&&!p.primaryImage)&&params.get('image'))p.primaryImage=params.get('image');
+        if(!p||!p.title)throw new Error('No product data');
+        /* Frontend safety: clean badge + salesVolume */
+        if(p.badge)p.badge=(p.badge||'').replace(/Amazon'?s?\s*Choice/gi,'Popular Choice');
+        if(p.salesVolume)p.salesVolume=(p.salesVolume||'').replace(/on Amazon\s*/gi,'').replace(/New\s+in past month/i,'New this month').trim();
+        renderProduct(p);
+        updateSEO(p);
+        addToRecentlyViewed(p);
+        setTimeout(function(){loadRecommendations(p)},200);
+      })
+      .catch(function(err){
+        var isTimeout=err&&(err.name==='TimeoutError'||/timed?\s*out/i.test(err.message));
+        if(isTimeout&&attempt<_pdpMaxRetries){
+          console.warn('PDP fetch timeout (attempt '+(attempt+1)+'), retrying...');
+          container.innerHTML=skeletonHTML()+'<div style="text-align:center;padding:12px;font-size:14px;color:#666">Loading is taking longer than usual, please wait...</div>';
+          return fetchProduct(attempt+1);
+        }
+        console.error('PDP fetch error:',err);
+        var userMsg=isTimeout?'The server is taking too long to respond. This may be temporary \u2014 please try again.':'We hit a bump loading the details. Please try again in a moment.';
+        container.innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><h2 style="font-size:22px;font-weight:700;margin-bottom:8px">Unable to load this product</h2><p style="color:#666;margin-bottom:4px">'+userMsg+'</p><p style="font-size:13px;color:#999;margin-bottom:16px">'+esc(err.message)+'</p><div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><a href="javascript:location.reload()" style="display:inline-block;padding:12px 24px;background:#e53e3e;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">Try again</a><a href="/" style="display:inline-block;padding:12px 24px;background:#f3f4f6;color:#333;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">Back to Home</a></div></div>';
+      });
+  }
+  fetchProduct(0);
 
   function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
   function unesc(s){if(!s||typeof s!=='string')return s||'';var d=document.createElement('textarea');d.innerHTML=s;return d.value}

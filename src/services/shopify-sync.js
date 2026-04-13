@@ -298,6 +298,9 @@ async function createShopifyProduct(productData, pricingResult) {
         { namespace: 'dealshub', key: 'delivery_max_days', value: String(productData.deliveryEstimate?.maxDays || ''), type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'delivery_label', value: productData.deliveryEstimate?.label || '', type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'shipping_note', value: productData.shippingData?.note || '', type: 'single_line_text_field' },
+        // Persist source shipping cost: 0 = free/unknown; >0 = real cost returned by source API
+        { namespace: 'dealshub', key: 'source_shipping_cost', value: String(productData.shippingData?.cost != null ? productData.shippingData.cost : 0), type: 'single_line_text_field' },
+        { namespace: 'dealshub', key: 'source_shipping_known', value: String(productData.shippingData?.cost != null ? 1 : 0), type: 'single_line_text_field' },
         { namespace: 'dealshub', key: 'return_window', value: String(productData.returnPolicy?.window || ''), type: 'single_line_text_field' }
       ]
     }

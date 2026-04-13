@@ -171,7 +171,7 @@ async function findExistingProduct(source, sourceId) {
           shopifyProductId: match.id,
           shopifyVariantId: match.variants?.[0]?.id || null,
           handle: match.handle,
-          variants: (match.variants || []).map(v => ({ id: v.id, title: v.title, price: v.price }))
+          variants: (match.variants || []).map(v => ({ id: v.id, title: v.title, price: v.price, sku: v.sku }))
         };
         syncCache.set(cacheKey, mapping, 3600000);
         logger.info('sync', 'Found existing product via tag search', { source, sourceId, shopifyId: match.id });
@@ -192,7 +192,7 @@ async function findExistingProduct(source, sourceId) {
           shopifyProductId: check.product.id,
           shopifyVariantId: dbMapping.shopify_variant_id || check.product.variants?.[0]?.id,
           handle: check.product.handle,
-          variants: (check.product.variants || []).map(v => ({ id: v.id, title: v.title, price: v.price }))
+          variants: (check.product.variants || []).map(v => ({ id: v.id, title: v.title, price: v.price, sku: v.sku }))
         };
         syncCache.set(cacheKey, mapping, 3600000);
         logger.info('sync', 'Found existing product via DB mapping', { source, sourceId, shopifyId: check.product.id });
@@ -347,7 +347,7 @@ async function createShopifyProduct(productData, pricingResult) {
     shopifyProductId: product.id,
     shopifyVariantId: product.variants[0]?.id,
     handle: product.handle,
-    variants: product.variants.map(v => ({ id: v.id, title: v.title, price: v.price })),
+    variants: product.variants.map(v => ({ id: v.id, title: v.title, price: v.price, sku: v.sku })),
     isNewlyCreated: true // Signal to frontend that this is new
   };
   syncCache.set(`mapping:${source}:${sourceId}`, mapping, 3600000);
@@ -498,7 +498,7 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
         });
         logger.info('sync', `Repaired variant ${v.id}: forced untracked/continue`);
       }));
-      mapping.variants = variants.map(v => ({ id: v.id, title: v.title, price: v.price }));
+      mapping.variants = variants.map(v => ({ id: v.id, title: v.title, price: v.price, sku: v.sku }));
       syncCache.set(cacheKey, mapping, 3600000);
       logSync(source, sourceId, 'repair', 'success', { shopifyId: mapping.shopifyProductId });
     } catch (repairErr) {
@@ -516,31 +516,66 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     }
   }
 
-  // Determine which variant to use — FIX v1.1: Flexible variant matching
+  // Determine which variant to use — FIX v1.2: Multi-strategy variant matching
+  // Priority: source variant ID (SKU suffix) > exact title > title equals ignoring "Option: " prefix > contains (only if unambiguous)
   let variantId = mapping.shopifyVariantId;
+  let matchStrategy = 'default_first_variant';
+
   if (selectedVariantId && mapping.variants?.length > 1) {
-    const normalizedInput = String(selectedVariantId).trim().toLowerCase();
-    const match = mapping.variants.find(v => {
-      const vTitle = (v.title || '').trim().toLowerCase();
-      // Exact match
-      if (vTitle === normalizedInput) return true;
-      // "Option: Black" matches "Black"
-      if (vTitle === 'option: ' + normalizedInput) return true;
-      // "Black" matches "Option: Black"
-      if ('option: ' + vTitle === normalizedInput) return true;
-      // Partial contains
-      if (vTitle.includes(normalizedInput) || normalizedInput.includes(vTitle)) return true;
-      // Strip "Option: " prefix from both and compare
-      const stripPrefix = s => s.replace(/^option:\s*/i, '');
-      if (stripPrefix(vTitle) === stripPrefix(normalizedInput)) return true;
-      return false;
+    const rawInput = String(selectedVariantId).trim();
+    const normalizedInput = rawInput.toLowerCase();
+    const stripPrefix = s => s.replace(/^option:\s*/i, '').trim();
+    const normInput = stripPrefix(normalizedInput);
+
+    // Strategy 1: Match by source variant ID embedded in Shopify SKU
+    // SKU format: DH-<SOURCE>-<sourceId>-<sourceVariantId>
+    // If frontend sends sourceVariantId directly (numeric string), match SKU suffix.
+    const skuMatch = mapping.variants.find(v => {
+      if (!v.sku) return false;
+      const skuParts = String(v.sku).split('-');
+      const lastPart = skuParts[skuParts.length - 1];
+      return lastPart === rawInput || lastPart === normalizedInput;
     });
-    if (match) {
-      variantId = match.id;
-      logger.info('sync', `Variant matched: "${selectedVariantId}" → variant ${match.id} ("${match.title}")`);
+    if (skuMatch) {
+      variantId = skuMatch.id;
+      matchStrategy = 'sku_source_variant_id';
     } else {
-      logger.warn('sync', `No variant match for "${selectedVariantId}" among: ${mapping.variants.map(v => v.title).join(', ')}`);
+      // Strategy 2: Exact title match (case-insensitive, ignoring "Option: " prefix)
+      const exactMatch = mapping.variants.find(v => {
+        const vTitle = stripPrefix((v.title || '').trim().toLowerCase());
+        return vTitle === normInput;
+      });
+      if (exactMatch) {
+        variantId = exactMatch.id;
+        matchStrategy = 'exact_title';
+      } else {
+        // Strategy 3: Contains match — but only use if UNAMBIGUOUS (exactly one hit)
+        const containsMatches = mapping.variants.filter(v => {
+          const vTitle = stripPrefix((v.title || '').trim().toLowerCase());
+          return vTitle.includes(normInput) || normInput.includes(vTitle);
+        });
+        if (containsMatches.length === 1) {
+          variantId = containsMatches[0].id;
+          matchStrategy = 'contains_unambiguous';
+        } else if (containsMatches.length > 1) {
+          logger.warn('sync', `Ambiguous variant match for "${selectedVariantId}" — matched ${containsMatches.length} variants, using first. Frontend should send full variant title or source variant ID.`, {
+            source, sourceId,
+            input: selectedVariantId,
+            matches: containsMatches.map(v => ({ id: v.id, title: v.title }))
+          });
+          variantId = containsMatches[0].id;
+          matchStrategy = 'contains_ambiguous_first';
+        } else {
+          logger.warn('sync', `No variant match for "${selectedVariantId}" among: ${mapping.variants.map(v => v.title).join(' | ')}`, {
+            source, sourceId,
+            input: selectedVariantId,
+            availableVariants: mapping.variants.map(v => ({ id: v.id, title: v.title, sku: v.sku }))
+          });
+          matchStrategy = 'no_match_fallback_first';
+        }
+      }
     }
+    logger.info('sync', `Variant resolved: "${selectedVariantId}" → variant ${variantId} via ${matchStrategy}`);
   }
 
   _timing.total = Date.now() - _startTime;

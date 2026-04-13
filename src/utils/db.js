@@ -141,6 +141,12 @@ function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_tiers_source
       ON markup_tiers(source_store, min_price);
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // Seed default pricing rules if empty
@@ -778,8 +784,63 @@ function updateMappingPrice(id, newPrice, newOriginalPrice) {
   }
 }
 
+// ============================================================
+// APP SETTINGS (generic key-value store) + SHIPPING BUFFERS
+// ============================================================
+
+function getSetting(key, defaultValue = null) {
+  try {
+    const row = getDb().prepare('SELECT value FROM app_settings WHERE key = ?').get(key);
+    if (!row) return defaultValue;
+    try { return JSON.parse(row.value); } catch { return row.value; }
+  } catch (e) {
+    logger.error('db', 'getSetting failed', { key, error: e.message });
+    return defaultValue;
+  }
+}
+
+function setSetting(key, value) {
+  try {
+    const v = typeof value === 'string' ? value : JSON.stringify(value);
+    getDb().prepare(`
+      INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+    `).run(key, v);
+    return true;
+  } catch (e) {
+    logger.error('db', 'setSetting failed', { key, error: e.message });
+    return false;
+  }
+}
+
+// Default shipping buffer per source (USD added to landed cost before markup)
+const DEFAULT_SHIPPING_BUFFERS = {
+  amazon_prime:       0,   // Prime/FBA continental US is reliably free
+  amazon_marketplace: 4,   // Non-Prime sellers charge shipping
+  aliexpress:         3,   // AliExpress has variable shipping
+  sephora:            0,   // Usually free
+  macys:              2,
+  shein:              2,
+  _ak_hi_pr_surcharge: 8   // Extra surcharge absorbed when shipping AK/HI/PR
+};
+
+function getShippingBuffers() {
+  const stored = getSetting('shipping_buffers', null);
+  return { ...DEFAULT_SHIPPING_BUFFERS, ...(stored || {}) };
+}
+
+function setShippingBuffers(buffers) {
+  const merged = { ...DEFAULT_SHIPPING_BUFFERS, ...buffers };
+  return setSetting('shipping_buffers', merged);
+}
+
 module.exports = {
   getDb,
+  getSetting,
+  setSetting,
+  getShippingBuffers,
+  setShippingBuffers,
+  DEFAULT_SHIPPING_BUFFERS,
   findMapping,
   upsertMapping,
   logSync,

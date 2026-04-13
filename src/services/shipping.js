@@ -138,27 +138,42 @@ function getShippingQuote(source, productData = {}) {
   const estimate = getShippingEstimate(source);
   const returnPolicy = getReturnPolicy(source);
 
-  // Override with product-level shipping data if available from source API
+  // Business rule: always prefer real shipping data from source API.
+  // If source didn't provide any cost → default to 0 (NOT to profile cost).
+  // If source DID provide a cost (including 0), use that exact value.
   const sourceShipping = productData.shippingData || {};
   const sourceDelivery = productData.deliveryEstimate || {};
+
+  const sourceHasCost = sourceShipping.cost != null && !Number.isNaN(Number(sourceShipping.cost));
+  const cost = sourceHasCost ? Number(sourceShipping.cost) : 0;
+  const costSource = sourceHasCost ? 'source_api' : 'default_zero';
+  const freeShipping = cost === 0;
+
+  // ETA: prefer source, else fallback to profile (profile is better than nothing here)
+  const minDays = sourceDelivery.minDays || estimate.minDays;
+  const maxDays = sourceDelivery.maxDays || estimate.maxDays;
+
+  // Note: only say FREE when we are confident (source confirmed 0 OR source had no data → $0 default).
+  // Only say "Shipping: $X" when cost > 0.
+  const note = cost > 0
+    ? `Shipping: $${cost.toFixed(2)}`
+    : (sourceShipping.note && sourceHasCost ? sourceShipping.note : 'FREE Shipping');
 
   return {
     source,
     shipping: {
-      cost: sourceShipping.cost != null ? sourceShipping.cost : estimate.cost,
-      freeShipping: sourceShipping.cost === 0 || estimate.freeShipping,
-      minDays: sourceDelivery.minDays || estimate.minDays,
-      maxDays: sourceDelivery.maxDays || estimate.maxDays,
+      cost,
+      freeShipping,
+      costSource, // 'source_api' | 'default_zero' — for auditing/logging
+      minDays,
+      maxDays,
       label: sourceDelivery.label || estimate.label,
-      note: sourceShipping.note || estimate.note,
+      note,
       method: sourceShipping.method || 'Standard'
     },
     returnPolicy,
     allOptions: getShippingOptions(source),
-    deliveryPromise: _buildDeliveryPromise(
-      sourceDelivery.minDays || estimate.minDays,
-      sourceDelivery.maxDays || estimate.maxDays
-    )
+    deliveryPromise: _buildDeliveryPromise(minDays, maxDays)
   };
 }
 

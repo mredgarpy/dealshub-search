@@ -124,21 +124,39 @@ function calculateFinalPrice(sourcePrice, source, opts = {}) {
   const shippingCost = opts.shippingCost || 0;
   const fees = opts.fees || 0;
 
+  // Apply shipping buffer per source to protect margin when Shopify Basic
+  // cannot cotize real shipping per ZIP. The buffer is absorbed into landed
+  // cost so final price covers average shipping + AK/HI/PR surcharge.
+  let shippingBuffer = 0;
+  try {
+    const { getShippingBuffers } = require('./db');
+    const buffers = getShippingBuffers();
+    if (opts.isFBA === true) {
+      shippingBuffer = buffers.amazon_prime || 0;
+    } else if (source === 'amazon') {
+      shippingBuffer = buffers.amazon_marketplace || 0;
+    } else {
+      shippingBuffer = buffers[source] || 0;
+    }
+    // Per-call override wins
+    if (opts.shippingBuffer != null) shippingBuffer = opts.shippingBuffer;
+  } catch (e) {
+    // db not available — fall back to no buffer
+  }
+
   // Determine the actual cost to apply the multiplier to.
-  // For AliExpress: sourcePrice is MSRP (~$28). The API returns two other prices:
-  //   - promotionPrice: sometimes wholesale ($2), sometimes near retail ($11)
-  //   - estimated retail: MSRP × 0.42 ≈ real AliExpress price
-  // We use max(promotionPrice, MSRP × 0.42) to always pick the most accurate/safest value.
-  // When promotionPrice IS the real retail → we use it (more precise).
-  // When promotionPrice is wholesale → MSRP × 0.42 protects us from selling too low.
+  // For AliExpress: sourcePrice is MSRP (~$28). The API's promotionPrice (~$5)
+  // is wholesale, NOT the AliExpress retail price (~$11). We estimate the real
+  // AliExpress retail as MSRP × MSRP_RETAIL_FACTOR and use THAT as cost base.
+  // This ensures our price is ALWAYS above what AliExpress charges customers.
   let cost;
   if (isMSRP) {
-    const msrpEstimate = sourcePrice * MSRP_RETAIL_FACTOR; // ~$11.76 for $28 MSRP
-    const promoPrice = opts.sourceCost || 0;
-    cost = Math.max(promoPrice, msrpEstimate) + shippingCost + fees;
+    // AliExpress: estimate real retail price from MSRP
+    // MSRP $28 × 0.42 = $11.76 (≈ AliExpress retail $11.26)
+    cost = sourcePrice * MSRP_RETAIL_FACTOR + shippingCost + shippingBuffer + fees;
   } else {
     // Amazon, Sephora, Macys, SHEIN: sourcePrice IS the cost
-    cost = sourcePrice + shippingCost + fees;
+    cost = sourcePrice + shippingCost + shippingBuffer + fees;
   }
 
   // Look up tier multiplier

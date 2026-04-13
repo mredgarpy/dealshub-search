@@ -945,4 +945,135 @@ router.post('/theme-sync', async (req, res) => {
   }
 });
 
+// ============================================================
+// SHIPPING BUFFERS (per-source absorbed shipping cost for pricing)
+// ============================================================
+
+router.get('/shipping-buffers', (req, res) => {
+  try {
+    const { getShippingBuffers, DEFAULT_SHIPPING_BUFFERS } = require('../utils/db');
+    res.json({
+      buffers: getShippingBuffers(),
+      defaults: DEFAULT_SHIPPING_BUFFERS,
+      explanation: {
+        amazon_prime: 'Buffer applied when product.isFBA === true (usually $0 at continental US)',
+        amazon_marketplace: 'Buffer applied for Amazon non-Prime / marketplace sellers',
+        aliexpress: 'Buffer for AliExpress to cover variable shipping',
+        sephora: 'Buffer for Sephora',
+        macys: 'Buffer for Macys',
+        shein: 'Buffer for SHEIN',
+        _ak_hi_pr_surcharge: 'Extra surcharge absorbed to cover AK/HI/PR destinations (not yet auto-applied — use for reference)'
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/shipping-buffers', (req, res) => {
+  try {
+    const { setShippingBuffers, getShippingBuffers } = require('../utils/db');
+    const input = req.body || {};
+    const clean = {};
+    for (const [k, v] of Object.entries(input)) {
+      const num = parseFloat(v);
+      if (!Number.isNaN(num) && num >= 0 && num <= 100) clean[k] = num;
+    }
+    setShippingBuffers(clean);
+    // Invalidate pricing cache so changes take effect immediately
+    try { require('../utils/pricing').invalidatePricingCache(); } catch {}
+    logger.info('admin', 'Shipping buffers updated', { buffers: clean });
+    res.json({ success: true, buffers: getShippingBuffers() });
+  } catch (e) {
+    logger.error('admin', 'Failed to update shipping buffers', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================================
+// SHOPIFY SHIPPING ZONES CONFIGURATION
+// Programmatically creates/updates delivery profiles in Shopify
+// ============================================================
+
+router.get('/shopify/shipping-zones', async (req, res) => {
+  try {
+    const { shopifyAdmin } = require('../shopify-admin');
+    const r = await shopifyAdmin('GET', '/shipping_zones.json');
+    res.json({ zones: r.shipping_zones || [], raw: r });
+  } catch (e) {
+    logger.error('admin', 'shipping-zones GET failed', { error: e.message });
+    res.status(500).json({ error: e.message, hint: 'Token may lack read_shipping scope' });
+  }
+});
+
+// Recommended shipping zones for DealsHub (USD, Basic plan friendly)
+const RECOMMENDED_ZONES = [
+  {
+    name: 'Continental US (48 states)',
+    countries: [{ code: 'US', provinces_exclude: ['AK', 'HI'] }],
+    price_based_rates: [
+      { name: 'Free Shipping (orders $35+)', price: 0, min_order_subtotal: 35 },
+      { name: 'Standard Shipping', price: 4.99, max_order_subtotal: 34.99 }
+    ]
+  },
+  {
+    name: 'Alaska & Hawaii',
+    countries: [{ code: 'US', provinces_include: ['AK', 'HI'] }],
+    price_based_rates: [
+      { name: 'Extended Area Shipping', price: 14.99 }
+    ]
+  },
+  {
+    name: 'Puerto Rico & US Virgin Islands',
+    countries: [{ code: 'PR' }, { code: 'VI' }],
+    price_based_rates: [
+      { name: 'Island Shipping', price: 19.99 }
+    ]
+  }
+];
+
+router.post('/shopify/setup-shipping-zones', async (req, res) => {
+  try {
+    const { shopifyAdmin } = require('../shopify-admin');
+    const customZones = req.body?.zones;
+    const zonesToCreate = Array.isArray(customZones) && customZones.length ? customZones : RECOMMENDED_ZONES;
+
+    // NOTE: Shopify Basic does not support programmatic DeliveryProfile creation
+    // via the REST shipping_zones endpoint in all regions. This endpoint attempts
+    // it and returns actionable errors if it fails so the user can configure manually.
+    const existing = await shopifyAdmin('GET', '/shipping_zones.json').catch(e => ({ _err: e.message }));
+    const results = [];
+    for (const zone of zonesToCreate) {
+      try {
+        const r = await shopifyAdmin('POST', '/shipping_zones.json', { shipping_zone: zone });
+        results.push({ name: zone.name, status: 'created', id: r.shipping_zone?.id });
+      } catch (e) {
+        results.push({ name: zone.name, status: 'error', error: e.message });
+      }
+    }
+    const anySuccess = results.some(r => r.status === 'created');
+    res.json({
+      success: anySuccess,
+      existing,
+      results,
+      recommendation: RECOMMENDED_ZONES,
+      manualSetupUrl: 'https://admin.shopify.com/store/YOUR-STORE/settings/shipping',
+      note: anySuccess
+        ? 'Zones created. Review in Shopify admin > Settings > Shipping and delivery.'
+        : 'Shopify REST shipping_zones API is limited. Use the manualSetupUrl to configure zones manually using the recommendation values.'
+    });
+  } catch (e) {
+    logger.error('admin', 'setup-shipping-zones failed', { error: e.message });
+    res.status(500).json({
+      error: e.message,
+      recommendation: RECOMMENDED_ZONES,
+      hint: 'Configure zones manually at Shopify admin > Settings > Shipping and delivery using the recommendation values'
+    });
+  }
+});
+
+router.get('/shopify/recommended-zones', (req, res) => {
+  res.json({ zones: RECOMMENDED_ZONES });
+});
+
 module.exports = router;

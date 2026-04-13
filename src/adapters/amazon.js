@@ -119,8 +119,15 @@ class AmazonAdapter extends BaseAdapter {
     if (!offer) return null;
 
     const deliveryPrice = offer.delivery_price || '';
-    const isFree = deliveryPrice === 'FREE' || deliveryPrice === '$0.00' || deliveryPrice === '';
-    const cost = isFree ? 0 : parseFloat(deliveryPrice.replace('$', '').replace(',', '')) || 0;
+    // IMPORTANT: empty deliveryPrice means "API did not provide shipping data".
+    // Do NOT treat missing data as FREE — only explicit FREE / $0.00 is free.
+    const hasExplicitFree = deliveryPrice === 'FREE' || deliveryPrice === '$0.00';
+    const hasNumericCost = /\$\d/.test(deliveryPrice);
+    const costKnown = hasExplicitFree || hasNumericCost;
+    const cost = hasExplicitFree ? 0
+               : hasNumericCost ? (parseFloat(deliveryPrice.replace('$', '').replace(',', '')) || 0)
+               : 0; // unknown → default 0 per business rule
+    const isFree = hasExplicitFree; // only show FREE badge when source confirmed it
 
     // Clean ships_from: API may return "bjkrTrf\nShips from China." — extract name only
     const rawShipsFrom = offer.ships_from || '';

@@ -74,6 +74,8 @@
     <a data-page="sync">⟳ Sync & Mappings</a>
     <a data-page="pricing">$ Pricing & Margins</a>
     <a data-page="shipping">▲ Shipping Rules</a>
+    <a data-page="buffers">⛨ Shipping Buffers</a>
+    <a data-page="zones">◈ Shopify Zones</a>
     <a data-page="logs">⚠ Logs & Health</a>
     <div class="lbl">Navegación</div>
     <a href="/admin/">← Volver al CRM</a>
@@ -184,6 +186,61 @@
       <div class="card">
         <h3>Shipping Rules activas <button class="btn sec sm" onclick="loadShippingRules()">↻</button></h3>
         <div id="sr-table" class="empty">Cargando…</div>
+      </div>
+    </div>
+
+    <!-- SHIPPING BUFFERS -->
+    <div class="page" id="p-buffers">
+      <h2>Shipping Buffers</h2>
+      <div class="sub">Monto en USD absorbido al costo del producto <strong>antes del markup</strong>. Protege tu margen cuando Shopify Basic no puede cotizar shipping real por ZIP. Ajusta según realidad operativa.</div>
+
+      <div class="card">
+        <h3>Buffers por source</h3>
+        <div id="buf-form">
+          <div class="empty">Cargando…</div>
+        </div>
+        <div style="margin-top:12px"><button class="btn" onclick="saveBuffers()">Guardar buffers</button>
+          <button class="btn sec" onclick="loadBuffers()">Recargar defaults</button></div>
+        <div id="buf-out" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <h3>Cómo funciona</h3>
+        <p style="color:var(--text2);font-size:11px;line-height:1.6">
+          El pricing engine suma este buffer al <code>landed_cost</code> antes de aplicar markup. Ejemplo:<br>
+          Producto AliExpress costo $10 · buffer $3 · multiplier 2.0 → <strong>precio final $26</strong> (no $20).<br>
+          Así cubres shipping aunque la API del source no devuelva costo real. Para Amazon: si el producto es <code>isFBA=true</code> se usa <code>amazon_prime</code>; en otro caso <code>amazon_marketplace</code>.
+        </p>
+      </div>
+    </div>
+
+    <!-- SHOPIFY ZONES -->
+    <div class="page" id="p-zones">
+      <h2>Shopify Shipping Zones</h2>
+      <div class="sub">Configuración de zonas en Shopify admin. Shopify Basic cobra este shipping en checkout según dirección del cliente.</div>
+
+      <div class="card">
+        <h3>Zonas actuales en Shopify <button class="btn sec sm" onclick="loadZones()">↻</button></h3>
+        <div id="zn-current" class="empty">Cargando…</div>
+      </div>
+
+      <div class="card">
+        <h3>Configuración recomendada</h3>
+        <div id="zn-recommended" class="empty">Cargando…</div>
+        <div style="margin-top:12px">
+          <button class="btn" onclick="setupZones()">Intentar crear zonas automáticamente</button>
+          <a href="https://admin.shopify.com/store/dealshubmiami/settings/shipping" target="_blank" class="btn sec" style="text-decoration:none;display:inline-block;margin-left:8px">Abrir Shopify admin (configurar manual)</a>
+        </div>
+        <div id="zn-out" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <h3>Notas importantes</h3>
+        <p style="color:var(--text2);font-size:11px;line-height:1.7">
+          ⚠️ <strong>Shopify Basic no soporta Carrier Service dinámico.</strong> El shipping al cliente se cobra usando estas zonas estáticas, no cotización real por ZIP.<br>
+          ⚠️ Si "crear automáticamente" falla (común en Basic), usa el botón <strong>Abrir Shopify admin</strong> y copia los valores de la tabla recomendada.<br>
+          ✓ Los Shipping Buffers (pestaña anterior) compensan la imprecisión de las zonas estáticas absorbiendo shipping promedio en el precio del producto.
+        </p>
       </div>
     </div>
 
@@ -515,12 +572,114 @@ async function loadHealth(){
   document.getElementById('hl-table').innerHTML = h;
 }
 
+// ─── SHIPPING BUFFERS ───
+async function loadBuffers(){
+  const d = await api('/shipping-buffers');
+  if(d?.error){ document.getElementById('buf-form').innerHTML = '<div class="err">Error: '+esc(d.error)+'</div>'; return; }
+  const b = d.buffers || {};
+  const exp = d.explanation || {};
+  const keys = ['amazon_prime','amazon_marketplace','aliexpress','sephora','macys','shein','_ak_hi_pr_surcharge'];
+  let h = '<div class="row" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">';
+  keys.forEach(k=>{
+    h += `<div>
+      <label>${esc(k)}</label>
+      <input type="number" step="0.01" min="0" max="100" id="buf-${k}" value="${esc(b[k]!=null?b[k]:0)}">
+      <div style="font-size:9px;color:var(--text3);margin-top:3px;line-height:1.4">${esc((exp[k]||'').substring(0,120))}</div>
+    </div>`;
+  });
+  h += '</div>';
+  document.getElementById('buf-form').innerHTML = h;
+}
+
+async function saveBuffers(){
+  const keys = ['amazon_prime','amazon_marketplace','aliexpress','sephora','macys','shein','_ak_hi_pr_surcharge'];
+  const body = {};
+  keys.forEach(k=>{
+    const v = parseFloat(document.getElementById('buf-'+k).value);
+    if(!isNaN(v)) body[k] = v;
+  });
+  const r = await api('/shipping-buffers', {method:'POST', body: JSON.stringify(body)});
+  if(r?.error) return toast('#buf-out', 'Error: '+r.error, 'err');
+  toast('#buf-out', '✓ Buffers guardados. Los próximos resync usarán estos valores.', 'ok');
+  loadBuffers();
+}
+
+// ─── SHOPIFY ZONES ───
+async function loadZones(){
+  const [current, rec] = await Promise.all([
+    api('/shopify/shipping-zones').catch(e=>({error:e.message})),
+    api('/shopify/recommended-zones').catch(()=>null)
+  ]);
+  // Current zones
+  if(current?.error){
+    document.getElementById('zn-current').innerHTML = '<div class="err">No se pudo leer zonas de Shopify: '+esc(current.error)+'<br><span style="font-size:10px">Probablemente tu Shopify App token no tiene scope <code>read_shipping</code>. Configura zonas manualmente.</span></div>';
+  } else {
+    const zones = current?.zones || [];
+    if(!zones.length){
+      document.getElementById('zn-current').innerHTML = '<div class="empty">⚠️ No hay shipping zones configuradas. Configura usando la recomendación abajo.</div>';
+    } else {
+      let h = '<table><thead><tr><th>Nombre</th><th>Países</th><th>Rates</th></tr></thead><tbody>';
+      zones.forEach(z=>{
+        const countries = (z.countries||[]).map(c=>c.code||c.name).join(', ');
+        const rates = [...(z.price_based_shipping_rates||[]),...(z.weight_based_shipping_rates||[])].map(r=>`${r.name}: $${r.price}`).join('<br>');
+        h += `<tr><td><strong>${esc(z.name)}</strong></td><td class="mono">${esc(countries)}</td><td style="font-size:10px">${rates||'—'}</td></tr>`;
+      });
+      h += '</tbody></table>';
+      document.getElementById('zn-current').innerHTML = h;
+    }
+  }
+  // Recommendations
+  if(rec?.zones){
+    let h = '<table><thead><tr><th>Zona</th><th>Cobertura</th><th>Tarifa</th></tr></thead><tbody>';
+    rec.zones.forEach(z=>{
+      const countries = (z.countries||[]).map(c=>{
+        if(c.provinces_exclude) return `US (excluye ${c.provinces_exclude.join(', ')})`;
+        if(c.provinces_include) return `US ${c.provinces_include.join(' / ')}`;
+        return c.code;
+      }).join(', ');
+      const rates = (z.price_based_rates||[]).map(r=>{
+        let s = `${r.name}: $${r.price}`;
+        if(r.min_order_subtotal) s += ` (cart ≥ $${r.min_order_subtotal})`;
+        if(r.max_order_subtotal) s += ` (cart ≤ $${r.max_order_subtotal})`;
+        return s;
+      }).join('<br>');
+      h += `<tr><td><strong>${esc(z.name)}</strong></td><td>${esc(countries)}</td><td style="font-size:10px;line-height:1.6">${rates}</td></tr>`;
+    });
+    h += '</tbody></table>';
+    document.getElementById('zn-recommended').innerHTML = h;
+  }
+}
+
+async function setupZones(){
+  if(!confirm('Esto intentará crear las zonas recomendadas en Shopify. ¿Continuar?')) return;
+  document.getElementById('zn-out').innerHTML = '<div class="empty">Configurando zonas…</div>';
+  const r = await api('/shopify/setup-shipping-zones', {method:'POST', body: JSON.stringify({})});
+  if(r?.error){
+    document.getElementById('zn-out').innerHTML = `<div class="err">Error: ${esc(r.error)}<br><strong>Siguiente paso:</strong> ${esc(r.hint||'Configura manualmente en Shopify admin')}</div>`;
+    return;
+  }
+  let h = '<div class="'+(r.success?'ok':'err')+'">'+(r.success?'✓ Algunas zonas fueron creadas':'⚠️ Configuración automática no disponible en Basic')+'</div>';
+  h += '<table style="margin-top:10px"><thead><tr><th>Zona</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>';
+  (r.results||[]).forEach(res=>{
+    const cls = res.status==='created'?'b-gr':'b-re';
+    h += `<tr><td>${esc(res.name)}</td><td><span class="badge ${cls}">${esc(res.status)}</span></td><td style="font-size:10px">${esc(res.error||'ID: '+res.id)}</td></tr>`;
+  });
+  h += '</tbody></table>';
+  if(!r.success){
+    h += '<div style="margin-top:10px;font-size:11px;color:var(--text2)">→ '+esc(r.note||'')+'</div>';
+  }
+  document.getElementById('zn-out').innerHTML = h;
+  loadZones();
+}
+
 // ─── router ───
 function loadPage(p){
   if(p==='overview') loadOverview();
   else if(p==='sync') loadMappings();
   else if(p==='pricing'){ loadPricingRules(); loadMarkupTiers(); }
   else if(p==='shipping') loadShippingRules();
+  else if(p==='buffers') loadBuffers();
+  else if(p==='zones') loadZones();
   else if(p==='logs'){ loadFailures(); loadLogs(); loadHealth(); }
 }
 

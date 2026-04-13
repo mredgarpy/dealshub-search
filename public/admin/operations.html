@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DealsHub — Operations Panel</title>
+<style>
+  :root{
+    --bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;--border:#2a2a2a;
+    --text:#e5e5e5;--text2:#a1a1aa;--text3:#71717a;
+    --red:#e53e3e;--green:#22c55e;--amber:#f59e0b;--blue:#3b82f6;
+    --radius:6px;--mono:'SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;font-size:12px;line-height:1.5}
+  .app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+  .sb{background:var(--bg2);border-right:1px solid var(--border);padding:16px 8px}
+  .sb h1{font-size:13px;color:var(--red);margin-bottom:16px;padding:0 8px;letter-spacing:.5px;font-family:var(--mono)}
+  .sb a{display:block;padding:8px 12px;color:var(--text2);text-decoration:none;border-radius:var(--radius);font-size:12px;margin-bottom:2px;cursor:pointer;border-left:3px solid transparent}
+  .sb a:hover{background:rgba(229,62,62,.06);color:var(--text)}
+  .sb a.active{background:rgba(229,62,62,.1);color:var(--red);border-left-color:var(--red);font-weight:600}
+  .sb .lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:12px 12px 4px}
+  .main{padding:24px;overflow-y:auto;max-height:100vh}
+  .page{display:none}
+  .page.active{display:block}
+  h2{font-size:18px;margin-bottom:4px}
+  .sub{color:var(--text3);margin-bottom:20px;font-size:12px}
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+  .card h3{font-size:13px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  .stat{background:var(--bg3);padding:12px;border-radius:var(--radius);border:1px solid var(--border)}
+  .stat .l{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+  .stat .v{font-size:22px;font-weight:700;margin-top:4px;font-family:var(--mono)}
+  .stat .s{font-size:10px;color:var(--text3);margin-top:2px}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{text-align:left;padding:8px;border-bottom:1px solid var(--border)}
+  th{color:var(--text3);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px;background:var(--bg3)}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .mono{font-family:var(--mono)}
+  .btn{background:var(--red);color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600}
+  .btn:hover{background:#c53030}
+  .btn.sec{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+  .btn.sec:hover{background:#252525}
+  .btn.gr{background:var(--green)}
+  .btn.sm{padding:4px 8px;font-size:10px}
+  .badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:600;text-transform:uppercase}
+  .b-gr{background:rgba(34,197,94,.15);color:var(--green)}
+  .b-re{background:rgba(229,62,62,.15);color:var(--red)}
+  .b-am{background:rgba(245,158,11,.15);color:var(--amber)}
+  .b-bl{background:rgba(59,130,246,.15);color:var(--blue)}
+  .b-gy{background:var(--bg3);color:var(--text2)}
+  input,select,textarea{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-size:11px;font-family:inherit;width:100%}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--red)}
+  label{display:block;font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+  .row{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:12px}
+  .empty{padding:30px;text-align:center;color:var(--text3);font-size:11px}
+  .err{background:rgba(229,62,62,.1);border:1px solid var(--red);padding:10px;border-radius:4px;color:var(--red);font-size:11px;margin-bottom:12px}
+  .ok{background:rgba(34,197,94,.1);border:1px solid var(--green);padding:10px;border-radius:4px;color:var(--green);font-size:11px;margin-bottom:12px}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .toolbar input{width:220px}
+  .tag{display:inline-block;background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:9px;color:var(--text2);margin-right:3px}
+  pre{background:var(--bg);padding:8px;border-radius:4px;font-size:10px;overflow-x:auto;max-height:200px;font-family:var(--mono)}
+  details>summary{cursor:pointer;color:var(--blue);font-size:10px}
+  @media(max-width:768px){.app{grid-template-columns:1fr}.sb{position:sticky;top:0;z-index:10;display:flex;overflow-x:auto;padding:8px}.sb h1,.sb .lbl{display:none}.sb a{white-space:nowrap}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sb">
+    <h1>⚙ OPS PANEL</h1>
+    <div class="lbl">Sync</div>
+    <a data-page="overview" class="active">◉ Overview</a>
+    <a data-page="sync">⟳ Sync & Mappings</a>
+    <a data-page="pricing">$ Pricing & Margins</a>
+    <a data-page="shipping">▲ Shipping Rules</a>
+    <a data-page="logs">⚠ Logs & Health</a>
+    <div class="lbl">Navegación</div>
+    <a href="/admin/">← Volver al CRM</a>
+  </aside>
+
+  <main class="main">
+
+    <!-- OVERVIEW -->
+    <div class="page active" id="p-overview">
+      <h2>Operations Overview</h2>
+      <div class="sub">Resumen operativo del backend DealsHub — sync, costos, shipping y errores</div>
+      <div class="grid" id="ovStats">
+        <div class="stat"><div class="l">Mappings</div><div class="v" id="ov-mappings">…</div><div class="s">Productos sincronizados</div></div>
+        <div class="stat"><div class="l">Pricing Rules</div><div class="v" id="ov-pricing">…</div><div class="s">Activas</div></div>
+        <div class="stat"><div class="l">Shipping Rules</div><div class="v" id="ov-shipping">…</div><div class="s">Activas</div></div>
+        <div class="stat"><div class="l">Failures (24h)</div><div class="v" id="ov-failures">…</div><div class="s">Sin resolver</div></div>
+      </div>
+      <div class="card">
+        <h3>Health Sources</h3>
+        <div id="ov-health" class="empty">Cargando…</div>
+      </div>
+    </div>
+
+    <!-- SYNC & MAPPINGS -->
+    <div class="page" id="p-sync">
+      <h2>Sync & Mappings</h2>
+      <div class="sub">Productos externos mapeados a Shopify. Resync manual cuando sea necesario.</div>
+
+      <div class="card">
+        <h3>Resync manual</h3>
+        <div class="row">
+          <div><label>Source</label><select id="rs-source"><option value="amazon">Amazon</option><option value="aliexpress">AliExpress</option><option value="macys">Macy's</option><option value="sephora">Sephora</option><option value="shein">SHEIN</option></select></div>
+          <div><label>Source ID</label><input id="rs-id" placeholder="ej: B0973L1NVT"></div>
+          <div style="align-self:end"><button class="btn" onclick="doResync()">Resync ahora</button></div>
+        </div>
+        <div id="rs-out"></div>
+      </div>
+
+      <div class="card">
+        <h3>Mappings (<span id="map-count">0</span>) <button class="btn sec sm" onclick="loadMappings()">↻ Refresh</button></h3>
+        <div class="toolbar">
+          <input id="map-filter" placeholder="Filtrar por source o SKU…" oninput="renderMappings()">
+          <select id="map-source-filter" onchange="renderMappings()" style="width:140px">
+            <option value="">Todas las sources</option>
+            <option>amazon</option><option>aliexpress</option><option>macys</option><option>sephora</option><option>shein</option>
+          </select>
+        </div>
+        <div id="map-table" class="empty">Cargando…</div>
+      </div>
+    </div>
+
+    <!-- PRICING & MARGINS -->
+    <div class="page" id="p-pricing">
+      <h2>Pricing & Margins</h2>
+      <div class="sub">Reglas de pricing y bandas de markup por source / categoría / rango de precio</div>
+
+      <div class="card">
+        <h3>Nueva Pricing Rule</h3>
+        <div class="row">
+          <div><label>Source</label><select id="pr-source"><option value="">(todas)</option><option>amazon</option><option>aliexpress</option><option>macys</option><option>sephora</option><option>shein</option></select></div>
+          <div><label>Categoría</label><input id="pr-cat" placeholder="ej: electronics"></div>
+          <div><label>Markup %</label><input id="pr-markup" type="number" step="0.01" placeholder="ej: 35"></div>
+          <div><label>Precio mín</label><input id="pr-min" type="number" step="0.01"></div>
+          <div><label>Precio máx</label><input id="pr-max" type="number" step="0.01"></div>
+          <div><label>Prioridad</label><input id="pr-prio" type="number" value="10"></div>
+          <div style="align-self:end"><button class="btn" onclick="savePricingRule()">Guardar regla</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Pricing Rules activas <button class="btn sec sm" onclick="loadPricingRules()">↻</button></h3>
+        <div id="pr-table" class="empty">Cargando…</div>
+      </div>
+
+      <div class="card">
+        <h3>Markup Tiers (bandas por rango de costo)</h3>
+        <p style="color:var(--text3);font-size:10px;margin-bottom:8px">Multiplicadores por banda de costo. Ej: costo $0-10 → x2.5, $10-50 → x1.8, etc.</p>
+        <div id="mt-table" class="empty">Cargando…</div>
+        <div class="row" style="margin-top:12px">
+          <div><label>Min cost</label><input id="mt-min" type="number" step="0.01"></div>
+          <div><label>Max cost</label><input id="mt-max" type="number" step="0.01"></div>
+          <div><label>Multiplicador</label><input id="mt-mult" type="number" step="0.01" placeholder="1.5"></div>
+          <div><label>Source (opt)</label><select id="mt-source"><option value="">(todas)</option><option>amazon</option><option>aliexpress</option><option>macys</option><option>sephora</option><option>shein</option></select></div>
+          <div style="align-self:end"><button class="btn" onclick="addMarkupTier()">+ Añadir tier</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHIPPING RULES -->
+    <div class="page" id="p-shipping">
+      <h2>Shipping Rules</h2>
+      <div class="sub">Reglas de shipping por source / categoría. Controla costo mostrado al cliente y ETA.</div>
+
+      <div class="card">
+        <h3>Nueva Shipping Rule</h3>
+        <div class="row">
+          <div><label>Source</label><select id="sr-source"><option value="">(todas)</option><option>amazon</option><option>aliexpress</option><option>macys</option><option>sephora</option><option>shein</option></select></div>
+          <div><label>Categoría</label><input id="sr-cat" placeholder="(todas)"></div>
+          <div><label>Costo ($)</label><input id="sr-cost" type="number" step="0.01" value="0"></div>
+          <div><label>ETA mín (días)</label><input id="sr-min" type="number" value="5"></div>
+          <div><label>ETA máx (días)</label><input id="sr-max" type="number" value="10"></div>
+          <div><label>Free threshold</label><input id="sr-free" type="number" step="0.01" placeholder="ej: 50"></div>
+          <div><label>Prioridad</label><input id="sr-prio" type="number" value="10"></div>
+          <div style="align-self:end"><button class="btn" onclick="saveShippingRule()">Guardar regla</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Shipping Rules activas <button class="btn sec sm" onclick="loadShippingRules()">↻</button></h3>
+        <div id="sr-table" class="empty">Cargando…</div>
+      </div>
+    </div>
+
+    <!-- LOGS & HEALTH -->
+    <div class="page" id="p-logs">
+      <h2>Logs & Health</h2>
+      <div class="sub">Errores de sources, sync logs y estado de APIs externas</div>
+
+      <div class="card">
+        <h3>Source Failures sin resolver <button class="btn sec sm" onclick="loadFailures()">↻</button></h3>
+        <div id="fl-table" class="empty">Cargando…</div>
+      </div>
+
+      <div class="card">
+        <h3>Sync Logs recientes <button class="btn sec sm" onclick="loadLogs()">↻</button></h3>
+        <div id="lg-table" class="empty">Cargando…</div>
+      </div>
+
+      <div class="card">
+        <h3>Source Health (live) <button class="btn sec sm" onclick="loadHealth()">↻</button></h3>
+        <div id="hl-table" class="empty">Cargando…</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const API = '/api/admin';
+let _mappings=[], _pricing=[], _shipping=[], _tiers=[], _failures=[], _logs=[];
+
+// ─── nav ───
+document.querySelectorAll('.sb a[data-page]').forEach(a=>{
+  a.onclick = e => {
+    e.preventDefault();
+    const p = a.dataset.page;
+    document.querySelectorAll('.sb a').forEach(x=>x.classList.remove('active'));
+    a.classList.add('active');
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    document.getElementById('p-'+p).classList.add('active');
+    loadPage(p);
+  };
+});
+
+async function api(path, opts={}){
+  try{
+    const r = await fetch(API+path, {
+      headers: {'Content-Type':'application/json', ...(opts.headers||{})},
+      ...opts
+    });
+    if(!r.ok) throw new Error(r.status+' '+r.statusText);
+    return await r.json();
+  }catch(e){
+    console.error('API err', path, e);
+    return {error: e.message};
+  }
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function toast(sel, msg, type='ok'){
+  const el = document.querySelector(sel);
+  if(!el) return;
+  el.innerHTML = `<div class="${type}">${esc(msg)}</div>`;
+  setTimeout(()=>{ el.innerHTML=''; }, 6000);
+}
+
+// ─── OVERVIEW ───
+async function loadOverview(){
+  const [maps, rules, ships, fails, health] = await Promise.all([
+    api('/mappings?limit=1'),
+    api('/pricing-rules'),
+    api('/shipping-rules'),
+    api('/failures?resolved=false'),
+    fetch('/api/source-health').then(r=>r.json()).catch(()=>null)
+  ]);
+  document.getElementById('ov-mappings').textContent = maps?.total ?? maps?.count ?? (maps?.mappings?.length||'?');
+  document.getElementById('ov-pricing').textContent = (rules?.rules||rules||[]).length;
+  document.getElementById('ov-shipping').textContent = (ships?.rules||ships||[]).length;
+  document.getElementById('ov-failures').textContent = (fails?.failures||fails||[]).length;
+
+  if(health?.sources){
+    let h = '<table><thead><tr><th>Source</th><th>Status</th><th>Latencia</th><th>Última prueba</th></tr></thead><tbody>';
+    for(const [k,v] of Object.entries(health.sources)){
+      const st = v.status || 'unknown';
+      const cls = st==='ok'||st==='healthy' ? 'b-gr' : st==='paused'||st==='slow' ? 'b-am' : 'b-re';
+      h += `<tr><td><strong>${esc(k)}</strong></td><td><span class="badge ${cls}">${esc(st)}</span></td><td class="mono">${esc(v.latencyMs||'—')}ms</td><td class="mono">${esc(v.checkedAt||v.lastChecked||'—')}</td></tr>`;
+    }
+    h += '</tbody></table>';
+    document.getElementById('ov-health').innerHTML = h;
+  } else {
+    document.getElementById('ov-health').innerHTML = '<div class="empty">Health endpoint no disponible</div>';
+  }
+}
+
+// ─── SYNC & MAPPINGS ───
+async function loadMappings(){
+  const d = await api('/mappings?limit=500');
+  _mappings = d?.mappings || d || [];
+  document.getElementById('map-count').textContent = _mappings.length;
+  renderMappings();
+}
+
+function renderMappings(){
+  const f = (document.getElementById('map-filter').value||'').toLowerCase();
+  const sf = document.getElementById('map-source-filter').value;
+  const rows = _mappings.filter(m=>{
+    if(sf && (m.source_store||m.source)!==sf) return false;
+    if(!f) return true;
+    return JSON.stringify(m).toLowerCase().includes(f);
+  });
+  if(!rows.length){ document.getElementById('map-table').innerHTML = '<div class="empty">Sin mappings</div>'; return; }
+  let h = '<table><thead><tr><th>Source</th><th>Source ID</th><th>Shopify Product</th><th>Handle</th><th>Sync</th><th>Last synced</th><th></th></tr></thead><tbody>';
+  rows.slice(0,200).forEach(m=>{
+    const src = m.source_store||m.source||'?';
+    const sid = m.source_product_id||m.sourceId||'';
+    const spid = m.shopify_product_id||m.shopifyProductId||'';
+    const handle = m.shopify_handle||m.handle||'';
+    const status = m.sync_status||m.status||'ok';
+    const cls = status==='ok' ? 'b-gr' : status==='pending'||status==='stale' ? 'b-am' : 'b-re';
+    const last = m.last_synced_at||m.lastSyncedAt||'';
+    h += `<tr>
+      <td><span class="tag">${esc(src)}</span></td>
+      <td class="mono">${esc(sid)}</td>
+      <td class="mono">${esc(spid)}</td>
+      <td><a href="https://stylehubmiami.com/products/${esc(handle)}" target="_blank" style="color:var(--blue)">${esc(handle)}</a></td>
+      <td><span class="badge ${cls}">${esc(status)}</span></td>
+      <td class="mono" style="font-size:9px">${esc(last)}</td>
+      <td><button class="btn sm" onclick="resyncRow('${esc(src)}','${esc(sid)}')">Resync</button> <button class="btn sec sm" onclick="deleteMapping(${m.id||0})">✕</button></td>
+    </tr>`;
+  });
+  h += '</tbody></table>';
+  if(rows.length>200) h += `<div class="empty" style="font-size:10px">Mostrando 200 de ${rows.length}. Filtra para ver más.</div>`;
+  document.getElementById('map-table').innerHTML = h;
+}
+
+async function doResync(){
+  const src = document.getElementById('rs-source').value;
+  const id = document.getElementById('rs-id').value.trim();
+  if(!id) return toast('#rs-out','Source ID requerido','err');
+  document.getElementById('rs-out').innerHTML = '<div class="empty">Sync en curso…</div>';
+  const r = await api(`/sync/resync/${src}/${encodeURIComponent(id)}`, {method:'POST'});
+  if(r?.error) return toast('#rs-out', 'Error: '+r.error, 'err');
+  toast('#rs-out', `Resync OK → Shopify product ${r?.shopifyProductId||r?.productId||'?'}`, 'ok');
+  loadMappings();
+}
+
+async function resyncRow(src, id){
+  document.getElementById('rs-source').value = src;
+  document.getElementById('rs-id').value = id;
+  await doResync();
+}
+
+async function deleteMapping(id){
+  if(!id || !confirm('Eliminar mapping #'+id+'? No borra el producto en Shopify.')) return;
+  const r = await api(`/mappings/${id}`, {method:'DELETE'});
+  if(r?.error) return alert('Error: '+r.error);
+  loadMappings();
+}
+
+// ─── PRICING ───
+async function loadPricingRules(){
+  const d = await api('/pricing-rules');
+  _pricing = d?.rules || d || [];
+  if(!_pricing.length){ document.getElementById('pr-table').innerHTML = '<div class="empty">Sin reglas. Crea la primera arriba.</div>'; return; }
+  let h = '<table><thead><tr><th>Source</th><th>Categoría</th><th>Markup %</th><th>Rango precio</th><th>Prioridad</th><th></th></tr></thead><tbody>';
+  _pricing.forEach(r=>{
+    h += `<tr>
+      <td><span class="tag">${esc(r.source||r.source_store||'todas')}</span></td>
+      <td>${esc(r.category||'—')}</td>
+      <td class="mono">${esc(r.markup_percent||r.markup||0)}%</td>
+      <td class="mono">$${esc(r.min_price||r.price_min||0)}–$${esc(r.max_price||r.price_max||'∞')}</td>
+      <td class="mono">${esc(r.priority||0)}</td>
+      <td><button class="btn sec sm" onclick="deletePricingRule(${r.id})">✕</button></td>
+    </tr>`;
+  });
+  h += '</tbody></table>';
+  document.getElementById('pr-table').innerHTML = h;
+}
+
+async function savePricingRule(){
+  const body = {
+    source: document.getElementById('pr-source').value || null,
+    category: document.getElementById('pr-cat').value || null,
+    markup_percent: parseFloat(document.getElementById('pr-markup').value) || 0,
+    min_price: parseFloat(document.getElementById('pr-min').value) || null,
+    max_price: parseFloat(document.getElementById('pr-max').value) || null,
+    priority: parseInt(document.getElementById('pr-prio').value) || 10,
+    active: 1
+  };
+  const r = await api('/pricing-rules', {method:'POST', body: JSON.stringify(body)});
+  if(r?.error) return alert('Error: '+r.error);
+  ['pr-cat','pr-markup','pr-min','pr-max'].forEach(id=>document.getElementById(id).value='');
+  loadPricingRules();
+}
+
+async function deletePricingRule(id){
+  if(!confirm('Eliminar pricing rule #'+id+'?')) return;
+  const r = await api(`/pricing-rules/${id}`, {method:'DELETE'});
+  if(r?.error) return alert('Error: '+r.error);
+  loadPricingRules();
+}
+
+async function loadMarkupTiers(){
+  const d = await api('/markup-tiers');
+  _tiers = d?.tiers || d || [];
+  if(!_tiers.length){ document.getElementById('mt-table').innerHTML = '<div class="empty">Sin tiers definidos.</div>'; return; }
+  let h = '<table><thead><tr><th>Source</th><th>Costo mín</th><th>Costo máx</th><th>Multiplicador</th></tr></thead><tbody>';
+  _tiers.forEach(t=>{
+    h += `<tr><td><span class="tag">${esc(t.source||'todas')}</span></td><td class="mono">$${esc(t.min_cost||0)}</td><td class="mono">$${esc(t.max_cost||'∞')}</td><td class="mono">x${esc(t.multiplier||1)}</td></tr>`;
+  });
+  h += '</tbody></table>';
+  document.getElementById('mt-table').innerHTML = h;
+}
+
+async function addMarkupTier(){
+  const tiers = [..._tiers, {
+    source: document.getElementById('mt-source').value || null,
+    min_cost: parseFloat(document.getElementById('mt-min').value) || 0,
+    max_cost: parseFloat(document.getElementById('mt-max').value) || null,
+    multiplier: parseFloat(document.getElementById('mt-mult').value) || 1
+  }];
+  const r = await api('/markup-tiers', {method:'POST', body: JSON.stringify({tiers})});
+  if(r?.error) return alert('Error: '+r.error);
+  ['mt-min','mt-max','mt-mult'].forEach(id=>document.getElementById(id).value='');
+  loadMarkupTiers();
+}
+
+// ─── SHIPPING ───
+async function loadShippingRules(){
+  const d = await api('/shipping-rules');
+  _shipping = d?.rules || d || [];
+  if(!_shipping.length){ document.getElementById('sr-table').innerHTML = '<div class="empty">Sin reglas.</div>'; return; }
+  let h = '<table><thead><tr><th>Source</th><th>Categoría</th><th>Costo</th><th>ETA</th><th>Free ≥</th><th>Prioridad</th><th></th></tr></thead><tbody>';
+  _shipping.forEach(r=>{
+    h += `<tr>
+      <td><span class="tag">${esc(r.source||'todas')}</span></td>
+      <td>${esc(r.category||'—')}</td>
+      <td class="mono">$${esc(r.shipping_cost||r.cost||0)}</td>
+      <td class="mono">${esc(r.eta_min_days||r.min_days||'?')}–${esc(r.eta_max_days||r.max_days||'?')}d</td>
+      <td class="mono">${r.free_threshold?'$'+r.free_threshold:'—'}</td>
+      <td class="mono">${esc(r.priority||0)}</td>
+      <td><button class="btn sec sm" onclick="deleteShippingRule(${r.id})">✕</button></td>
+    </tr>`;
+  });
+  h += '</tbody></table>';
+  document.getElementById('sr-table').innerHTML = h;
+}
+
+async function saveShippingRule(){
+  const body = {
+    source: document.getElementById('sr-source').value || null,
+    category: document.getElementById('sr-cat').value || null,
+    shipping_cost: parseFloat(document.getElementById('sr-cost').value) || 0,
+    eta_min_days: parseInt(document.getElementById('sr-min').value) || 5,
+    eta_max_days: parseInt(document.getElementById('sr-max').value) || 10,
+    free_threshold: parseFloat(document.getElementById('sr-free').value) || null,
+    priority: parseInt(document.getElementById('sr-prio').value) || 10,
+    active: 1
+  };
+  const r = await api('/shipping-rules', {method:'POST', body: JSON.stringify(body)});
+  if(r?.error) return alert('Error: '+r.error);
+  ['sr-cat','sr-cost','sr-free'].forEach(id=>document.getElementById(id).value='');
+  loadShippingRules();
+}
+
+async function deleteShippingRule(id){
+  if(!confirm('Eliminar shipping rule #'+id+'?')) return;
+  const r = await api(`/shipping-rules/${id}`, {method:'DELETE'});
+  if(r?.error) return alert('Error: '+r.error);
+  loadShippingRules();
+}
+
+// ─── LOGS ───
+async function loadFailures(){
+  const d = await api('/failures?resolved=false&limit=100');
+  _failures = d?.failures || d || [];
+  if(!_failures.length){ document.getElementById('fl-table').innerHTML = '<div class="empty">✓ Sin errores sin resolver</div>'; return; }
+  let h = '<table><thead><tr><th>Fecha</th><th>Source</th><th>Tipo</th><th>Detalle</th><th></th></tr></thead><tbody>';
+  _failures.forEach(f=>{
+    h += `<tr>
+      <td class="mono" style="font-size:9px">${esc(f.created_at||f.occurred_at||'')}</td>
+      <td><span class="tag">${esc(f.source||f.source_store||'?')}</span></td>
+      <td>${esc(f.failure_type||f.type||'error')}</td>
+      <td><details><summary>${esc((f.message||'').substring(0,80))}</summary><pre>${esc(JSON.stringify(f, null, 2))}</pre></details></td>
+      <td><button class="btn sm" onclick="resolveFailure(${f.id})">Resolver</button></td>
+    </tr>`;
+  });
+  h += '</tbody></table>';
+  document.getElementById('fl-table').innerHTML = h;
+}
+
+async function resolveFailure(id){
+  const r = await api(`/failures/${id}/resolve`, {method:'POST', body: JSON.stringify({})});
+  if(r?.error) return alert('Error: '+r.error);
+  loadFailures();
+}
+
+async function loadLogs(){
+  const d = await api('/logs?limit=50');
+  _logs = d?.logs || d || [];
+  if(!_logs.length){ document.getElementById('lg-table').innerHTML = '<div class="empty">Sin logs recientes</div>'; return; }
+  let h = '<table><thead><tr><th>Fecha</th><th>Source</th><th>Acción</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>';
+  _logs.forEach(l=>{
+    const st = l.status||'ok';
+    const cls = st==='ok'||st==='success' ? 'b-gr' : st==='error'||st==='failed' ? 'b-re' : 'b-am';
+    h += `<tr>
+      <td class="mono" style="font-size:9px">${esc(l.created_at||l.at||'')}</td>
+      <td><span class="tag">${esc(l.source||'?')}</span></td>
+      <td>${esc(l.action||l.operation||'sync')}</td>
+      <td><span class="badge ${cls}">${esc(st)}</span></td>
+      <td style="font-size:10px;color:var(--text2)">${esc((l.message||l.detail||'').substring(0,120))}</td>
+    </tr>`;
+  });
+  h += '</tbody></table>';
+  document.getElementById('lg-table').innerHTML = h;
+}
+
+async function loadHealth(){
+  const d = await fetch('/api/source-health').then(r=>r.json()).catch(()=>null);
+  if(!d?.sources){ document.getElementById('hl-table').innerHTML = '<div class="empty">Endpoint no disponible</div>'; return; }
+  let h = '<table><thead><tr><th>Source</th><th>Status</th><th>Latencia</th><th>Resultados</th><th>Última prueba</th></tr></thead><tbody>';
+  for(const [k,v] of Object.entries(d.sources)){
+    const st = v.status||'unknown';
+    const cls = st==='ok'||st==='healthy' ? 'b-gr' : st==='paused'||st==='slow' ? 'b-am' : 'b-re';
+    h += `<tr><td><strong>${esc(k)}</strong></td><td><span class="badge ${cls}">${esc(st)}</span></td><td class="mono">${esc(v.latencyMs||'—')}ms</td><td class="mono">${esc(v.sampleResults||v.results||'—')}</td><td class="mono" style="font-size:9px">${esc(v.checkedAt||v.lastChecked||'—')}</td></tr>`;
+  }
+  h += '</tbody></table>';
+  document.getElementById('hl-table').innerHTML = h;
+}
+
+// ─── router ───
+function loadPage(p){
+  if(p==='overview') loadOverview();
+  else if(p==='sync') loadMappings();
+  else if(p==='pricing'){ loadPricingRules(); loadMarkupTiers(); }
+  else if(p==='shipping') loadShippingRules();
+  else if(p==='logs'){ loadFailures(); loadLogs(); loadHealth(); }
+}
+
+loadOverview();
+</script>
+</body>
+</html>

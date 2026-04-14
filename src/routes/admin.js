@@ -1076,4 +1076,104 @@ router.get('/shopify/recommended-zones', (req, res) => {
   res.json({ zones: RECOMMENDED_ZONES });
 });
 
+// ============================================================
+// THEME ASSET — Generic upload/read/patch for Shopify theme files
+// ============================================================
+// GET  /shopify/theme-asset?key=assets/foo.css  -> read current value
+// PUT  /shopify/theme-asset                     -> body: { key, value }  upload content
+// POST /shopify/theme-asset/patch               -> body: { key, find, replace, insertBefore, content }
+//      patches an existing asset by string replacement or insertion
+// ============================================================
+
+async function _getActiveThemeId() {
+  const { shopifyAdmin } = require('../shopify-admin');
+  const themes = await shopifyAdmin('GET', '/themes.json');
+  const mainTheme = (themes.themes || []).find(t => t.role === 'main');
+  if (!mainTheme) throw new Error('No main theme found');
+  return mainTheme.id;
+}
+
+router.get('/shopify/theme-asset', async (req, res) => {
+  try {
+    const key = req.query.key;
+    if (!key) return res.status(400).json({ error: 'Missing key query param (e.g. key=assets/foo.css)' });
+    const { shopifyAdmin } = require('../shopify-admin');
+    const themeId = await _getActiveThemeId();
+    const r = await shopifyAdmin('GET', `/themes/${themeId}/assets.json?asset[key]=${encodeURIComponent(key)}&theme_id=${themeId}`);
+    res.json({ success: true, themeId, asset: r.asset });
+  } catch (e) {
+    logger.error('admin', 'theme-asset GET failed', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.put('/shopify/theme-asset', async (req, res) => {
+  try {
+    const { key, value, src } = req.body || {};
+    if (!key) return res.status(400).json({ error: 'Missing "key" in body (e.g. "assets/foo.css" or "layout/theme.liquid")' });
+    if (value == null && !src) return res.status(400).json({ error: 'Provide "value" (string content) or "src" (remote URL)' });
+
+    const { shopifyAdmin } = require('../shopify-admin');
+    const themeId = await _getActiveThemeId();
+
+    const asset = src ? { key, src } : { key, value: String(value) };
+    const r = await shopifyAdmin('PUT', `/themes/${themeId}/assets.json`, { asset });
+    logger.info('admin', 'Theme asset uploaded', { key, themeId, size: value ? String(value).length : 0 });
+    res.json({ success: true, themeId, asset: r.asset });
+  } catch (e) {
+    logger.error('admin', 'theme-asset PUT failed', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/shopify/theme-asset/patch', async (req, res) => {
+  try {
+    const { key, find, replace, insertBefore, content } = req.body || {};
+    if (!key) return res.status(400).json({ error: 'Missing "key" (e.g. "layout/theme.liquid")' });
+    if (!content && find == null && !insertBefore) return res.status(400).json({ error: 'Provide "content" for raw overwrite, or "find"+"replace", or "insertBefore"+"content" for insertion' });
+
+    const { shopifyAdmin } = require('../shopify-admin');
+    const themeId = await _getActiveThemeId();
+
+    // 1) Fetch current value
+    const current = await shopifyAdmin('GET', `/themes/${themeId}/assets.json?asset[key]=${encodeURIComponent(key)}&theme_id=${themeId}`);
+    let value = current.asset?.value || '';
+    if (!value) return res.status(404).json({ error: `Asset ${key} not found or empty` });
+
+    let changed = false;
+    let info = {};
+
+    if (find != null && replace != null) {
+      if (value.indexOf(find) === -1) {
+        return res.status(409).json({ error: `"find" string not found in asset`, key, findPreview: String(find).slice(0, 100) });
+      }
+      value = value.split(find).join(replace);
+      changed = true;
+      info.op = 'replace';
+    } else if (insertBefore != null && content != null) {
+      const idx = value.indexOf(insertBefore);
+      if (idx === -1) return res.status(409).json({ error: `"insertBefore" string not found`, key });
+      if (value.indexOf(content) !== -1) {
+        return res.json({ success: true, themeId, key, skipped: true, reason: 'Content already present, no changes made' });
+      }
+      value = value.slice(0, idx) + content + value.slice(idx);
+      changed = true;
+      info.op = 'insertBefore';
+    } else if (content != null) {
+      value = content;
+      changed = true;
+      info.op = 'overwrite';
+    }
+
+    if (!changed) return res.json({ success: true, themeId, key, skipped: true });
+
+    const r = await shopifyAdmin('PUT', `/themes/${themeId}/assets.json`, { asset: { key, value } });
+    logger.info('admin', 'Theme asset patched', { key, themeId, op: info.op });
+    res.json({ success: true, themeId, key, op: info.op, newSize: value.length, asset: r.asset });
+  } catch (e) {
+    logger.error('admin', 'theme-asset patch failed', { error: e.message });
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

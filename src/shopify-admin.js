@@ -23,12 +23,7 @@ async function shopifyAdmin(method, apiPath, body = null) {
 
   if (method === 'DELETE' && resp.ok) return { success: true };
 
-  const text = await resp.text();
-  if (!text || text.trim() === '') {
-    if (resp.ok) return { success: true };
-    throw new Error(`Empty response with status ${resp.status}`);
-  }
-  const data = JSON.parse(text);
+  const data = await resp.json();
   if (!resp.ok) {
     throw new Error(JSON.stringify(data.errors || data));
   }

@@ -3,27 +3,103 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+      <meta name="msvalidate.01" content="6B123633EFF8F4E88147DC9617A7C476" />
   <link rel="preconnect" href="https://dealshub-search.onrender.com" crossorigin>
   <link rel="dns-prefetch" href="https://dealshub-search.onrender.com">
 
-  {%- comment -%} SEO Title — unique per template {%- endcomment -%}
+      {{ 'dealshub-mobile-fixes.css' | asset_url | stylesheet_tag }}
+        <meta property="og:image" content="{{ 'stylehub-logo-email.png' | asset_url }}" />
+
+  {%- comment -%} SEO Title — unique per template / page handle {%- endcomment -%}
   {%- if template == 'index' -%}
     <title>StyleHub Miami | Best Deals on Fashion, Beauty & Electronics | Free Shipping</title>
-  {%- elsif template contains 'product' -%}
+  {%- elsif template contains 'product' and product -%}
     <title>{{ product.title | escape }} | ${{ product.price | money_without_currency }} | StyleHub Miami</title>
   {%- elsif template contains 'collection' -%}
-    <title>{{ collection.title | escape }} | Shop at StyleHub Miami</title>
+    <title>{{ collection.title | escape }} — Shop Best Deals | StyleHub Miami</title>
   {%- elsif template contains 'article' -%}
     <title>{{ article.title | escape }} | StyleHub Miami Blog</title>
+  {%- elsif template contains 'blog' -%}
+    <title>StyleHub Blog — Tips, Trends & Smart Shopping Guides | StyleHub Miami</title>
+  {%- elsif page.handle == 'about-us' -%}
+    <title>About Us — StyleHub Miami | Your Trusted Deal Destination</title>
+  {%- elsif page.handle == 'faq' -%}
+    <title>FAQ — Frequently Asked Questions | StyleHub Miami</title>
+  {%- elsif page.handle == 'contact-us' or page.handle == 'contact' -%}
+    <title>Contact Us — Customer Support | StyleHub Miami</title>
+  {%- elsif page.handle == 'shipping-policy' -%}
+    <title>Shipping Policy — Delivery Info | StyleHub Miami</title>
+  {%- elsif page.handle == 'returns-refund-policy' -%}
+    <title>Returns & Refund Policy | StyleHub Miami</title>
+  {%- elsif page.handle == 'privacy-policy' -%}
+    <title>Privacy Policy | StyleHub Miami</title>
+  {%- elsif page.handle == 'terms-of-service' -%}
+    <title>Terms of Service | StyleHub Miami</title>
+  {%- elsif page.handle == 'help-center' -%}
+    <title>Help Center — Customer Support | StyleHub Miami</title>
+  {%- elsif page.handle == 'tracking' -%}
+    <title>Track Your Order | StyleHub Miami</title>
+  {%- elsif page.handle == 'deals' -%}
+    <title>Today's Best Deals — Up to 70% Off | StyleHub Miami</title>
+  {%- elsif page.handle == 'best-sellers' -%}
+    <title>Best Sellers — Top Rated Products | StyleHub Miami</title>
+  {%- elsif page.handle == 'new-arrivals' -%}
+    <title>New Arrivals — Latest Products | StyleHub Miami</title>
+  {%- elsif page.handle == 'most-wanted' -%}
+    <title>Most Wanted — Trending Now | StyleHub Miami</title>
+  {%- elsif page.handle == 'plus' -%}
+    <title>StyleHub Plus — Free Shipping & Exclusive Benefits</title>
+  {%- elsif page.handle == 'rewards' -%}
+    <title>Rewards Program — Earn Points | StyleHub Miami</title>
   {%- else -%}
     <title>{{ page_title | escape }}{% unless page_title contains 'StyleHub' %} | StyleHub Miami{% endunless %}</title>
   {%- endif -%}
 
-  {%- comment -%} SEO Meta Tags {%- endcomment -%}
-  {%- if page_description -%}
+  {%- comment -%} SEO Meta Descriptions — unique per template / page handle {%- endcomment -%}
+  {%- comment -%} Skip garbage auto-gen descriptions ($, product dumps) AND Spanish descriptions on English site {%- endcomment -%}
+  {%- assign _has_custom_desc = false -%}
+  {%- if page_description and page_description != blank -%}
+    {%- assign _desc_lower = page_description | downcase -%}
+    {%- unless page_description contains '$' or page_description contains 'Shop Now' or page_description contains '★' or _desc_lower contains 'explora ' or _desc_lower contains 'descubr' or _desc_lower contains 'encuentra ' or _desc_lower contains 'selección curada' or _desc_lower contains 'envío rápido' or _desc_lower contains 'stylehubmiami.' -%}
+      {%- assign _has_custom_desc = true -%}
+    {%- endunless -%}
+  {%- endif -%}
+  {%- if _has_custom_desc -%}
     <meta name="description" content="{{ page_description | escape }}">
   {%- elsif template == 'index' -%}
-    <meta name="description" content="Shop millions of products at the best prices. Fashion, beauty, electronics, shoes & more from Amazon, AliExpress & trusted sellers. Free shipping on $35+. Secure checkout. Fast delivery to all 50 US states.">
+    <meta name="description" content="Shop millions of products at the best prices. Fashion, beauty, electronics, shoes & more. Free shipping on $35+. Secure checkout. Fast delivery to all 50 US states.">
+  {%- elsif template contains 'collection' and collection -%}
+    <meta name="description" content="Shop the best {{ collection.title | escape }} deals at StyleHub Miami. Top brands, great prices, free shipping on $35+. Secure checkout & fast delivery.">
+  {%- elsif page.handle == 'about-us' -%}
+    <meta name="description" content="Learn about StyleHub Miami — your trusted destination for the best deals on fashion, beauty, electronics & more. Based in Miami, FL. Serving all 50 US states.">
+  {%- elsif page.handle == 'faq' -%}
+    <meta name="description" content="Frequently asked questions about StyleHub Miami. Shipping, returns, order tracking, payments & more. Get answers to your questions.">
+  {%- elsif page.handle == 'contact-us' or page.handle == 'contact' -%}
+    <meta name="description" content="Contact StyleHub Miami customer support. We're here to help with orders, shipping, returns & more. Email: support@stylehubmiami.com">
+  {%- elsif page.handle == 'shipping-policy' -%}
+    <meta name="description" content="StyleHub Miami shipping policy. Free shipping on orders over $35. Estimated delivery times, shipping methods & tracking information.">
+  {%- elsif page.handle == 'returns-refund-policy' -%}
+    <meta name="description" content="StyleHub Miami returns & refund policy. Easy 30-day returns. Free return shipping. Full refund guarantee. Learn how to return or exchange items.">
+  {%- elsif page.handle == 'privacy-policy' -%}
+    <meta name="description" content="StyleHub Miami privacy policy. How we collect, use, and protect your personal information. Your privacy matters to us.">
+  {%- elsif page.handle == 'terms-of-service' -%}
+    <meta name="description" content="StyleHub Miami terms of service. Rules and guidelines for using our website and purchasing products.">
+  {%- elsif page.handle == 'help-center' -%}
+    <meta name="description" content="StyleHub Miami Help Center. Find answers about shipping, returns, tracking orders, account issues & more.">
+  {%- elsif page.handle == 'tracking' -%}
+    <meta name="description" content="Track your StyleHub Miami order. Enter your order number and email to see real-time delivery status and tracking updates.">
+  {%- elsif page.handle == 'deals' -%}
+    <meta name="description" content="Today's best deals at StyleHub Miami. Up to 70% off on fashion, beauty, electronics & home. New deals added daily. Free shipping on $35+.">
+  {%- elsif page.handle == 'best-sellers' -%}
+    <meta name="description" content="Shop StyleHub Miami best sellers. Top rated products loved by thousands of customers. Fashion, beauty, electronics & more.">
+  {%- elsif page.handle == 'new-arrivals' -%}
+    <meta name="description" content="New arrivals at StyleHub Miami. The latest products in fashion, beauty, electronics & home. Be the first to shop trending items.">
+  {%- elsif page.handle == 'most-wanted' -%}
+    <meta name="description" content="Most wanted products at StyleHub Miami. Trending deals, viral products & customer favorites across all categories.">
+  {%- elsif template contains 'blog' -%}
+    <meta name="description" content="StyleHub Blog — tips, trends, and smart shopping guides. Discover the best deals, product reviews, and style inspiration at StyleHub Miami.">
+  {%- elsif template contains 'article' and article -%}
+    <meta name="description" content="{{ article.content | strip_html | truncate: 155 | escape }}">
   {%- else -%}
     <meta name="description" content="StyleHub Miami — Shop the best deals on fashion, beauty, electronics & more. Free shipping on $35+. Secure checkout. 24/7 support.">
   {%- endif -%}
@@ -62,20 +138,6 @@
     .dh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
     @media(max-width:768px){.dh-grid{grid-template-columns:repeat(2,1fr);gap:10px}}
     @media(max-width:480px){.dh-grid{grid-template-columns:repeat(2,1fr);gap:8px}.dh-api-card h3{font-size:11px!important}}
-    /* Policy pages (native Shopify /policies/*) */
-    .shopify-policy__container{max-width:780px;margin:0 auto;padding:40px 20px 60px}
-    .shopify-policy__container .shopify-policy__title{font-size:28px;font-weight:700;color:#1a1a2e;margin-bottom:20px}
-    .shopify-policy__container .shopify-policy__body{font-size:14px;color:#4A5568;line-height:1.8}
-    .shopify-policy__container .shopify-policy__body h1,.shopify-policy__container .shopify-policy__body h2,.shopify-policy__container .shopify-policy__body h3{color:#1a1a2e;margin:24px 0 12px}
-    .shopify-policy__container .shopify-policy__body a{color:#e53e3e}
-    .shopify-policy__container .shopify-policy__body table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
-    .shopify-policy__container .shopify-policy__body th,.shopify-policy__container .shopify-policy__body td{border:1px solid #e2e8f0;padding:10px 14px;text-align:left}
-    .shopify-policy__container .shopify-policy__body th{background:#f7fafc;font-weight:600;color:#1a1a2e}
-    @media(max-width:768px){
-      .shopify-policy__container{padding:24px 16px 40px}
-      .shopify-policy__container .shopify-policy__title{font-size:22px}
-      .shopify-policy__container .shopify-policy__body table{display:block;overflow-x:auto}
-    }
   </style>
   {{ 'stylehub-api.js' | asset_url | script_tag }}
 
@@ -166,8 +228,45 @@
   </script>
   {%- endif -%}
 
-  {%- comment -%} Google Search Console verification {%- endcomment -%}
-  <meta name="google-site-verification" content="googled4a221a39184d512">
+  {%- comment -%} JSON-LD: Collection Breadcrumbs {%- endcomment -%}
+  {%- if template contains 'collection' and collection -%}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://stylehubmiami.com/" },
+      { "@type": "ListItem", "position": 2, "name": {{ collection.title | json }} }
+    ]
+  }
+  </script>
+  {%- endif -%}
+
+  {%- comment -%} JSON-LD: FAQ Page {%- endcomment -%}
+  {%- if page.handle == 'faq' -%}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": []
+  }
+  </script>
+  {%- endif -%}
+
+  {%- comment -%} Google Search Console Verification {%- endcomment -%}
+  {%- if settings.google_site_verification and settings.google_site_verification != blank -%}
+    <meta name="google-site-verification" content="{{ settings.google_site_verification }}">
+  {%- endif -%}
+
+  {%- comment -%} Bing Webmaster Verification {%- endcomment -%}
+  {%- if settings.bing_site_verification and settings.bing_site_verification != blank -%}
+    <meta name="msvalidate.01" content="{{ settings.bing_site_verification }}">
+  {%- endif -%}
+
+  {%- comment -%} SEO: noindex for dynamic search/product shell pages (JS-rendered, not useful for Google) {%- endcomment -%}
+  {%- if request.path == '/pages/search-results' or request.path == '/pages/product' -%}
+    <meta name="robots" content="noindex, follow">
+  {%- endif -%}
 
   {%- comment -%} StyleHub Plus — Server-side detection via customer tags {%- endcomment -%}
   {%- assign is_plus = false -%}
@@ -196,5 +295,6 @@
   {% section 'dealshub-footer' %}
   <script src="{{ 'dealshub-analytics.js' | asset_url }}" defer></script>
   {% render 'cookie-consent' %}
+  <script src="{{ 'dealshub-mobile-fixes.js' | asset_url }}" defer></script>
 </body>
 </html>

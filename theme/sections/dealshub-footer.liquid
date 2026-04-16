@@ -17,8 +17,14 @@
     .dh-footer__newsletter-input{flex:1;padding:10px 14px;border:1px solid #333;border-right:none;border-radius:6px 0 0 6px;background:#0d0d1a;color:#fff;font-size:14px;outline:none}
     .dh-footer__newsletter-input::placeholder{color:#666}
     .dh-footer__newsletter-input:focus{border-color:#e53e3e}
-    .dh-footer__newsletter-btn{padding:10px 18px;background:#e53e3e;color:#fff;border:none;border-radius:0 6px 6px 0;font-weight:700;font-size:14px;cursor:pointer;transition:background .2s}
+    .dh-footer__newsletter-btn{padding:10px 18px;background:#e53e3e;color:#fff;border:none;border-radius:0 6px 6px 0;font-weight:700;font-size:14px;cursor:pointer;transition:background .2s;min-width:56px}
     .dh-footer__newsletter-btn:hover{background:#c53030}
+    .dh-footer__newsletter-btn:disabled{background:#7a2323;cursor:not-allowed}
+    .dh-footer__newsletter-btn.is-success{background:#22c55e!important;color:#fff!important}
+    .dh-footer__newsletter-msg{min-height:18px;margin-top:8px;font-size:12px;line-height:1.4;color:#a0a0b0;transition:color .2s}
+    .dh-footer__newsletter-msg.is-success{color:#22c55e}
+    .dh-footer__newsletter-msg.is-error{color:#ff6b6b}
+    .dh-footer__newsletter-msg.is-info{color:#a0a0b0}
     .dh-footer__bottom{border-top:1px solid #2a2a3e;margin-top:40px;padding:20px 24px;text-align:center}
     .dh-footer__bottom-inner{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
     .dh-footer__copy{font-size:13px;color:#666}
@@ -51,20 +57,21 @@
       <p>Your #1 destination for the best deals on fashion, beauty, electronics and more from top brands.</p>
       <div class="dh-footer__newsletter">
         <span class="dh-footer__newsletter-label">Get exclusive deals</span>
-        <form class="dh-footer__newsletter-form" action="#" method="post" id="dh-footer-newsletter">
-          <input type="email" class="dh-footer__newsletter-input" placeholder="Your email..." required aria-label="Email for newsletter">
-          <button type="submit" class="dh-footer__newsletter-btn">OK</button>
+        <form class="dh-footer__newsletter-form" action="https://dealshub-search.onrender.com/api/newsletter-subscribe" method="post" id="dh-footer-newsletter" novalidate>
+          <input type="email" class="dh-footer__newsletter-input" name="email" placeholder="Your email..." required aria-label="Email for newsletter" aria-describedby="dh-footer-newsletter-msg" autocomplete="email">
+          <button type="submit" class="dh-footer__newsletter-btn" aria-label="Subscribe">OK</button>
         </form>
+        <div class="dh-footer__newsletter-msg" id="dh-footer-newsletter-msg" role="status" aria-live="polite"></div>
       </div>
     </div>
 
     <div class="dh-footer__col">
       <h3>Categories</h3>
-      <a href="/collections/fashion">Fashion</a>
-      <a href="/collections/beauty">Beauty</a>
-      <a href="/collections/electronics">Electronics</a>
-      <a href="/collections/home">Home</a>
-      <a href="/collections/sports">Sports</a>
+      <a href="/pages/category?cat=fashion">Fashion</a>
+      <a href="/pages/category?cat=beauty">Beauty</a>
+      <a href="/pages/category?cat=electronics">Electronics</a>
+      <a href="/pages/category?cat=home">Home</a>
+      <a href="/pages/category?cat=sports">Sports</a>
       <a href="/pages/search-results?category=flash-deals">Flash Deals</a>
     </div>
 
@@ -74,12 +81,10 @@
       <a href="/pages/wishlist" class="dh-footer__icon">❤️ My Wishlist</a>
       <a href="/pages/my-account#addresses" class="dh-footer__icon">📍 My Addresses</a>
       <a href="/pages/my-account#settings" class="dh-footer__icon">🔒 Account</a>
-      <a href="/pages/tracking" class="dh-footer__icon" style="color:#e53e3e">📦 Track Order</a>
     </div>
 
     <div class="dh-footer__col">
       <h3>Help</h3>
-      <a href="/pages/tracking">Track My Order</a>
       <a href="/pages/help-center">Help Center</a>
       <a href="/pages/shipping-policy">Shipping Policy</a>
       <a href="/policies/refund-policy">Returns & Refunds</a>
@@ -103,18 +108,108 @@
 
 <script>
 (function(){
+  var ENDPOINT = 'https://dealshub-search.onrender.com/api/newsletter-subscribe';
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   var form = document.getElementById('dh-footer-newsletter');
-  if(form){
-    form.addEventListener('submit', function(e){
-      e.preventDefault();
-      var email = form.querySelector('input[type="email"]').value;
-      if(email && window.DHAnalytics){
-        window.DHAnalytics.trackNewsletterSignup('footer');
+  if (!form) return;
+
+  var input = form.querySelector('input[type="email"]');
+  var btn = form.querySelector('button[type="submit"]');
+  var msg = document.getElementById('dh-footer-newsletter-msg');
+
+  function setMessage(text, kind){
+    if (!msg) return;
+    msg.textContent = text || '';
+    msg.classList.remove('is-success','is-error','is-info');
+    if (kind) msg.classList.add('is-' + kind);
+  }
+
+  function setButtonState(state){
+    if (!btn) return;
+    btn.classList.remove('is-success');
+    switch(state){
+      case 'loading':
+        btn.disabled = true;
+        btn.textContent = '...';
+        break;
+      case 'success':
+        btn.disabled = true;
+        btn.textContent = '✓';
+        btn.classList.add('is-success');
+        break;
+      case 'idle':
+      default:
+        btn.disabled = false;
+        btn.textContent = 'OK';
+    }
+  }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+
+    var email = (input && input.value || '').trim();
+
+    if (!EMAIL_RE.test(email)){
+      setMessage('Please enter a valid email address.', 'error');
+      if (input) input.focus();
+      return;
+    }
+
+    setButtonState('loading');
+    setMessage('Subscribing...', 'info');
+
+    fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ email: email, source: 'footer' })
+    })
+    .then(function(r){ return r.json().catch(function(){ return { success:false, status:'error', message:'Something went wrong. Please try again.' }; }); })
+    .then(function(data){
+      if (data && data.success){
+        setButtonState('success');
+        setMessage(data.message || "Thanks for subscribing!", 'success');
+
+        // Analytics tracking (non-blocking, optional)
+        try {
+          if (window.DHAnalytics && typeof window.DHAnalytics.trackNewsletterSignup === 'function') {
+            window.DHAnalytics.trackNewsletterSignup('footer');
+          }
+          if (typeof window.gtag === 'function') {
+            window.gtag('event', 'newsletter_signup', { method: 'footer', status: data.status || 'subscribed' });
+          }
+          if (typeof window.fbq === 'function') {
+            window.fbq('track', 'Subscribe', { source: 'footer' });
+          }
+        } catch(_){}
+
+        // Clear input on true first-time or resubscribe; keep on "already" so user sees the state clearly
+        if (data.status === 'subscribed' || data.status === 'resubscribed') {
+          if (input) input.value = '';
+        }
+
+        // Restore button after a few seconds so user can subscribe another email if needed
+        setTimeout(function(){
+          setButtonState('idle');
+        }, 4000);
+      } else {
+        setButtonState('idle');
+        setMessage((data && data.message) || 'Something went wrong. Please try again.', 'error');
       }
-      var btn = form.querySelector('button');
-      btn.textContent = '✓';
-      btn.style.background = '#22c55e';
-      setTimeout(function(){ btn.textContent = 'OK'; btn.style.background = '#e53e3e'; }, 2000);
+    })
+    .catch(function(err){
+      console.error('[newsletter] fetch failed:', err);
+      setButtonState('idle');
+      setMessage('Network error. Please try again in a moment.', 'error');
+    });
+  });
+
+  // Clear error state as soon as user edits the input
+  if (input) {
+    input.addEventListener('input', function(){
+      if (msg && msg.classList.contains('is-error')) {
+        setMessage('', null);
+      }
     });
   }
 })();

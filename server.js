@@ -1380,6 +1380,25 @@ app.post('/api/prepare-cart', async (req, res) => {
       price: result.priceSnapshot.price
     });
 
+    // ── AUTODS REACTIVE TRACKING ──
+    // Register product in local autods_products table so AutoDS platform can
+    // pick it up (via CSV bulk import or API). Reactive tracking aligned with
+    // plan limit 500 — only consumes variations when product is actually added to cart.
+    try {
+      const autodsService = require('./src/services/autods');
+      autodsService.registerProduct({
+        source: srcLower,
+        sourceId: srcId,
+        sourceUrl: productData.sourceUrl || productData.url || '',
+        shopifyProductId: result.shopifyProductId,
+        shopifyVariantId: result.shopifyVariantId,
+        shopifyHandle: result.handle
+      });
+    } catch (autodsErr) {
+      // Non-blocking — never fail cart prep due to tracking
+      logger.warn('cart', `[AutoDS] registerProduct failed (non-blocking): ${autodsErr.message}`);
+    }
+
     res.json(result);
   } catch (e) {
     logger.error('cart', 'Prepare cart failed', { error: e.message, source, sourceId });
@@ -1428,6 +1447,21 @@ app.post('/api/create-and-add', async (req, res) => {
       selectedVariantId: variant_title,
       quantity: 1
     });
+
+    // ── AUTODS REACTIVE TRACKING (legacy endpoint) ──
+    try {
+      const autodsService = require('./src/services/autods');
+      autodsService.registerProduct({
+        source: productData.source,
+        sourceId: productData.sourceId,
+        sourceUrl: productData.sourceUrl || '',
+        shopifyProductId: result.shopifyProductId,
+        shopifyVariantId: result.shopifyVariantId,
+        shopifyHandle: result.handle
+      });
+    } catch (autodsErr) {
+      logger.warn('legacy-cart', `[AutoDS] registerProduct failed (non-blocking): ${autodsErr.message}`);
+    }
 
     res.json({
       success: true,

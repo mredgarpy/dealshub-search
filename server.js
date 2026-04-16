@@ -2699,35 +2699,22 @@ app.get('/webhooks/health', (req, res) => {
 });
 
 // ============================================================
-// CRON JOBS — Scheduled background tasks
+// CRON JOBS — Removed (services/cron.js cleaned up in v3.6.0)
+// Admin endpoints kept as stubs for backward compatibility
 // ============================================================
-const cron = require('./src/services/cron');
 
-// ---- ADMIN: Cron Status ----
 app.get('/api/admin/cron/status', (req, res) => {
   const token = req.query.token || req.headers['x-admin-token'];
   if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
-  res.json(cron.getCronStatus());
+  res.json({ status: 'disabled', message: 'Cron service removed in v3.6.0' });
 });
 
-// ---- ADMIN: Run a specific cron task on demand ----
-app.post('/api/admin/cron/run/:task', async (req, res) => {
-  const token = req.query.token || req.headers['x-admin-token'];
-  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
-  try {
-    const result = await cron.runTask(req.params.task);
-    res.json({ success: true, result });
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
+app.post('/api/admin/cron/run/:task', (req, res) => {
+  res.status(410).json({ error: 'Cron service removed in v3.6.0' });
 });
 
-// ---- ADMIN: Cron History ----
 app.get('/api/admin/cron/history', (req, res) => {
-  const token = req.query.token || req.headers['x-admin-token'];
-  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
-  const { limit = 50 } = req.query;
-  res.json(cron.taskHistory.slice(0, parseInt(limit)));
+  res.json([]);
 });
 
 // ---- ADMIN: Backfill missing products from order items into autods_products ----
@@ -2837,13 +2824,7 @@ app.listen(PORT, () => {
   // Warm up cache after server starts (don't await â let it run in background)
   setTimeout(warmUpCache, 2000);
 
-  // ---- START CRON JOBS ----
-  try {
-    cron.startCronJobs();
-    logger.info('server', 'Cron jobs started');
-  } catch (e) {
-    logger.warn('server', `Cron startup failed: ${e.message}`);
-  }
+  // Cron jobs removed in v3.6.0
 
   // ---- KEEP-ALIVE SELF-PING ----
   // Render free tier spins down after ~15min of inactivity.

@@ -246,12 +246,8 @@ function setupCRMApi(app) {
       autodsStats = autods.getAutodsStats();
     } catch (e) {}
 
-    // Get cron status if available
-    let cronStatus = null;
-    try {
-      const cron = require('./services/cron');
-      cronStatus = cron.getCronStatus();
-    } catch (e) {}
+    // Cron removed in v3.6.0
+    const cronStatus = null;
 
     // Build recent activity from orders
     const recent = all

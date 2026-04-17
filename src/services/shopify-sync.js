@@ -439,6 +439,19 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
         handle: dbMapping.shopify_handle,
         variants: [{ id: dbMapping.shopify_variant_id, title: 'Default', price: String(dbMapping.last_price || pricingResult.price) }]
       };
+      // If user selected a variant, we need all Shopify variants for matching — DB only stores one
+      if (selectedVariantId && dbMapping.shopify_product_id) {
+        try {
+          const productResp = await shopifyAPI(`/products/${dbMapping.shopify_product_id}.json?fields=id,variants`);
+          const allVariants = productResp?.product?.variants || [];
+          if (allVariants.length > 1) {
+            mapping.variants = allVariants.map(v => ({ id: v.id, title: v.title, price: v.price, sku: v.sku }));
+            logger.info('sync', `Fetched ${allVariants.length} Shopify variants for variant matching`, { source, sourceId });
+          }
+        } catch (fetchErr) {
+          logger.warn('sync', `Could not fetch Shopify variants: ${fetchErr.message}`, { source, sourceId });
+        }
+      }
       syncCache.set(cacheKey, mapping, 3600000);
       logger.info('sync', 'Found existing mapping in DB', { source, sourceId, shopifyId: dbMapping.shopify_product_id });
     }

@@ -439,43 +439,46 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
         handle: dbMapping.shopify_handle,
         variants: [{ id: dbMapping.shopify_variant_id, title: 'Default', price: String(dbMapping.last_price || pricingResult.price) }]
       };
-      // Always fetch all Shopify variants — DB only stores one, but we need all for:
-      // 1. Variant matching (user selects specific size/color)
-      // 2. Bulk price refresh (update ALL stale variant prices at once)
-      if (dbMapping.shopify_product_id) {
-        try {
-          const productResp = await shopifyAPI(`/products/${dbMapping.shopify_product_id}.json?fields=id,variants`);
-          const allVariants = productResp?.product?.variants || [];
-          if (allVariants.length > 0) {
-            mapping.variants = allVariants.map(v => ({ id: v.id, title: v.title, price: v.price, sku: v.sku }));
-            // BULK PRICE REFRESH: check if ANY variant has stale pricing and update ALL at once
-            const newPrice = String(pricingResult.price);
-            const staleVariants = allVariants.filter(v => String(v.price) !== newPrice);
-            if (staleVariants.length > 0) {
-              logger.info('sync', `Found ${staleVariants.length}/${allVariants.length} variants with stale prices, bulk updating`, { source, sourceId, expected: newPrice, found: staleVariants.map(v => v.price).slice(0, 5) });
-              const newCompareAt = pricingResult.compareAt ? String(pricingResult.compareAt) : null;
-              await Promise.allSettled(staleVariants.map(async (v) => {
-                try {
-                  const vUpdate = { id: v.id, price: newPrice };
-                  if (newCompareAt) vUpdate.compare_at_price = newCompareAt;
-                  await shopifyAPI(`/variants/${v.id}.json`, 'PUT', { variant: vUpdate });
-                } catch (err) {
-                  logger.warn('sync', `Bulk price update failed for variant ${v.id}: ${err.message}`);
-                }
-              }));
-              // Update mapping with new prices
-              mapping.variants = mapping.variants.map(v => ({ ...v, price: newPrice }));
-              logger.info('sync', `Bulk price refresh complete: ${staleVariants.length} variants updated to $${newPrice}`, { source, sourceId });
-            }
-            logger.info('sync', `Fetched ${allVariants.length} Shopify variants`, { source, sourceId });
-          }
-        } catch (fetchErr) {
-          logger.warn('sync', `Could not fetch Shopify variants: ${fetchErr.message}`, { source, sourceId });
-        }
-      }
       syncCache.set(cacheKey, mapping, 3600000);
       logger.info('sync', 'Found existing mapping in DB', { source, sourceId, shopifyId: dbMapping.shopify_product_id });
     }
+  }
+
+  // ── ALWAYS fetch real Shopify variants & bulk price refresh ─────────
+  // Runs regardless of whether mapping came from cache, DB, or Shopify search.
+  // This ensures we always have correct variant titles for matching AND
+  // correct prices — even if the syncCache had stale data.
+  if (mapping && !mapping.isNewlyCreated && mapping.shopifyProductId) {
+    try {
+      const productResp = await shopifyAPI(`/products/${mapping.shopifyProductId}.json?fields=id,variants`);
+      const allVariants = productResp?.product?.variants || [];
+      if (allVariants.length > 0) {
+        mapping.variants = allVariants.map(v => ({ id: v.id, title: v.title, price: v.price, sku: v.sku }));
+        // BULK PRICE REFRESH: update ALL variants with stale prices
+        const newPrice = String(pricingResult.price);
+        const staleVariants = allVariants.filter(v => String(v.price) !== newPrice);
+        if (staleVariants.length > 0) {
+          logger.info('sync', `Found ${staleVariants.length}/${allVariants.length} variants with stale prices, bulk updating`, { source, sourceId, expected: newPrice, found: staleVariants.map(v => v.price).slice(0, 5) });
+          const newCompareAt = pricingResult.compareAt ? String(pricingResult.compareAt) : null;
+          await Promise.allSettled(staleVariants.map(async (v) => {
+            try {
+              const vUpdate = { id: v.id, price: newPrice };
+              if (newCompareAt) vUpdate.compare_at_price = newCompareAt;
+              await shopifyAPI(`/variants/${v.id}.json`, 'PUT', { variant: vUpdate });
+            } catch (err) {
+              logger.warn('sync', `Bulk price update failed for variant ${v.id}: ${err.message}`);
+            }
+          }));
+          mapping.variants = mapping.variants.map(v => ({ ...v, price: newPrice }));
+          logger.info('sync', `Bulk price refresh complete: ${staleVariants.length} variants updated to $${newPrice}`, { source, sourceId });
+        }
+        // Update cache with real variant data
+        syncCache.set(cacheKey, mapping, 3600000);
+      }
+    } catch (fetchErr) {
+      logger.warn('sync', `Could not fetch Shopify variants for price refresh: ${fetchErr.message}`, { source, sourceId });
+    }
+    _timing.priceRefresh = Date.now() - _startTime;
   }
 
   if (!mapping) {

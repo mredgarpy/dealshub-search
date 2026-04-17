@@ -686,14 +686,21 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     cartAddPayload: {
       id: variantId,
       quantity,
-      properties: {
-        _source_store: source,
-        _source_id: String(sourceId),
-        _selected_variant: selectedVariantId || 'default',
-        _shopify_variant_title: mapping.variants?.find(v => String(v.id) === String(variantId))?.title || '',
-        _sync_version: Date.now().toString(),
-        _landed_cost_band: String(pricingResult.landedCost)
-      }
+      properties: (() => {
+        const matchedVariant = mapping.variants?.find(v => String(v.id) === String(variantId));
+        // Extract source variant ID from SKU: DH-SOURCE-productId-variantId
+        const skuParts = (matchedVariant?.sku || '').split('-');
+        const sourceVariantId = skuParts.length >= 4 ? skuParts.slice(3).join('-') : '';
+        return {
+          _source_store: source,
+          _source_id: String(sourceId),
+          _source_variant_id: sourceVariantId,
+          _selected_variant: selectedVariantId || 'default',
+          _shopify_variant_title: matchedVariant?.title || '',
+          _sync_version: Date.now().toString(),
+          _landed_cost_band: String(pricingResult.landedCost)
+        };
+      })()
     },
     _internal: {
       landedCost: pricingResult.landedCost,

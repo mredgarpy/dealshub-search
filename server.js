@@ -538,7 +538,8 @@ async function productDetailHandler(req, res) {
         product.variants = product.variants.map(v => {
           if (v.price && typeof v.price === 'number' && v.price > 0) {
             const vPricing = calculateFinalPrice(v.price, source, {
-              sourceCost: v.sourceCost || product.sourceCostRaw || null
+              sourceCost: v.sourceCost || product.sourceCostRaw || null,
+              deliveryInfo: product.deliveryInfo || product.shippingData || null
             });
             v.sourcePrice = v.price;
             v.price = vPricing.price;

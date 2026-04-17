@@ -79,11 +79,38 @@ const { STORES, getActiveStores, isStoreActive, classifyOrigin } = require('./sr
 // Initialize adapters
 initAdapters({ rapidApiKey: process.env.RAPIDAPI_KEY });
 
+// v3.5: Decode HTML entities in product text fields (titles, descriptions, bullets)
+function decodeHtmlEntities(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+// v3.5: Clean product text fields — decode entities in title, description, bullets
+function cleanProductText(p) {
+  if (!p) return p;
+  if (p.title) p.title = decodeHtmlEntities(p.title);
+  if (p.description && typeof p.description === 'string') p.description = decodeHtmlEntities(p.description);
+  if (Array.isArray(p.bullets)) p.bullets = p.bullets.map(b => decodeHtmlEntities(b));
+  if (p.brand) p.brand = decodeHtmlEntities(p.brand);
+  return p;
+}
+
 // v1.6: Apply pricing markup to search result arrays so all prices shown are final customer prices
 function applySearchPricing(products) {
   if (!Array.isArray(products)) return products;
   return products.map(p => {
     if (!p || !p.price) return p;
+    cleanProductText(p); // v3.5: decode HTML entities
     const rawPrice = typeof p.price === 'number' ? p.price : parseFloat(String(p.price).replace(/[^0-9.]/g, ''));
     if (!rawPrice || rawPrice <= 0) return p;
     const source = (p.source || p.sourceName || 'amazon').toLowerCase();
@@ -557,6 +584,7 @@ async function productDetailHandler(req, res) {
       logger.warn('product', `Source returned mismatched product`, { requested: requestedId, returned: returnedId, source });
       product._mismatch = true; // Flag but still return it for transparency
     }
+    cleanProductText(product); // v3.5: decode HTML entities
     if (!product._mismatch) {
       productCache.set(cacheKey, product);
     }

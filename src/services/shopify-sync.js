@@ -155,31 +155,34 @@ async function findExistingProduct(source, sourceId) {
   const cached = syncCache.get(cacheKey);
   if (cached) return cached;
 
-  // Strategy 1: Search by tags
+  // Strategy 1: Search by SKU via GraphQL (more reliable than REST tag search)
   try {
-    const tagFilter = encodeURIComponent(`source-id:${sourceId}`);
-    const data = await shopifyAPI(
-      `/products.json?limit=5&status=any&fields=id,handle,variants,status,tags&tag=${tagFilter}`
-    );
-    if (data?.products?.length > 0) {
-      const match = data.products.find(p => {
-        const tags = (p.tags || '').split(',').map(t => t.trim());
-        return tags.includes(`source-id:${sourceId}`) && tags.includes(`source:${source}`);
-      });
-      if (match && match.status !== 'archived') {
+    const skuPrefix = `DH-${source.toUpperCase()}-${sourceId}`;
+    const gqlQuery = `{ products(first:1, query:"sku:${skuPrefix}*") { edges { node { legacyResourceId handle status variants(first:100) { edges { node { legacyResourceId title price sku } } } } } } }`;
+    const gqlResp = await shopifyAPI('/graphql.json', 'POST', { query: gqlQuery });
+    const gqlProducts = gqlResp?.data?.products?.edges || [];
+    if (gqlProducts.length > 0) {
+      const p = gqlProducts[0].node;
+      if (p.status !== 'ARCHIVED') {
+        const variants = (p.variants?.edges || []).map(e => ({
+          id: Number(e.node.legacyResourceId),
+          title: e.node.title,
+          price: e.node.price,
+          sku: e.node.sku
+        }));
         const mapping = {
-          shopifyProductId: match.id,
-          shopifyVariantId: match.variants?.[0]?.id || null,
-          handle: match.handle,
-          variants: (match.variants || []).map(v => ({ id: v.id, title: v.title, price: v.price, sku: v.sku }))
+          shopifyProductId: Number(p.legacyResourceId),
+          shopifyVariantId: variants[0]?.id || null,
+          handle: p.handle,
+          variants
         };
         syncCache.set(cacheKey, mapping, 3600000);
-        logger.info('sync', 'Found existing product via tag search', { source, sourceId, shopifyId: match.id });
+        logger.info('sync', 'Found existing product via GraphQL SKU search', { source, sourceId, shopifyId: mapping.shopifyProductId, variants: variants.length });
         return mapping;
       }
     }
   } catch (e) {
-    logger.debug('sync', 'Tag-based product search failed', { error: e.message });
+    logger.debug('sync', 'GraphQL SKU search failed, falling back', { error: e.message });
   }
 
   // Strategy 2: Check persistent DB mapping

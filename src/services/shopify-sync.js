@@ -607,6 +607,48 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     logger.info('sync', `Variant resolved: "${selectedVariantId}" → variant ${variantId} via ${matchStrategy}`);
   }
 
+  // ── PRICE REFRESH for SELECTED variant ──────────────────────────────
+  // The earlier refresh only covers the default variant (mapping.shopifyVariantId).
+  // If the user selected a different variant, its Shopify price may still be stale.
+  if (mapping && !mapping.isNewlyCreated && variantId && variantId !== mapping.shopifyVariantId) {
+    const selectedVariantData = mapping.variants?.find(v => String(v.id) === String(variantId));
+    const selCurrentPrice = selectedVariantData?.price;
+    const selNewPrice = String(pricingResult.price);
+    const selNewCompareAt = pricingResult.compareAt ? String(pricingResult.compareAt) : null;
+    if (selCurrentPrice && String(selCurrentPrice) !== selNewPrice) {
+      try {
+        const vUpdate = { id: variantId, price: selNewPrice };
+        if (selNewCompareAt) vUpdate.compare_at_price = selNewCompareAt;
+        await shopifyAPI(`/variants/${variantId}.json`, 'PUT', { variant: vUpdate });
+        if (selectedVariantData) selectedVariantData.price = selNewPrice;
+        syncCache.set(`mapping:${source}:${sourceId}`, mapping, 3600000);
+        logger.info('sync', `Selected variant price refreshed: $${selCurrentPrice} → $${selNewPrice}`, { source, sourceId, variantId });
+      } catch (priceErr) {
+        logger.warn('sync', `Selected variant price refresh failed (non-blocking): ${priceErr.message}`, { source, sourceId, variantId });
+      }
+    }
+  }
+  // Also refresh the DEFAULT variant if it wasn't covered above
+  // (covers the case where variantId === mapping.shopifyVariantId but price is stale)
+  if (mapping && !mapping.isNewlyCreated && variantId && String(variantId) === String(mapping.shopifyVariantId)) {
+    const defVariantData = mapping.variants?.find(v => String(v.id) === String(variantId));
+    const defCurrentPrice = defVariantData?.price;
+    const defNewPrice = String(pricingResult.price);
+    const defNewCompareAt = pricingResult.compareAt ? String(pricingResult.compareAt) : null;
+    if (defCurrentPrice && String(defCurrentPrice) !== defNewPrice) {
+      try {
+        const vUpdate = { id: variantId, price: defNewPrice };
+        if (defNewCompareAt) vUpdate.compare_at_price = defNewCompareAt;
+        await shopifyAPI(`/variants/${variantId}.json`, 'PUT', { variant: vUpdate });
+        if (defVariantData) defVariantData.price = defNewPrice;
+        syncCache.set(`mapping:${source}:${sourceId}`, mapping, 3600000);
+        logger.info('sync', `Default variant price refreshed: $${defCurrentPrice} → $${defNewPrice}`, { source, sourceId, variantId });
+      } catch (priceErr) {
+        logger.warn('sync', `Default variant price refresh failed: ${priceErr.message}`, { source, sourceId, variantId });
+      }
+    }
+  }
+
   _timing.total = Date.now() - _startTime;
   logger.info('sync', `prepareCart completed in ${_timing.total}ms`, { source, sourceId, timing: _timing, isNew: !!mapping.isNewlyCreated });
 

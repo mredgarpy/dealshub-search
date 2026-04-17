@@ -416,7 +416,8 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
   // and will be handled through Shopify shipping profiles. This keeps PDP price = cart price.
   // The source shipping cost is stored in metafields for operations/margin tracking.
   const pricingResult = calculateFinalPrice(sourcePrice, source, {
-    originalPrice: sourceOrigPrice
+    originalPrice: sourceOrigPrice,
+    deliveryInfo: productData.deliveryInfo || productData.shippingData || null
   });
 
   _timing.pricing = Date.now() - _startTime;
@@ -516,6 +517,31 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
         originalPrice: productData.originalPrice
       });
       logSync(source, sourceId, 'recreate', 'success', { shopifyId: mapping.shopifyProductId });
+    }
+  }
+
+  // ── PRICE REFRESH: Always update Shopify price if it changed ──────────
+  // Source prices change frequently (can shift within 1 hour). When a customer
+  // adds an existing product to cart, recalculate and push the current price
+  // to Shopify so the cart/checkout always reflect the latest pricing.
+  if (mapping && !mapping.isNewlyCreated && mapping.shopifyVariantId) {
+    const currentShopifyPrice = mapping.variants?.[0]?.price;
+    const newPrice = String(pricingResult.price);
+    const newCompareAt = pricingResult.compareAt ? String(pricingResult.compareAt) : null;
+    if (currentShopifyPrice && String(currentShopifyPrice) !== newPrice) {
+      try {
+        const variantUpdate = { id: mapping.shopifyVariantId, price: newPrice };
+        if (newCompareAt) variantUpdate.compare_at_price = newCompareAt;
+        await shopifyAPI(`/variants/${mapping.shopifyVariantId}.json`, 'PUT', { variant: variantUpdate });
+        // Update cache and DB mapping with new price
+        if (mapping.variants?.[0]) mapping.variants[0].price = newPrice;
+        syncCache.set(`mapping:${source}:${sourceId}`, mapping, 3600000);
+        upsertMapping({ source, sourceId, shopifyProductId: mapping.shopifyProductId, shopifyVariantId: mapping.shopifyVariantId, handle: mapping.handle, price: pricingResult.price, originalPrice: sourceOrigPrice });
+        logger.info('sync', `Price refreshed: $${currentShopifyPrice} → $${newPrice}`, { source, sourceId, variantId: mapping.shopifyVariantId });
+        _timing.priceRefresh = Date.now() - _startTime;
+      } catch (priceErr) {
+        logger.warn('sync', `Price refresh failed (non-blocking): ${priceErr.message}`, { source, sourceId });
+      }
     }
   }
 

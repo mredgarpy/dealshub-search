@@ -224,8 +224,12 @@ async function createShopifyProduct(productData, pricingResult) {
   if (sourceVariants && sourceVariants.length > 0) {
     sourceVariants.slice(0, 100).forEach((v, i) => {
       // v1.6: Use sourcePrice to avoid double-markup (frontend may send already-marked-up prices)
+      // v2.0: Pass deliveryInfo so variant pricing uses real shipping data (not stale DB buffers)
       const vRawPrice = v.sourcePrice || v.price;
-      const vPrice = vRawPrice ? calculateFinalPrice(vRawPrice, source) : pricingResult;
+      const vPrice = vRawPrice ? calculateFinalPrice(vRawPrice, source, {
+        originalPrice: v.sourceOriginalPrice || v.originalPrice || null,
+        deliveryInfo: productData.deliveryInfo || productData.shippingData || null
+      }) : pricingResult;
       shopifyVariants.push({
         title: v.title || `Option ${i + 1}`,
         price: vPrice.price.toFixed(2),

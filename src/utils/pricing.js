@@ -127,22 +127,36 @@ function calculateFinalPrice(sourcePrice, source, opts = {}) {
   // Apply shipping buffer per source to protect margin when Shopify Basic
   // cannot cotize real shipping per ZIP. The buffer is absorbed into landed
   // cost so final price covers average shipping + AK/HI/PR surcharge.
+  //
+  // v3.1: If the product has real shipping data from the source API
+  // (deliveryInfo.cost or deliveryInfo.isFree), use that instead of the
+  // flat buffer. The flat buffer is only a fallback for when the API
+  // doesn't provide shipping info.
   let shippingBuffer = 0;
-  try {
-    const { getShippingBuffers } = require('./db');
-    const buffers = getShippingBuffers();
-    if (opts.isFBA === true) {
-      shippingBuffer = buffers.amazon_prime || 0;
-    } else if (source === 'amazon') {
-      shippingBuffer = buffers.amazon_marketplace || 0;
-    } else {
-      shippingBuffer = buffers[source] || 0;
+  const hasRealShipping = opts.deliveryInfo && (
+    typeof opts.deliveryInfo.cost === 'number' || opts.deliveryInfo.isFree === true
+  );
+  if (hasRealShipping) {
+    // Use real shipping cost from source API
+    shippingBuffer = opts.deliveryInfo.isFree ? 0 : (opts.deliveryInfo.cost || 0);
+  } else {
+    // Fallback: use configured buffer per source
+    try {
+      const { getShippingBuffers } = require('./db');
+      const buffers = getShippingBuffers();
+      if (opts.isFBA === true) {
+        shippingBuffer = buffers.amazon_prime || 0;
+      } else if (source === 'amazon') {
+        shippingBuffer = buffers.amazon_marketplace || 0;
+      } else {
+        shippingBuffer = buffers[source] || 0;
+      }
+    } catch (e) {
+      // db not available — fall back to no buffer
     }
-    // Per-call override wins
-    if (opts.shippingBuffer != null) shippingBuffer = opts.shippingBuffer;
-  } catch (e) {
-    // db not available — fall back to no buffer
   }
+  // Per-call override always wins
+  if (opts.shippingBuffer != null) shippingBuffer = opts.shippingBuffer;
 
   // Determine the actual cost to apply the multiplier to.
   // For AliExpress: sourcePrice is MSRP (~$28). The API's promotionPrice (~$5)

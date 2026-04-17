@@ -128,7 +128,7 @@ function applySearchPricing(products) {
     const rawOrig = p.originalPrice ? (typeof p.originalPrice === 'number' ? p.originalPrice : parseFloat(String(p.originalPrice).replace(/[^0-9.]/g, ''))) : null;
     // Pass sourceCost (wholesale price) for AliExpress tier-based pricing
     const rawSourceCost = p.sourceCost ? (typeof p.sourceCost === 'number' ? p.sourceCost : parseFloat(String(p.sourceCost).replace(/[^0-9.]/g, ''))) : null;
-    const pricing = calculateFinalPrice(rawPrice, source, { originalPrice: rawOrig, sourceCost: rawSourceCost });
+    const pricing = calculateFinalPrice(rawPrice, source, { originalPrice: rawOrig, sourceCost: rawSourceCost, deliveryInfo: p.deliveryInfo || null });
     if (pricing.price) {
       p.sourcePrice = rawPrice;
       p.sourceCost = rawSourceCost;
@@ -499,7 +499,8 @@ async function productDetailHandler(req, res) {
     if (product.price && product.price > 0) {
       const pricing = calculateFinalPrice(product.price, source, {
         originalPrice: product.originalPrice,
-        sourceCost: product.sourceCost || null
+        sourceCost: product.sourceCost || null,
+        deliveryInfo: product.deliveryInfo || product.shippingData || null
       });
       // Save original source prices before overwriting
       product.sourcePrice = product.price;
@@ -1778,7 +1779,8 @@ app.get('/api/debug/product-pipeline', async (req, res) => {
     steps.pricingEngine = 'starting';
     const pricing = calculateFinalPrice(product.price || 0, source, {
       originalPrice: product.originalPrice,
-      sourceCost: product.sourceCost || null
+      sourceCost: product.sourceCost || null,
+      deliveryInfo: product.deliveryInfo || product.shippingData || null
     });
     steps.pricingEngine = pricing ? 'ok' : 'null';
 

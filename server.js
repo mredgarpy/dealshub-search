@@ -201,6 +201,11 @@ const CATEGORY_MAP = {
 
 // ---- UNIFIED SEARCH ----
 app.get('/api/search', async (req, res) => {
+  // Prevent browsers/CDNs from caching stale prices
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+
   const { q, store, limit = 20, page = 1, origin, category } = req.query;
   if (!q) return res.status(400).json({ error: 'Missing query parameter q' });
 
@@ -337,6 +342,11 @@ app.get('/api/product', (req, res) => {
 app.get('/api/product/:id', (req, res) => productDetailHandler(req, res));
 
 async function productDetailHandler(req, res) {
+  // Prevent browsers/CDNs from caching stale prices
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+
   const id = req.params.id;
   const { store, source: sourceParam } = req.query;
   const source = (sourceParam || store || 'amazon').toLowerCase();

@@ -157,7 +157,7 @@ function _aliexpressShipping(sourcePrice, apiData) {
     );
 
   let cost = 0;
-  let method = shipsFromUS ? 'US Warehouse' : 'AliExpress Standard';
+  let method = shipsFromUS ? 'US Warehouse' : 'Standard Shipping';
   let isFree = true;
 
   if (hasRealShipping) {
@@ -171,7 +171,16 @@ function _aliexpressShipping(sourcePrice, apiData) {
 
     cost = best.fee || 0;
     isFree = cost === 0;
-    method = best.company || method;
+    // Sanitize source store names from shipping method — customer should not see "AliExpress Standard" etc.
+    let rawMethod = best.company || method;
+    method = rawMethod
+      .replace(/\b(ali\s*express|aliexpress)\b/gi, 'Standard')
+      .replace(/\b(shein)\b/gi, 'Standard')
+      .replace(/\b(sephora)\b/gi, '')
+      .replace(/\b(macy'?s)\b/gi, '')
+      .replace(/\b(amazon)\b/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim() || 'Standard Shipping';
   }
 
   // Delivery estimate: prefer real data from adapter, fallback to static rules

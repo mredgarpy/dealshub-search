@@ -43,8 +43,8 @@ const SHIPPING_PROFILES = {
   },
   aliexpress: {
     domestic: {
-      standard: { cost: 0, minDays: 15, maxDays: 30, label: 'AliExpress Standard (15-30 days)' },
-      premium:  { cost: 4.99, minDays: 7, maxDays: 15, label: 'AliExpress Premium (7-15 days)' }
+      standard: { cost: 0, minDays: 15, maxDays: 30, label: 'Standard Shipping (15-30 days)' },
+      premium:  { cost: 4.99, minDays: 7, maxDays: 15, label: 'Express Shipping (7-15 days)' }
     },
     international: {
       standard: { cost: 0, minDays: 20, maxDays: 40, label: 'China-US Shipping (20-40 days)' },
@@ -71,8 +71,8 @@ const SHIPPING_PROFILES = {
   },
   shein: {
     domestic: {
-      standard: { cost: 0, minDays: 7, maxDays: 14, label: 'SHEIN Standard (7-14 days)' },
-      express:  { cost: 4.99, minDays: 3, maxDays: 7, label: 'SHEIN Express (3-7 days)' }
+      standard: { cost: 0, minDays: 7, maxDays: 14, label: 'Standard Shipping (7-14 days)' },
+      express:  { cost: 4.99, minDays: 3, maxDays: 7, label: 'Express Shipping (3-7 days)' }
     },
     international: {
       standard: { cost: 0, minDays: 10, maxDays: 20, label: 'International Shipping (10-20 days)' }

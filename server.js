@@ -310,7 +310,7 @@ app.get('/api/search', async (req, res) => {
       filteredResults.forEach(p => {
         if (p && p.id && p.source) {
           const itemKey = `searchitem:${p.source}:${p.id}`;
-          productCache.set(itemKey, p, 7200000); // 2h TTL
+          productCache.set(itemKey, p, 1800000); // 30min TTL
         }
       });
     }
@@ -609,7 +609,7 @@ async function productDetailHandler(req, res) {
     }
     cleanProductText(product); // v3.5: decode HTML entities
     if (!product._mismatch) {
-      productCache.set(cacheKey, product);
+      productCache.set(cacheKey, product, 1800000); // 30min TTL
     }
     res.json(product);
   } catch (e) {
@@ -768,7 +768,7 @@ app.get('/api/trending', async (req, res) => {
     );
     const all = interleaveFromSettled(results, 20);
     const response = { results: blacklist.filterProducts(applySearchPricing(all)), section: 'trending' };
-    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    searchCache.set(cacheKey, response, 3600000); // 1 hour
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -797,7 +797,7 @@ app.get('/api/bestsellers', async (req, res) => {
     });
     const all = filtered.length >= 5 ? filtered.slice(0, 20) : raw.slice(0, 20);
     const response = { results: blacklist.filterProducts(applySearchPricing(all)), section: 'bestsellers' };
-    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    searchCache.set(cacheKey, response, 3600000); // 1 hour
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -821,7 +821,7 @@ app.get('/api/amazon-bestsellers', async (req, res) => {
     const results = await amazon.getBestSellers(type, category, limit);
     const enriched = applySearchPricing(results);
     const response = { results: enriched, section: type.toLowerCase().replace(/_/g, '-'), category };
-    searchCache.set(cacheKey, response, type === 'BEST_SELLERS' ? 21600000 : 43200000); // 6h or 12h
+    searchCache.set(cacheKey, response, type === 'BEST_SELLERS' ? 3600000 : 3600000); // 1 hour
     res.json(response);
   } catch (e) {
     logger.error('api', `amazon-bestsellers error: ${e.message}`);
@@ -849,7 +849,7 @@ app.get('/api/best-value-intl', async (req, res) => {
       .slice(0, limit);
     const enriched = applySearchPricing(filtered);
     const response = { results: enriched, section: 'best-value-intl' };
-    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    searchCache.set(cacheKey, response, 3600000); // 1 hour
     res.json(response);
   } catch (e) {
     logger.error('api', `best-value-intl error: ${e.message}`);
@@ -873,7 +873,7 @@ app.get('/api/new-arrivals', async (req, res) => {
     );
     const all = interleaveFromSettled(results, 20);
     const response = { results: blacklist.filterProducts(applySearchPricing(all)), section: 'new-arrivals' };
-    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    searchCache.set(cacheKey, response, 3600000); // 1 hour
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -905,7 +905,7 @@ app.get('/api/featured', async (req, res) => {
     );
     const all = interleaveFromSettled(results, 12);
     const response = { results: blacklist.filterProducts(applySearchPricing(all)), section: 'featured', category };
-    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    searchCache.set(cacheKey, response, 3600000); // 1 hour
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -967,7 +967,7 @@ app.get('/api/recommendations', async (req, res) => {
       .slice(0, 12);
 
     const response = { similar: applySearchPricing(similar), deals: applySearchPricing(deals) };
-    searchCache.set(cacheKey, response, 7200000); // 2 hours
+    searchCache.set(cacheKey, response, 1800000); // 30 min
     res.json(response);
   } catch (e) {
     console.error('Recommendations error:', e.message);
@@ -1147,7 +1147,7 @@ app.get('/api/banners', async (req, res) => {
     }
 
     const response = { banners };
-    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    searchCache.set(cacheKey, response, 3600000); // 1 hour
     res.set('Cache-Control', 'public, max-age=21600');
     res.json(response);
   } catch (e) {
@@ -1236,7 +1236,7 @@ app.get('/api/home-cards', async (req, res) => {
     const gridCards = cards.slice(1, 5);
 
     const response = { sideCard, gridCards };
-    searchCache.set(cacheKey, response, 21600000); // 6 hours
+    searchCache.set(cacheKey, response, 3600000); // 1 hour
     res.set('Cache-Control', 'public, max-age=21600');
     res.json(response);
   } catch (e) {

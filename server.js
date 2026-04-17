@@ -98,7 +98,18 @@ function decodeHtmlEntities(str) {
 // v3.5: Clean product text fields — decode entities in title, description, bullets
 function cleanProductText(p) {
   if (!p) return p;
-  if (p.title) p.title = decodeHtmlEntities(p.title);
+  if (p.title) {
+    p.title = decodeHtmlEntities(p.title);
+    // v3.6: Remove store-name prefixes from titles (e.g. "Amazon.com: Blink..." → "Blink...")
+    p.title = p.title
+      .replace(/^Amazon\.com\s*:\s*/i, '')
+      .replace(/^Amazon\.com\s+/i, '')
+      .replace(/^AliExpress\s*[-:]\s*/i, '')
+      .replace(/^Sephora\s*[-:]\s*/i, '')
+      .replace(/^SHEIN\s*[-:]\s*/i, '')
+      .replace(/^Macy'?s\s*[-:]\s*/i, '')
+      .trim();
+  }
   if (p.description && typeof p.description === 'string') p.description = decodeHtmlEntities(p.description);
   if (Array.isArray(p.bullets)) p.bullets = p.bullets.map(b => decodeHtmlEntities(b));
   if (p.brand) p.brand = decodeHtmlEntities(p.brand);

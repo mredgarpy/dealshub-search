@@ -689,6 +689,8 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
       properties: {
         _source_store: source,
         _source_id: String(sourceId),
+        _selected_variant: selectedVariantId || 'default',
+        _shopify_variant_title: mapping.variants?.find(v => String(v.id) === String(variantId))?.title || '',
         _sync_version: Date.now().toString(),
         _landed_cost_band: String(pricingResult.landedCost)
       }

@@ -38,15 +38,32 @@ function csvEscape(value) {
 // ---- BUILD CSV ROWS FROM AN ORDER ----
 /**
  * Returns { csv, rows, unmapped } for a Shopify order payload.
- *   csv: string (AutoDS-compatible Product URL,Supplier,Region)
- *   rows: array of { sourceUrl, supplier, region, quantity, title, sku, lineItemId }
- *   unmapped: array of line items that could not be resolved to a source
+ *
+ * CSV schema — designed for AutoDS bulk product import with precise variant
+ * matching. Column semantics:
+ *   Product URL      — Variant-specific URL when available (sku_id / skuId /
+ *                      child ASIN embedded); falls back to base product URL.
+ *   Supplier         — Canonical supplier name (Amazon, AliExpress, etc.).
+ *   Warehouse Region — Shipping region (default "US", override via env).
+ *   Quantity         — From Shopify line_item.quantity.
+ *   Variant SKU      — Internal SKU (DH-{SOURCE}-{productId}-{variantId})
+ *                      used to match against Shopify order variants on import.
+ *   Variant Title    — Human-readable color/size (e.g. "Pink / Medium") for
+ *                      operator verification; "—" when product has no variants.
+ *   Order Ref        — Shopify order name (#1009) for traceability.
+ *
+ * @returns {{
+ *   csv: string,
+ *   rows: Array<{sourceUrl, supplier, region, quantity, variantSku, variantTitle,
+ *                title, sku, lineItemId, source, sourceId, sourceVariantId, method}>,
+ *   unmapped: Array<{lineItemId, productId, title, sku, variantTitle, quantity}>
+ * }}
  */
 function buildOrderCsv(order) {
   const db = getDb();
   const lineItems = order.line_items || [];
 
-  const header = 'Product URL,Supplier,Warehouse Region,Quantity,Order Ref';
+  const header = 'Product URL,Supplier,Warehouse Region,Quantity,Variant SKU,Variant Title,Order Ref';
   const rows = [];
   const rowObjects = [];
   const unmapped = [];
@@ -61,27 +78,41 @@ function buildOrderCsv(order) {
         productId: item.product_id,
         title: item.title,
         sku: item.sku || '',
+        variantTitle: item.variant_title && item.variant_title !== 'Default Title'
+          ? item.variant_title : '',
         quantity: item.quantity || 1
       });
       continue;
     }
 
     const supplier = AUTODS_SUPPLIER_MAP[info.source.toLowerCase()] || info.source;
-    const url = info.buyId || info.sourceUrl || buildSourceUrl(info.source, info.sourceId);
+    // info.buyId is already variant-aware (built via buildSourceUrl with variantId).
+    // The fallback chain here only fires if extractSourceInfo returned partial data.
+    const url = info.buyId
+      || info.sourceUrl
+      || buildSourceUrl(info.source, info.sourceId, null, info.sourceVariantId);
     const region = WAREHOUSE_REGION();
     const qty = item.quantity || 1;
+    const variantSku = info.shopifySku || item.sku || '';
+    const variantTitle = info.variantTitle || '—';
 
-    rows.push([url, supplier, region, qty, orderRef].map(csvEscape).join(','));
+    rows.push([url, supplier, region, qty, variantSku, variantTitle, orderRef]
+      .map(csvEscape)
+      .join(','));
+
     rowObjects.push({
       sourceUrl: url,
       supplier,
       region,
       quantity: qty,
+      variantSku,
+      variantTitle,
       title: item.title,
       sku: item.sku || '',
       lineItemId: item.id,
       source: info.source,
       sourceId: info.sourceId,
+      sourceVariantId: info.sourceVariantId,
       method: info.method
     });
   }
@@ -111,14 +142,25 @@ function buildHtmlBody(order, rows, unmapped) {
   const styleTd = 'padding:8px 12px;border-bottom:1px solid #eee;font-size:14px;color:#222;vertical-align:top;';
   const styleTh = 'padding:10px 12px;background:#f7f7f9;text-align:left;font-size:12px;color:#555;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #e4e4e7;';
 
-  const rowsHtml = rows.map(r => `
+  const rowsHtml = rows.map(r => {
+    const variantBadge = (r.variantTitle && r.variantTitle !== '—')
+      ? `<div style="margin-top:4px;display:inline-block;padding:2px 8px;background:#eef2ff;color:#3730a3;border-radius:4px;font-size:11px;font-weight:600;">${escapeHtml(r.variantTitle)}</div>`
+      : '';
+    return `
     <tr>
       <td style="${styleTd}">${r.supplier}</td>
-      <td style="${styleTd}"><a href="${r.sourceUrl}" style="color:#d8232a;word-break:break-all;">${r.sourceUrl}</a></td>
+      <td style="${styleTd}">
+        <a href="${r.sourceUrl}" style="color:#d8232a;word-break:break-all;">${r.sourceUrl}</a>
+        ${variantBadge}
+      </td>
       <td style="${styleTd}">${r.quantity}</td>
-      <td style="${styleTd}">${escapeHtml(r.title || '')}</td>
+      <td style="${styleTd}">
+        ${escapeHtml(r.title || '')}
+        ${r.variantSku ? `<div style="margin-top:4px;color:#6b7280;font-size:11px;font-family:ui-monospace,Menlo,monospace;">${escapeHtml(r.variantSku)}</div>` : ''}
+      </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   const unmappedHtml = unmapped.length ? `
     <h3 style="font-family:system-ui,sans-serif;color:#b91c1c;margin:24px 0 8px;">⚠ ${unmapped.length} item(s) without source mapping</h3>
@@ -127,6 +169,7 @@ function buildHtmlBody(order, rows, unmapped) {
       <thead><tr>
         <th style="${styleTh}">Title</th>
         <th style="${styleTh}">SKU</th>
+        <th style="${styleTh}">Variant</th>
         <th style="${styleTh}">Qty</th>
       </tr></thead>
       <tbody>
@@ -134,6 +177,7 @@ function buildHtmlBody(order, rows, unmapped) {
           <tr>
             <td style="${styleTd}">${escapeHtml(u.title || '')}</td>
             <td style="${styleTd}">${escapeHtml(u.sku || '—')}</td>
+            <td style="${styleTd}">${escapeHtml(u.variantTitle || '—')}</td>
             <td style="${styleTd}">${u.quantity}</td>
           </tr>
         `).join('')}

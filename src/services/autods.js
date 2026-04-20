@@ -23,18 +23,66 @@ const AUTODS_API_URL = () => process.env.AUTODS_API_URL || 'https://api.autods.c
 const AUTODS_STORE_ID = () => process.env.AUTODS_STORE_ID || '';
 const AUTODS_ENABLED = () => process.env.AUTODS_ENABLED === 'true';
 
-// ---- SOURCE URL BUILDERS ----
-// Maps source + sourceId to the canonical supplier URL that AutoDS uses as "Buy ID"
+// ---- SOURCE URL BUILDERS (variant-aware) ----
+// Each builder accepts (productId, variantId?) and returns the canonical
+// supplier URL that AutoDS uses as "Buy ID". When variantId is provided,
+// the builder returns a variant-specific URL so AutoDS imports the exact
+// color/size/option the customer ordered.
+//
+// To add a new source in the future:
+//   1. Add an entry to SOURCE_URL_BUILDERS with the variant-aware URL logic
+//   2. Add the display name to AUTODS_SUPPLIER_MAP below
+//   3. Add the SKU prefix pattern to the SKU parser regex (extractSourceInfo)
 const SOURCE_URL_BUILDERS = {
-  amazon: (id) => `https://www.amazon.com/dp/${id}`,
-  aliexpress: (id) => `https://www.aliexpress.com/item/${id}.html`,
-  sephora: (id) => `https://www.sephora.com/product/${id}`,
-  macys: (id) => `https://www.macys.com/shop/product/${id}`,
-  shein: (id) => `https://us.shein.com/product-p-${id}.html`
+  // Amazon: variants are child ASINs (different from parent ASIN). When we
+  // have a child ASIN in variantId, we use IT as the URL target — that's the
+  // actual buyable page. Parent ASIN is just a grouping and may not have a PDP.
+  amazon: (id, variantId) => {
+    const asin = (variantId && variantId !== id) ? variantId : id;
+    return `https://www.amazon.com/dp/${asin}`;
+  },
+  // AliExpress: variants are sku_id query params on the base product URL.
+  aliexpress: (id, variantId) => {
+    const base = `https://www.aliexpress.com/item/${id}.html`;
+    return variantId ? `${base}?sku_id=${encodeURIComponent(variantId)}` : base;
+  },
+  // Sephora: variants are skuId query params.
+  sephora: (id, variantId) => {
+    const base = `https://www.sephora.com/product/${id}`;
+    return variantId ? `${base}?skuId=${encodeURIComponent(variantId)}` : base;
+  },
+  // Macy's: variant param convention varies; we append ?variantId= as a best-effort
+  // hint. AutoDS operator should verify color/size on import for Macy's orders.
+  macys: (id, variantId) => {
+    const base = `https://www.macys.com/shop/product/${id}`;
+    return variantId ? `${base}?variantId=${encodeURIComponent(variantId)}` : base;
+  },
+  // SHEIN: variants are skuId query params.
+  shein: (id, variantId) => {
+    const base = `https://us.shein.com/product-p-${id}.html`;
+    return variantId ? `${base}?skuId=${encodeURIComponent(variantId)}` : base;
+  }
 };
 
-function buildSourceUrl(source, sourceId, existingUrl) {
-  // Prefer existing URL if it looks valid
+/**
+ * Build a source-specific product URL, preferring a variant-aware URL when
+ * variantId is provided.
+ *
+ * @param {string} source     - 'amazon' | 'aliexpress' | 'sephora' | 'macys' | 'shein'
+ * @param {string} sourceId   - Product ID on the source platform
+ * @param {string?} existingUrl - Pre-existing URL (used when variantId is absent)
+ * @param {string?} variantId - Source-side variant ID (sku_id, skuId, child ASIN, etc.)
+ * @returns {string} Canonical buy URL for AutoDS
+ */
+function buildSourceUrl(source, sourceId, existingUrl, variantId) {
+  // When an explicit variantId is provided, ALWAYS rebuild to guarantee the
+  // URL carries the variant param — otherwise AutoDS may import the wrong
+  // color/size. This is stricter than preferring existingUrl.
+  if (variantId) {
+    const builder = SOURCE_URL_BUILDERS[source.toLowerCase()];
+    if (builder) return builder(sourceId, variantId);
+  }
+  // No variantId → prefer existing URL if it looks valid.
   if (existingUrl && existingUrl.startsWith('http')) return existingUrl;
   const builder = SOURCE_URL_BUILDERS[source.toLowerCase()];
   return builder ? builder(sourceId) : '';
@@ -429,34 +477,58 @@ function extractSourceInfo(lineItem, db) {
     }
   }
 
+  // Common extras available on every Shopify line item — passed through on
+  // every return path so downstream (CSV, HTML, DB) has variant context.
+  const variantTitle = lineItem.variant_title && lineItem.variant_title !== 'Default Title'
+    ? lineItem.variant_title
+    : null;
+  const shopifySku = lineItem.sku || null;
+  const shopifyVariantId = lineItem.variant_id || null;
+
   if (props._source_store && props._source_id) {
     const source = String(props._source_store).trim();
     const sourceId = String(props._source_id).trim();
     if (!source || !sourceId) return null; // Empty after trim = invalid
-    const sourceUrl = buildSourceUrl(source, sourceId);
+    const sourceVariantId = props._source_variant_id
+      ? String(props._source_variant_id).trim() || null
+      : null;
+    const sourceUrl = buildSourceUrl(source, sourceId, null, sourceVariantId);
     return {
       source,
       sourceId,
-      sourceVariantId: props._source_variant_id || null,
+      sourceVariantId,
       sourceUrl,
       buyId: sourceUrl,
+      variantTitle,
+      shopifySku,
+      shopifyVariantId,
       method: 'line_item_properties'
     };
   }
 
-  // Strategy 2: SKU parsing (DH-AMAZON-B0D9F5K3X1 format)
+  // Strategy 2: SKU parsing
+  // Formats supported:
+  //   Legacy:  DH-AMAZON-B0D9F5K3X1            (productId only)
+  //   Current: DH-ALIEXPRESS-{productId}-{variantId}
+  // The productId segment never contains a dash across current sources
+  // (ASINs, numeric IDs, Sephora P-codes). The variantId segment may contain
+  // dashes in future sources, so we capture everything after the 3rd hyphen.
   if (lineItem.sku) {
-    const skuMatch = lineItem.sku.match(/^DH-(\w+)-(.+?)(?:-\d+)?$/);
+    const skuMatch = lineItem.sku.match(/^DH-(\w+)-([^-]+)(?:-(.+))?$/);
     if (skuMatch) {
       const source = skuMatch[1].toLowerCase();
       const sourceId = skuMatch[2];
-      const sourceUrl = buildSourceUrl(source, sourceId);
+      const sourceVariantId = skuMatch[3] || null;
+      const sourceUrl = buildSourceUrl(source, sourceId, null, sourceVariantId);
       return {
         source,
         sourceId,
-        sourceVariantId: null,
+        sourceVariantId,
         sourceUrl,
         buyId: sourceUrl,
+        variantTitle,
+        shopifySku,
+        shopifyVariantId,
         method: 'sku_parse'
       };
     }
@@ -470,13 +542,21 @@ function extractSourceInfo(lineItem, db) {
       ).get(lineItem.product_id);
 
       if (mapping) {
-        const sourceUrl = buildSourceUrl(mapping.source_store, mapping.source_product_id);
+        const sourceUrl = buildSourceUrl(
+          mapping.source_store,
+          mapping.source_product_id,
+          null,
+          mapping.source_variant_id
+        );
         return {
           source: mapping.source_store,
           sourceId: mapping.source_product_id,
           sourceVariantId: mapping.source_variant_id,
           sourceUrl,
           buyId: sourceUrl,
+          variantTitle,
+          shopifySku,
+          shopifyVariantId,
           method: 'db_mapping'
         };
       }
@@ -499,6 +579,9 @@ function extractSourceInfo(lineItem, db) {
           sourceVariantId: null,
           sourceUrl: autodsProduct.source_url || autodsProduct.buy_id,
           buyId: autodsProduct.buy_id,
+          variantTitle,
+          shopifySku,
+          shopifyVariantId,
           method: 'autods_products'
         };
       }

@@ -2662,9 +2662,13 @@ app.get('/api/admin/autods/mapping-csv', (req, res) => {
 // Fetches the order from Shopify Admin and triggers the same email path
 // the order-created webhook would take. Use for: (1) re-delivering a lost
 // email, (2) testing the mailer with Order #1009 after deploy.
-// Example: POST /api/admin/autods/resend-csv?token=...&order=1009
-//     or: POST /api/admin/autods/resend-csv?token=...&orderId=<numeric-shopify-id>
-app.post('/api/admin/autods/resend-csv', async (req, res) => {
+// Example: GET/POST /api/admin/autods/resend-csv?token=...&order=1009
+//      or: GET/POST /api/admin/autods/resend-csv?token=...&orderId=<numeric-shopify-id>
+// Accepts GET (for quick browser testing) and POST (for scripts/automation).
+app.all('/api/admin/autods/resend-csv', async (req, res) => {
+  if (!['GET', 'POST'].includes(req.method)) {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
   const token = req.query.token || req.headers['x-admin-token'];
   if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
 

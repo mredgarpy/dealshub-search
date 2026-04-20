@@ -2658,6 +2658,135 @@ app.get('/api/admin/autods/mapping-csv', (req, res) => {
   }
 });
 
+// ---- ADMIN: Resend AutoDS CSV Email for an existing order ----
+// Fetches the order from Shopify Admin and triggers the same email path
+// the order-created webhook would take. Use for: (1) re-delivering a lost
+// email, (2) testing the mailer with Order #1009 after deploy.
+// Example: POST /api/admin/autods/resend-csv?token=...&order=1009
+//     or: POST /api/admin/autods/resend-csv?token=...&orderId=<numeric-shopify-id>
+app.post('/api/admin/autods/resend-csv', async (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+
+  const { order: orderNumber, orderId, to } = req.query;
+  if (!orderNumber && !orderId) {
+    return res.status(400).json({ error: 'Missing ?order=<number> or ?orderId=<shopify-id>' });
+  }
+
+  try {
+    const { shopifyAdmin } = require('./src/shopify-admin');
+    let shopifyOrder = null;
+
+    if (orderId) {
+      const resp = await shopifyAdmin('GET', `/orders/${orderId}.json`);
+      shopifyOrder = resp?.order;
+    } else {
+      // Search by name (Shopify stores the "#1009" form in `name` and numeric in `order_number`).
+      const clean = String(orderNumber).replace(/[^\d]/g, '');
+      const resp = await shopifyAdmin('GET', `/orders.json?name=%23${clean}&status=any&limit=1`);
+      shopifyOrder = (resp?.orders || [])[0];
+      if (!shopifyOrder) {
+        // Fallback: search by order_number
+        const resp2 = await shopifyAdmin('GET', `/orders.json?status=any&limit=50&fields=id,name,order_number`);
+        const match = (resp2?.orders || []).find(o => String(o.order_number) === clean || String(o.name).replace('#','') === clean);
+        if (match) {
+          const full = await shopifyAdmin('GET', `/orders/${match.id}.json`);
+          shopifyOrder = full?.order;
+        }
+      }
+    }
+
+    if (!shopifyOrder) {
+      return res.status(404).json({ error: 'Order not found in Shopify', orderNumber, orderId });
+    }
+
+    const { sendAutodsOrderEmail } = require('./src/services/autods-order-email');
+    const result = await sendAutodsOrderEmail(shopifyOrder, to ? { to } : {});
+
+    return res.json({
+      orderName: shopifyOrder.name,
+      orderId: shopifyOrder.id,
+      result,
+      mappedItems: result.rows?.length || 0,
+      unmappedItems: result.unmapped?.length || 0
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: Preview AutoDS CSV for an order (no email sent) ----
+app.get('/api/admin/autods/preview-order-csv', async (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+
+  const { order: orderNumber, orderId, download } = req.query;
+  if (!orderNumber && !orderId) {
+    return res.status(400).json({ error: 'Missing ?order=<number> or ?orderId=<shopify-id>' });
+  }
+
+  try {
+    const { shopifyAdmin } = require('./src/shopify-admin');
+    let shopifyOrder = null;
+
+    if (orderId) {
+      const resp = await shopifyAdmin('GET', `/orders/${orderId}.json`);
+      shopifyOrder = resp?.order;
+    } else {
+      const clean = String(orderNumber).replace(/[^\d]/g, '');
+      const resp = await shopifyAdmin('GET', `/orders.json?name=%23${clean}&status=any&limit=1`);
+      shopifyOrder = (resp?.orders || [])[0];
+    }
+
+    if (!shopifyOrder) return res.status(404).json({ error: 'Order not found' });
+
+    const { buildOrderCsv } = require('./src/services/autods-order-email');
+    const { csv, rows, unmapped } = buildOrderCsv(shopifyOrder);
+
+    if (download === 'true') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="order-${shopifyOrder.name.replace(/[^\w.-]/g, '_')}.csv"`);
+      return res.send(csv);
+    }
+
+    return res.json({
+      orderName: shopifyOrder.name,
+      orderId: shopifyOrder.id,
+      csv,
+      rows,
+      unmapped,
+      mappedCount: rows.length,
+      unmappedCount: unmapped.length
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ---- ADMIN: SMTP / Mailer health check ----
+app.get('/api/admin/autods/mailer-health', async (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const mailer = require('./src/services/mailer');
+    const cfg = mailer.getConfig();
+    const verify = await mailer.verifyConnection();
+    return res.json({
+      enabled: cfg.enabled,
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      user: cfg.user ? `${cfg.user.slice(0, 3)}…@${cfg.user.split('@')[1] || '?'}` : '(unset)',
+      fromName: cfg.fromName,
+      fromAddress: cfg.fromAddress,
+      verify
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 // ---- ADMIN: Mark product(s) as linked in AutoDS ----
 app.post('/api/admin/autods/mark-linked', (req, res) => {
   const token = req.query.token || req.headers['x-admin-token'];

@@ -117,6 +117,17 @@ function setupWebhooks(app) {
         } catch (autodsErr) {
           logger.error('webhook', `[AutoDS] Order processing failed: ${autodsErr.message}`);
         }
+
+        // ── AUTODS CSV EMAIL (stop-gap until API access is unlocked) ──
+        // Runs AFTER processOrderWebhook so extractSourceInfo benefits from
+        // any freshly-registered mappings. Fire-and-forget, never breaks the webhook.
+        try {
+          const { sendAutodsOrderEmail } = require('./services/autods-order-email');
+          const emailResult = await sendAutodsOrderEmail(o);
+          logger.info('webhook', `[AutoDS-Email] Order ${o.name} → ok=${emailResult?.ok}, reason=${emailResult?.reason || 'sent'}, mapped=${emailResult?.rows?.length}, unmapped=${emailResult?.unmapped?.length}`);
+        } catch (mailErr) {
+          logger.error('webhook', `[AutoDS-Email] Failed for ${o.name}: ${mailErr.message}`);
+        }
       })();
 
       // ── AUTO-DETECT PLUS MEMBERSHIP PURCHASE ──

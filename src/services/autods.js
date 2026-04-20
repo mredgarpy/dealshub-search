@@ -489,9 +489,25 @@ function extractSourceInfo(lineItem, db) {
     const source = String(props._source_store).trim();
     const sourceId = String(props._source_id).trim();
     if (!source || !sourceId) return null; // Empty after trim = invalid
-    const sourceVariantId = props._source_variant_id
+
+    // Variant resolution — try properties first, then fall back to SKU parsing.
+    // Why the fallback: some prepare-cart flows (notably older Amazon sync)
+    // set _source_store and _source_id but forget _source_variant_id. The
+    // Shopify SKU is the authoritative fallback because it's generated at
+    // sync time as DH-{SOURCE}-{productId}-{variantId} and survives even
+    // when properties drift. Without this, we'd end up with sourceVariantId:
+    // null → CSV URL lacks the variant param → AutoDS imports wrong variant.
+    let sourceVariantId = props._source_variant_id
       ? String(props._source_variant_id).trim() || null
       : null;
+
+    if (!sourceVariantId && shopifySku) {
+      const skuMatch = shopifySku.match(/^DH-(\w+)-([^-]+)(?:-(.+))?$/);
+      if (skuMatch && skuMatch[1].toLowerCase() === source.toLowerCase() && skuMatch[3]) {
+        sourceVariantId = skuMatch[3];
+      }
+    }
+
     const sourceUrl = buildSourceUrl(source, sourceId, null, sourceVariantId);
     return {
       source,
@@ -502,7 +518,9 @@ function extractSourceInfo(lineItem, db) {
       variantTitle,
       shopifySku,
       shopifyVariantId,
-      method: 'line_item_properties'
+      method: sourceVariantId && !props._source_variant_id
+        ? 'line_item_properties+sku_fallback'
+        : 'line_item_properties'
     };
   }
 

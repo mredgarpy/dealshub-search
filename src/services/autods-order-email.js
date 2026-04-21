@@ -39,18 +39,18 @@ function csvEscape(value) {
 /**
  * Returns { csv, rows, unmapped } for a Shopify order payload.
  *
- * CSV schema — designed for AutoDS bulk product import with precise variant
- * matching. Column semantics:
- *   Product URL      — Variant-specific URL when available (sku_id / skuId /
- *                      child ASIN embedded); falls back to base product URL.
- *   Supplier         — Canonical supplier name (Amazon, AliExpress, etc.).
- *   Warehouse Region — Shipping region (default "US", override via env).
- *   Quantity         — From Shopify line_item.quantity.
- *   Variant SKU      — Internal SKU (DH-{SOURCE}-{productId}-{variantId})
- *                      used to match against Shopify order variants on import.
- *   Variant Title    — Human-readable color/size (e.g. "Pink / Medium") for
- *                      operator verification; "—" when product has no variants.
- *   Order Ref        — Shopify order name (#1009) for traceability.
+ * CSV schema — AutoDS Bulk Import format (official):
+ *   BuyId — Variant-specific supplier URL (sku_id / skuId / child ASIN embedded)
+ *           or supplier product ID. THIS IS THE ONLY REQUIRED COLUMN; AutoDS
+ *           rejects the whole upload if this header is missing/misnamed.
+ *   Title — Optional product title; helps AutoDS display the correct name
+ *           after import instead of the default scraped one.
+ *
+ * We keep the attachment minimal because AutoDS's CSV parser is strict:
+ * unknown columns in prior tests caused silent rejection. All the richer
+ * per-line context (quantity, variant SKU, variant title, order ref) still
+ * lives in `rowObjects` and renders in the HTML body of the email for the
+ * operator, but does NOT go into the CSV.
  *
  * @returns {{
  *   csv: string,
@@ -63,7 +63,8 @@ function buildOrderCsv(order) {
   const db = getDb();
   const lineItems = order.line_items || [];
 
-  const header = 'Product URL,Supplier,Warehouse Region,Quantity,Variant SKU,Variant Title,Order Ref';
+  // AutoDS official header — MUST be "BuyId" for the upload to be recognized.
+  const header = 'BuyId,Title';
   const rows = [];
   const rowObjects = [];
   const unmapped = [];
@@ -96,10 +97,17 @@ function buildOrderCsv(order) {
     const variantSku = info.shopifySku || item.sku || '';
     const variantTitle = info.variantTitle || '—';
 
-    rows.push([url, supplier, region, qty, variantSku, variantTitle, orderRef]
+    // CSV: only BuyId + Title (AutoDS strict schema).
+    // Title append variant for disambiguation when available.
+    const csvTitle = (variantTitle && variantTitle !== '—')
+      ? `${item.title || ''} (${variantTitle})`
+      : (item.title || '');
+
+    rows.push([url, csvTitle]
       .map(csvEscape)
       .join(','));
 
+    // rowObjects: full context for the HTML email body (NOT for the CSV).
     rowObjects.push({
       sourceUrl: url,
       supplier,

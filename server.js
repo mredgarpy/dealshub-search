@@ -2918,6 +2918,57 @@ app.post('/api/admin/autods/mark-linked', (req, res) => {
   }
 });
 
+// ---- ADMIN: Seed source_seller_id onto an existing autods_products row ----
+// Use when the RapidAPI adapter couldn't capture sellerId (e.g. Amazon-sold
+// products where /product-offers returns no seller_id), and we know the
+// canonical smid from a manual check. After seeding, resend-csv will emit
+// /gp/product/ASIN/?smid=SID&th=1 via the DB fallback path.
+//
+// Example:
+//   POST /api/admin/autods/seed-seller?token=...
+//   body: { source: "amazon", sourceId: "B00IFWO8PI", sellerId: "A2Q1LRYTXHYQ2K" }
+app.post('/api/admin/autods/seed-seller', (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { source, sourceId, sellerId, variantId } = req.body || {};
+    if (!source || !sourceId || !sellerId) {
+      return res.status(400).json({ error: 'Missing source, sourceId, or sellerId' });
+    }
+    const { getDb } = require('./src/utils/db');
+    const db = getDb();
+    if (!db) return res.status(503).json({ error: 'Database unavailable' });
+
+    // Look up existing mapping so we don't clobber Shopify link data
+    const existing = db.prepare(
+      'SELECT shopify_product_id, shopify_variant_id, shopify_handle, source_url FROM autods_products WHERE source_store = ? AND source_product_id = ?'
+    ).get(source.toLowerCase(), String(sourceId));
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Product not registered in autods_products. Run prepareCart first.', source, sourceId });
+    }
+
+    autods.registerProduct({
+      source,
+      sourceId,
+      sourceUrl: existing.source_url,
+      shopifyProductId: existing.shopify_product_id,
+      shopifyVariantId: existing.shopify_variant_id,
+      shopifyHandle: existing.shopify_handle,
+      sourceSellerId: sellerId,
+      sourceVariantId: variantId || null,
+    });
+
+    const after = db.prepare(
+      'SELECT buy_id, source_seller_id, source_variant_id FROM autods_products WHERE source_store = ? AND source_product_id = ?'
+    ).get(source.toLowerCase(), String(sourceId));
+
+    res.json({ success: true, source, sourceId, seeded: after });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ---- ADMIN: Register existing products to AutoDS tracking ----
 // Scans product_mappings table and registers any untracked products
 app.post('/api/admin/autods/sync-existing', (req, res) => {

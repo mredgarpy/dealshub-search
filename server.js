@@ -2958,8 +2958,13 @@ app.post('/api/admin/autods/seed-seller', (req, res) => {
       } catch (_) { /* product_mappings may have different schema */ }
     }
 
+    // If no mapping exists anywhere (e.g. ephemeral disk wiped DB but the
+    // original Shopify order still carries line item properties), seed with
+    // nulls for Shopify fields. extractSourceInfo's DB fallback only needs
+    // source_seller_id — shopify IDs aren't read from autods_products at
+    // CSV generation time. This unblocks seeding for "orphan" products.
     if (!existing) {
-      return res.status(404).json({ error: 'Product not found in autods_products or product_mappings.', source, sourceId });
+      existing = { shopify_product_id: null, shopify_variant_id: null, shopify_handle: null, source_url: null };
     }
 
     autods.registerProduct({

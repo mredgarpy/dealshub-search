@@ -2614,16 +2614,62 @@ try { autods.initAutodsSchema(); } catch (e) { logger.warn('server', `AutoDS sch
 
 // NOTE: Order webhooks are handled in src/webhooks.js (order-created, order-fulfilled, order-cancelled)
 // AutoDS processing is hooked into the existing order-created handler there.
-// The endpoints below provide a FALLBACK for direct Shopify webhook registration if needed.
+// The endpoint below is a REDUNDANT, TOKEN-AUTH'D second channel that fires the
+// same pipeline (processOrderWebhook + sendAutodsOrderEmail). It exists because
+// the HMAC-protected webhook in src/webhooks.js can silently fail if
+// SHOPIFY_WEBHOOK_SECRET drifts out of sync with the API client's "API secret key".
+// Register this URL in Shopify with `?token=<WEBHOOK_TOKEN>` in the address. The
+// token in the query string plays the same role as HMAC: anyone without the
+// token gets 401, so the endpoint is equally safe in practice.
+const WEBHOOK_TOKEN_FALLBACK = 'wh-FB5yKxpOVwFeIwhXZd5o8YUZnmOvbwF6';
 app.post('/webhooks/orders/create', async (req, res) => {
-  res.status(200).json({ received: true });
-  try {
-    if (req.body && req.body.id) {
-      await autods.processOrderWebhook(req.body);
+  // ── AUTH: token in query OR valid HMAC ──
+  const expected = process.env.WEBHOOK_TOKEN || WEBHOOK_TOKEN_FALLBACK;
+  const provided = req.query.token || req.headers['x-webhook-token'];
+  const tokenOk = provided && provided === expected;
+  if (!tokenOk) {
+    // Fall back to HMAC verification path (same rules as src/webhooks.js).
+    const hmac = req.headers['x-shopify-hmac-sha256'];
+    const secret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
+    let hmacOk = false;
+    if (secret && hmac && req.rawBody) {
+      try {
+        const crypto = require('crypto');
+        const hash = crypto.createHmac('sha256', secret).update(req.rawBody, 'utf8').digest('base64');
+        hmacOk = crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash));
+      } catch (e) { hmacOk = false; }
     }
-  } catch (e) {
-    logger.error('webhook', 'Order webhook (direct) failed', { error: e.message });
+    if (!hmacOk) {
+      logger.warn('webhook', 'orders/create rejected — no valid token or HMAC');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
   }
+
+  // Ack Shopify immediately so it doesn't retry on slow downstreams.
+  res.status(200).json({ received: true });
+
+  const order = req.body;
+  if (!order || !order.id) return;
+
+  // ── FULL ORDER PIPELINE (fire-and-forget) ──
+  // Mirrors src/webhooks.js order-created but without HMAC coupling.
+  (async () => {
+    const orderRef = order.name || `#${order.order_number || order.id}`;
+    try {
+      const result = await autods.processOrderWebhook(order);
+      logger.info('webhook', `[orders/create:token] ${orderRef} → autods status=${result?.status}, items=${result?.items?.length}`);
+    } catch (e) {
+      logger.error('webhook', `[orders/create:token] ${orderRef} autods failed: ${e.message}`);
+    }
+
+    try {
+      const { sendAutodsOrderEmail } = require('./src/services/autods-order-email');
+      const emailResult = await sendAutodsOrderEmail(order);
+      logger.info('webhook', `[orders/create:token] ${orderRef} CSV email → ok=${emailResult?.ok}, reason=${emailResult?.reason || 'sent'}, mapped=${emailResult?.rows?.length}`);
+    } catch (e) {
+      logger.error('webhook', `[orders/create:token] ${orderRef} CSV email failed: ${e.message}`);
+    }
+  })();
 });
 
 // ---- ADMIN: AutoDS Dashboard ----

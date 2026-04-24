@@ -593,8 +593,42 @@ class AmazonAdapter extends BaseAdapter {
         title: `${v._groupName}: ${v.value || ''}`,
         price: parsePrice(v.price) || p.price,
         image: v.photo || v.image || null,
-        available: v.is_available !== false
+        available: v.is_available !== false,
+        selected: v.is_selected === true
       }));
+
+      // v2.7 (2026-04-24): Sort variants so the DEFAULT (variants[0]) is always
+      // a sensible choice — fixes Order #1009 bug where Shopify product was
+      // created with the first variant (Blueberry Grape, unavailable) as default
+      // when user had requested Tropical (parent ASIN). Priority:
+      //   1. Variant matching the parent ASIN (self — always the "current" product)
+      //   2. is_selected === true AND available
+      //   3. available
+      //   4. rest
+      const parentAsin = String(d.asin || asin || '');
+      p.variants.sort((a, b) => {
+        const score = (v) => {
+          if (parentAsin && v.id === parentAsin) return 0;
+          if (v.selected && v.available) return 1;
+          if (v.available) return 2;
+          return 3;
+        };
+        return score(a) - score(b);
+      });
+
+      // Mirror the ordering in p.options[].values so the PDP UI also shows the
+      // intended default first (same scoring rules per group).
+      p.options.forEach(group => {
+        group.values.sort((a, b) => {
+          const score = (v) => {
+            if (parentAsin && v.asin === parentAsin) return 0;
+            if (v.selected && v.is_available) return 1;
+            if (v.is_available) return 2;
+            return 3;
+          };
+          return score(a) - score(b);
+        });
+      });
     }
 
     // ---- v2.6: Enrich with multi-dimensional variants from all_product_variations ----

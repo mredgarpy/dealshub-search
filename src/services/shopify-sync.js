@@ -616,13 +616,47 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
           });
           variantId = containsMatches[0].id;
           matchStrategy = 'contains_ambiguous_first';
+        } else if (normInput.includes(' / ')) {
+          // Strategy 4 (v2.7): Frontend sent joined labels like
+          // "Tropical / 3 Count (Pack of 1)". Split by " / " and look for a
+          // UNIQUE variant whose title contains any fragment.
+          const fragments = normInput.split(' / ').map(s => s.trim()).filter(Boolean);
+          let fragMatch = null;
+          for (const frag of fragments) {
+            const hits = mapping.variants.filter(v => stripPrefix((v.title || '').toLowerCase()).includes(frag));
+            if (hits.length === 1) { fragMatch = hits[0]; break; }
+          }
+          if (fragMatch) {
+            variantId = fragMatch.id;
+            matchStrategy = 'fragment_unambiguous';
+          } else {
+            // Strategy 5: prefer first AVAILABLE variant over plain first
+            const firstAvailable = mapping.variants.find(v => v.available !== false);
+            if (firstAvailable && firstAvailable.id !== variantId) {
+              variantId = firstAvailable.id;
+              matchStrategy = 'no_match_fallback_first_available';
+            } else {
+              matchStrategy = 'no_match_fallback_first';
+            }
+            logger.warn('sync', `No variant match for "${selectedVariantId}" (tried fragments: ${fragments.join(', ')}) among: ${mapping.variants.map(v => v.title).join(' | ')}`, {
+              source, sourceId, input: selectedVariantId,
+              availableVariants: mapping.variants.map(v => ({ id: v.id, title: v.title, sku: v.sku }))
+            });
+          }
         } else {
+          // Strategy 5: prefer first AVAILABLE variant over plain first
+          const firstAvailable = mapping.variants.find(v => v.available !== false);
+          if (firstAvailable && firstAvailable.id !== variantId) {
+            variantId = firstAvailable.id;
+            matchStrategy = 'no_match_fallback_first_available';
+          } else {
+            matchStrategy = 'no_match_fallback_first';
+          }
           logger.warn('sync', `No variant match for "${selectedVariantId}" among: ${mapping.variants.map(v => v.title).join(' | ')}`, {
             source, sourceId,
             input: selectedVariantId,
             availableVariants: mapping.variants.map(v => ({ id: v.id, title: v.title, sku: v.sku }))
           });
-          matchStrategy = 'no_match_fallback_first';
         }
       }
     }

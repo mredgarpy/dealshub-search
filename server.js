@@ -1366,10 +1366,38 @@ app.post('/api/prepare-cart', async (req, res) => {
       let variantId = cachedMapping.shopifyVariantId;
       if (selectedVariant && cachedMapping.variants?.length > 1) {
         const norm = s => (s || '').trim().toLowerCase().replace(/^option:\s*/i, '');
-        const match = cachedMapping.variants.find(v => {
-          const vt = norm(v.title), sv = norm(selectedVariant);
-          return vt === sv || vt.includes(sv) || sv.includes(vt);
+        const rawInput = String(selectedVariant).trim();
+        const svNorm = norm(rawInput);
+
+        // Strategy 1 (v2.7): Match by SKU suffix (source variant ID / ASIN).
+        // SKU format: DH-<SOURCE>-<sourceId>-<sourceVariantId>. Frontend can send
+        // the raw child ASIN (e.g. "B0B4PLR1K5") as selectedVariant — this is
+        // now the preferred path from Amazon PDP to avoid the " / "-join bug.
+        const skuMatch = cachedMapping.variants.find(v => {
+          if (!v.sku) return false;
+          const parts = String(v.sku).split('-');
+          const last = parts[parts.length - 1];
+          return last === rawInput || String(last).toLowerCase() === svNorm;
         });
+
+        let match = skuMatch;
+        if (!match) {
+          // Strategy 2: Exact title, or unambiguous contains in either direction
+          match = cachedMapping.variants.find(v => {
+            const vt = norm(v.title);
+            return vt === svNorm || vt.includes(svNorm) || svNorm.includes(vt);
+          });
+        }
+        if (!match && svNorm.includes(' / ')) {
+          // Strategy 3: Frontend may have sent concatenated labels like
+          // "Tropical / 3 Count (Pack of 1)". Split and look for a UNIQUE
+          // variant whose title contains any one fragment.
+          const fragments = svNorm.split(' / ').map(s => s.trim()).filter(Boolean);
+          for (const frag of fragments) {
+            const hits = cachedMapping.variants.filter(v => norm(v.title).includes(frag));
+            if (hits.length === 1) { match = hits[0]; break; }
+          }
+        }
         if (match) variantId = match.id;
       }
       logger.info('cart', 'FAST PATH: cache hit, skipping source fetch', { source: srcLower, sourceId: srcId, variantId });

@@ -2939,13 +2939,27 @@ app.post('/api/admin/autods/seed-seller', (req, res) => {
     const db = getDb();
     if (!db) return res.status(503).json({ error: 'Database unavailable' });
 
-    // Look up existing mapping so we don't clobber Shopify link data
-    const existing = db.prepare(
+    // Look up existing mapping in autods_products first, falling back to
+    // product_mappings (which tracks every Shopify sync even when autods_products
+    // was never hit — e.g. when prepareCart ran pre-fix). This lets us seed
+    // smid for orders whose products predate the autods registration path.
+    let existing = db.prepare(
       'SELECT shopify_product_id, shopify_variant_id, shopify_handle, source_url FROM autods_products WHERE source_store = ? AND source_product_id = ?'
     ).get(source.toLowerCase(), String(sourceId));
 
     if (!existing) {
-      return res.status(404).json({ error: 'Product not registered in autods_products. Run prepareCart first.', source, sourceId });
+      try {
+        const mapping = db.prepare(
+          'SELECT shopify_product_id, shopify_variant_id, shopify_handle FROM product_mappings WHERE source_store = ? AND source_product_id = ? LIMIT 1'
+        ).get(source.toLowerCase(), String(sourceId));
+        if (mapping) {
+          existing = { ...mapping, source_url: null };
+        }
+      } catch (_) { /* product_mappings may have different schema */ }
+    }
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Product not found in autods_products or product_mappings.', source, sourceId });
     }
 
     autods.registerProduct({

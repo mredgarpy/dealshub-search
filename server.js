@@ -441,6 +441,28 @@ async function productDetailHandler(req, res) {
       } catch (altErr) {
         // Non-critical — just return empty alternatives
       }
+
+      // 2026-04-24: Self-healing dead-product filter.
+      // When /api/product can't resolve, mark the id as dead so future home
+      // feeds (/api/trending, /api/bestsellers, /api/new-arrivals, /api/featured,
+      // /api/search) skip it via blacklist.filterProducts(). Also purge cached
+      // feeds so the fix takes effect on the next request instead of waiting
+      // for TTL (1h) to expire.
+      try {
+        const added = blacklist.addProduct(source, id, 'dead_listing:404 - auto-detected by /api/product');
+        if (added) {
+          logger.info('product', `Auto-blacklisted dead product`, { source, id });
+          // Invalidate home-feed caches so this product disappears immediately
+          ['trending', 'bestsellers', 'new-arrivals'].forEach(k => searchCache.del && searchCache.del(k));
+          // featured is cached per category; nuke common ones
+          ['featured:fashion','featured:beauty','featured:electronics','featured:home','featured:sports',
+           'featured:moda','featured:belleza','featured:electronica','featured:hogar','featured:deportes']
+            .forEach(k => searchCache.del && searchCache.del(k));
+        }
+      } catch (blErr) {
+        logger.warn('product', 'Auto-blacklist failed (non-fatal)', { error: blErr.message, source, id });
+      }
+
       return res.status(404).json({
         error: 'Product not found',
         message: 'This product may no longer be available.',

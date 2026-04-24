@@ -36,16 +36,15 @@ const TIER_RANGES = [
 ];
 
 // Sources that use MSRP-based pricing: API returns MSRP as "price".
-// For these sources, the cost base is estimated as MSRP × RETAIL_FACTOR.
-// AliExpress API's "promotionPrice" is a wholesale/dropship rate ($2-$5),
-// NOT the actual AliExpress retail price ($11-$15). The real AliExpress
-// customer price is approximately MSRP × 0.42.
-// We use this estimated retail as cost base, then apply tier multiplier.
-const MSRP_SOURCES = new Set(['aliexpress']);
+// DISABLED 2026-04-24: For cheap AliExpress items ($1-$5), the API's `price` IS
+// the real selling price, NOT an inflated MSRP. Treating it as MSRP and then
+// multiplying by 0.42 under-costed everything by ~58%, producing margins of
+// $0.30-$0.80 after Shopify fees ($0.30 + 2.9%) on items that ALSO have $1-$2
+// shipping charged at AliExpress checkout. Now all sources use sourcePrice
+// directly as cost base. Real AliExpress shipping comes via deliveryInfo.cost.
+const MSRP_SOURCES = new Set([]);
 
-// Factor to estimate the real AliExpress retail price from MSRP.
-// Based on observed data: AliExpress retail ≈ MSRP × 0.40-0.45
-// Using 0.42 as conservative estimate to stay above AliExpress prices.
+// Legacy factor — kept for backward-compat but unused while MSRP_SOURCES is empty.
 const MSRP_RETAIL_FACTOR = 0.42;
 
 // Price floors per source (minimum selling price)

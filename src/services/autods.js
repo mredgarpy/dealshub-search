@@ -23,42 +23,59 @@ const AUTODS_API_URL = () => process.env.AUTODS_API_URL || 'https://api.autods.c
 const AUTODS_STORE_ID = () => process.env.AUTODS_STORE_ID || '';
 const AUTODS_ENABLED = () => process.env.AUTODS_ENABLED === 'true';
 
-// ---- SOURCE URL BUILDERS (variant-aware) ----
-// Each builder accepts (productId, variantId?) and returns the canonical
-// supplier URL that AutoDS uses as "Buy ID". When variantId is provided,
-// the builder returns a variant-specific URL so AutoDS imports the exact
-// color/size/option the customer ordered.
+// ---- SOURCE URL BUILDERS (variant + seller aware) ----
+// Each builder accepts (productId, variantId?, sellerId?) and returns the
+// canonical supplier URL that AutoDS uses as "Buy ID".
+//
+// Why sellerId matters (Amazon-specific, 2026-04-24):
+//   Some Amazon ASINs fail AutoDS scraping with "Internal Error / Unexpected
+//   Error from Supplier" when passed as bare ASIN — the buybox may resolve to
+//   a restricted seller (MAP, regional restriction, or reseller prohibition).
+//   Passing `?smid=SELLER_ID&th=1` forces AutoDS to target the EXACT offer the
+//   customer saw, bypassing the broken buybox resolution. Evidence:
+//   B00IFWO8PI (Honest Baby Wipes) — bare ASIN failed; smid URL created draft
+//   in seconds with 22 variants + full specs. See memory
+//   project_autods_smid_fix.md.
+//
+// For other sources the sellerId arg is accepted but ignored (single-seller
+// platforms), kept in the signature so callers don't need per-source branching.
 //
 // To add a new source in the future:
-//   1. Add an entry to SOURCE_URL_BUILDERS with the variant-aware URL logic
+//   1. Add an entry to SOURCE_URL_BUILDERS with the variant/seller-aware logic
 //   2. Add the display name to AUTODS_SUPPLIER_MAP below
 //   3. Add the SKU prefix pattern to the SKU parser regex (extractSourceInfo)
 const SOURCE_URL_BUILDERS = {
   // Amazon: variants are child ASINs (different from parent ASIN). When we
   // have a child ASIN in variantId, we use IT as the URL target — that's the
   // actual buyable page. Parent ASIN is just a grouping and may not have a PDP.
-  amazon: (id, variantId) => {
+  // When sellerId is available, emit the `/gp/product/` form with smid+th=1
+  // so AutoDS resolves the seller-specific listing instead of the buybox.
+  amazon: (id, variantId, sellerId) => {
     const asin = (variantId && variantId !== id) ? variantId : id;
+    if (sellerId) {
+      return `https://www.amazon.com/gp/product/${asin}/?smid=${encodeURIComponent(sellerId)}&th=1`;
+    }
     return `https://www.amazon.com/dp/${asin}`;
   },
   // AliExpress: variants are sku_id query params on the base product URL.
-  aliexpress: (id, variantId) => {
+  // Single-seller per listing — sellerId has no effect.
+  aliexpress: (id, variantId /* , sellerId */) => {
     const base = `https://www.aliexpress.com/item/${id}.html`;
     return variantId ? `${base}?sku_id=${encodeURIComponent(variantId)}` : base;
   },
-  // Sephora: variants are skuId query params.
-  sephora: (id, variantId) => {
+  // Sephora: variants are skuId query params. Direct retailer — no sellerId.
+  sephora: (id, variantId /* , sellerId */) => {
     const base = `https://www.sephora.com/product/${id}`;
     return variantId ? `${base}?skuId=${encodeURIComponent(variantId)}` : base;
   },
-  // Macy's: variant param convention varies; we append ?variantId= as a best-effort
-  // hint. AutoDS operator should verify color/size on import for Macy's orders.
-  macys: (id, variantId) => {
+  // Macy's: variant param convention varies; we append ?variantId= as a
+  // best-effort hint. Direct retailer — no sellerId.
+  macys: (id, variantId /* , sellerId */) => {
     const base = `https://www.macys.com/shop/product/${id}`;
     return variantId ? `${base}?variantId=${encodeURIComponent(variantId)}` : base;
   },
-  // SHEIN: variants are skuId query params.
-  shein: (id, variantId) => {
+  // SHEIN: variants are skuId query params. Direct retailer — no sellerId.
+  shein: (id, variantId /* , sellerId */) => {
     const base = `https://us.shein.com/product-p-${id}.html`;
     return variantId ? `${base}?skuId=${encodeURIComponent(variantId)}` : base;
   }
@@ -66,25 +83,30 @@ const SOURCE_URL_BUILDERS = {
 
 /**
  * Build a source-specific product URL, preferring a variant-aware URL when
- * variantId is provided.
+ * variantId is provided. When sellerId is available (Amazon only, today), the
+ * builder embeds it as `smid=` so AutoDS resolves the exact seller offer.
  *
- * @param {string} source     - 'amazon' | 'aliexpress' | 'sephora' | 'macys' | 'shein'
- * @param {string} sourceId   - Product ID on the source platform
- * @param {string?} existingUrl - Pre-existing URL (used when variantId is absent)
- * @param {string?} variantId - Source-side variant ID (sku_id, skuId, child ASIN, etc.)
+ * Backward compatible: existing callers passing (source, id, url, variantId)
+ * keep working — sellerId is an optional 5th argument.
+ *
+ * @param {string} source      - 'amazon' | 'aliexpress' | 'sephora' | 'macys' | 'shein'
+ * @param {string} sourceId    - Product ID on the source platform
+ * @param {string?} existingUrl - Pre-existing URL (used when variantId + sellerId are both absent)
+ * @param {string?} variantId  - Source-side variant ID (sku_id, skuId, child ASIN, etc.)
+ * @param {string?} sellerId   - Source-side seller / merchant ID (Amazon smid). Ignored by other sources.
  * @returns {string} Canonical buy URL for AutoDS
  */
-function buildSourceUrl(source, sourceId, existingUrl, variantId) {
-  // When an explicit variantId is provided, ALWAYS rebuild to guarantee the
-  // URL carries the variant param — otherwise AutoDS may import the wrong
-  // color/size. This is stricter than preferring existingUrl.
-  if (variantId) {
-    const builder = SOURCE_URL_BUILDERS[source.toLowerCase()];
-    if (builder) return builder(sourceId, variantId);
+function buildSourceUrl(source, sourceId, existingUrl, variantId, sellerId) {
+  const builder = SOURCE_URL_BUILDERS[(source || '').toLowerCase()];
+  // When variantId or sellerId is provided, ALWAYS rebuild — the extra
+  // params are load-bearing for AutoDS, so an existingUrl that lacks them
+  // would silently cause the "Internal Error / Unexpected Error from Supplier"
+  // we've been debugging.
+  if (builder && (variantId || sellerId)) {
+    return builder(sourceId, variantId, sellerId);
   }
-  // No variantId → prefer existing URL if it looks valid.
+  // Neither variantId nor sellerId → prefer existing URL if it looks valid.
   if (existingUrl && existingUrl.startsWith('http')) return existingUrl;
-  const builder = SOURCE_URL_BUILDERS[source.toLowerCase()];
   return builder ? builder(sourceId) : '';
 }
 
@@ -98,6 +120,20 @@ const AUTODS_SUPPLIER_MAP = {
 };
 
 // ---- DB SCHEMA EXTENSION ----
+// Idempotent ALTER TABLE helper — SQLite throws on duplicate column,
+// which we swallow so repeated calls are safe.
+function ensureColumn(db, table, column, typeDef) {
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${typeDef}`);
+    logger.info('autods', `Schema migration: added ${table}.${column}`);
+  } catch (e) {
+    // "duplicate column name" → column already exists, safe to ignore.
+    if (!/duplicate column/i.test(e.message)) {
+      logger.warn('autods', `ensureColumn(${table}.${column}) failed: ${e.message}`);
+    }
+  }
+}
+
 function initAutodsSchema() {
   const db = getDb();
   if (!db) return;
@@ -118,6 +154,8 @@ function initAutodsSchema() {
         buy_id TEXT,
         supplier_name TEXT,
         warehouse_region TEXT DEFAULT 'US',
+        source_seller_id TEXT,
+        source_variant_id TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now')),
         UNIQUE(source_store, source_product_id)
@@ -181,6 +219,16 @@ function initAutodsSchema() {
       CREATE INDEX IF NOT EXISTS idx_autods_items_order
         ON autods_order_items(autods_order_id);
     `);
+
+    // ── Column migrations (idempotent) ──
+    // For pre-existing installs, the columns above may be missing.
+    // SQLite ignores ADD COLUMN IF NOT EXISTS syntax pre-3.35 on some hosts,
+    // so we do it via try/catch in ensureColumn.
+    ensureColumn(db, 'autods_products',   'source_seller_id',  'TEXT');
+    ensureColumn(db, 'autods_products',   'source_variant_id', 'TEXT');
+    ensureColumn(db, 'autods_order_items','source_seller_id',  'TEXT');
+    ensureColumn(db, 'autods_order_items','source_variant_id', 'TEXT');
+
     logger.info('autods', 'AutoDS schema initialized');
   } catch (e) {
     logger.warn('autods', `AutoDS schema init failed: ${e.message}`);
@@ -188,11 +236,37 @@ function initAutodsSchema() {
 }
 
 // ---- REGISTER PRODUCT (called after Shopify sync) ----
-function registerProduct({ source, sourceId, sourceUrl, shopifyProductId, shopifyVariantId, shopifyHandle }) {
+// sourceSellerId / sourceVariantId flow through from the PDP's bestOffer data
+// (Amazon) so the eventual CSV BuyId carries `?smid=` and `&variant`-aware
+// params — AutoDS cannot resolve some Amazon ASINs without them.
+function registerProduct({ source, sourceId, sourceUrl, shopifyProductId, shopifyVariantId, shopifyHandle, sourceSellerId, sourceVariantId }) {
   const db = getDb();
   if (!db) return null;
 
-  const buyId = buildSourceUrl(source, sourceId, sourceUrl);
+  let sellerId = sourceSellerId ? String(sourceSellerId).trim() : null;
+  let variantId = sourceVariantId ? String(sourceVariantId).trim() : null;
+
+  // Backfill from DB: if this call omits seller/variant but a prior
+  // registration captured them, reuse the stored values so we never
+  // "downgrade" the canonical buy_id back to the bare `/dp/ASIN` form.
+  // This matters for the order-webhook auto-register path, which has no
+  // access to the original bestOffer data.
+  if (!sellerId || !variantId) {
+    try {
+      const existing = db.prepare(
+        'SELECT source_seller_id, source_variant_id FROM autods_products WHERE source_store = ? AND source_product_id = ?'
+      ).get(source.toLowerCase(), String(sourceId));
+      if (existing) {
+        if (!sellerId && existing.source_seller_id)  sellerId  = existing.source_seller_id;
+        if (!variantId && existing.source_variant_id) variantId = existing.source_variant_id;
+      }
+    } catch (_) { /* non-fatal — column may not exist on very old DBs */ }
+  }
+
+  // Rebuild URL with seller/variant when available — NEVER trust the cached
+  // sourceUrl from the adapter, it may be the bare `/dp/ASIN` form that fails
+  // AutoDS scraping.
+  const buyId = buildSourceUrl(source, sourceId, sourceUrl, variantId, sellerId);
   const supplierName = AUTODS_SUPPLIER_MAP[source.toLowerCase()] || source;
 
   try {
@@ -200,8 +274,9 @@ function registerProduct({ source, sourceId, sourceUrl, shopifyProductId, shopif
       INSERT INTO autods_products (
         source_store, source_product_id, source_url, shopify_product_id,
         shopify_variant_id, shopify_handle, buy_id, supplier_name,
+        source_seller_id, source_variant_id,
         autods_status, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'))
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'))
       ON CONFLICT(source_store, source_product_id) DO UPDATE SET
         source_url = excluded.source_url,
         shopify_product_id = excluded.shopify_product_id,
@@ -209,10 +284,19 @@ function registerProduct({ source, sourceId, sourceUrl, shopifyProductId, shopif
         shopify_handle = excluded.shopify_handle,
         buy_id = excluded.buy_id,
         supplier_name = excluded.supplier_name,
+        -- Never clobber a known seller/variant with NULL. COALESCE keeps the
+        -- stored value when the new insert is missing data (e.g. legacy
+        -- webhook path without seller capture).
+        source_seller_id = COALESCE(excluded.source_seller_id, autods_products.source_seller_id),
+        source_variant_id = COALESCE(excluded.source_variant_id, autods_products.source_variant_id),
         updated_at = datetime('now')
     `);
-    const result = stmt.run(source, String(sourceId), buyId, shopifyProductId, shopifyVariantId, shopifyHandle, buyId, supplierName);
-    logger.info('autods', 'Product registered for AutoDS', { source, sourceId, shopifyProductId, buyId });
+    const result = stmt.run(
+      source, String(sourceId), buyId, shopifyProductId,
+      shopifyVariantId, shopifyHandle, buyId, supplierName,
+      sellerId, variantId
+    );
+    logger.info('autods', 'Product registered for AutoDS', { source, sourceId, shopifyProductId, buyId, sellerId: sellerId ? `${sellerId.slice(0, 4)}…` : null });
 
     // If AutoDS API is enabled, try to register via API
     if (AUTODS_ENABLED() && AUTODS_API_KEY()) {
@@ -355,8 +439,10 @@ async function processOrderWebhook(orderData) {
             INSERT OR REPLACE INTO autods_order_items (
               autods_order_id, shopify_line_item_id, shopify_product_id,
               shopify_variant_id, source_store, source_product_id, source_url,
-              buy_id, quantity, price, variant_title, autods_item_status, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', datetime('now'))
+              buy_id, quantity, price, variant_title,
+              source_seller_id, source_variant_id,
+              autods_item_status, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', datetime('now'))
           `);
 
           itemStmt.run(
@@ -371,6 +457,8 @@ async function processOrderWebhook(orderData) {
             item.quantity || 1,
             parseFloat(item.price) || 0,
             item.variant_title || '',
+            sourceInfo.sourceSellerId || null,
+            sourceInfo.sourceVariantId || null,
           );
 
           itemResults.push({
@@ -382,6 +470,9 @@ async function processOrderWebhook(orderData) {
           });
 
           // ── AUTO-REGISTER product in autods_products if missing ──
+          // Pass seller + variant so the stored buy_id is rebuilt with smid
+          // when we have it. Idempotent: COALESCE in registerProduct keeps
+          // any previously-captured seller if this call omits it.
           try {
             registerProduct({
               source: sourceInfo.source,
@@ -389,7 +480,9 @@ async function processOrderWebhook(orderData) {
               sourceUrl: sourceInfo.sourceUrl || '',
               shopifyProductId: item.product_id,
               shopifyVariantId: item.variant_id,
-              shopifyHandle: ''
+              shopifyHandle: '',
+              sourceSellerId: sourceInfo.sourceSellerId || null,
+              sourceVariantId: sourceInfo.sourceVariantId || null
             });
             logger.info('autods', `Auto-registered product from order: ${sourceInfo.source}/${sourceInfo.sourceId}`);
           } catch (regErr) {
@@ -508,11 +601,27 @@ function extractSourceInfo(lineItem, db) {
       }
     }
 
-    const sourceUrl = buildSourceUrl(source, sourceId, null, sourceVariantId);
+    // Seller resolution (Amazon smid). Priority: line item property → DB.
+    // DB fallback covers old orders placed before the property was emitted,
+    // AND legacy _source_store/_source_id items that carry no seller hint.
+    let sourceSellerId = props._source_seller_id
+      ? String(props._source_seller_id).trim() || null
+      : null;
+    if (!sourceSellerId && db) {
+      try {
+        const row = db.prepare(
+          'SELECT source_seller_id FROM autods_products WHERE source_store = ? AND source_product_id = ?'
+        ).get(source.toLowerCase(), sourceId);
+        if (row && row.source_seller_id) sourceSellerId = row.source_seller_id;
+      } catch (_) { /* non-fatal */ }
+    }
+
+    const sourceUrl = buildSourceUrl(source, sourceId, null, sourceVariantId, sourceSellerId);
     return {
       source,
       sourceId,
       sourceVariantId,
+      sourceSellerId,
       sourceUrl,
       buyId: sourceUrl,
       variantTitle,
@@ -537,11 +646,23 @@ function extractSourceInfo(lineItem, db) {
       const source = skuMatch[1].toLowerCase();
       const sourceId = skuMatch[2];
       const sourceVariantId = skuMatch[3] || null;
-      const sourceUrl = buildSourceUrl(source, sourceId, null, sourceVariantId);
+      // Enrich from autods_products — SKU parsing gives no seller hint on its
+      // own, but we may have stashed smid at prepareCart time.
+      let sourceSellerId = null;
+      if (db) {
+        try {
+          const row = db.prepare(
+            'SELECT source_seller_id FROM autods_products WHERE source_store = ? AND source_product_id = ?'
+          ).get(source, sourceId);
+          if (row && row.source_seller_id) sourceSellerId = row.source_seller_id;
+        } catch (_) { /* non-fatal */ }
+      }
+      const sourceUrl = buildSourceUrl(source, sourceId, null, sourceVariantId, sourceSellerId);
       return {
         source,
         sourceId,
         sourceVariantId,
+        sourceSellerId,
         sourceUrl,
         buyId: sourceUrl,
         variantTitle,
@@ -560,16 +681,28 @@ function extractSourceInfo(lineItem, db) {
       ).get(lineItem.product_id);
 
       if (mapping) {
+        // Enrich with smid from autods_products (product_mappings doesn't
+        // carry seller info, so we cross-join).
+        let sourceSellerId = null;
+        try {
+          const row = db.prepare(
+            'SELECT source_seller_id FROM autods_products WHERE source_store = ? AND source_product_id = ?'
+          ).get(mapping.source_store, mapping.source_product_id);
+          if (row && row.source_seller_id) sourceSellerId = row.source_seller_id;
+        } catch (_) { /* non-fatal */ }
+
         const sourceUrl = buildSourceUrl(
           mapping.source_store,
           mapping.source_product_id,
           null,
-          mapping.source_variant_id
+          mapping.source_variant_id,
+          sourceSellerId
         );
         return {
           source: mapping.source_store,
           sourceId: mapping.source_product_id,
           sourceVariantId: mapping.source_variant_id,
+          sourceSellerId,
           sourceUrl,
           buyId: sourceUrl,
           variantTitle,
@@ -591,12 +724,20 @@ function extractSourceInfo(lineItem, db) {
       ).get(lineItem.product_id);
 
       if (autodsProduct) {
+        // Rebuild with seller/variant when stored — buy_id may be stale if
+        // the product was registered before the smid fix (2026-04-24).
+        const sellerId = autodsProduct.source_seller_id || null;
+        const variantId = autodsProduct.source_variant_id || null;
+        const rebuiltUrl = (sellerId || variantId)
+          ? buildSourceUrl(autodsProduct.source_store, autodsProduct.source_product_id, null, variantId, sellerId)
+          : (autodsProduct.source_url || autodsProduct.buy_id);
         return {
           source: autodsProduct.source_store,
           sourceId: autodsProduct.source_product_id,
-          sourceVariantId: null,
-          sourceUrl: autodsProduct.source_url || autodsProduct.buy_id,
-          buyId: autodsProduct.buy_id,
+          sourceVariantId: variantId,
+          sourceSellerId: sellerId,
+          sourceUrl: rebuiltUrl,
+          buyId: rebuiltUrl,
           variantTitle,
           shopifySku,
           shopifyVariantId,
@@ -648,7 +789,13 @@ function generateAutodsCSV(filters = {}) {
     // Columns: Product URL, Supplier, Warehouse Region
     const header = 'Product URL,Supplier,Warehouse Region';
     const rows = products.map(p => {
-      const url = p.buy_id || p.source_url || buildSourceUrl(p.source_store, p.source_product_id);
+      // Prefer a rebuilt URL when we have seller/variant — stored buy_id may
+      // be stale (written before the smid fix). Fallback chain preserves
+      // legacy behavior when no seller data is available.
+      const hasExtras = p.source_seller_id || p.source_variant_id;
+      const url = hasExtras
+        ? buildSourceUrl(p.source_store, p.source_product_id, p.buy_id || p.source_url, p.source_variant_id, p.source_seller_id)
+        : (p.buy_id || p.source_url || buildSourceUrl(p.source_store, p.source_product_id));
       const supplier = p.supplier_name || AUTODS_SUPPLIER_MAP[p.source_store] || p.source_store;
       const region = p.warehouse_region || 'US';
       return `"${url}","${supplier}","${region}"`;

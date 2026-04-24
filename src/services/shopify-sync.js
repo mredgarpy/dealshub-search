@@ -427,6 +427,27 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
     deliveryInfo: productData.deliveryInfo || productData.shippingData || null
   });
 
+  // ── AutoDS enrichment fields captured once per prepareCart call ──
+  // capturedSellerId (Amazon smid): Amazon's /product-offers endpoint exposes
+  // buybox seller_id on product.bestOffer. We carry it into line item
+  // properties so the order webhook → CSV pipeline can emit
+  // `/gp/product/{ASIN}/?smid={SELLER}&th=1` instead of bare `/dp/{ASIN}`.
+  // Bare ASIN caused "Internal Error / Unexpected Error from Supplier" for
+  // restricted-buybox items (e.g. Honest Baby Wipes B00IFWO8PI).
+  // capturedVariantId: the raw source-side variant identifier (child ASIN,
+  // sku_id, etc.) that the frontend sent. Used for the same CSV URL path.
+  // Sources without a buybox seller concept (AliExpress, Sephora, Macy's,
+  // SHEIN) just get null — the URL builder ignores sellerId for them.
+  const capturedSellerId =
+    productData?.bestOffer?.sellerId ||
+    productData?.rawSourceMeta?.bestOfferSellerId ||
+    productData?.sellerData?.id ||
+    null;
+  const capturedVariantId =
+    (selectedVariantId && String(selectedVariantId).trim()) ||
+    productData?.selectedVariant?.sourceVariantId ||
+    null;
+
   _timing.pricing = Date.now() - _startTime;
   const cacheKey = `mapping:${source}:${sourceId}`;
 
@@ -527,7 +548,9 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
           sourceUrl: productData.sourceUrl || '',
           shopifyProductId: mapping.shopifyProductId,
           shopifyVariantId: mapping.shopifyVariantId,
-          shopifyHandle: mapping.handle
+          shopifyHandle: mapping.handle,
+          sourceSellerId: capturedSellerId,
+          sourceVariantId: capturedVariantId
         });
       } catch (e) {
         logger.debug('sync', `AutoDS registration failed (non-blocking): ${e.message}`);
@@ -692,7 +715,7 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
         // Extract source variant ID from SKU: DH-SOURCE-productId-variantId
         const skuParts = (matchedVariant?.sku || '').split('-');
         const sourceVariantId = skuParts.length >= 4 ? skuParts.slice(3).join('-') : '';
-        return {
+        const props = {
           _source_store: source,
           _source_id: String(sourceId),
           _source_variant_id: sourceVariantId,
@@ -701,6 +724,13 @@ async function prepareCart({ source, sourceId, productData, selectedVariantId, q
           _sync_version: Date.now().toString(),
           _landed_cost_band: String(pricingResult.landedCost)
         };
+        // Amazon smid: only set when we actually captured one. Empty-string
+        // property would waste a line-item-property slot (Shopify caps at 10)
+        // and pollute the webhook payload for non-Amazon orders.
+        if (capturedSellerId) {
+          props._source_seller_id = String(capturedSellerId);
+        }
+        return props;
       })()
     },
     _internal: {

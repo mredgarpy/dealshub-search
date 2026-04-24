@@ -1485,15 +1485,24 @@ app.post('/api/prepare-cart', async (req, res) => {
     // Register product in local autods_products table so AutoDS platform can
     // pick it up (via CSV bulk import or API). Reactive tracking aligned with
     // plan limit 500 — only consumes variations when product is actually added to cart.
+    // Seller/variant capture mirrors the inline registerProduct inside prepareCart —
+    // required so the eventual CSV BuyId gets `?smid=` for Amazon.
     try {
       const autodsService = require('./src/services/autods');
+      const sellerId =
+        productData?.bestOffer?.sellerId ||
+        productData?.rawSourceMeta?.bestOfferSellerId ||
+        productData?.sellerData?.id ||
+        null;
       autodsService.registerProduct({
         source: srcLower,
         sourceId: srcId,
         sourceUrl: productData.sourceUrl || productData.url || '',
         shopifyProductId: result.shopifyProductId,
         shopifyVariantId: result.shopifyVariantId,
-        shopifyHandle: result.handle
+        shopifyHandle: result.handle,
+        sourceSellerId: sellerId,
+        sourceVariantId: selectedVariant ? String(selectedVariant).trim() : null
       });
     } catch (autodsErr) {
       // Non-blocking — never fail cart prep due to tracking

@@ -1115,4 +1115,56 @@ router.post('/shopify/theme-asset/patch', async (req, res) => {
   }
 });
 
+
+// ============================================================
+// CRON RESYNC — Daily background job to refresh prices/stock/variants
+// ============================================================
+const cronResync = require('../services/cron-resync');
+
+/**
+ * POST /admin/cron/run
+ * Trigger a manual resync of all (or filtered) mappings.
+ * Body: { source?: 'amazon'|'aliexpress'|..., limit?: number }
+ */
+router.post('/cron/run', async (req, res) => {
+  try {
+    const { source, limit } = req.body || {};
+    const result = await cronResync.resyncAll({ source, limit });
+    if (result.error === 'already_running') {
+      return res.status(409).json({ success: false, error: 'A resync job is already running', progress: result.progress });
+    }
+    res.json({ success: true, ...result });
+  } catch (e) {
+    logger.error('admin', 'POST /cron/run failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * GET /admin/cron/status
+ * Returns last run status + current job progress (if running).
+ */
+router.get('/cron/status', (req, res) => {
+  try {
+    const status = cronResync.loadStatus();
+    const progress = cronResync.getProgress();
+    res.json({ success: true, isRunning: cronResync.isRunning(), progress, status });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * POST /admin/cron/stop
+ * Politely request the running job to halt after current item.
+ */
+router.post('/cron/stop', (req, res) => {
+  try {
+    cronResync.requestStop();
+    res.json({ success: true, message: 'Stop requested — will halt after current item' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 module.exports = router;

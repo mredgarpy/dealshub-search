@@ -227,14 +227,14 @@ async function createShopifyProduct(productData, pricingResult) {
       // v2.0: Pass deliveryInfo so variant pricing uses real shipping data (not stale DB buffers)
       const vRawPrice = v.sourcePrice || v.price;
       const vPrice = vRawPrice ? calculateFinalPrice(vRawPrice, source, {
-        originalPrice: v.sourceOriginalPrice || v.originalPrice || null,
+        originalPrice: v.sourceOriginalPrice || v.originalPrice || productData.sourceOriginalPrice || productData.originalPrice || null,
         deliveryInfo: productData.deliveryInfo || productData.shippingData || null
       }) : pricingResult;
       shopifyVariants.push({
         title: v.title || `Option ${i + 1}`,
         price: vPrice.price.toFixed(2),
         compare_at_price: vPrice.compareAt ? vPrice.compareAt.toFixed(2) : null,
-        sku: `DH-${source.toUpperCase()}-${sourceId}-${v.id || i}`,
+        sku: `DH-${source.toUpperCase()}-${sourceId}-${v.id || sourceId}-${i}`,
         inventory_management: null,
         inventory_policy: 'continue',
         requires_shipping: true,
@@ -268,7 +268,7 @@ async function createShopifyProduct(productData, pricingResult) {
   const shopifyOptions = [];
   if (sourceVariants && sourceVariants.length > 0) {
     shopifyOptions.push({
-      name: (options?.[0]?.name) || 'Option',
+      name: 'Variant',
       values: sourceVariants.map(v => v.title)
     });
   }

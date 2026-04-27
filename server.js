@@ -3059,19 +3059,10 @@ app.get('/webhooks/health', (req, res) => {
 });
 
 // ============================================================
-// CRON JOBS — Removed (services/cron.js cleaned up in v3.6.0)
-// Admin endpoints kept as stubs for backward compatibility
+// CRON JOBS — re-enabled with cron-resync service (2026-04-27)
+// Endpoints live in src/routes/admin.js (cron/run, cron/status, cron/stop).
+// Auto-scheduler armed in app.listen handler below.
 // ============================================================
-
-app.get('/api/admin/cron/status', (req, res) => {
-  const token = req.query.token || req.headers['x-admin-token'];
-  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
-  res.json({ status: 'disabled', message: 'Cron service removed in v3.6.0' });
-});
-
-app.post('/api/admin/cron/run/:task', (req, res) => {
-  res.status(410).json({ error: 'Cron service removed in v3.6.0' });
-});
 
 app.get('/api/admin/cron/history', (req, res) => {
   res.json([]);
@@ -3184,7 +3175,15 @@ app.listen(PORT, () => {
   // Warm up cache after server starts (don't await â let it run in background)
   setTimeout(warmUpCache, 2000);
 
-  // Cron jobs removed in v3.6.0
+  // ---- AUTO-RESYNC SCHEDULER ----
+  // Daily refresh of Shopify products from source APIs (price, stock, variants, images).
+  // First run 30min after boot; recurs every 24h. Manual trigger via POST /api/admin/cron/run.
+  try {
+    const cronResync = require('./src/services/cron-resync');
+    cronResync.startScheduler();
+  } catch (e) {
+    logger.warn('server', `cron-resync scheduler failed to start: ${e.message}`);
+  }
 
   // ---- KEEP-ALIVE SELF-PING ----
   // Render free tier spins down after ~15min of inactivity.

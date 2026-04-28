@@ -2681,6 +2681,170 @@ app.post('/webhooks/orders/create', async (req, res) => {
   })();
 });
 
+// ─────────────────────────────────────────────────────────────────────
+// AUTODS BRIDGE WEBHOOK — checkouts/create
+// ─────────────────────────────────────────────────────────────────────
+// When a Shopify customer reaches the checkout page, this fires. We extract
+// each line item's source product info (Amazon ASIN / AliExpress URL) and
+// fire-and-forget a Connect call to the AutoDS Bridge running on Edgar's PC
+// (via Cloudflare Tunnel). By the time the customer pays, the product is
+// already Connected in AutoDS and Orders Processor auto-fulfills.
+//
+// Required env vars:
+//   AUTODS_BRIDGE_URL    — e.g., https://xxx.trycloudflare.com
+//   AUTODS_BRIDGE_TOKEN  — must match BRIDGE_TOKEN in autods-local-bridge.js
+//
+// Optional:
+//   AUTODS_BRIDGE_DEDUP_TTL_MS — default 86400000 (24h)
+//
+// Auth: same ?token=<WEBHOOK_TOKEN> as orders/create.
+
+// Dedup map: key = `${source}:${sourceId}`, value = timestamp
+const _bridgeDedupCache = new Map();
+const BRIDGE_DEDUP_TTL_MS = parseInt(process.env.AUTODS_BRIDGE_DEDUP_TTL_MS || '86400000', 10);
+
+function _bridgeDedupCheck(key) {
+  const now = Date.now();
+  const last = _bridgeDedupCache.get(key);
+  if (last && (now - last) < BRIDGE_DEDUP_TTL_MS) return true; // still valid
+  _bridgeDedupCache.set(key, now);
+  // Opportunistic prune
+  if (_bridgeDedupCache.size > 5000) {
+    for (const [k, t] of _bridgeDedupCache) {
+      if ((now - t) > BRIDGE_DEDUP_TTL_MS) _bridgeDedupCache.delete(k);
+    }
+  }
+  return false;
+}
+
+function _readLineItemProperty(lineItem, key) {
+  if (!lineItem || !lineItem.properties) return null;
+  const props = lineItem.properties;
+  if (Array.isArray(props)) {
+    const found = props.find(p => p && p.name === key);
+    return found ? found.value : null;
+  }
+  if (typeof props === 'object') return props[key] || null;
+  return null;
+}
+
+function _extractSourceFromLineItem(lineItem) {
+  // Properties our prepareCart attaches: _source_store, _source_id, _source_smid,
+  // _source_variant_id, _source_url, _shopify_product_id (the live Shopify id we created).
+  const source = _readLineItemProperty(lineItem, '_source_store');
+  const sourceId = _readLineItemProperty(lineItem, '_source_id');
+  if (!source || !sourceId) return null;
+  return {
+    source: String(source).toLowerCase(),
+    sourceId: String(sourceId),
+    smid: _readLineItemProperty(lineItem, '_source_smid') || null,
+    sourceUrl: _readLineItemProperty(lineItem, '_source_url') || null,
+    shopifyProductId: lineItem.product_id ? String(lineItem.product_id) : null
+  };
+}
+
+async function _callBridgeConnect(payload) {
+  const bridgeUrl = process.env.AUTODS_BRIDGE_URL;
+  const bridgeToken = process.env.AUTODS_BRIDGE_TOKEN || 'dev-token-change-me-in-production';
+  if (!bridgeUrl) throw new Error('AUTODS_BRIDGE_URL not configured');
+
+  const fetch = require('node-fetch');
+  const url = bridgeUrl.replace(/\/$/, '') + '/connect-product';
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 180000); // 3 min hard cap
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bridge-Token': bridgeToken
+      },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    });
+    const json = await r.json().catch(() => ({}));
+    return { httpStatus: r.status, body: json };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+app.post('/webhooks/checkouts/create', async (req, res) => {
+  // Same auth pattern as /webhooks/orders/create
+  const expected = process.env.WEBHOOK_TOKEN || WEBHOOK_TOKEN_FALLBACK;
+  const provided = req.query.token || req.headers['x-webhook-token'];
+  const tokenOk = provided && provided === expected;
+  if (!tokenOk) {
+    const hmac = req.headers['x-shopify-hmac-sha256'];
+    const secret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_CLIENT_SECRET;
+    let hmacOk = false;
+    if (secret && hmac && req.rawBody) {
+      try {
+        const crypto = require('crypto');
+        const hash = crypto.createHmac('sha256', secret).update(req.rawBody, 'utf8').digest('base64');
+        hmacOk = crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(hash));
+      } catch (e) { hmacOk = false; }
+    }
+    if (!hmacOk) {
+      logger.warn('webhook', 'checkouts/create rejected — no valid token or HMAC');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
+
+  // Ack Shopify immediately
+  res.status(200).json({ received: true });
+
+  const checkout = req.body;
+  if (!checkout || !checkout.id) return;
+  const checkoutRef = checkout.token || checkout.id;
+  const lineItems = Array.isArray(checkout.line_items) ? checkout.line_items : [];
+  if (lineItems.length === 0) return;
+
+  // Fire-and-forget Connect calls for each line item
+  (async () => {
+    for (const item of lineItems) {
+      const src = _extractSourceFromLineItem(item);
+      if (!src || !src.shopifyProductId) {
+        logger.debug('bridge', `[checkouts/create:${checkoutRef}] skip line item ${item.id || '?'} — no source props`);
+        continue;
+      }
+      const dedupKey = `${src.source}:${src.sourceId}`;
+      if (_bridgeDedupCheck(dedupKey)) {
+        logger.info('bridge', `[checkouts/create:${checkoutRef}] dedup skip ${dedupKey} (already requested in last ${BRIDGE_DEDUP_TTL_MS/1000/3600}h)`);
+        continue;
+      }
+      logger.info('bridge', `[checkouts/create:${checkoutRef}] dispatch connect ${dedupKey} → shopify=${src.shopifyProductId}`);
+      try {
+        const result = await _callBridgeConnect(src);
+        logger.info('bridge', `[checkouts/create:${checkoutRef}] connect result ${dedupKey}: http=${result.httpStatus} ok=${result.body?.ok} reason=${result.body?.reason || 'ok'}`);
+      } catch (e) {
+        logger.error('bridge', `[checkouts/create:${checkoutRef}] connect call failed ${dedupKey}: ${e.message}`);
+        // On failure remove from dedup so a retry can happen
+        _bridgeDedupCache.delete(dedupKey);
+      }
+    }
+  })();
+});
+
+// Diagnostic: GET to verify bridge connectivity from Render
+app.get('/api/admin/bridge-health', async (req, res) => {
+  const token = req.query.token || req.headers['x-admin-token'];
+  if (token !== 'stylehub-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  const bridgeUrl = process.env.AUTODS_BRIDGE_URL;
+  if (!bridgeUrl) return res.status(503).json({ ok: false, reason: 'AUTODS_BRIDGE_URL not configured' });
+  try {
+    const fetch = require('node-fetch');
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 30000);
+    const r = await fetch(bridgeUrl.replace(/\/$/, '') + '/health', { signal: ctrl.signal });
+    clearTimeout(t);
+    const body = await r.json().catch(() => ({}));
+    res.json({ ok: r.ok, httpStatus: r.status, bridgeResponse: body, bridgeUrl, dedupCacheSize: _bridgeDedupCache.size });
+  } catch (e) {
+    res.status(503).json({ ok: false, reason: e.message, bridgeUrl });
+  }
+});
+
 // ---- ADMIN: AutoDS Dashboard ----
 app.get('/api/admin/autods/stats', (req, res) => {
   const token = req.query.token || req.headers['x-admin-token'];

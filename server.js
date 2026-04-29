@@ -662,7 +662,8 @@ async function productDetailHandler(req, res) {
             productData: product,
             selectedVariant: null,
             sourceUrl: product.sourceUrl || product.url || null,
-            smid: product?.bestOffer?.sellerId || product?.rawSourceMeta?.bestOfferSellerId || null
+            smid: product?.bestOffer?.sellerId || product?.rawSourceMeta?.bestOfferSellerId || null,
+            userAgent: req.headers['user-agent'] || null
           });
         }
       }
@@ -1558,16 +1559,113 @@ async function _processWizardJob({ jobId, source, sourceId, productData, selecte
   }
 }
 
+// ─── Pre-warm safeguards (anti-runaway) ───
+// Each wizard call consumes 1 of AutoDS' 500-product cap, so we have to be
+// strict about who triggers a pre-warm. The wizard must only fire for
+// REAL HUMAN visits to the PDP, not crawlers, and only at a sustainable rate.
+const PREWARM_RATE_LIMIT_PER_MIN = parseInt(process.env.PREWARM_RATE_LIMIT_PER_MIN || '4', 10);
+const PREWARM_DAILY_CAP = parseInt(process.env.PREWARM_DAILY_CAP || '40', 10);
+const AUTODS_PRODUCT_CAP_THRESHOLD = parseInt(process.env.AUTODS_PRODUCT_CAP_THRESHOLD || '450', 10);
+const AUTODS_HEALTH_CACHE_MS = 60000; // re-check bridge /health at most once a minute
+
+const _prewarmBudget = {
+  recentKickoffs: [],   // timestamps in ms within the last minute
+  dailyCount: 0,
+  dailyDate: null,      // YYYY-MM-DD
+  capCheck: { lastChecked: 0, productsCount: null, error: null }
+};
+
+const _BOT_UA_RE = /bot\b|crawl|spider|slurp|bingbot|googlebot|facebookexternalhit|whatsapp|telegrambot|linkedinbot|twitterbot|pinterest|baiduspider|yandex|duckduckbot|applebot|semrushbot|ahrefsbot|mj12bot|ia_archiver|httpclient|python-requests|curl\/|wget\/|scrapy|headlesschrome|phantomjs|puppeteer|playwright/i;
+
+function _isLikelyBot(userAgent) {
+  if (!userAgent) return true; // No UA = treat as bot/script
+  return _BOT_UA_RE.test(String(userAgent).toLowerCase());
+}
+
+function _checkPrewarmBudget() {
+  const now = Date.now();
+
+  // Slide the per-minute window
+  _prewarmBudget.recentKickoffs = _prewarmBudget.recentKickoffs.filter(t => now - t < 60000);
+
+  // Reset daily counter at UTC midnight
+  const today = new Date().toISOString().slice(0, 10);
+  if (_prewarmBudget.dailyDate !== today) {
+    _prewarmBudget.dailyDate = today;
+    _prewarmBudget.dailyCount = 0;
+  }
+
+  if (_prewarmBudget.recentKickoffs.length >= PREWARM_RATE_LIMIT_PER_MIN) {
+    return { allowed: false, reason: `rate-limit-min:${PREWARM_RATE_LIMIT_PER_MIN}` };
+  }
+  if (_prewarmBudget.dailyCount >= PREWARM_DAILY_CAP) {
+    return { allowed: false, reason: `rate-limit-day:${PREWARM_DAILY_CAP}` };
+  }
+  if (
+    _prewarmBudget.capCheck.productsCount !== null &&
+    _prewarmBudget.capCheck.productsCount >= AUTODS_PRODUCT_CAP_THRESHOLD
+  ) {
+    return { allowed: false, reason: `autods-cap:${_prewarmBudget.capCheck.productsCount}/${AUTODS_PRODUCT_CAP_THRESHOLD}` };
+  }
+  return { allowed: true };
+}
+
+function _recordPrewarmKickoff() {
+  _prewarmBudget.recentKickoffs.push(Date.now());
+  _prewarmBudget.dailyCount += 1;
+}
+
+async function _refreshAutoDSCapCache() {
+  if (Date.now() - _prewarmBudget.capCheck.lastChecked < AUTODS_HEALTH_CACHE_MS) return;
+  try {
+    const { checkBridgeHealth } = require('./src/services/autods-wizard');
+    const r = await checkBridgeHealth(8000);
+    _prewarmBudget.capCheck = {
+      lastChecked: Date.now(),
+      productsCount: typeof r.productsCount === 'number' ? r.productsCount : null,
+      error: r.ok ? null : (r.reason || null)
+    };
+  } catch (e) {
+    _prewarmBudget.capCheck = { lastChecked: Date.now(), productsCount: null, error: e.message };
+  }
+}
+
 /**
  * Fire-and-forget pre-warm: ensure a wizard call is in flight for source+sourceId.
  * Returns the (possibly already existing) job. Safe to call repeatedly.
+ *
+ * Skips silently if:
+ *   - feature flag off / bridge not configured
+ *   - user-agent looks like a bot
+ *   - per-minute or daily rate limit exceeded
+ *   - AutoDS product count is at/over the threshold
  */
-function _kickoffWizardPrewarm({ source, sourceId, productData, selectedVariant, sourceUrl, smid }) {
+function _kickoffWizardPrewarm({ source, sourceId, productData, selectedVariant, sourceUrl, smid, userAgent }) {
   if (process.env.USE_ASYNC_WIZARD_PREPARE_CART !== 'true') return null;
   if (!process.env.AUTODS_BRIDGE_URL) return null;
 
+  // Bot guard — bots crawling product pages must NEVER trigger a wizard call.
+  if (_isLikelyBot(userAgent)) {
+    logger.debug && logger.debug('cart-wizard', `[prewarm] skip bot ${source}:${sourceId} ua=${(userAgent || '').substring(0, 80)}`);
+    return null;
+  }
+
+  // Dedup — same ASIN already in flight or recently completed
   const existing = cartJobs.findLiveJob(source, sourceId);
   if (existing) return existing;
+
+  // Refresh AutoDS cap cache async (don't block); the budget check below
+  // uses whatever value was last cached.
+  _refreshAutoDSCapCache().catch(() => {});
+
+  // Budget check (rate limit + AutoDS cap)
+  const budget = _checkPrewarmBudget();
+  if (!budget.allowed) {
+    logger.info('cart-wizard', `[prewarm] skip ${source}:${sourceId} reason=${budget.reason}`);
+    return null;
+  }
+
+  _recordPrewarmKickoff();
 
   const job = cartJobs.createJob({
     source, sourceId,
@@ -1733,14 +1831,20 @@ app.post('/api/prepare-cart', async (req, res) => {
       process.env.AUTODS_BRIDGE_URL
     ) {
       const wizardWaitMs = parseInt(process.env.WIZARD_WAIT_MS || '60000', 10);
-      // Either reuse an in-flight job (PDP pre-warm) or kick off a new one
+      // Either reuse an in-flight job (PDP pre-warm) or kick off a new one.
+      // Note: in /api/prepare-cart we DO want to allow bots / scripts that POST
+      // here (they're rare — Shopify cart endpoints aren't crawled). But if the
+      // request has a bot UA it's almost certainly a real customer's request
+      // (they don't crawl /api/prepare-cart). We pass UA anyway so the budget
+      // and bot guard still apply consistently.
       const job = _kickoffWizardPrewarm({
         source: srcLower,
         sourceId: srcId,
         productData,
         selectedVariant,
         sourceUrl: productData.sourceUrl || productData.url || null,
-        smid: productData?.bestOffer?.sellerId || productData?.rawSourceMeta?.bestOfferSellerId || null
+        smid: productData?.bestOffer?.sellerId || productData?.rawSourceMeta?.bestOfferSellerId || null,
+        userAgent: req.headers['user-agent'] || null
       });
       if (job) {
         const settled = await _awaitWizardJob(job.jobId, wizardWaitMs);

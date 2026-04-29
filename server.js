@@ -63,7 +63,9 @@ app.use((req, res, next) => {
 const logger = require('./src/utils/logger');
 const { searchCache, productCache } = require('./src/utils/cache');
 const { initAdapters, getAdapter, getAllAdapters, VALID_SOURCES } = require('./src/adapters');
-const { prepareCart } = require('./src/services/shopify-sync');
+const { prepareCart, shopifyAPI: shopifyAPIDirect } = require('./src/services/shopify-sync');
+const { callWizard: callBridgeWizard } = require('./src/services/autods-wizard');
+const cartJobs = require('./src/services/cart-job-queue');
 const { calculateFinalPrice, parsePrice } = require('./src/utils/pricing');
 const { getShippingEstimate, getReturnPolicy, getShippingOptions, getShippingQuote, invalidateShippingCache } = require('./src/services/shipping');
 const { invalidatePricingCache } = require('./src/utils/pricing');
@@ -634,6 +636,40 @@ async function productDetailHandler(req, res) {
       productCache.set(cacheKey, product, 1800000); // 30min TTL
     }
     res.json(product);
+
+    // ── PDP PRE-WARM (Fase 2) ──
+    // Fire-and-forget: kick off the AutoDS Single Product wizard so by the
+    // time the customer clicks Add to Cart (avg 60-180s on PDP), the product
+    // is already Connected and /api/prepare-cart hits the cache → instant
+    // auto-fulfill. No-op if feature flag disabled or bridge not configured.
+    // Dedup: cartJobs.findLiveJob prevents concurrent calls for the same ASIN.
+    try {
+      if (
+        process.env.USE_ASYNC_WIZARD_PREPARE_CART === 'true' &&
+        process.env.AUTODS_BRIDGE_URL &&
+        !product._mismatch &&
+        !product.priceUnavailable
+      ) {
+        // Skip if a Shopify mapping already exists (cache or DB) — wizard
+        // would just create a duplicate.
+        const { syncCache } = require('./src/utils/cache');
+        const { findMapping } = require('./src/utils/db');
+        const existingMapping = syncCache.get(`mapping:${source}:${id}`) || findMapping(source, id);
+        if (!existingMapping) {
+          _kickoffWizardPrewarm({
+            source,
+            sourceId: id,
+            productData: product,
+            selectedVariant: null,
+            sourceUrl: product.sourceUrl || product.url || null,
+            smid: product?.bestOffer?.sellerId || product?.rawSourceMeta?.bestOfferSellerId || null
+          });
+        }
+      }
+    } catch (e) {
+      // Pre-warm errors must NEVER affect the PDP response
+      logger.warn('product', `[prewarm] non-fatal: ${e.message}`);
+    }
   } catch (e) {
     logger.error('product', 'Product detail failed', { error: e.message, step, source, id, stack: e.stack?.split('\n').slice(0, 3).join(' | ') });
     res.status(500).json({ error: 'Failed to load product', step, detail: e.message });
@@ -1354,6 +1390,225 @@ app.get('/api/reviews/:id', async (req, res) => {
 // CAPA B â ON-DEMAND SYNC LAYER
 // ============================================================
 
+// ─────────────────────────────────────────────────────────────────────
+// ASYNC WIZARD PIPELINE (Fase 2 — backend-only async cart preparation)
+// ─────────────────────────────────────────────────────────────────────
+// Goal: 90%+ of Add to Cart requests are auto-fulfilled by AutoDS, with
+// zero perceived wait, AND zero frontend changes.
+//
+// Strategy:
+//   1. /api/product (PDP load) fires a fire-and-forget bridge wizard call
+//      for cache-miss ASINs. By the time the customer clicks Add to Cart
+//      (avg 60-180s on PDP), the wizard usually completed → cache hit on
+//      /api/prepare-cart → instant auto-fulfill.
+//
+//   2. /api/prepare-cart on cache miss waits for an in-flight wizard up to
+//      WIZARD_WAIT_MS (default 60s). If the wizard finishes in time, returns
+//      the wizard mapping (auto-fulfill ON). If it's still running OR there's
+//      no in-flight wizard, falls back to Admin API path (current behaviour,
+//      manual CSV email fulfill).
+//
+//   3. When the wizard eventually completes (even after the customer left),
+//      its mapping replaces the Admin API mapping in cache + DB. FUTURE
+//      customers for the same ASIN get auto-fulfill on cache hit.
+//
+// Feature flag: USE_ASYNC_WIZARD_PREPARE_CART=true  (default OFF)
+// Wait timeout: WIZARD_WAIT_MS=60000                 (default 60s)
+// ─────────────────────────────────────────────────────────────────────
+
+function _normaliseSelectedVariant(s) {
+  return (s || '').toString().trim().toLowerCase().replace(/^option:\s*/i, '');
+}
+
+function _resolveVariantId(variants, selectedVariant) {
+  if (!Array.isArray(variants) || variants.length === 0) return null;
+  const first = variants[0];
+  if (variants.length === 1 || !selectedVariant) return String(first.id);
+
+  const rawInput = String(selectedVariant).trim();
+  const svNorm = _normaliseSelectedVariant(rawInput);
+
+  let match = variants.find(v => {
+    if (!v.sku) return false;
+    const parts = String(v.sku).split('-');
+    const last = parts[parts.length - 1];
+    return last === rawInput || String(last).toLowerCase() === svNorm;
+  });
+
+  if (!match) {
+    match = variants.find(v => {
+      const vt = _normaliseSelectedVariant(v.title);
+      return vt === svNorm || vt.includes(svNorm) || svNorm.includes(vt);
+    });
+  }
+  if (!match && svNorm.includes(' / ')) {
+    const fragments = svNorm.split(' / ').map(s => s.trim()).filter(Boolean);
+    for (const frag of fragments) {
+      const hits = variants.filter(v => _normaliseSelectedVariant(v.title).includes(frag));
+      if (hits.length === 1) { match = hits[0]; break; }
+    }
+  }
+  return String((match || first).id);
+}
+
+/**
+ * Run a wizard job to completion. Updates cartJobs status + persists mapping
+ * to syncCache and DB on success. Always settles the job (ready or failed).
+ *
+ * Caller must have already created the job via cartJobs.createJob.
+ */
+async function _processWizardJob({ jobId, source, sourceId, productData, selectedVariant, sourceUrl, smid }) {
+  try {
+    logger.info('cart-wizard', `[${jobId}] start ${source}:${sourceId} smid=${smid || '-'}`);
+
+    const wizardRes = await callBridgeWizard({ source, sourceId, sourceUrl, smid });
+
+    if (wizardRes.ok && wizardRes.shopifyProductId) {
+      logger.info('cart-wizard', `[${jobId}] wizard OK shopify=${wizardRes.shopifyProductId} importJob=${wizardRes.autodsImportJobId || '-'}`);
+
+      let product = null;
+      try {
+        const resp = await shopifyAPIDirect(`/products/${wizardRes.shopifyProductId}.json?fields=id,handle,title,variants,status`);
+        product = resp && resp.product;
+      } catch (e) {
+        logger.warn('cart-wizard', `[${jobId}] shopify fetch failed after wizard: ${e.message}`);
+      }
+
+      if (product && Array.isArray(product.variants) && product.variants.length > 0) {
+        const variants = product.variants.map(v => ({
+          id: String(v.id),
+          title: v.title,
+          sku: v.sku || null,
+          price: v.price || null,
+          inventory_item_id: v.inventory_item_id || null
+        }));
+        const variantId = _resolveVariantId(variants, selectedVariant);
+        const mapping = {
+          shopifyProductId: String(product.id),
+          shopifyVariantId: variantId,
+          handle: product.handle,
+          variants
+        };
+
+        try {
+          const { syncCache } = require('./src/utils/cache');
+          syncCache.set(`mapping:${source}:${sourceId}`, mapping);
+        } catch (e) { /* non-fatal */ }
+        try {
+          const { upsertMapping } = require('./src/utils/db');
+          upsertMapping({
+            source,
+            sourceId,
+            sourceVariantId: selectedVariant ? String(selectedVariant) : null,
+            shopifyProductId: mapping.shopifyProductId,
+            shopifyVariantId: mapping.shopifyVariantId,
+            handle: mapping.handle,
+            price: variants[0].price || null,
+            originalPrice: null,
+            syncHash: 'wizard-' + Date.now()
+          });
+        } catch (e) {
+          logger.warn('cart-wizard', `[${jobId}] db.upsertMapping failed (non-fatal): ${e.message}`);
+        }
+
+        try {
+          const autodsService = require('./src/services/autods');
+          autodsService.registerProduct({
+            source, sourceId,
+            sourceUrl: sourceUrl || '',
+            shopifyProductId: mapping.shopifyProductId,
+            shopifyVariantId: mapping.shopifyVariantId,
+            shopifyHandle: mapping.handle,
+            sourceSellerId: smid || null,
+            sourceVariantId: selectedVariant ? String(selectedVariant).trim() : null
+          });
+        } catch (e) { /* non-fatal */ }
+
+        cartJobs.updateJob(jobId, {
+          status: 'ready',
+          autoFulfill: true,
+          result: {
+            success: true,
+            shopifyProductId: mapping.shopifyProductId,
+            shopifyVariantId: mapping.shopifyVariantId,
+            handle: mapping.handle,
+            quantity: 1,
+            availability: true,
+            isNewlyCreated: true,
+            autodsConnected: true,
+            autodsImportJobId: wizardRes.autodsImportJobId || null,
+            priceSnapshot: { price: parseFloat(variants[0].price || 0), compareAt: null, currency: 'USD' },
+            shippingSummary: { note: 'Standard shipping', deliveryLabel: null }
+          }
+        });
+        logger.info('cart-wizard', `[${jobId}] ready (wizard) variant=${variantId}`);
+        return;
+      }
+
+      logger.warn('cart-wizard', `[${jobId}] wizard returned shopifyProductId but Shopify lookup empty`);
+    } else {
+      logger.warn('cart-wizard', `[${jobId}] wizard not-ok: ${wizardRes.reason || 'unknown'}`);
+    }
+
+    // Wizard didn't yield a usable product — mark job failed so callers know to fall back.
+    cartJobs.updateJob(jobId, { status: 'failed', error: wizardRes.reason || 'wizard returned no product' });
+  } catch (e) {
+    logger.error('cart-wizard', `[${jobId}] crashed: ${e.message}`);
+    cartJobs.updateJob(jobId, { status: 'failed', error: e.message });
+  }
+}
+
+/**
+ * Fire-and-forget pre-warm: ensure a wizard call is in flight for source+sourceId.
+ * Returns the (possibly already existing) job. Safe to call repeatedly.
+ */
+function _kickoffWizardPrewarm({ source, sourceId, productData, selectedVariant, sourceUrl, smid }) {
+  if (process.env.USE_ASYNC_WIZARD_PREPARE_CART !== 'true') return null;
+  if (!process.env.AUTODS_BRIDGE_URL) return null;
+
+  const existing = cartJobs.findLiveJob(source, sourceId);
+  if (existing) return existing;
+
+  const job = cartJobs.createJob({
+    source, sourceId,
+    productPreview: {
+      title: productData?.title || null,
+      image: productData?.primaryImage || (productData?.images && productData.images[0]) || null,
+      price: productData?.price || null,
+      handle: productData?.normalizedHandle || null
+    }
+  });
+  // fire and forget — let the worker run in the background
+  setImmediate(() => {
+    _processWizardJob({
+      jobId: job.jobId,
+      source, sourceId, productData, selectedVariant,
+      sourceUrl: sourceUrl || productData?.sourceUrl || productData?.url || null,
+      smid: smid || productData?.bestOffer?.sellerId || productData?.rawSourceMeta?.bestOfferSellerId || null
+    }).catch(e => {
+      logger.error('cart-wizard', `[${job.jobId}] unhandled: ${e.message}`);
+      cartJobs.updateJob(job.jobId, { status: 'failed', error: e.message });
+    });
+  });
+  return job;
+}
+
+/**
+ * Block until an in-flight wizard finishes OR timeout elapses.
+ * Returns the latest job state (ready/failed) or pending if timed out.
+ */
+async function _awaitWizardJob(jobId, maxWaitMs) {
+  const start = Date.now();
+  const pollMs = 1000;
+  while (Date.now() - start < maxWaitMs) {
+    const job = cartJobs.getJob(jobId);
+    if (!job) return null;
+    if (job.status === 'ready' || job.status === 'failed') return job;
+    await new Promise(r => setTimeout(r, pollMs));
+  }
+  return cartJobs.getJob(jobId);
+}
+
 // ---- PREPARE CART (Sync + Add to Cart) ----
 app.post('/api/prepare-cart', async (req, res) => {
   const { source, sourceId, selectedVariant, quantity = 1, forceResync = false, productData: clientProductData } = req.body;
@@ -1465,7 +1720,43 @@ app.post('/api/prepare-cart', async (req, res) => {
       return res.status(404).json({ error: 'Product not found on source' });
     }
 
-    // 2. Sync to Shopify and get cart-ready data
+    // ── ASYNC WIZARD PATH (Fase 2) ──
+    // If the wizard pipeline is enabled and the bridge is configured, try the
+    // AutoDS Single Product wizard first so the resulting Shopify product is
+    // already Connected (auto-fulfill). If a wizard job is in flight (likely
+    // pre-warmed when the customer hit the PDP), wait up to WIZARD_WAIT_MS for
+    // it. If it finishes in time, return the wizard mapping. Otherwise fall
+    // through to the existing Admin API path (manual fulfill via CSV email,
+    // current behaviour).
+    if (
+      process.env.USE_ASYNC_WIZARD_PREPARE_CART === 'true' &&
+      process.env.AUTODS_BRIDGE_URL
+    ) {
+      const wizardWaitMs = parseInt(process.env.WIZARD_WAIT_MS || '60000', 10);
+      // Either reuse an in-flight job (PDP pre-warm) or kick off a new one
+      const job = _kickoffWizardPrewarm({
+        source: srcLower,
+        sourceId: srcId,
+        productData,
+        selectedVariant,
+        sourceUrl: productData.sourceUrl || productData.url || null,
+        smid: productData?.bestOffer?.sellerId || productData?.rawSourceMeta?.bestOfferSellerId || null
+      });
+      if (job) {
+        const settled = await _awaitWizardJob(job.jobId, wizardWaitMs);
+        if (settled && settled.status === 'ready' && settled.result) {
+          logger.info('cart', `wizard hit (job=${job.jobId}, autoFulfill=true) → ${srcLower}:${srcId}`);
+          return res.json(settled.result);
+        }
+        if (settled && settled.status === 'failed') {
+          logger.warn('cart', `wizard failed (job=${job.jobId}): ${settled.error || '?'} — falling back to Admin API`);
+        } else {
+          logger.info('cart', `wizard still pending after ${wizardWaitMs}ms (job=${job.jobId}) — falling back to Admin API. Future hits will benefit when wizard completes.`);
+        }
+      }
+    }
+
+    // 2. Sync to Shopify and get cart-ready data (Admin API path — fallback / default)
     const result = await prepareCart({
       source: srcLower,
       sourceId: srcId,

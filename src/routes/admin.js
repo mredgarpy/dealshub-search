@@ -1297,4 +1297,117 @@ router.post('/mappings/recover-from-shopify', async (req, res) => {
   }
 });
 
+/**
+ * GET /admin/debug/variant/:id
+ * Debug endpoint — returns full Shopify variant + parent product for inspection
+ */
+router.get('/debug/variant/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { shopifyAPI } = require('../services/shopify-sync');
+    const vResp = await shopifyAPI(`/variants/${id}.json`);
+    const variant = vResp && vResp.variant;
+    if (!variant) return res.status(404).json({ error: 'variant not found' });
+
+    let invLevels = null;
+    if (variant.inventory_item_id) {
+      try {
+        const lvls = await shopifyAPI(`/inventory_levels.json?inventory_item_ids=${variant.inventory_item_id}`);
+        invLevels = lvls && lvls.inventory_levels;
+      } catch (e) { /* ignore */ }
+    }
+
+    let invItem = null;
+    if (variant.inventory_item_id) {
+      try {
+        const it = await shopifyAPI(`/inventory_items/${variant.inventory_item_id}.json`);
+        invItem = it && it.inventory_item;
+      } catch (e) { /* ignore */ }
+    }
+
+    let product = null;
+    if (variant.product_id) {
+      try {
+        const p = await shopifyAPI(`/products/${variant.product_id}.json?fields=id,handle,title,status,published_at,published_scope,vendor`);
+        product = p && p.product;
+      } catch (e) { /* ignore */ }
+    }
+
+    res.json({ variant, inventoryLevels: invLevels, inventoryItem: invItem, product });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /admin/mappings/force-buyable
+ * Aggressive variant repair: sets inventory_management:null AND inventory_quantity
+ * via inventory_levels (in case some path still rejects).
+ *
+ * Body: { variantId } or { shopifyProductId }
+ */
+router.post('/mappings/force-buyable', async (req, res) => {
+  try {
+    const { variantId, shopifyProductId } = req.body || {};
+    const { shopifyAPI } = require('../services/shopify-sync');
+
+    let variants = [];
+    if (variantId) {
+      const v = await shopifyAPI(`/variants/${variantId}.json`);
+      if (v && v.variant) variants = [v.variant];
+    } else if (shopifyProductId) {
+      const p = await shopifyAPI(`/products/${shopifyProductId}.json?fields=id,variants`);
+      if (p && p.product) variants = p.product.variants || [];
+    } else {
+      return res.status(400).json({ error: 'variantId or shopifyProductId required' });
+    }
+
+    if (variants.length === 0) return res.status(404).json({ error: 'no variants' });
+
+    // Get default location for inventory_levels.set
+    let locationId = null;
+    try {
+      const locs = await shopifyAPI('/locations.json');
+      const loc = (locs.locations || []).find(l => l.active && l.legacy === false) || (locs.locations || [])[0];
+      locationId = loc && loc.id;
+    } catch (e) { /* ignore */ }
+
+    const results = [];
+    for (const v of variants) {
+      const r = { variantId: v.id, steps: [] };
+      // Step 1: PUT variant — force inventory_policy:continue + management:null
+      try {
+        await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
+          variant: { id: v.id, inventory_policy: 'continue', inventory_management: null, requires_shipping: true, taxable: true }
+        });
+        r.steps.push('variant-updated');
+      } catch (e) { r.steps.push('variant-update-failed:' + e.message); }
+
+      // Step 2: Connect inventory_item to default location with quantity 999
+      if (v.inventory_item_id && locationId) {
+        try {
+          await shopifyAPI('/inventory_levels/connect.json', 'POST', {
+            location_id: locationId,
+            inventory_item_id: v.inventory_item_id
+          });
+          r.steps.push('inventory-connected');
+        } catch (e) { /* may already be connected */ }
+        try {
+          await shopifyAPI('/inventory_levels/set.json', 'POST', {
+            location_id: locationId,
+            inventory_item_id: v.inventory_item_id,
+            available: 999
+          });
+          r.steps.push('inventory-set-999');
+        } catch (e) { r.steps.push('inventory-set-failed:' + e.message); }
+      }
+      results.push(r);
+    }
+
+    res.json({ success: true, locationId, results });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

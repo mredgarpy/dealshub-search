@@ -1204,4 +1204,79 @@ router.post('/mappings/bulk-import', (req, res) => {
   }
 });
 
+/**
+ * POST /admin/mappings/recover-from-shopify
+ * Recover a single mapping when the bridge wizard succeeded but our DOM
+ * extraction failed (modal empty, navigation killed context, etc).
+ *
+ * Caller already knows the shopifyProductId (visible in AutoDS dashboard
+ * "Sell Item ID"). We fetch the rest from Shopify Admin API and upsert.
+ *
+ * Body: { source, sourceId, shopifyProductId }
+ *   - source        e.g. "amazon"
+ *   - sourceId      e.g. "B0FSKVBD2X"
+ *   - shopifyProductId   e.g. "9048746164355"
+ */
+router.post('/mappings/recover-from-shopify', async (req, res) => {
+  try {
+    const { source, sourceId, shopifyProductId } = req.body || {};
+    if (!source || !sourceId || !shopifyProductId) {
+      return res.status(400).json({ success: false, error: 'source, sourceId, shopifyProductId required' });
+    }
+
+    const { shopifyAPI } = require('../services/shopify-sync');
+    const resp = await shopifyAPI(`/products/${shopifyProductId}.json?fields=id,handle,title,variants,status`);
+    const product = resp && resp.product;
+    if (!product) return res.status(404).json({ success: false, error: 'Shopify product not found' });
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    if (variants.length === 0) return res.status(404).json({ success: false, error: 'product has no variants' });
+
+    const firstVariant = variants[0];
+    const mapping = {
+      source: String(source).toLowerCase(),
+      sourceId: String(sourceId),
+      sourceVariantId: null,
+      shopifyProductId: String(product.id),
+      shopifyVariantId: String(firstVariant.id),
+      handle: product.handle,
+      price: firstVariant.price || null,
+      originalPrice: firstVariant.compare_at_price || null,
+      syncHash: 'wizard-recovery-' + Date.now()
+    };
+    upsertMapping(mapping);
+
+    // Also seed syncCache so next /api/prepare-cart hits it instantly
+    try {
+      const { syncCache } = require('../utils/cache');
+      syncCache.set(`mapping:${mapping.source}:${mapping.sourceId}`, {
+        shopifyProductId: mapping.shopifyProductId,
+        shopifyVariantId: mapping.shopifyVariantId,
+        handle: mapping.handle,
+        variants: variants.map(v => ({
+          id: String(v.id),
+          title: v.title,
+          sku: v.sku || null,
+          price: v.price || null
+        }))
+      });
+    } catch (e) { /* non-fatal */ }
+
+    logger.info('admin', `wizard-recovery: ${mapping.source}:${mapping.sourceId} -> ${mapping.shopifyProductId}/${mapping.shopifyVariantId} (${product.handle})`);
+    res.json({
+      success: true,
+      mapping: {
+        source: mapping.source,
+        sourceId: mapping.sourceId,
+        shopifyProductId: mapping.shopifyProductId,
+        shopifyVariantId: mapping.shopifyVariantId,
+        handle: mapping.handle,
+        variantCount: variants.length
+      }
+    });
+  } catch (e) {
+    logger.error('admin', 'wizard-recovery failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 module.exports = router;

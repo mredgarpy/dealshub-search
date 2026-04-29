@@ -1650,6 +1650,30 @@ function _kickoffWizardPrewarm({ source, sourceId, productData, selectedVariant,
     return null;
   }
 
+  // ── Mapping guard — never fire the wizard when we ALREADY have a Shopify
+  // product mapped to this ASIN (in syncCache OR persisted in SQLite). This
+  // prevents duplicate wizard runs after a Render restart wipes syncCache.
+  try {
+    const { syncCache } = require('./src/utils/cache');
+    if (syncCache.get(`mapping:${source}:${sourceId}`)) {
+      logger.info('cart-wizard', `[prewarm] skip ${source}:${sourceId} — mapping already in syncCache`);
+      return null;
+    }
+    const { findMapping } = require('./src/utils/db');
+    const dbm = findMapping(source, sourceId);
+    if (dbm && dbm.shopify_variant_id) {
+      logger.info('cart-wizard', `[prewarm] skip ${source}:${sourceId} — mapping in DB shopify=${dbm.shopify_product_id}`);
+      // Opportunistically seed syncCache so the next FAST PATH hits it
+      syncCache.set(`mapping:${source}:${sourceId}`, {
+        shopifyProductId: String(dbm.shopify_product_id),
+        shopifyVariantId: String(dbm.shopify_variant_id),
+        handle: dbm.shopify_handle,
+        variants: [{ id: String(dbm.shopify_variant_id), title: null, sku: null, price: dbm.last_price || null }]
+      });
+      return null;
+    }
+  } catch (e) { /* non-fatal — fall through to normal flow */ }
+
   // Dedup — same ASIN already in flight or recently completed
   const existing = cartJobs.findLiveJob(source, sourceId);
   if (existing) return existing;

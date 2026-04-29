@@ -1231,6 +1231,23 @@ router.post('/mappings/recover-from-shopify', async (req, res) => {
     const variants = Array.isArray(product.variants) ? product.variants : [];
     if (variants.length === 0) return res.status(404).json({ success: false, error: 'product has no variants' });
 
+    // ── REPAIR variants for buyability ──
+    // AutoDS creates products with inventory_management:shopify + inventory_policy:deny,
+    // so Shopify rejects /cart/add.js when inventory_quantity is 0. Force them to
+    // inventory_policy:continue + inventory_management:null so they can always be added.
+    let repaired = 0;
+    await Promise.allSettled(variants.map(async (v) => {
+      if (v.inventory_policy === 'continue' && !v.inventory_management) return;
+      try {
+        await shopifyAPI(`/variants/${v.id}.json`, 'PUT', {
+          variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
+        });
+        repaired++;
+      } catch (e) {
+        logger.warn('admin', `wizard-recovery variant ${v.id} repair failed: ${e.message}`);
+      }
+    }));
+
     const firstVariant = variants[0];
     const mapping = {
       source: String(source).toLowerCase(),
@@ -1261,7 +1278,7 @@ router.post('/mappings/recover-from-shopify', async (req, res) => {
       });
     } catch (e) { /* non-fatal */ }
 
-    logger.info('admin', `wizard-recovery: ${mapping.source}:${mapping.sourceId} -> ${mapping.shopifyProductId}/${mapping.shopifyVariantId} (${product.handle})`);
+    logger.info('admin', `wizard-recovery: ${mapping.source}:${mapping.sourceId} -> ${mapping.shopifyProductId}/${mapping.shopifyVariantId} (${product.handle}) [repaired ${repaired}/${variants.length}]`);
     res.json({
       success: true,
       mapping: {
@@ -1270,7 +1287,8 @@ router.post('/mappings/recover-from-shopify', async (req, res) => {
         shopifyProductId: mapping.shopifyProductId,
         shopifyVariantId: mapping.shopifyVariantId,
         handle: mapping.handle,
-        variantCount: variants.length
+        variantCount: variants.length,
+        variantsRepaired: repaired
       }
     });
   } catch (e) {

@@ -1476,6 +1476,21 @@ async function _processWizardJob({ jobId, source, sourceId, productData, selecte
       }
 
       if (product && Array.isArray(product.variants) && product.variants.length > 0) {
+        // ── REPAIR variants for buyability ──
+        // AutoDS creates products with inventory_management:shopify + inventory_policy:deny
+        // which causes /cart/add.js to fail with 422 "already sold out". Force them to
+        // inventory_policy:continue + inventory_management:null so customers can add.
+        await Promise.allSettled(product.variants.map(async (v) => {
+          if (v.inventory_policy === 'continue' && !v.inventory_management) return;
+          try {
+            await shopifyAPIDirect(`/variants/${v.id}.json`, 'PUT', {
+              variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
+            });
+          } catch (e) {
+            logger.warn('cart-wizard', `[${jobId}] variant ${v.id} repair failed: ${e.message}`);
+          }
+        }));
+
         const variants = product.variants.map(v => ({
           id: String(v.id),
           title: v.title,

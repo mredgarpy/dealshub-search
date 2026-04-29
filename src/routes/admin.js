@@ -1410,4 +1410,13 @@ router.post('/mappings/force-buyable', async (req, res) => {
   }
 });
 
+
+router.get('/debug/locations', async (req, res) => {
+  try {
+    const { shopifyAPI } = require('../services/shopify-sync');
+    const r = await shopifyAPI('/locations.json');
+    res.json(r);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;

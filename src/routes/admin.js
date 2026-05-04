@@ -1419,4 +1419,73 @@ router.get('/debug/locations', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/**
+ * GET /admin/oauth/callback
+ * OAuth callback for capturing the Admin API access_token after a Custom App
+ * is (re-)installed in the merchant's store. Trades the temporary `code` for
+ * a permanent access token by POSTing to {shop}/admin/oauth/access_token with
+ * the app's client_id + client_secret.
+ *
+ * Requires Render env vars:
+ *   SHOPIFY_APP_CLIENT_ID
+ *   SHOPIFY_APP_CLIENT_SECRET
+ *
+ * On success, displays the access_token in the response so the operator can
+ * copy it into SHOPIFY_ADMIN_TOKEN.
+ */
+router.get('/oauth/callback', async (req, res) => {
+  try {
+    const { code, shop, state, hmac } = req.query;
+    if (!code || !shop) {
+      return res.status(400).send(
+        '<h1>OAuth callback error</h1>' +
+        '<p>Missing <code>code</code> or <code>shop</code> in query string.</p>' +
+        '<pre>' + JSON.stringify(req.query, null, 2) + '</pre>'
+      );
+    }
+
+    const clientId = process.env.SHOPIFY_APP_CLIENT_ID;
+    const clientSecret = process.env.SHOPIFY_APP_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      return res.status(500).send(
+        '<h1>Server config error</h1>' +
+        '<p>SHOPIFY_APP_CLIENT_ID or SHOPIFY_APP_CLIENT_SECRET not set in env.</p>'
+      );
+    }
+
+    const fetch = require('node-fetch');
+    const tokenUrl = `https://${shop}/admin/oauth/access_token`;
+    const r = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code })
+    });
+    const data = await r.json();
+    if (!r.ok || !data.access_token) {
+      return res.status(502).send(
+        '<h1>Token exchange failed</h1>' +
+        '<pre>' + JSON.stringify(data, null, 2) + '</pre>'
+      );
+    }
+
+    logger.info('admin', `OAuth: captured access_token for shop=${shop} scope="${data.scope}"`);
+    // Render a clear page the operator can copy from
+    res.send(
+      `<!doctype html><html><head><meta charset="utf-8"><title>OAuth OK</title>` +
+      `<style>body{font-family:system-ui,-apple-system,sans-serif;background:#0a0e14;color:#cdd9e5;padding:32px;max-width:760px;margin:0 auto}` +
+      `code,pre{background:#1c2128;padding:6px 10px;border-radius:6px;display:block;word-break:break-all;color:#7ee787}` +
+      `h1{color:#7ee787}h3{color:#79c0ff;margin-top:24px}.note{background:#1f2937;border-left:4px solid #f0c674;padding:12px 16px;border-radius:6px;margin:16px 0}</style></head><body>` +
+      `<h1>✓ Access token captured</h1>` +
+      `<div class="note"><strong>Copy this token IMMEDIATELY</strong> and paste it into Render env var <code>SHOPIFY_ADMIN_TOKEN</code>. Then trigger a redeploy. This page will not be retrievable again.</div>` +
+      `<h3>Shop</h3><pre>${shop}</pre>` +
+      `<h3>Scopes granted</h3><pre>${data.scope || '(empty)'}</pre>` +
+      `<h3>Admin API access token</h3><pre>${data.access_token}</pre>` +
+      `</body></html>`
+    );
+  } catch (e) {
+    logger.error('admin', 'OAuth callback failed', { error: e.message });
+    res.status(500).send('<h1>OAuth callback error</h1><pre>' + e.message + '</pre>');
+  }
+});
+
 module.exports = router;

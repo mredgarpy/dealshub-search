@@ -1477,17 +1477,33 @@ async function _processWizardJob({ jobId, source, sourceId, productData, selecte
 
       if (product && Array.isArray(product.variants) && product.variants.length > 0) {
         // ── REPAIR variants for buyability ──
-        // AutoDS creates products with inventory_management:shopify + inventory_policy:deny
-        // which causes /cart/add.js to fail with 422 "already sold out". Force them to
-        // inventory_policy:continue + inventory_management:null so customers can add.
+        // AutoDS creates products with inventory_management:shopify + inventory_policy:deny,
+        // and inventory_item.tracked:true with quantity 0. /cart/add.js then rejects with
+        // 422 "already sold out". To make the variant always buyable instantly:
+        //   1. variant.inventory_policy:continue + inventory_management:null
+        //   2. inventory_item.tracked:false  (THE source-of-truth flag at runtime)
+        // Without (2) the storefront keeps treating it as sold out for ~30min until
+        // the cache invalidates.
         await Promise.allSettled(product.variants.map(async (v) => {
-          if (v.inventory_policy === 'continue' && !v.inventory_management) return;
-          try {
-            await shopifyAPIDirect(`/variants/${v.id}.json`, 'PUT', {
-              variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
-            });
-          } catch (e) {
-            logger.warn('cart-wizard', `[${jobId}] variant ${v.id} repair failed: ${e.message}`);
+          // Variant-level fix
+          if (!(v.inventory_policy === 'continue' && !v.inventory_management)) {
+            try {
+              await shopifyAPIDirect(`/variants/${v.id}.json`, 'PUT', {
+                variant: { id: v.id, inventory_policy: 'continue', inventory_management: null }
+              });
+            } catch (e) {
+              logger.warn('cart-wizard', `[${jobId}] variant ${v.id} repair failed: ${e.message}`);
+            }
+          }
+          // Inventory-item level fix — requires write_inventory scope
+          if (v.inventory_item_id) {
+            try {
+              await shopifyAPIDirect(`/inventory_items/${v.inventory_item_id}.json`, 'PUT', {
+                inventory_item: { id: v.inventory_item_id, tracked: false }
+              });
+            } catch (e) {
+              logger.warn('cart-wizard', `[${jobId}] inventory_item ${v.inventory_item_id} untrack failed: ${e.message}`);
+            }
           }
         }));
 

@@ -1589,11 +1589,12 @@ router.post('/mappings/bulk-recover-from-shopify', async (req, res) => {
  */
 router.post('/cleanup/duplicates', async (req, res) => {
   try {
-    const { dryRun = false, limit = 1000, throttleMs = 250 } = req.body || {};
+    const { dryRun = false, limit = 5000, throttleMs = 150 } = req.body || {};
     const { shopifyAPI } = require('../services/shopify-sync');
     const { findMapping } = require('../utils/db');
 
-    // Walk every product
+    // Walk every product. since_id pagination is monotonically ascending so
+    // we always reach the end. Cap to `limit` pages-worth.
     const all = [];
     let sinceId = 0;
     while (all.length < limit) {
@@ -1605,14 +1606,25 @@ router.post('/cleanup/duplicates', async (req, res) => {
       if (batch.length < 250) break;
     }
 
-    const HANDLE_RX = /^(amazon|aliexpress|macys|sephora|shein)-([a-z0-9]+)-/i;
+    // STRICT handle parser: only treat as AutoDS-created when the ID slot
+    // matches the per-source pattern. Otherwise we'd fold every "amazon-
+    // essentials-..." (real word from product title) into a fake source group.
+    function parseHandle(handle) {
+      const m = (handle || '').match(/^(amazon|aliexpress|macys|sephora|shein)-([a-z0-9]+)-/i);
+      if (!m) return null;
+      const src = m[1].toLowerCase();
+      const id  = m[2];
+      if (src === 'amazon'     && !/^B[0-9A-Z]{9}$/i.test(id)) return null;
+      if (src === 'aliexpress' && !/^\d{10,16}$/.test(id))     return null;
+      // macys/sephora/shein: trust the slug
+      return { source: src, sourceId: src === 'amazon' ? id.toUpperCase() : id };
+    }
+
     const groups = new Map();
     for (const p of all) {
-      const m = (p.handle || '').match(HANDLE_RX);
-      if (!m) continue;
-      const source = m[1].toLowerCase();
-      const sourceId = source === 'amazon' ? m[2].toUpperCase() : m[2];
-      const key = `${source}:${sourceId}`;
+      const parsed = parseHandle(p.handle);
+      if (!parsed) continue;
+      const key = `${parsed.source}:${parsed.sourceId}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(p);
     }

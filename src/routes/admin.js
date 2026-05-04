@@ -1383,23 +1383,18 @@ router.post('/mappings/force-buyable', async (req, res) => {
         r.steps.push('variant-updated');
       } catch (e) { r.steps.push('variant-update-failed:' + e.message); }
 
-      // Step 2: Connect inventory_item to default location with quantity 999
-      if (v.inventory_item_id && locationId) {
+      // Step 2: PUT inventory_item — force tracked:false so Shopify ignores stock
+      // entirely. This is the source-of-truth flag at runtime (the variant's
+      // inventory_management is partially deprecated). Without this, the
+      // storefront/cart still treats the variant as "sold out" even though
+      // inventory_management is null.
+      if (v.inventory_item_id) {
         try {
-          await shopifyAPI('/inventory_levels/connect.json', 'POST', {
-            location_id: locationId,
-            inventory_item_id: v.inventory_item_id
+          await shopifyAPI(`/inventory_items/${v.inventory_item_id}.json`, 'PUT', {
+            inventory_item: { id: v.inventory_item_id, tracked: false }
           });
-          r.steps.push('inventory-connected');
-        } catch (e) { /* may already be connected */ }
-        try {
-          await shopifyAPI('/inventory_levels/set.json', 'POST', {
-            location_id: locationId,
-            inventory_item_id: v.inventory_item_id,
-            available: 999
-          });
-          r.steps.push('inventory-set-999');
-        } catch (e) { r.steps.push('inventory-set-failed:' + e.message); }
+          r.steps.push('inventory-item-untracked');
+        } catch (e) { r.steps.push('inventory-item-untrack-failed:' + e.message); }
       }
       results.push(r);
     }

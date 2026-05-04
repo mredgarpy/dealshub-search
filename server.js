@@ -3786,6 +3786,23 @@ app.listen(PORT, () => {
   logger.info('server', `StyleHub backend v2.5 running on port ${PORT}`);
   logger.info('server', `Sources: ${VALID_SOURCES.join(', ')}`);
   logger.info('server', `Shopify: ${process.env.SHOPIFY_STORE_DOMAIN ? 'configured' : 'NOT configured'}`);
+
+  // ---- POSTGRES BACKUP RESTORE ----
+  // Render Free Tier wipes the SQLite filesystem on every deploy. If a
+  // DATABASE_URL is configured (Render Postgres), pull all persisted product
+  // mappings back into the in-process SQLite so the wizard pipeline never
+  // re-creates a duplicate Shopify product after a deploy.
+  if (process.env.DATABASE_URL) {
+    (async () => {
+      try {
+        const restored = await db.restoreMappingsFromBackup();
+        logger.info('server', `Postgres restore: ${restored} mapping(s) re-seeded into SQLite`);
+      } catch (e) {
+        logger.error('server', `Postgres restore failed: ${e.message}`);
+      }
+    })();
+  }
+
   // Warm up cache after server starts (don't await â let it run in background)
   setTimeout(warmUpCache, 2000);
 

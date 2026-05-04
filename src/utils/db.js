@@ -273,6 +273,7 @@ function findMapping(source, sourceId) {
 function upsertMapping(data) {
   const d = getDb();
   if (!d) return null;
+  let result = null;
   try {
     const stmt = d.prepare(`
       INSERT INTO product_mappings (source_store, source_product_id, source_variant_id,
@@ -289,7 +290,7 @@ function upsertMapping(data) {
         sync_status = 'synced',
         updated_at = datetime('now')
     `);
-    return stmt.run(
+    result = stmt.run(
       data.source, String(data.sourceId), data.sourceVariantId || null,
       data.shopifyProductId, data.shopifyVariantId, data.handle,
       data.price || null, data.originalPrice || null,
@@ -298,6 +299,74 @@ function upsertMapping(data) {
   } catch (e) {
     logger.error('db', 'upsertMapping failed', { error: e.message });
     return null;
+  }
+
+  // Mirror to persistent Postgres backup (no-op when DATABASE_URL unset).
+  // Async, fire-and-forget — SQLite is the source of truth at runtime.
+  try {
+    const pgBackup = require('./db-pg-backup');
+    pgBackup.backupMapping(data);
+  } catch (e) { /* non-fatal */ }
+
+  return result;
+}
+
+/**
+ * Restore mappings from Postgres backup (called on boot after Render Free
+ * wipes the SQLite filesystem). Inserts directly without re-mirroring back
+ * to PG (so no infinite loop). Returns the count restored.
+ */
+async function restoreMappingsFromBackup() {
+  const d = getDb();
+  if (!d) return 0;
+  let pgBackup;
+  try {
+    pgBackup = require('./db-pg-backup');
+  } catch (e) {
+    return 0;
+  }
+  if (!pgBackup.isEnabled()) return 0;
+  let rows = [];
+  try {
+    rows = await pgBackup.restoreMappings();
+  } catch (e) {
+    logger.error('db', `restoreMappings call failed: ${e.message}`);
+    return 0;
+  }
+  if (!rows || rows.length === 0) return 0;
+
+  const stmt = d.prepare(`
+    INSERT INTO product_mappings (source_store, source_product_id, source_variant_id,
+      shopify_product_id, shopify_variant_id, shopify_handle, last_price, last_original_price,
+      sync_hash, sync_status, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', datetime('now'))
+    ON CONFLICT(source_store, source_product_id) DO UPDATE SET
+      shopify_product_id = excluded.shopify_product_id,
+      shopify_variant_id = excluded.shopify_variant_id,
+      shopify_handle = excluded.shopify_handle,
+      last_price = excluded.last_price,
+      last_original_price = excluded.last_original_price,
+      sync_hash = excluded.sync_hash,
+      sync_status = 'synced',
+      updated_at = datetime('now')
+  `);
+  const tx = d.transaction((rows) => {
+    for (const r of rows) {
+      stmt.run(
+        r.source, String(r.sourceId), r.sourceVariantId || null,
+        r.shopifyProductId, r.shopifyVariantId, r.handle,
+        r.price || null, r.originalPrice || null,
+        r.syncHash || null
+      );
+    }
+  });
+  try {
+    tx(rows);
+    logger.info('db', `Restored ${rows.length} mapping(s) from Postgres backup`);
+    return rows.length;
+  } catch (e) {
+    logger.error('db', `restoreMappingsFromBackup tx failed: ${e.message}`);
+    return 0;
   }
 }
 
@@ -593,8 +662,17 @@ function deleteMapping(id) {
   const d = getDb();
   if (!d) return false;
   try {
+    // Capture source/sourceId before delete so we can mirror the delete to PG
+    const row = d.prepare('SELECT source_store, source_product_id FROM product_mappings WHERE id = ?').get(id);
     const stmt = d.prepare('DELETE FROM product_mappings WHERE id = ?');
-    return stmt.run(id).changes > 0;
+    const ok = stmt.run(id).changes > 0;
+    if (ok && row) {
+      try {
+        const pgBackup = require('./db-pg-backup');
+        pgBackup.deleteBackupMapping(row.source_store, row.source_product_id);
+      } catch (e) { /* non-fatal */ }
+    }
+    return ok;
   } catch (e) {
     logger.error('db', 'deleteMapping failed', { error: e.message });
     return false;
@@ -843,6 +921,7 @@ module.exports = {
   DEFAULT_SHIPPING_BUFFERS,
   findMapping,
   upsertMapping,
+  restoreMappingsFromBackup,
   logSync,
   getAllMappings,
   getMappingCount,

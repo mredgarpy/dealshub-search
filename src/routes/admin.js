@@ -1483,4 +1483,99 @@ router.get('/oauth/callback', async (req, res) => {
   }
 });
 
+/**
+ * POST /admin/mappings/bulk-recover-from-shopify
+ * Walk every Shopify product and recover the mapping when the handle has the
+ * AutoDS-created shape:
+ *   amazon-{asin}-{slug}        → source=amazon,    sourceId={asin}
+ *   aliexpress-{itemId}-{slug}  → source=aliexpress sourceId={itemId}
+ *
+ * Useful after Postgres backup activation to back-fill the mappings the
+ * wizard pipeline created before persistence existed.
+ *
+ * Body: { limit?: number, dryRun?: boolean }
+ */
+router.post('/mappings/bulk-recover-from-shopify', async (req, res) => {
+  try {
+    const { limit = 250, dryRun = false } = req.body || {};
+    const { shopifyAPI } = require('../services/shopify-sync');
+    const { findMapping } = require('../utils/db');
+
+    // Walk products via REST pagination (since_id)
+    const all = [];
+    let sinceId = 0;
+    let pageCount = 0;
+    const maxPages = 10;
+    while (pageCount < maxPages) {
+      const resp = await shopifyAPI(`/products.json?limit=250&since_id=${sinceId}&fields=id,handle,variants,status`);
+      const batch = (resp && resp.products) || [];
+      if (batch.length === 0) break;
+      all.push(...batch);
+      sinceId = batch[batch.length - 1].id;
+      pageCount++;
+      if (batch.length < 250) break;
+      if (all.length >= limit) break;
+    }
+
+    const HANDLE_RX = /^(amazon|aliexpress|macys|sephora|shein)-([a-z0-9]+)-/i;
+    const recovered = [];
+    const skipped = [];
+    const errors = [];
+
+    for (const p of all.slice(0, limit)) {
+      const m = (p.handle || '').match(HANDLE_RX);
+      if (!m) { skipped.push({ id: p.id, handle: p.handle, reason: 'unparseable-handle' }); continue; }
+      const source = m[1].toLowerCase();
+      const sourceId = source === 'amazon' ? m[2].toUpperCase() : m[2];
+
+      // Skip already-mapped (newest wins; keep existing)
+      const existing = findMapping(source, sourceId);
+      if (existing && existing.shopify_product_id == p.id) {
+        skipped.push({ id: p.id, handle: p.handle, reason: 'already-mapped' });
+        continue;
+      }
+
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      if (variants.length === 0) { skipped.push({ id: p.id, handle: p.handle, reason: 'no-variants' }); continue; }
+      const firstVariant = variants[0];
+
+      if (dryRun) {
+        recovered.push({ source, sourceId, shopifyProductId: p.id, shopifyVariantId: firstVariant.id, handle: p.handle, action: 'would-upsert' });
+        continue;
+      }
+
+      try {
+        upsertMapping({
+          source,
+          sourceId,
+          sourceVariantId: null,
+          shopifyProductId: String(p.id),
+          shopifyVariantId: String(firstVariant.id),
+          handle: p.handle,
+          price: firstVariant.price || null,
+          originalPrice: firstVariant.compare_at_price || null,
+          syncHash: 'bulk-recover-' + Date.now()
+        });
+        recovered.push({ source, sourceId, shopifyProductId: p.id, shopifyVariantId: firstVariant.id, handle: p.handle });
+      } catch (e) {
+        errors.push({ id: p.id, handle: p.handle, error: e.message });
+      }
+    }
+
+    logger.info('admin', `bulk-recover: scanned=${all.length} recovered=${recovered.length} skipped=${skipped.length} errors=${errors.length} dryRun=${dryRun}`);
+    res.json({
+      success: true,
+      dryRun,
+      scanned: all.length,
+      recovered: recovered.length,
+      skipped: skipped.length,
+      errors: errors.length,
+      details: { recovered, skipped: skipped.slice(0, 50), errors }
+    });
+  } catch (e) {
+    logger.error('admin', 'bulk-recover-from-shopify failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 module.exports = router;

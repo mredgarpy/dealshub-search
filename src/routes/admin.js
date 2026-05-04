@@ -1168,6 +1168,85 @@ router.post('/cron/stop', (req, res) => {
   }
 });
 
+// ============================================================
+// AUTODS PURGE — Free slots in AutoDS plan by deleting unused products
+// ============================================================
+const autodsPurge = require('../services/autods-purge');
+
+/**
+ * POST /admin/autods/purge
+ * Trigger an AutoDS slot purge. Deletes the oldest never-ordered Shopify
+ * products synced via the AutoDS wizard, freeing slots in the plan cap.
+ *
+ * Body:
+ *   - dryRun: boolean (default false) — preview without deleting
+ *   - limit:  number  (default auto)  — override # of products to delete
+ *   - force:  boolean (default false) — bypass the threshold check
+ *
+ * Threshold behavior: if currentCount < AUTODS_PURGE_THRESHOLD (450 by
+ * default), the run is skipped unless force=true.
+ */
+router.post('/autods/purge', async (req, res) => {
+  try {
+    const { dryRun, limit, force } = req.body || {};
+    const result = await autodsPurge.runPurge({
+      dryRun: !!dryRun,
+      limit: limit ? parseInt(limit, 10) : null,
+      force: !!force
+    });
+    if (result.error === 'already_running') {
+      return res.status(409).json({ success: false, error: 'Purge already running', progress: result.progress });
+    }
+    res.json({ success: true, ...result });
+  } catch (e) {
+    logger.error('admin', 'POST /autods/purge failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * GET /admin/autods/purge/status
+ * Returns last purge run + current job progress (if running).
+ */
+router.get('/autods/purge/status', (req, res) => {
+  try {
+    const status = autodsPurge.loadStatus();
+    const progress = autodsPurge.getProgress();
+    const currentCount = autodsPurge.countAutodsProducts();
+    const config = autodsPurge._config();
+    res.json({
+      success: true,
+      isRunning: autodsPurge.isRunning(),
+      currentCount,
+      config,
+      progress,
+      status
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+/**
+ * GET /admin/autods/purge/candidates
+ * Inspect what *would* be deleted on the next run without triggering it.
+ * Query params: limit (default 50)
+ */
+router.get('/autods/purge/candidates', (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    const candidates = autodsPurge.findCandidates(limit);
+    res.json({
+      success: true,
+      currentCount: autodsPurge.countAutodsProducts(),
+      config: autodsPurge._config(),
+      candidates
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 
 /**
  * POST /admin/mappings/bulk-import

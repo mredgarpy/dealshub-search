@@ -3816,6 +3816,17 @@ app.listen(PORT, () => {
     logger.warn('server', `cron-resync scheduler failed to start: ${e.message}`);
   }
 
+  // ---- AUTODS PURGE SCHEDULER ----
+  // Daily check + delete of oldest unsold AutoDS-synced products once we
+  // cross the slot threshold. First run 90min after boot; recurs every 24h.
+  // Manual trigger via POST /api/admin/autods/purge.
+  try {
+    const autodsPurge = require('./src/services/autods-purge');
+    autodsPurge.startScheduler();
+  } catch (e) {
+    logger.warn('server', `autods-purge scheduler failed to start: ${e.message}`);
+  }
+
   // ---- KEEP-ALIVE SELF-PING ----
   // Render free tier spins down after ~15min of inactivity.
   // This pings /health every 12 minutes to prevent cold starts.

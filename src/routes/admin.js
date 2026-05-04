@@ -1578,4 +1578,113 @@ router.post('/mappings/bulk-recover-from-shopify', async (req, res) => {
   }
 });
 
+/**
+ * POST /admin/cleanup/duplicates
+ * Find Shopify products that share the same parsed (source, sourceId) and
+ * delete the duplicates. The "canonical" survivor is the product currently
+ * referenced by the DB mapping; if no mapping exists, the most-recent
+ * product wins and gets recorded as the new mapping.
+ *
+ * Body: { dryRun?: boolean, limit?: number, throttleMs?: number }
+ */
+router.post('/cleanup/duplicates', async (req, res) => {
+  try {
+    const { dryRun = false, limit = 1000, throttleMs = 250 } = req.body || {};
+    const { shopifyAPI } = require('../services/shopify-sync');
+    const { findMapping } = require('../utils/db');
+
+    // Walk every product
+    const all = [];
+    let sinceId = 0;
+    while (all.length < limit) {
+      const resp = await shopifyAPI(`/products.json?limit=250&since_id=${sinceId}&fields=id,handle,variants,created_at`);
+      const batch = (resp && resp.products) || [];
+      if (batch.length === 0) break;
+      all.push(...batch);
+      sinceId = batch[batch.length - 1].id;
+      if (batch.length < 250) break;
+    }
+
+    const HANDLE_RX = /^(amazon|aliexpress|macys|sephora|shein)-([a-z0-9]+)-/i;
+    const groups = new Map();
+    for (const p of all) {
+      const m = (p.handle || '').match(HANDLE_RX);
+      if (!m) continue;
+      const source = m[1].toLowerCase();
+      const sourceId = source === 'amazon' ? m[2].toUpperCase() : m[2];
+      const key = `${source}:${sourceId}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(p);
+    }
+
+    const dupGroups = Array.from(groups.entries()).filter(([k, v]) => v.length > 1);
+
+    const deleted = [];
+    const kept = [];
+    const errors = [];
+
+    for (const [key, products] of dupGroups) {
+      const [source, sourceId] = key.split(':');
+      // Decide canonical: existing DB mapping wins; else the most-recent product
+      const existing = findMapping(source, sourceId);
+      let canonical = null;
+      if (existing && existing.shopify_product_id) {
+        canonical = products.find(p => String(p.id) === String(existing.shopify_product_id));
+      }
+      if (!canonical) {
+        // Pick the most recent (highest id is also most recent for Shopify)
+        canonical = products.slice().sort((a, b) => Number(b.id) - Number(a.id))[0];
+      }
+      kept.push({ source, sourceId, canonicalId: canonical.id, handle: canonical.handle });
+
+      // Re-record canonical mapping (so Postgres backup catches it)
+      if (!dryRun && canonical.variants && canonical.variants.length > 0) {
+        try {
+          upsertMapping({
+            source, sourceId,
+            sourceVariantId: null,
+            shopifyProductId: String(canonical.id),
+            shopifyVariantId: String(canonical.variants[0].id),
+            handle: canonical.handle,
+            price: canonical.variants[0].price || null,
+            originalPrice: canonical.variants[0].compare_at_price || null,
+            syncHash: 'cleanup-canonical-' + Date.now()
+          });
+        } catch (e) { /* non-fatal */ }
+      }
+
+      // Delete all other products in this group
+      for (const p of products) {
+        if (String(p.id) === String(canonical.id)) continue;
+        if (dryRun) {
+          deleted.push({ source, sourceId, deletedId: p.id, handle: p.handle, canonicalId: canonical.id, action: 'would-delete' });
+          continue;
+        }
+        try {
+          await shopifyAPI(`/products/${p.id}.json`, 'DELETE');
+          deleted.push({ source, sourceId, deletedId: p.id, handle: p.handle, canonicalId: canonical.id });
+          if (throttleMs > 0) await new Promise(r => setTimeout(r, throttleMs));
+        } catch (e) {
+          errors.push({ id: p.id, handle: p.handle, error: e.message });
+        }
+      }
+    }
+
+    logger.info('admin', `cleanup-duplicates: scanned=${all.length} dupGroups=${dupGroups.length} kept=${kept.length} deleted=${deleted.length} errors=${errors.length} dryRun=${dryRun}`);
+    res.json({
+      success: true,
+      dryRun,
+      scanned: all.length,
+      duplicateGroups: dupGroups.length,
+      kept: kept.length,
+      deleted: deleted.length,
+      errors: errors.length,
+      sample: { kept: kept.slice(0, 10), deleted: deleted.slice(0, 10), errors }
+    });
+  } catch (e) {
+    logger.error('admin', 'cleanup-duplicates failed', { error: e.message });
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 module.exports = router;

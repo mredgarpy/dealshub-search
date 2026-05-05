@@ -196,8 +196,12 @@ async function runPurge(opts = {}) {
   const toDelete  = Math.min(desired, PURGE_BATCH_LIMIT);
   const candidates = findCandidates(toDelete);
 
+  // Capture startedAt locally so the response can return it even if the
+  // async IIFE finishes (and nulls _runningJob) before this function returns,
+  // which is what happens when candidates.length === 0.
+  const startedAt = new Date().toISOString();
   _runningJob = {
-    startedAt: new Date().toISOString(),
+    startedAt,
     currentCount,
     target: PURGE_TARGET,
     plannedDeletes: candidates.length,
@@ -209,7 +213,7 @@ async function runPurge(opts = {}) {
   };
 
   const status = loadStatus();
-  status.lastRun = _runningJob.startedAt;
+  status.lastRun = startedAt;
   status.lastStatus = dryRun ? 'dry-running' : 'running';
   saveStatus(status);
 
@@ -307,7 +311,7 @@ async function runPurge(opts = {}) {
     currentCount,
     target: PURGE_TARGET,
     plannedDeletes: candidates.length,
-    startedAt: _runningJob.startedAt
+    startedAt
   };
 }
 

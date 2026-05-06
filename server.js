@@ -1825,7 +1825,25 @@ async function _awaitWizardJob(jobId, maxWaitMs) {
 
 // ---- PREPARE CART (Sync + Add to Cart) ----
 app.post('/api/prepare-cart', async (req, res) => {
-  const { source, sourceId, selectedVariant, quantity = 1, forceResync = false, productData: clientProductData } = req.body;
+  const { source, sourceId, selectedVariant, selectedVariantLabel, quantity = 1, forceResync = false, productData: clientProductData } = req.body;
+  // Frontend sends `selectedVariant` as the SOURCE-side identifier (Amazon
+  // ASIN like "B010GNWPMQ") and `selectedVariantLabel` as the human-readable
+  // option title ("Color: Cherry Frost"). The Shopify variants imported by
+  // AutoDS are titled with color names ("Cherry Frost", "Pink Ice", ...) —
+  // ASIN is not in their title or SKU. So if we only try to match the ASIN
+  // against Shopify variant titles, we always fall back to variants[0] (the
+  // first imported color, e.g. "Honolulu Is Calling") and the cart shows
+  // the wrong variant. Build a list of candidate match keys: try the label
+  // (color name) FIRST, then the ASIN as fallback.
+  const _matchKeys = [];
+  if (selectedVariantLabel) {
+    const lbl = String(selectedVariantLabel).trim();
+    _matchKeys.push(lbl);
+    // Strip "Color: " or "Option: " prefix when present
+    const stripped = lbl.replace(/^(?:color|option|size|style|colour)\s*:\s*/i, '').trim();
+    if (stripped && stripped !== lbl) _matchKeys.push(stripped);
+  }
+  if (selectedVariant) _matchKeys.push(String(selectedVariant).trim());
 
   if (!source || !sourceId) {
     return res.status(400).json({ error: 'Missing source or sourceId' });
@@ -1855,41 +1873,44 @@ app.post('/api/prepare-cart', async (req, res) => {
     if (cachedMapping && cachedMapping.shopifyVariantId) {
       // FAST PATH: Already synced, skip source API entirely
       let variantId = cachedMapping.shopifyVariantId;
-      if (selectedVariant && cachedMapping.variants?.length > 1) {
-        const norm = s => (s || '').trim().toLowerCase().replace(/^option:\s*/i, '');
-        const rawInput = String(selectedVariant).trim();
-        const svNorm = norm(rawInput);
-
-        // Strategy 1 (v2.7): Match by SKU suffix (source variant ID / ASIN).
-        // SKU format: DH-<SOURCE>-<sourceId>-<sourceVariantId>. Frontend can send
-        // the raw child ASIN (e.g. "B0B4PLR1K5") as selectedVariant — this is
-        // now the preferred path from Amazon PDP to avoid the " / "-join bug.
-        const skuMatch = cachedMapping.variants.find(v => {
-          if (!v.sku) return false;
-          const parts = String(v.sku).split('-');
-          const last = parts[parts.length - 1];
-          return last === rawInput || String(last).toLowerCase() === svNorm;
-        });
-
-        let match = skuMatch;
-        if (!match) {
-          // Strategy 2: Exact title, or unambiguous contains in either direction
+      if (_matchKeys.length && cachedMapping.variants?.length > 1) {
+        const norm = s => (s || '').trim().toLowerCase().replace(/^(?:color|option|size|style|colour)\s*:\s*/i, '').trim();
+        let match = null;
+        // Try each candidate key (label first, then ASIN/raw input). For each
+        // key, try strategies 1→3. First key + strategy that produces a hit wins.
+        for (const key of _matchKeys) {
+          if (match) break;
+          const rawInput = String(key).trim();
+          const svNorm = norm(rawInput);
+          // Strategy 1: Match by SKU last segment (DH-SOURCE-srcId-srcVarId).
+          match = cachedMapping.variants.find(v => {
+            if (!v.sku) return false;
+            const parts = String(v.sku).split('-');
+            const last = parts[parts.length - 1];
+            return last === rawInput || String(last).toLowerCase() === svNorm;
+          });
+          if (match) break;
+          // Strategy 2: Title equality / containment in either direction
           match = cachedMapping.variants.find(v => {
             const vt = norm(v.title);
             return vt === svNorm || vt.includes(svNorm) || svNorm.includes(vt);
           });
-        }
-        if (!match && svNorm.includes(' / ')) {
-          // Strategy 3: Frontend may have sent concatenated labels like
-          // "Tropical / 3 Count (Pack of 1)". Split and look for a UNIQUE
-          // variant whose title contains any one fragment.
-          const fragments = svNorm.split(' / ').map(s => s.trim()).filter(Boolean);
-          for (const frag of fragments) {
-            const hits = cachedMapping.variants.filter(v => norm(v.title).includes(frag));
-            if (hits.length === 1) { match = hits[0]; break; }
+          if (match) break;
+          // Strategy 3: Concatenated " / "-fragments — split and find unique title hit
+          if (svNorm.includes(' / ')) {
+            const fragments = svNorm.split(' / ').map(s => s.trim()).filter(Boolean);
+            for (const frag of fragments) {
+              const hits = cachedMapping.variants.filter(v => norm(v.title).includes(frag));
+              if (hits.length === 1) { match = hits[0]; break; }
+            }
           }
         }
-        if (match) variantId = match.id;
+        if (match) {
+          variantId = match.id;
+          logger.info('cart', `FAST PATH variant matched via keys=${JSON.stringify(_matchKeys.slice(0,2))} → ${variantId} (${match.title || '?'})`);
+        } else {
+          logger.warn('cart', `FAST PATH no variant match for keys=${JSON.stringify(_matchKeys.slice(0,2))} — defaulting to ${variantId}`);
+        }
       }
       logger.info('cart', 'FAST PATH: cache hit, skipping source fetch', { source: srcLower, sourceId: srcId, variantId });
       return res.json({
@@ -1973,13 +1994,24 @@ app.post('/api/prepare-cart', async (req, res) => {
           // on the PDP — honor THAT against the full variants list cached by
           // _processWizardJob in syncCache.
           let finalResult = settled.result;
-          if (selectedVariant) {
+          if (_matchKeys.length) {
             try {
               const cm = syncCache.get(`mapping:${srcLower}:${srcId}`);
               if (cm && Array.isArray(cm.variants) && cm.variants.length > 1) {
-                const newVariantId = _resolveVariantId(cm.variants, selectedVariant);
+                let newVariantId = null;
+                for (const key of _matchKeys) {
+                  const candidate = _resolveVariantId(cm.variants, key);
+                  if (candidate && String(candidate) !== String(cm.variants[0].id)) {
+                    // Found a non-default match (i.e. _resolveVariantId actually
+                    // matched something rather than falling back to variants[0])
+                    newVariantId = candidate;
+                    break;
+                  }
+                  // If we only get the first variant id back, try the next key
+                  if (!newVariantId && candidate) newVariantId = candidate;
+                }
                 if (newVariantId && String(newVariantId) !== String(finalResult.shopifyVariantId)) {
-                  logger.info('cart', `wizard variant re-resolved post-settle: '${selectedVariant}' → ${newVariantId} (was ${finalResult.shopifyVariantId})`);
+                  logger.info('cart', `wizard variant re-resolved post-settle: keys=${JSON.stringify(_matchKeys.slice(0,2))} → ${newVariantId} (was ${finalResult.shopifyVariantId})`);
                   finalResult = { ...finalResult, shopifyVariantId: newVariantId };
                 }
               }

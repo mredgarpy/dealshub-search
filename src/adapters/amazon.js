@@ -572,16 +572,30 @@ class AmazonAdapter extends BaseAdapter {
         });
       }
 
-      // Mark the current product's own variant as unavailable if the product itself is out of stock
+      // Force the current product's own variant to match the product-level stock
+      // signal. RapidAPI has TWO known quirks here:
+      //   1. (already covered) When the queried product is genuinely out of
+      //      stock, mark the matching variant entry as unavailable so the PDP
+      //      crosses it out.
+      //   2. (NEW 2026-05-06) When the queried product is in stock, RapidAPI
+      //      sometimes returns `is_available: false` ON THAT SAME variant entry
+      //      while marking all the OTHER variants as available — likely
+      //      because Amazon's PDP doesn't render an "available" badge inline
+      //      for the SELECTED variant (it's already shown as the main product).
+      //      We saw this with B010GNWPMQ (Cherry Frost): product = "In Stock",
+      //      but the Cherry Frost color row came back as is_available=false,
+      //      so the storefront defaulted away from it. Trust p.availability
+      //      over the per-variant flag for the queried ASIN.
       const currentAsin = String(d.asin || asin || '');
-      const isCurrentOutOfStock = p.stockSignal === 'out_of_stock' ||
-        (p.availability && /unavailable|out\s*of\s*stock/i.test(p.availability));
-      if (isCurrentOutOfStock && currentAsin) {
+      const productInStock    = p.stockSignal === 'in_stock'    || (p.availability && /in\s*stock/i.test(p.availability));
+      const productOutOfStock = p.stockSignal === 'out_of_stock' || (p.availability && /unavailable|out\s*of\s*stock/i.test(p.availability));
+      if (currentAsin && (productInStock || productOutOfStock)) {
+        const forced = !!productInStock; // explicit in-stock wins; otherwise out-of-stock
         for (const g of Object.values(groups)) {
           g.values.forEach(v => {
-            if (v.asin === currentAsin) {
-              v.is_available = false;
-              logger.info('amazon', `Marked variant ${currentAsin} as unavailable (product out of stock)`);
+            if (v.asin === currentAsin && v.is_available !== forced) {
+              v.is_available = forced;
+              logger.info('amazon', `Forced variant ${currentAsin} availability=${forced} to match product state (was ${!forced})`);
             }
           });
         }

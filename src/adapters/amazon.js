@@ -601,6 +601,36 @@ class AmazonAdapter extends BaseAdapter {
         }
       }
 
+      // Force `selected: true` on the queried ASIN's variant entry. RapidAPI
+      // returns `is_selected: false` on every entry (it's only set for the
+      // ACTUAL "highlighted" variant on Amazon's page, which depends on
+      // session/locale and is unreliable for our use). The PDP storefront
+      // uses this flag to decide which color/size swatch gets the red
+      // outline when the page first paints — without it the frontend
+      // defaults to the FIRST AVAILABLE entry (e.g. "A Short Affair") even
+      // when the URL clearly says id=B010GNWPMQ (Cherry Frost). We also
+      // unset selected on every other entry to avoid duplicate highlighting.
+      if (currentAsin) {
+        for (const g of Object.values(groups)) {
+          // Only force `selected` on the group whose values actually have
+          // ASINs (color group, size group when isColorNav). Skip pure
+          // text-only groups where ASIN is null.
+          const groupHasAsins = g.values.some(v => v.asin);
+          if (!groupHasAsins) continue;
+          let matched = false;
+          g.values.forEach(v => {
+            if (v.asin === currentAsin) {
+              v.selected = true;
+              matched = true;
+            } else if (v.selected === true) {
+              // Only one swatch may be "selected" per group — clear stale ones.
+              v.selected = false;
+            }
+          });
+          if (matched) logger.info('amazon', `Forced selected=true on ${g.name}: ${currentAsin}`);
+        }
+      }
+
       p.options = Object.values(groups);
       p.variants = allVariants.filter(v => v && typeof v === 'object').map(v => ({
         id: v.asin || '',

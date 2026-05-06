@@ -1966,7 +1966,26 @@ app.post('/api/prepare-cart', async (req, res) => {
         const settled = await _awaitWizardJob(job.jobId, wizardWaitMs);
         if (settled && settled.status === 'ready' && settled.result) {
           logger.info('cart', `wizard hit (job=${job.jobId}, autoFulfill=true) → ${srcLower}:${srcId}`);
-          return res.json(settled.result);
+          // Re-resolve variant: settled.result.shopifyVariantId was decided at
+          // wizard-job-creation time (when pre-warm fired and selectedVariant
+          // was usually null), so it points at variants[0] (the Shopify
+          // product's first variant). The user has just chosen a real variant
+          // on the PDP — honor THAT against the full variants list cached by
+          // _processWizardJob in syncCache.
+          let finalResult = settled.result;
+          if (selectedVariant) {
+            try {
+              const cm = syncCache.get(`mapping:${srcLower}:${srcId}`);
+              if (cm && Array.isArray(cm.variants) && cm.variants.length > 1) {
+                const newVariantId = _resolveVariantId(cm.variants, selectedVariant);
+                if (newVariantId && String(newVariantId) !== String(finalResult.shopifyVariantId)) {
+                  logger.info('cart', `wizard variant re-resolved post-settle: '${selectedVariant}' → ${newVariantId} (was ${finalResult.shopifyVariantId})`);
+                  finalResult = { ...finalResult, shopifyVariantId: newVariantId };
+                }
+              }
+            } catch (e) { logger.warn('cart', `variant re-resolution failed (non-fatal): ${e.message}`); }
+          }
+          return res.json(finalResult);
         }
         if (settled && settled.status === 'failed') {
           logger.warn('cart', `wizard failed (job=${job.jobId}): ${settled.error || '?'} — falling back to Admin API`);

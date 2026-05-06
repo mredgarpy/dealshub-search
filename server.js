@@ -1453,6 +1453,54 @@ function _resolveVariantId(variants, selectedVariant) {
 }
 
 /**
+ * Fallback: find a recently-created Shopify product by handle prefix.
+ *
+ * Why this exists: the AutoDS modal-scraping path in the bridge can fail to
+ * extract `shopify_product_id` when:
+ *   - the modal HTML changed (selectors out of date), or
+ *   - the import returned "already exists" instead of a fresh draft modal
+ * In both cases AutoDS has *actually created* a Shopify product with a
+ * predictable handle (`amazon-{asin}-{slug}` / `aliexpress-{id}-{slug}` /
+ * etc.), so we can find it via Shopify Admin API search by created_at.
+ *
+ * Returns the matched product object {id, handle, title, variants} or null.
+ *
+ * Costs: 1 GET request to /products.json. Cheap enough to call as a default
+ * recovery path on every shopifyProductId=null response.
+ */
+async function _findShopifyProductByHandlePrefix(source, sourceId) {
+  try {
+    const handlePrefix = `${source}-${String(sourceId).toLowerCase()}-`;
+    // Look at products created in the last 30 minutes — the wizard fired
+    // moments ago, so the right product is recent. Newest first.
+    const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const url = `/products.json?created_at_min=${encodeURIComponent(since)}&limit=50&fields=id,handle,title,variants,created_at`;
+    const resp = await shopifyAPIDirect(url);
+    const products = (resp && resp.products) || [];
+    const match = products.find(p => (p.handle || '').toLowerCase().startsWith(handlePrefix));
+    if (match) {
+      logger.info('cart-wizard-fallback', `Recovered ${source}:${sourceId} via handle prefix → shopify=${match.id} handle=${match.handle}`);
+      return match;
+    }
+    // Second pass: in case the AutoDS import was older than 30 min (we hit
+    // "already exists"), scan newer products with no time filter but capped.
+    // This is bounded — Shopify won't return more than 250 per page.
+    const respAll = await shopifyAPIDirect(`/products.json?limit=250&fields=id,handle,title,variants&order=created_at%20desc`);
+    const all = (respAll && respAll.products) || [];
+    const matchAll = all.find(p => (p.handle || '').toLowerCase().startsWith(handlePrefix));
+    if (matchAll) {
+      logger.info('cart-wizard-fallback', `Recovered ${source}:${sourceId} via wide scan → shopify=${matchAll.id} handle=${matchAll.handle}`);
+      return matchAll;
+    }
+    logger.warn('cart-wizard-fallback', `No product found with handle prefix "${handlePrefix}" — fallback failed`);
+    return null;
+  } catch (e) {
+    logger.warn('cart-wizard-fallback', `Lookup failed for ${source}:${sourceId}: ${e.message}`);
+    return null;
+  }
+}
+
+/**
  * Run a wizard job to completion. Updates cartJobs status + persists mapping
  * to syncCache and DB on success. Always settles the job (ready or failed).
  *
@@ -1463,6 +1511,19 @@ async function _processWizardJob({ jobId, source, sourceId, productData, selecte
     logger.info('cart-wizard', `[${jobId}] start ${source}:${sourceId} smid=${smid || '-'}`);
 
     const wizardRes = await callBridgeWizard({ source, sourceId, sourceUrl, smid });
+
+    // ── FALLBACK 1: bridge couldn't extract shopifyProductId ──
+    // Common when modal selectors are out of date or AutoDS returned
+    // "already exists". Try Shopify Admin API by handle prefix.
+    if (wizardRes.ok && !wizardRes.shopifyProductId) {
+      logger.info('cart-wizard', `[${jobId}] bridge returned null shopifyProductId — attempting Shopify Admin fallback`);
+      const fallback = await _findShopifyProductByHandlePrefix(source, sourceId);
+      if (fallback && fallback.id) {
+        wizardRes.shopifyProductId = String(fallback.id);
+        wizardRes._fallbackUsed = 'handle-prefix-search';
+        logger.info('cart-wizard', `[${jobId}] fallback success — shopify=${wizardRes.shopifyProductId}`);
+      }
+    }
 
     if (wizardRes.ok && wizardRes.shopifyProductId) {
       logger.info('cart-wizard', `[${jobId}] wizard OK shopify=${wizardRes.shopifyProductId} importJob=${wizardRes.autodsImportJobId || '-'}`);

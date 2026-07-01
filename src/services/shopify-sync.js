@@ -211,6 +211,35 @@ async function findExistingProduct(source, sourceId) {
   return null;
 }
 
+// ---- STABLE HANDLE (SEO fix: same source product => same URL forever) ----
+function slugify(str) {
+  return String(str || '')
+    .toLowerCase()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'product';
+}
+// Deterministic + unique per source product. Including source+sourceId means a
+// re-created product reclaims its ORIGINAL url instead of getting a -2/-9 suffix.
+function buildStableHandle(title, source, sourceId) {
+  const base = slugify(title);
+  const suffix = `${String(source || '').toLowerCase()}-${String(sourceId || '')}`
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return suffix ? `${base}-${suffix}`.slice(0, 120).replace(/-+$/,'') : base;
+}
+// Best-effort: remove a leftover purge "tombstone" redirect so a recreated
+// product is reachable at its stable handle. Never throws.
+async function removeConflictingRedirect(handle) {
+  if (!handle) return;
+  try {
+    const found = await shopifyAPI(`/redirects.json?path=${encodeURIComponent('/products/' + handle)}`);
+    for (const r of (found.redirects || [])) {
+      try { await shopifyAPI(`/redirects/${r.id}.json`, 'DELETE'); } catch (e) {}
+    }
+  } catch (e) { /* non-blocking */ }
+}
+
 // ---- CREATE PRODUCT IN SHOPIFY ----
 async function createShopifyProduct(productData, pricingResult) {
   const {
@@ -279,6 +308,7 @@ async function createShopifyProduct(productData, pricingResult) {
   const payload = {
     product: {
       title: safeTitle,
+      handle: buildStableHandle(safeTitle, source, sourceId),
       body_html: formatDescription(description, bullets),
       vendor: brand || 'StyleHub',
       product_type: productData.category || 'General',
@@ -313,9 +343,24 @@ async function createShopifyProduct(productData, pricingResult) {
     }
   };
 
-  logger.info('sync', 'Creating Shopify product', { source, sourceId, title: title.substring(0, 50) });
-  const result = await shopifyAPI('/products.json', 'POST', payload);
+  logger.info('sync', 'Creating Shopify product', { source, sourceId, title: title.substring(0, 50), handle: payload.product.handle });
+  let result;
+  try {
+    result = await shopifyAPI('/products.json', 'POST', payload);
+  } catch (e) {
+    // If the explicit stable handle is already taken (e.g. archived twin),
+    // fall back to Shopify auto-handle so product creation never breaks.
+    if (/handle/i.test(e.message) || /\b422\b/.test(e.message)) {
+      logger.warn('sync', 'Stable handle rejected — retrying with auto-handle', { handle: payload.product.handle, error: e.message.slice(0, 120) });
+      delete payload.product.handle;
+      result = await shopifyAPI('/products.json', 'POST', payload);
+    } else {
+      throw e;
+    }
+  }
   const product = result.product;
+  // Clear any leftover purge redirect pointing at this handle (fire-and-forget)
+  if (product && product.handle) removeConflictingRedirect(product.handle).catch(() => {});
 
   if (!product || !product.id) {
     throw new Error('Product creation returned no product');

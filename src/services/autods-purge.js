@@ -152,6 +152,31 @@ async function deleteShopifyProduct(shopifyProductId) {
   return { ok: false, status: resp.status, error: txt.slice(0, 200) };
 }
 
+// ---- CREATE 301 REDIRECT FOR A PURGED PRODUCT (SEO fix) ----
+// When we delete a product, its /products/<handle> url would 404 and Google
+// would flag it. Instead we leave a 301 -> /collections/all so link equity and
+// crawl budget aren't wasted. Best-effort: never throws, 422 (exists) ignored.
+async function createRedirectForDeleted(handle) {
+  if (!handle) return;
+  try {
+    const url = `https://${SHOPIFY_DOMAIN()}/admin/api/${API_VERSION}/redirects.json`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': SHOPIFY_TOKEN()
+      },
+      body: JSON.stringify({ redirect: { path: `/products/${handle}`, target: '/collections/all' } })
+    });
+    if (!resp.ok && resp.status !== 422) {
+      const t = await resp.text();
+      logger.warn('autods-purge', `Redirect create failed for ${handle}: ${resp.status} ${t.slice(0, 120)}`);
+    }
+  } catch (e) {
+    logger.warn('autods-purge', `Redirect create exception for ${handle}: ${e.message}`);
+  }
+}
+
 // ---- DELETE LOCAL MAPPING + AUTODS RECORD ----
 function purgeLocalRecords(mappingId, source, sourceId, shopifyProductId) {
   const db = getDb();
@@ -238,6 +263,8 @@ async function runPurge(opts = {}) {
         try {
           const r = await deleteShopifyProduct(c.shopify_product_id);
           if (r.ok) {
+            // SEO: leave a 301 so the now-dead product url doesn't 404 in Google
+            if (!r.alreadyGone) { await createRedirectForDeleted(c.shopify_handle); }
             purgeLocalRecords(c.mapping_id, c.source_store, c.source_product_id, c.shopify_product_id);
             _runningJob.deleted++;
             _runningJob.items.push({
